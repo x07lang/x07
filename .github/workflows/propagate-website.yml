@@ -33,9 +33,13 @@ jobs:
     env:
       X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
       X07_BOT_SSH_SIGNING_KEY: ${{ secrets.X07_BOT_SSH_SIGNING_KEY }}
+      X07_BOT_COMMIT_NAME: ${{ secrets.X07_BOT_COMMIT_NAME }}
+      X07_BOT_COMMIT_EMAIL: ${{ secrets.X07_BOT_COMMIT_EMAIL }}
     steps:
       - name: Resolve tag and options
         id: vars
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -46,9 +50,9 @@ jobs:
               published_at_utc="$(jq -r '.inputs.published_at_utc // ""' "$GITHUB_EVENT_PATH")"
               ;;
             workflow_run)
-              tag="$(jq -r '.workflow_run.head_branch' "$GITHUB_EVENT_PATH")"
+              tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
               set_latest="true"
-              published_at_utc=""
+              published_at_utc="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.published_at // ""')"
               ;;
             release)
               tag="$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")"
@@ -100,7 +104,12 @@ jobs:
           set -euo pipefail
           tag="${{ steps.vars.outputs.tag }}"
           mkdir -p dist
-          gh release download "$tag" --pattern "channels.json" --dir dist
+          gh release download "$tag" --pattern "channels.json" --dir dist --clobber
+          mkdir -p dist/channels
+          gh release download "$tag" --pattern "stable.json" --dir dist/channels --clobber
+          for asset in beta.json nightly.json; do
+            gh release download "$tag" --pattern "$asset" --dir dist/channels --clobber || true
+          done
 
       - name: Checkout (x07-website)
         uses: actions/checkout@v4
@@ -124,6 +133,8 @@ jobs:
           python3 ../scripts/open_pr_website_update.py \
             --tag "$tag" \
             --bundle "../dist/x07-docs-${tag}.tar.gz" \
+            --channels-json "../dist/channels.json" \
+            --channels-dir "../dist/channels" \
             "${args[@]}"
 
       - name: Commit + push (x07-website main)
@@ -138,15 +149,17 @@ jobs:
           fi
 
           git status --porcelain
-          git config user.name "x07-bot"
-          git config user.email "x07-bot@users.noreply.github.com"
+          git config user.name "${X07_BOT_COMMIT_NAME:-x07-bot}"
+          git config user.email "${X07_BOT_COMMIT_EMAIL:-x07-bot@users.noreply.github.com}"
           if [ -n "${X07_BOT_SSH_SIGNING_KEY:-}" ]; then
             key_file="$HOME/.ssh/x07-bot-signing-key"
             mkdir -p "$(dirname "$key_file")"
-            printf '%s' "$X07_BOT_SSH_SIGNING_KEY" > "$key_file"
+            printf '%s' "$X07_BOT_SSH_SIGNING_KEY" | base64 --decode > "$key_file"
             chmod 600 "$key_file"
+            ssh-keygen -y -f "$key_file" > "${key_file}.pub"
+            chmod 644 "${key_file}.pub"
             git config gpg.format ssh
-            git config user.signingkey "$key_file"
+            git config user.signingkey "${key_file}.pub"
             git config commit.gpgsign true
           fi
           git add -A

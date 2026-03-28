@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["example.main"]},{"body":"x","ensures":[{"expr":["=","__result","x"],"id":"e0"}],"kind":"defn","name":"example.main","params":[{"name":"x","ty":"i32"}],"requires":[{"expr":["=","x","x"],"id":"r0"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"example","schema_version":"x07.x07ast@0.8.0"}

@@ -7,18 +7,23 @@ use anyhow::{Context, Result};
 use clap::Args;
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
+use x07_contracts::X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION;
 use x07_pkg::SparseIndexClient;
 use x07_runner_common::os_paths;
 use x07c::builtin_modules;
 use x07c::project;
 
+use crate::report_common;
 use crate::util;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) const DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
 const PKG_PROVIDES_REPORT_SCHEMA_VERSION: &str = "x07.pkg.provides.report@0.1.0";
+const X07_DEP_CLOSURE_ATTEST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-dep.closure.attest.schema.json");
 
 fn default_index_url() -> String {
     match std::env::var("X07_PKG_INDEX_URL") {
@@ -52,6 +57,8 @@ pub enum PkgCommand {
     Pack(PackArgs),
     /// Resolve project dependencies and write `x07.lock.json`.
     Lock(LockArgs),
+    /// Emit a dependency-closure attestation from `x07.json` + `x07.lock.json`.
+    AttestClosure(AttestClosureArgs),
     /// Find packages that provide a given module id.
     Provides(ProvidesArgs),
     /// Store a registry token for `pkg publish`.
@@ -116,6 +123,10 @@ pub struct VersionsArgs {
     #[arg(long, value_name = "URL")]
     pub index: Option<String>,
 
+    /// Force a fresh sparse-index fetch (cache-busting).
+    #[arg(long)]
+    pub refresh: bool,
+
     /// Package name.
     #[arg(value_name = "NAME")]
     pub name: String,
@@ -151,6 +162,33 @@ pub struct LockArgs {
     pub allow_yanked: bool,
 
     /// When using `--check`, allow dependencies with active advisories.
+    #[arg(long)]
+    pub allow_advisories: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct AttestClosureArgs {
+    /// Project manifest path (`x07.json`).
+    #[arg(long, value_name = "PATH", default_value = "x07.json")]
+    pub project: PathBuf,
+
+    /// Output path for the dependency-closure attestation.
+    #[arg(long, value_name = "PATH")]
+    pub out: PathBuf,
+
+    /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
+    #[arg(long, value_name = "URL")]
+    pub index: Option<String>,
+
+    /// Disallow network access and reuse existing lockfile metadata.
+    #[arg(long)]
+    pub offline: bool,
+
+    /// Allow yanked dependencies while still recording them in the attestation.
+    #[arg(long)]
+    pub allow_yanked: bool,
+
+    /// Allow active advisories while still recording them in the attestation.
     #[arg(long)]
     pub allow_advisories: bool,
 }
@@ -225,6 +263,46 @@ struct LockResult {
 }
 
 #[derive(Debug, Serialize)]
+struct DepClosureAttestation {
+    schema_version: &'static str,
+    project_path: String,
+    manifest_digest: String,
+    lockfile_digest: String,
+    package_set_digest: String,
+    dependencies: Vec<DepClosureDependency>,
+    advisory_check: DepClosureAdvisoryCheck,
+}
+
+#[derive(Debug, Serialize)]
+struct DepClosureDependency {
+    name: String,
+    version: String,
+    path: String,
+    package_manifest_digest: String,
+    module_root: String,
+    module_root_digest: String,
+    modules: Vec<DepClosureModuleDigest>,
+    yanked: bool,
+    advisories: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DepClosureModuleDigest {
+    module_id: String,
+    digest: String,
+}
+
+#[derive(Debug, Serialize)]
+struct DepClosureAdvisoryCheck {
+    mode: &'static str,
+    ok: bool,
+    allow_yanked: bool,
+    allow_advisories: bool,
+    yanked: Vec<String>,
+    advisories: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
 struct LoginResult {
     index: String,
     credentials_path: String,
@@ -274,6 +352,7 @@ pub fn cmd_pkg(
         PkgCommand::Versions(args) => cmd_pkg_versions(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(machine, args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
+        PkgCommand::AttestClosure(args) => cmd_pkg_attest_closure(args),
         PkgCommand::Provides(args) => cmd_pkg_provides(args),
         PkgCommand::Login(args) => cmd_pkg_login(args),
         PkgCommand::Publish(args) => cmd_pkg_publish(args),
@@ -1048,7 +1127,11 @@ fn pkg_versions_report(
         }
     };
 
-    let entries = match client.fetch_entries(&name) {
+    let entries = match if args.refresh {
+        client.fetch_entries_refresh(&name)
+    } else {
+        client.fetch_entries(&name)
+    } {
         Ok(entries) => entries,
         Err(err) => {
             let report = PkgReport::<VersionsResult> {
@@ -1158,6 +1241,57 @@ pub(crate) fn pkg_add_sync_quiet(
         .as_ref()
         .map(|e| e.message.clone())
         .unwrap_or_else(|| "pkg.add failed".to_string());
+    anyhow::bail!("{msg}");
+}
+
+pub(crate) fn ensure_project_deps_hydrated_quiet(project: PathBuf) -> Result<bool> {
+    let check_args = LockArgs {
+        project: project.clone(),
+        index: None,
+        check: true,
+        offline: true,
+        allow_yanked: false,
+        allow_advisories: false,
+    };
+    let (_code, check_report) = match pkg_lock_report(&check_args) {
+        Ok(result) => result,
+        Err(_) => return Ok(false),
+    };
+    if check_report.ok {
+        return Ok(false);
+    }
+    let should_sync = check_report
+        .error
+        .as_ref()
+        .map(|e| e.code.as_str())
+        .is_some_and(|code| {
+            matches!(
+                code,
+                "X07PKG_OFFLINE_MISSING_DEP" | "X07PKG_LOCK_MISSING" | "X07PKG_TRANSITIVE_MISSING"
+            )
+        });
+    if !should_sync {
+        return Ok(false);
+    }
+
+    let sync_args = LockArgs {
+        project,
+        index: None,
+        check: false,
+        offline: false,
+        allow_yanked: false,
+        allow_advisories: false,
+    };
+    let (_code, sync_report) = pkg_lock_report(&sync_args)?;
+    if sync_report.ok {
+        return Ok(true);
+    }
+
+    let msg = sync_report
+        .error
+        .as_ref()
+        .map(|e| e.message.clone())
+        .unwrap_or_else(|| "pkg.lock failed".to_string());
     anyhow::bail!("{msg}");
 }
 
@@ -1483,6 +1617,196 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
     Ok(code)
 }
 
+fn cmd_pkg_attest_closure(args: AttestClosureArgs) -> Result<std::process::ExitCode> {
+    let (attestation, ok) = build_dep_closure_attestation(&args)?;
+    let value = serde_json::to_value(&attestation).context("serialize dependency closure")?;
+    let schema_diags = report_common::validate_schema(
+        X07_DEP_CLOSURE_ATTEST_SCHEMA_BYTES,
+        "spec/x07-dep.closure.attest.schema.json",
+        &value,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "internal error: dependency closure attestation is not schema-valid: {}",
+            schema_diags[0].message
+        );
+    }
+    write_canonical_json_file(&args.out, &value)
+        .with_context(|| format!("write: {}", args.out.display()))?;
+    println!("{}", serde_json::to_string_pretty(&value)?);
+    Ok(if ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(20)
+    })
+}
+
+fn build_dep_closure_attestation(
+    args: &AttestClosureArgs,
+) -> Result<(DepClosureAttestation, bool)> {
+    let project_path = util::resolve_existing_path_upwards(&args.project);
+    let project_bytes = std::fs::read(&project_path)
+        .with_context(|| format!("read: {}", project_path.display()))?;
+    let manifest =
+        project::load_project_manifest(&project_path).context("load project manifest")?;
+    let lock_path = project::default_lockfile_path(&project_path, &manifest);
+    let lock_bytes = std::fs::read(&lock_path).with_context(|| {
+        format!(
+            "X07DEP_LOCK_CHECK_FAILED: read lockfile: {}",
+            lock_path.display()
+        )
+    })?;
+    let existing_lock: project::Lockfile =
+        serde_json::from_slice(&lock_bytes).with_context(|| {
+            format!(
+                "X07DEP_LOCK_CHECK_FAILED: parse lockfile JSON: {}",
+                lock_path.display()
+            )
+        })?;
+    project::verify_lockfile(&project_path, &manifest, &existing_lock).with_context(|| {
+        format!(
+            "X07DEP_LOCK_CHECK_FAILED: verify lockfile against {}",
+            project_path.display()
+        )
+    })?;
+
+    let index = args.index.clone().unwrap_or_else(default_index_url);
+    let lock_args = LockArgs {
+        project: project_path.clone(),
+        index: args.index.clone(),
+        check: false,
+        offline: args.offline,
+        allow_yanked: args.allow_yanked,
+        allow_advisories: args.allow_advisories,
+    };
+    let mut refreshed_lock = project::compute_lockfile(&project_path, &manifest)?;
+    let mut client: Option<SparseIndexClient> = None;
+    let mut index_used = None;
+    if let Some(err) = apply_lock_overrides_and_metadata(
+        &manifest,
+        &index,
+        &lock_args,
+        &mut client,
+        &mut index_used,
+        Some(&existing_lock),
+        &mut refreshed_lock,
+    )? {
+        anyhow::bail!("X07DEP_LOCK_CHECK_FAILED: {}", err.message);
+    }
+
+    let base = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut dependencies = Vec::with_capacity(refreshed_lock.dependencies.len());
+    let mut yanked = Vec::new();
+    let mut advisories = Vec::new();
+
+    for dep in &refreshed_lock.dependencies {
+        project::resolve_rel_path_with_workspace(base, &dep.path)?;
+        let mut modules = dep
+            .modules_sha256
+            .iter()
+            .map(|(module_id, digest)| DepClosureModuleDigest {
+                module_id: module_id.clone(),
+                digest: prefix_sha256_hex(digest),
+            })
+            .collect::<Vec<_>>();
+        modules.sort_by(|a, b| a.module_id.cmp(&b.module_id));
+
+        let advisory_ids = dep
+            .advisories
+            .iter()
+            .map(|advisory| advisory.id.clone())
+            .collect::<Vec<_>>();
+        if dep.yanked.unwrap_or(false) {
+            yanked.push(format!("{}@{}", dep.name, dep.version));
+        }
+        if !dep.advisories.is_empty() {
+            let rendered = dep
+                .advisories
+                .iter()
+                .map(|advisory| format!("{} ({})", advisory.id, advisory.summary))
+                .collect::<Vec<_>>()
+                .join(", ");
+            advisories.push(format!("{}@{}: {}", dep.name, dep.version, rendered));
+        }
+
+        dependencies.push(DepClosureDependency {
+            name: dep.name.clone(),
+            version: dep.version.clone(),
+            path: dep.path.clone(),
+            package_manifest_digest: prefix_sha256_hex(&dep.package_manifest_sha256),
+            module_root: dep.module_root.clone(),
+            module_root_digest: module_root_digest(dep),
+            modules,
+            yanked: dep.yanked.unwrap_or(false),
+            advisories: advisory_ids,
+        });
+    }
+
+    dependencies.sort_by(|a, b| {
+        (
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+            a.module_root.as_str(),
+        )
+            .cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+                b.module_root.as_str(),
+            ))
+    });
+    yanked.sort();
+    advisories.sort();
+
+    let package_set_digest = {
+        let bytes = serde_json::to_vec(&dependencies).context("serialize package set")?;
+        sha256_prefixed(&bytes)
+    };
+    let advisory_check = DepClosureAdvisoryCheck {
+        mode: if args.offline { "offline" } else { "online" },
+        ok: (args.allow_yanked || yanked.is_empty())
+            && (args.allow_advisories || advisories.is_empty()),
+        allow_yanked: args.allow_yanked,
+        allow_advisories: args.allow_advisories,
+        yanked,
+        advisories,
+    };
+    let attestation = DepClosureAttestation {
+        schema_version: X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION,
+        project_path: project_path.display().to_string(),
+        manifest_digest: sha256_prefixed(&project_bytes),
+        lockfile_digest: sha256_prefixed(&lock_bytes),
+        package_set_digest,
+        dependencies,
+        advisory_check,
+    };
+
+    let ok = attestation.advisory_check.ok;
+    Ok((attestation, ok))
+}
+
+fn prefix_sha256_hex(hex: &str) -> String {
+    format!("sha256:{hex}")
+}
+
+fn sha256_prefixed(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("sha256:{:x}", hasher.finalize())
+}
+
+fn module_root_digest(dep: &project::LockedDependency) -> String {
+    let mut hasher = Sha256::new();
+    for (module_id, digest) in &dep.modules_sha256 {
+        hasher.update(module_id.as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.as_bytes());
+        hasher.update([b'\n']);
+    }
+    format!("sha256:{:x}", hasher.finalize())
+}
+
 fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport<LockResult>)> {
     let project_path = util::resolve_existing_path_upwards(&args.project);
     let project_bytes = std::fs::read(&project_path)
@@ -1543,6 +1867,8 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         schema_bumped = true;
     }
 
+    let mut normalized_specs = normalize_project_doc_deps(&mut doc)?;
+
     let manifest = {
         let bytes = serde_json::to_vec(&doc)?;
         project::parse_project_manifest_bytes(&bytes, &project_path)
@@ -1566,7 +1892,11 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         }
     }
 
-    let mut updated_specs = apply_patch_overrides_to_project_doc_deps(&mut doc, &manifest.patch)?;
+    let mut updated_specs = std::mem::take(&mut normalized_specs);
+    updated_specs.extend(apply_patch_overrides_to_project_doc_deps(
+        &mut doc,
+        &manifest.patch,
+    )?);
 
     let mut fetched = Vec::new();
     let mut index_used: Option<String> = None;
@@ -2137,6 +2467,59 @@ fn apply_patch_overrides_to_project_doc_deps(
     Ok(updated)
 }
 
+fn normalize_project_doc_deps(doc: &mut Value) -> Result<Vec<String>> {
+    let obj = doc
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+    let Some(deps_val) = obj.get_mut("dependencies") else {
+        return Ok(Vec::new());
+    };
+    let Some(deps) = deps_val.as_array_mut() else {
+        anyhow::bail!("project.dependencies must be an array");
+    };
+
+    let mut normalized: Vec<String> = Vec::new();
+    for dep in deps.iter_mut() {
+        let Some(dep_obj) = dep.as_object_mut() else {
+            continue;
+        };
+        let name = dep_obj
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let version = dep_obj
+            .get("version")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if name.is_empty() || version.is_empty() {
+            continue;
+        }
+        let path = dep_obj
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if !path.is_empty() {
+            continue;
+        }
+        dep_obj.insert(
+            "path".to_string(),
+            Value::String(format!(".x07/deps/{name}/{version}")),
+        );
+        normalized.push(format!("{name}@{version}"));
+    }
+
+    if !normalized.is_empty() {
+        sort_project_deps(deps);
+    }
+
+    Ok(normalized)
+}
+
 fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {
     if a.schema_version.trim() != b.schema_version.trim() {
         return false;
@@ -2155,6 +2538,12 @@ fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {
             return false;
         }
         if da.modules_sha256 != db.modules_sha256 {
+            return false;
+        }
+        if da.overridden_by != db.overridden_by {
+            return false;
+        }
+        if da.yanked != db.yanked {
             return false;
         }
     }
@@ -2185,7 +2574,9 @@ fn preserve_lock_metadata(existing: &project::Lockfile, lock: &mut project::Lock
             dep.path.clone(),
             dep.package_manifest_sha256.clone(),
         )) {
-            dep.yanked = *yanked;
+            if yanked.is_some() {
+                dep.yanked = *yanked;
+            }
             dep.advisories = advisories.clone();
         }
     }
@@ -2230,7 +2621,7 @@ fn apply_lock_overrides_and_metadata(
     let needs_index = lock
         .dependencies
         .iter()
-        .any(|d| d.path.starts_with(".x07/deps/"));
+        .any(|d| project::is_vendored_dep_path(&d.path));
     if !needs_index {
         return Ok(None);
     }
@@ -2243,7 +2634,7 @@ fn apply_lock_overrides_and_metadata(
         std::collections::HashMap::new();
 
     for dep in &mut lock.dependencies {
-        if !dep.path.starts_with(".x07/deps/") {
+        if !project::is_vendored_dep_path(&dep.path) {
             continue;
         }
 
@@ -2360,6 +2751,169 @@ fn deps_from_project_doc(doc: &Value, project_path: &Path) -> Result<Vec<project
         });
     }
     Ok(out)
+}
+
+#[cfg(test)]
+#[allow(clippy::items_after_test_module)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(prefix: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix time")
+            .as_nanos();
+        let dir =
+            std::env::temp_dir().join(format!("x07_pkg_{prefix}_{}_{}", std::process::id(), stamp));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn write_fixture_project(root: &Path) -> (PathBuf, PathBuf) {
+        let dep_dir = root.join("deps/dep_local");
+        std::fs::create_dir_all(dep_dir.join("src/dep")).expect("create dep module dir");
+        std::fs::write(
+            dep_dir.join("x07-package.json"),
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": "x07.package@0.1.0",
+                "name": "dep-local",
+                "version": "1.2.3",
+                "module_root": "src",
+                "modules": ["dep.lib"]
+            }))
+            .expect("serialize package manifest"),
+        )
+        .expect("write package manifest");
+        std::fs::write(
+            dep_dir.join("src/dep/lib.x07.json"),
+            br#"{"schema_version":"x07.x07ast@0.8.0","decls":[]}"#,
+        )
+        .expect("write module");
+
+        let project_path = root.join("x07.json");
+        std::fs::write(
+            &project_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": "x07.project@0.3.0",
+                "world": "solve-pure",
+                "entry": "src/main.x07.json",
+                "module_roots": ["src"],
+                "dependencies": [
+                    {
+                        "name": "dep-local",
+                        "version": "1.2.3",
+                        "path": "deps/dep_local"
+                    }
+                ]
+            }))
+            .expect("serialize project"),
+        )
+        .expect("write project");
+        std::fs::create_dir_all(root.join("src")).expect("create src dir");
+        std::fs::write(
+            root.join("src/main.x07.json"),
+            br#"{"schema_version":"x07.x07ast@0.8.0","decls":[]}"#,
+        )
+        .expect("write entry");
+
+        let manifest = project::load_project_manifest(&project_path).expect("load project");
+        let lock = project::compute_lockfile(&project_path, &manifest).expect("compute lock");
+        let lock_path = project::default_lockfile_path(&project_path, &manifest);
+        std::fs::write(
+            &lock_path,
+            serde_json::to_vec_pretty(&lock).expect("serialize lock"),
+        )
+        .expect("write lock");
+        (project_path, lock_path)
+    }
+
+    #[test]
+    fn build_dep_closure_attestation_offline_records_dependency_inventory() {
+        let dir = temp_dir("attest_closure_ok");
+        let (project_path, _lock_path) = write_fixture_project(&dir);
+
+        let args = AttestClosureArgs {
+            project: project_path.clone(),
+            out: dir.join("target/dep.closure.attest.json"),
+            index: None,
+            offline: true,
+            allow_yanked: false,
+            allow_advisories: false,
+        };
+        let (attestation, ok) =
+            build_dep_closure_attestation(&args).expect("build dependency closure attestation");
+
+        assert!(ok);
+        assert_eq!(
+            attestation.schema_version,
+            X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION
+        );
+        assert_eq!(attestation.dependencies.len(), 1);
+        assert_eq!(attestation.dependencies[0].name, "dep-local");
+        assert!(attestation.package_set_digest.starts_with("sha256:"));
+        assert!(attestation.advisory_check.ok);
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn build_dep_closure_attestation_preserves_offline_lock_metadata() {
+        let dir = temp_dir("attest_closure_metadata");
+        let (project_path, lock_path) = write_fixture_project(&dir);
+
+        let mut lock_doc: Value =
+            serde_json::from_slice(&std::fs::read(&lock_path).expect("read lock for mutation"))
+                .expect("parse lock doc");
+        let dep = lock_doc
+            .pointer_mut("/dependencies/0")
+            .expect("dependency entry");
+        dep.as_object_mut()
+            .expect("dep object")
+            .insert("yanked".to_string(), Value::Bool(true));
+        dep.as_object_mut().expect("dep object").insert(
+            "advisories".to_string(),
+            serde_json::json!([{
+                "schema_version": "x07.pkg.advisory@0.1.0",
+                "id": "X07-2026-0001",
+                "package": "dep-local",
+                "version": "1.2.3",
+                "kind": "security",
+                "severity": "high",
+                "summary": "fixture advisory",
+                "created_at_utc": "2026-03-15T00:00:00Z"
+            }]),
+        );
+        std::fs::write(
+            &lock_path,
+            serde_json::to_vec_pretty(&lock_doc).expect("serialize mutated lock"),
+        )
+        .expect("write mutated lock");
+
+        let args = AttestClosureArgs {
+            project: project_path,
+            out: dir.join("target/dep.closure.attest.json"),
+            index: None,
+            offline: true,
+            allow_yanked: false,
+            allow_advisories: false,
+        };
+        let (attestation, ok) =
+            build_dep_closure_attestation(&args).expect("build dependency closure attestation");
+
+        assert!(!ok);
+        assert_eq!(
+            attestation.advisory_check.yanked,
+            vec!["dep-local@1.2.3".to_string()]
+        );
+        assert_eq!(attestation.advisory_check.advisories.len(), 1);
+        assert_eq!(
+            attestation.dependencies[0].advisories,
+            vec!["X07-2026-0001".to_string()]
+        );
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
 }
 
 fn requires_packages_from_manifest(dep_dir: &Path) -> Result<Vec<String>> {
@@ -2508,14 +3062,15 @@ fn ensure_deps_present(
     for dep in deps {
         let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
         if !dep_dir.join("x07-package.json").is_file() {
-            if ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some()) {
+            let patched_by_path = ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some());
+            if patched_by_path && !project::is_vendored_dep_path(&dep.path) {
                 missing_local_override.push(format!(
                     "{}@{} ({})",
                     dep.name,
                     dep.version,
                     dep_dir.display()
                 ));
-            } else if !dep.path.starts_with(".x07/deps/") {
+            } else if !project::is_vendored_dep_path(&dep.path) {
                 missing_local.push(format!(
                     "{}@{} ({})",
                     dep.name,
@@ -2877,7 +3432,7 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
                                 detail_url.as_str()
                             );
                             eprintln!(
-                                "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                                "warning: sparse index reads (x07 pkg versions) may be cached; try `x07 pkg versions --refresh {name}` or retry API verification via GET /v1/packages/<name>."
                             );
                         }
                     }
@@ -2887,7 +3442,7 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
                             detail_url.as_str()
                         );
                         eprintln!(
-                            "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                            "warning: sparse index reads (x07 pkg versions) may be cached; try `x07 pkg versions --refresh {name}` or retry API verification via GET /v1/packages/<name>."
                         );
                     }
                 },
@@ -2897,7 +3452,7 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
                         detail_url.as_str()
                     );
                     eprintln!(
-                        "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                        "warning: sparse index reads (x07 pkg versions) may be cached; try `x07 pkg versions --refresh {name}` or retry API verification via GET /v1/packages/<name>."
                     );
                 }
             }

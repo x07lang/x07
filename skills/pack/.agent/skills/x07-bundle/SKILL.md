@@ -18,6 +18,8 @@ Use `x07 bundle` to produce a native executable that can be run directly on the 
 - Bundle an OS-world CLI executable:
   - `x07 bundle --project x07.json --profile os --out dist/app`
   - run it: `./dist/app --help`
+  - if bundling fails with `fuel exhausted`, override:
+    - `x07 bundle --project x07.json --profile os --solve-fuel 500000000 --out dist/app`
 
 - Bundle a policy-enforced OS-world executable:
   - `x07 bundle --project x07.json --profile sandbox --out dist/app`
@@ -42,5 +44,5 @@ The bundled executable:
 
 `x07 bundle` prints a machine JSON report to stdout:
 
-- `schema_version: "x07.bundle.report@0.1.0"`
+- `schema_version: "x07.bundle.report@0.2.0"`
 - `report` contains the underlying runner report used to compile the native artifact

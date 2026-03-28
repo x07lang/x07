@@ -27,7 +27,6 @@
       "ext-json-rs@0.1.4",
       "ext-unicode-rs@0.1.5"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.coverage.schema.json",
+  "title": "x07.verify.coverage@0.4.0",
+  "description": "Reachable support and coverage report emitted by `x07 verify --coverage`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entry", "worlds", "summary", "functions"],
+  "properties": {
+    "schema_version": { "const": "x07.verify.coverage@0.4.0" },
+    "entry": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "worlds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "solve-pure",
+          "solve-fs",
+          "solve-rr",
+          "solve-kv",
+          "solve-full",
+          "run-os",
+          "run-os-sandboxed"
+        ]
+      },
+      "default": []
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reachable_defn",
+        "supported_defn",
+        "reachable_async",
+        "supported_async",
+        "imported_proof_summary_defn",
+        "termination_proven_defn",
+        "trusted_primitives",
+        "trusted_scheduler_models",
+        "capsule_boundaries",
+        "uncovered_defn",
+        "unsupported_defn"
+      ],
+      "properties": {
+        "reachable_defn": { "type": "integer", "minimum": 0 },
+        "supported_defn": { "type": "integer", "minimum": 0 },
+        "recursive_defn": { "type": "integer", "minimum": 0 },
+        "supported_recursive_defn": { "type": "integer", "minimum": 0 },
+        "imported_proof_summary_defn": { "type": "integer", "minimum": 0 },
+        "termination_proven_defn": { "type": "integer", "minimum": 0 },
+        "unsupported_recursive_defn": { "type": "integer", "minimum": 0 },
+        "reachable_async": { "type": "integer", "minimum": 0 },
+        "supported_async": { "type": "integer", "minimum": 0 },
+        "trusted_primitives": { "type": "integer", "minimum": 0 },
+        "trusted_scheduler_models": { "type": "integer", "minimum": 0 },
+        "capsule_boundaries": { "type": "integer", "minimum": 0 },
+        "uncovered_defn": { "type": "integer", "minimum": 0 },
+        "unsupported_defn": { "type": "integer", "minimum": 0 },
+        "async_model": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 256 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol", "kind", "status"],
+        "properties": {
+          "symbol": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "kind": {
+            "type": "string",
+            "enum": ["defn", "defasync", "extern", "builtin", "imported"]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "supported_recursive",
+              "supported_async",
+              "imported_proof_summary",
+              "termination_proven",
+              "trusted_primitive",
+              "trusted_scheduler_model",
+              "capsule_boundary",
+              "unsupported",
+              "uncovered"
+            ]
+          },
+          "signature": { "$ref": "#/$defs/function_signature" },
+          "support_summary": { "$ref": "#/$defs/function_support_summary" },
+          "decl_sha256_hex": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "source_path": {
+            "type": ["string", "null"],
+            "maxLength": 4096
+          },
+          "details": { "type": ["string", "null"], "maxLength": 65536 }
+        }
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "function_signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["params", "result"],
+      "properties": {
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/signature_param" },
+          "default": []
+        },
+        "result": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "result_brand": {
+          "type": ["string", "null"],
+          "maxLength": 256
+        }
+      }
+    },
+    "signature_param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ty"],
+      "properties": {
+        "ty": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "brand": {
+          "type": ["string", "null"],
+          "maxLength": 256
+        }
+      }
+    },
+    "function_support_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recursion_kind",
+        "has_decreases",
+        "decreases_count",
+        "prove_supported"
+      ],
+      "properties": {
+        "recursion_kind": {
+          "type": "string",
+          "enum": ["none", "self_recursive", "mutual"]
+        },
+        "has_decreases": { "type": "boolean" },
+        "decreases_count": { "type": "integer", "minimum": 0 },
+        "prove_supported": { "type": "boolean" }
+      }
+    }
+  }
+}

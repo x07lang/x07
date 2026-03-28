@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-capsule.attest.schema.json",
+  "title": "x07.capsule.attest@0.2.0",
+  "description": "Digest-bound attestation for a certified capsule.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capsule_id",
+    "contract_digest",
+    "module_digests",
+    "lockfile_digest",
+    "conformance_report_digest",
+    "peer_policy_digests",
+    "request_contract_digest",
+    "response_contract_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.capsule.attest@0.2.0" },
+    "capsule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "contract_digest": { "$ref": "#/$defs/sha256_digest" },
+    "module_digests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module_digest" },
+      "default": []
+    },
+    "lockfile_digest": { "$ref": "#/$defs/sha256_digest" },
+    "conformance_report_digest": { "$ref": "#/$defs/sha256_digest" },
+    "peer_policy_digests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module_digest" },
+      "default": []
+    },
+    "request_contract_digest": {
+      "anyOf": [
+        { "$ref": "#/$defs/sha256_digest" },
+        { "type": "null" }
+      ]
+    },
+    "response_contract_digest": {
+      "anyOf": [
+        { "$ref": "#/$defs/sha256_digest" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "module_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "digest": { "$ref": "#/$defs/sha256_digest" }
+      }
+    }
+  }
+}

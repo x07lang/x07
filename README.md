@@ -16,11 +16,17 @@ X07 is a programming language built from the ground up for **100% agentic coding
 
 ## Why X07?
 
+X07 is the core repo and entrypoint for the whole ecosystem. It is the place to start if you want to understand the language, install the toolchain, or build agent-friendly software that can move from local development to browser, device, MCP, package registry, and lifecycle platform workflows without switching languages.
+
 Autonomous agents struggle with mainstream languages because of **multiple equivalent patterns**, **ambiguous diagnostics**, **nondeterministic test environments**, and **text-based patching on fragile syntax**. X07 makes these constraints first-class concerns:
 
 ### Machine-First Source Format
 
 The canonical source is **x07AST JSON** (`*.x07.json`), not text files. Patches are structural ([RFC 6902 JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)), so agents apply changes mechanically—no parsing ambiguity, no whitespace surprises.
+
+### Memory-Safe Defaults
+
+Normal X07 programs work with checked values, bytes, views, and structured data rather than raw pointer arithmetic. Unsafe pointer surfaces are explicit, limited, and outside the standard agent workflow, which keeps day-to-day code generation safer and easier to review.
 
 ### Deterministic Execution
 
@@ -38,11 +44,154 @@ Errors are **structured identifiers with actionable fixes** designed for LLM con
 
 Side effects are opt-in. Programs run in deterministic solve worlds or OS worlds, and sandboxing is explicit and policy-driven.
 
+### Structured Concurrency
+
+X07 gives agents one clear concurrency model: structured task scopes, explicit budgets, and deterministic fixture-world execution. That keeps async code fast enough for real workloads while staying reviewable and testable.
+
 ### High Performance
 
 X07 compiles to optimized native code with competitive runtime performance. In the direct-binary benchmarks published in `x07lang/x07-perf-compare` (v0.0.3 snapshot), X07 matched or exceeded C/Rust execution times on the included workloads while compiling ~3x faster than C and ~6-7x faster than Rust. Binary sizes in that snapshot were comparable to C (~34 KiB).
 
 See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) for detailed benchmarks.
+
+## Why End Users Care
+
+- **Reliable memory model**: the default language surface avoids the raw-memory pitfalls that make systems code hard to trust.
+- **Speed**: X07 targets native execution and competitive runtime performance.
+- **Concurrency**: structured concurrency gives you parallel work without orphan-task chaos.
+- **Predictable deployment story**: the same ecosystem covers local CLIs, MCP servers, web UI, device apps, WASM backends, package publishing, and lifecycle operations.
+- **Simple mental model**: fewer equivalent ways to do the same thing means fewer hidden surprises in code reviews and maintenance.
+
+## Why Coding Agents Work Reliably With X07
+
+- **Canonical source and patching**: x07AST JSON plus JSON Patch avoids fragile text diffs.
+- **Stable diagnostics**: agents can key off structured codes and quickfixes instead of guessing from prose.
+- **Deterministic worlds and replay**: repair loops can stay reproducible until you explicitly opt into OS effects.
+- **Capability boundaries**: tools, runners, and hosts all use explicit contracts for what code is allowed to do.
+- **Single official path per capability**: fewer choices means less hallucinated glue code.
+
+## Formal verification & certification
+
+X07 exposes formal verification as a public toolchain surface, not an internal experiment.
+
+If you are new to formal verification, read the flow like this:
+
+1. `x07 verify --coverage` tells you what is reachable and whether x07 has support posture for that reachable graph. Coverage is planning/review data, not proof.
+2. `x07 verify --prove` generates proof evidence for the reachable symbols that are in the certifiable subset.
+3. `x07 verify --prove --emit-proof <path>` adds a proof object plus a proof-check report.
+4. `x07 prove check` replays that proof object against the current source, manifest, imported proof summaries, primitive manifest, async scheduler model, regenerated SMT obligation, and solver result.
+5. `x07 trust certify` takes proof evidence, tests, boundary evidence, capsule attestations, dependency-closure attestations, and runtime evidence and binds them into `certificate.json` plus `summary.html`.
+
+### What counts as proof
+
+- Coverage/support summaries (`x07.verify.summary@0.2.0`, `summary_kind = "coverage_support"`) are posture artifacts only. They are rejected anywhere proof evidence is required.
+- Proof summaries (`x07.verify.proof_summary@0.2.0`) are reusable proof evidence. Downstream prove runs can import them with `x07 verify --proof-summary <path>` or the deprecated `--summary <path>` alias.
+- Proof objects plus accepted proof-check reports are the strongest machine-checkable line. Strong trust profiles require them.
+
+### What strong certification means
+
+- The claim is about the operational entry named by `project.operational_entry_symbol`, not a proof-only helper.
+- Every symbol the active profile expects to be proved must have prove evidence and an accepted proof-check report.
+- Developer-only imported stubs, coverage-only imports, and bounded recursion are rejected fail-closed in strong profiles.
+- The certificate records the proof inventory, proof assumptions, proof-check results, and explicit formal-verification scope fields so reviewers can see what was formally proved and what still depends on capsules or runtime evidence.
+
+### Current certifiable subset
+
+- Pure self-recursive `defn` targets are certifiable when they declare `decreases[]`. Proof artifacts expose recursion boundedness explicitly instead of hiding it behind a pass/fail bit.
+- Direct prove inputs currently accept unbranded `bytes`, `bytes_view`, and `vec_u8`; first-order `option_*` and `result_*`; and schema-derived `bytes_view@brand` documents when the reachable graph exposes `meta.brands_v1.validate`.
+- That means proved cores can accept branded record/tagged-union views directly while keeping validation explicit in the generated driver.
+- Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
+- The networked sandbox profile is `trusted_program_sandboxed_net_v1`. It requires attested network capsules, pinned peer-policy files, a non-empty runtime allowlist, dependency-closure attestation, and VM-boundary network enforcement in the runtime attestation.
+
+### Solver versions
+
+- Linux prove/certify lanes are validated with official `cbmc 6.8.0` and `z3 4.16.0`.
+- Ubuntu 24.04 `universe` packages (`cbmc 5.95.1`, `z3 4.8.12`) are too old for the async proof/certification line.
+- Use `scripts/ci/install_formal_verification_tools_linux.sh` or the checked-in example workflows instead of distro solver packages.
+
+```mermaid
+flowchart LR
+    A[x07AST + arch + policies] --> B[x07 verify]
+    A --> C[x07 trust capsule]
+    A --> D[x07 test / x07 run]
+    A --> E[x07 trust report]
+    B --> F[x07 trust certify]
+    C --> F
+    D --> F
+    E --> F
+    F --> G[certificate.json + summary.html]
+```
+
+The public overview, design decisions, and starter paths live in
+[`docs/toolchain/formal-verification.md`](docs/toolchain/formal-verification.md).
+Use the matching template for the trust claim you want:
+
+- `x07 init --template verified-core-pure`
+- `x07 init --template trusted-sandbox-program`
+- `x07 init --template trusted-network-service`
+- `x07 init --template certified-capsule`
+- `x07 init --template certified-network-capsule`
+
+For service-oriented backend work, use the built-in service scaffolds:
+
+- `x07 init --template api-cell`
+- `x07 init --template event-consumer`
+- `x07 init --template scheduled-job`
+- `x07 init --template policy-service`
+- `ext-obj-core@0.1.1` and `ext-obj-s3@0.1.1` are the canonical first object-store wedge for service projects; use `std.obj.*` or `std.obj.s3.*` together with `std.obj.spec.*` response helpers on `run-os` or `run-os-sandboxed`
+- `x07 init --template workflow-service`
+
+Service authoring and constrained generation are exposed through:
+
+- `x07 service archetypes`
+- `x07 service genpack schema --archetype <id>`
+- `x07 service genpack grammar --archetype <id>`
+- `x07 service validate --manifest arch/service/index.x07service.json`
+
+Service manifests now carry runtime hints for:
+
+- probe definitions for API, worker, and policy cells
+- bus or consumer metadata for `event-consumer`
+- cron and retry metadata for `scheduled-job`
+- rollout and autoscaling hints for the first supported runtime wedge
+
+Canonical service deployment guidance lives in:
+
+- [`docs/guides/provider-agnostic-services.md`](docs/guides/provider-agnostic-services.md)
+- [`docs/guides/service-binding-migration.md`](docs/guides/service-binding-migration.md)
+- [`docs/guides/scaling-retry-idempotency.md`](docs/guides/scaling-retry-idempotency.md)
+
+Canonical certificate-first examples live in:
+
+- `docs/examples/verified_core_pure_v1/`
+- `docs/examples/trusted_sandbox_program_v1/`
+- `docs/examples/trusted_network_service_v1/`
+- `docs/examples/certified_capsule_v1/`
+- `docs/examples/certified_network_capsule_v1/`
+
+Additional first-party dogfood examples live in `x07-mcp`:
+
+- `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/` is the package-backed operational-entry example for the sandboxed local trust profile.
+- `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` is a developer/demo example only because its bearer-parser dependency currently relies on a developer-only imported stub path.
+
+## Ecosystem Overview
+
+X07 is not just a compiler. The public ecosystem is organized into focused repos with one consistent story:
+
+- [`x07lang/x07`](https://github.com/x07lang/x07): the core language, compiler, CLI, stdlib sources, schemas, and canonical docs.
+- [`x07lang/x07-mcp`](https://github.com/x07lang/x07-mcp): the MCP kit and the official `io.x07/x07lang-mcp` server for coding and operating X07 systems from agent runtimes.
+- [`x07lang/x07-wasm-backend`](https://github.com/x07lang/x07-wasm-backend): the WASM toolchain for pure modules, full-stack app bundles, browser UI, and device packaging.
+- [`x07lang/x07-web-ui`](https://github.com/x07lang/x07-web-ui): the official reducer-style web UI contracts and browser host.
+- [`x07lang/x07-device-host`](https://github.com/x07lang/x07-device-host): the desktop and mobile WebView host that runs the same X07 UI reducer across platforms.
+- [`x07lang/x07-wasi`](https://github.com/x07lang/x07-wasi): canonical `std.wasi.*` packages for WASI-facing X07 programs.
+- [`x07lang/x07-platform`](https://github.com/x07lang/x07-platform): the public runtime and control plane for workload delivery, release review, incidents, regressions, and device-release supervision through `x07lp`.
+- [`x07lang/x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts): the public `lp.*` contracts for workloads, topology, bindings, targets, releases, and lifecycle state shared by the platform CLI, UI, APIs, and MCP tools.
+- `x07lang/x07-platform-cloud`: the private repo behind x07 Sentinel, the managed control layer built on the public platform split.
+- [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry): the package registry backend.
+- [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web): the public package registry UI at [x07.io](https://x07.io).
+- [`x07lang/x07-website`](https://github.com/x07lang/x07-website): the documentation website at [x07lang.org](https://x07lang.org).
+
+For end users, that means one language with an official path for package distribution, WASM delivery, browser and device UI, MCP-based agent tooling, governed backend delivery through x07 Platform, and a managed Sentinel layer when teams need hosted control.
 
 ---
 
@@ -50,7 +199,7 @@ See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) fo
 
 ### Install
 
-The recommended installer is `x07up` (toolchain manager). It installs the toolchain under `~/.x07/`, configures `~/.x07/bin/` shims, and can install the agent kit (offline docs + skills).
+The recommended installer is `x07up` (toolchain manager). It installs the toolchain under `~/.x07/`, configures `~/.x07/bin/` shims, and manages optional runtime components such as `x07-wasm` and `x07-device-host-desktop`.
 
 macOS / Linux:
 
@@ -65,6 +214,15 @@ X07 is supported on Windows via WSL2 (Ubuntu recommended). In your WSL2 shell, r
 Docs: https://x07lang.org/docs/getting-started/installer/
 
 Advanced: toolchain archives are also available under https://github.com/x07lang/x07/releases
+
+Add the WASM and device-host components when you need them:
+
+```bash
+x07up update
+x07up component add wasm
+x07up component add device-host
+x07 wasm doctor --json
+```
 
 ### Run a Program
 
@@ -85,6 +243,16 @@ x07 lint --input program.x07.json
 x07 fix --input program.x07.json --write
 x07 ast apply-patch --in program.x07.json --patch patch.json --out program.x07.json --validate
 ```
+
+### Official MCP server (for agent runtimes)
+
+If your coding agent runtime supports MCP (Model Context Protocol), install and use the official X07 MCP server: `io.x07/x07lang-mcp`. It exposes token-efficient core editing tools plus capability-gated ecosystem tools such as `x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.wasm.core_v1`, `x07.web_ui.exec_v1`, `x07.device.exec_v1`, `x07.app.exec_v1`, `lp.query_v1`, safe lifecycle control via `lp.control_v1`, and safe patch application for x07AST JSON.
+
+For release-, incident-, and regression-aware clients, keep app-specific candidate/workspace state locally and consume operational truth from the official structured `lp.*` result contracts exposed through `x07lang-mcp`. The x07-side boundary is documented in [`docs/toolchain/mcp-kit.md`](docs/toolchain/mcp-kit.md) and [`docs/agent/platform.md`](docs/agent/platform.md).
+
+For MCP server projects, prefer `x07 init --template mcp-server-http-tasks` when you want the task-aware HTTP/SSE scaffold; `x07` delegates that template to `x07-mcp` rather than re-implementing MCP kit logic locally.
+
+Start here: https://x07lang.org/docs/getting-started/agent-quickstart/ (includes MCP setup).
 
 ---
 
@@ -112,12 +280,14 @@ x07/
 └── scripts/        # Tooling and CI scripts
 ```
 
-## Related Repositories
+## Key Links
 
-- [`x07lang/x07`](https://github.com/x07lang/x07) — Toolchain + stdlib (this repo)
-- [`x07lang/x07-website`](https://github.com/x07lang/x07-website) — x07lang.org
-- [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry) — Package registry
-- [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web) — Registry UI (x07.io)
+- Docs: [x07lang.org](https://x07lang.org)
+- Package registry: [x07.io](https://x07.io)
+- MCP kit: [x07lang/x07-mcp](https://github.com/x07lang/x07-mcp)
+- WASM tooling: [x07lang/x07-wasm-backend](https://github.com/x07lang/x07-wasm-backend)
+- Lifecycle platform: [x07lang/x07-platform](https://github.com/x07lang/x07-platform)
+- Official docs site repo: [x07lang/x07-website](https://github.com/x07lang/x07-website)
  
  ---
 

@@ -928,6 +928,7 @@ impl<'a> Emitter<'a> {
             "os.db.redis.open_v1" => self.emit_os_db_redis_open_v1_to(args, dest_ty, dest),
             "os.db.redis.cmd_v1" => self.emit_os_db_redis_cmd_v1_to(args, dest_ty, dest),
             "os.db.redis.close_v1" => self.emit_os_db_redis_close_v1_to(args, dest_ty, dest),
+            "os.obj.s3.dispatch_v1" => self.emit_os_obj_s3_dispatch_v1_to(args, dest_ty, dest),
             "os.env.get" => self.emit_os_env_get_to(args, dest_ty, dest),
             "os.time.now_unix_ms" => self.emit_os_time_now_unix_ms_to(args, dest_ty, dest),
             "os.time.now_instant_v1" => self.emit_os_time_now_instant_v1_to(args, dest_ty, dest),

@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["std.obj.spec.driver_s3_v1","std.obj.spec.flags_none_v1"]},{"body":1,"kind":"defn","name":"std.obj.spec.driver_s3_v1","params":[],"result":"i32"},{"body":0,"kind":"defn","name":"std.obj.spec.flags_none_v1","params":[],"result":"i32"}],"imports":[],"kind":"module","module_id":"std.obj.spec","schema_version":"x07.x07ast@0.3.0"}

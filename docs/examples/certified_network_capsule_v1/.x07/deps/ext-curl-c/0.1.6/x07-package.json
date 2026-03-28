@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-curl-c",
+  "description": "HTTP(S) client bindings via libcurl (run-os only).",
+  "docs": "HTTP(S) client bindings via libcurl (run-os only).\n\nModules:\n- ext.curl._ffi\n- ext.curl.http\n\nFFI libs:\n- curl\n\nUsage:\n- Add dependency: x07 pkg add ext-curl-c@0.1.6\n- Import the modules listed above.\n",
+  "version": "0.1.6",
+  "module_root": "modules",
+  "modules": [
+    "ext.curl._ffi",
+    "ext.curl.http"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "ffi",
+    "ffi_libs": [
+      "curl"
+    ],
+    "capabilities": [
+      "ffi",
+      "unsafe"
+    ]
+  }
+}

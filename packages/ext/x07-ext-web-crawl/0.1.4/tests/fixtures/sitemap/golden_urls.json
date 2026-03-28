@@ -1,0 +1,10 @@
+{
+  "simple": [
+    "https://example.com/",
+    "https://example.com/about"
+  ],
+  "index": [
+    "https://example.com/sitemap1.xml",
+    "https://example.com/sitemap2.xml"
+  ]
+}

@@ -149,6 +149,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("pkg.add") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-add.report.schema.json"
         )),
+        Some("pkg.attest-closure") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-attest-closure.report.schema.json"
+        )),
         Some("pkg.lock") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-lock.report.schema.json"
         )),
@@ -176,6 +179,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("policy.init") => Some(include_bytes!(
             "../../../spec/x07-tool-policy-init.report.schema.json"
         )),
+        Some("prove") => Some(include_bytes!(
+            "../../../spec/x07-tool-prove.report.schema.json"
+        )),
+        Some("prove.check") => Some(include_bytes!(
+            "../../../spec/x07-tool-prove-check.report.schema.json"
+        )),
         Some("review") => Some(include_bytes!(
             "../../../spec/x07-tool-review.report.schema.json"
         )),
@@ -197,6 +206,24 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("schema.derive") => Some(include_bytes!(
             "../../../spec/x07-tool-schema-derive.report.schema.json"
         )),
+        Some("service") => Some(include_bytes!(
+            "../../../spec/x07-tool-service.report.schema.json"
+        )),
+        Some("service.archetypes") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-archetypes.report.schema.json"
+        )),
+        Some("service.genpack") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-genpack.report.schema.json"
+        )),
+        Some("service.genpack.grammar") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-genpack-grammar.report.schema.json"
+        )),
+        Some("service.genpack.schema") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-genpack-schema.report.schema.json"
+        )),
+        Some("service.validate") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-validate.report.schema.json"
+        )),
         Some("sm") => Some(include_bytes!(
             "../../../spec/x07-tool-sm.report.schema.json"
         )),
@@ -211,6 +238,24 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("trust") => Some(include_bytes!(
             "../../../spec/x07-tool-trust.report.schema.json"
+        )),
+        Some("trust.certify") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-certify.report.schema.json"
+        )),
+        Some("trust.capsule") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-capsule.report.schema.json"
+        )),
+        Some("trust.capsule.attest") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-capsule-attest.report.schema.json"
+        )),
+        Some("trust.capsule.check") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-capsule-check.report.schema.json"
+        )),
+        Some("trust.profile") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-profile.report.schema.json"
+        )),
+        Some("trust.profile.check") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-profile-check.report.schema.json"
         )),
         Some("trust.report") => Some(include_bytes!(
             "../../../spec/x07-tool-trust-report.report.schema.json"

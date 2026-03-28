@@ -1,6 +1,6 @@
 ---
 name: x07-format
-description: Canonically format X07 x07AST JSON files using `x07 fmt` (check/write) with a machine-readable JSON report.
+description: Canonically format X07 x07AST JSON files using `x07 fmt` (check/write).
 metadata:
   short-description: Format x07AST JSON
   version: 0.1.0
@@ -14,10 +14,13 @@ Use this skill to keep x07AST JSON canonical (stable ordering + trailing newline
 ## Canonical commands
 
 - Check a file:
-  - `x07 fmt --input src/main.x07.json --check --json`
+  - `x07 fmt --input src/main.x07.json --check`
 
 - Rewrite a file:
-  - `x07 fmt --input src/main.x07.json --write --json`
+  - `x07 fmt --input src/main.x07.json --write`
+
+- Rewrite a file with deterministic multi-line formatting (intended for human editing/review):
+  - `x07 fmt --input src/main.x07.json --write --pretty`
 
 ## Notes
 

@@ -1,0 +1,25 @@
+{
+  "min_x07up_version": "0.1.60",
+  "packages": {
+    "std_web_ui": "0.1.7"
+  },
+  "published_at_utc": "2026-03-06T18:30:34Z",
+  "x07_device_host": {
+    "release_manifest_sha256": "sha256:fb00849eb3239421df00d2afffe1720b71a4434e5e6edb6095900532abf992bc",
+    "release_manifest_url": "https://github.com/x07lang/x07-device-host/releases/download/v0.1.1/x07-device-host-0.1.1-release.json",
+    "tag": "v0.1.1",
+    "version": "0.1.1"
+  },
+  "x07_wasm": {
+    "release_manifest_sha256": "sha256:a92447336b6700f0ce7288c154e52c6b249253798967f472c14ddd33450830bb",
+    "release_manifest_url": "https://github.com/x07lang/x07-wasm-backend/releases/download/v0.1.2/x07-wasm-0.1.2-release.json",
+    "tag": "v0.1.2",
+    "version": "0.1.2"
+  },
+  "x07_web_ui_host": {
+    "release_manifest_sha256": "sha256:c23c84d38a728920e6dc4f195d4379938f46d4ec1a6681723c73f7b2e6126139",
+    "release_manifest_url": "https://github.com/x07lang/x07-web-ui/releases/download/v0.1.7/x07-web-ui-host-0.1.7-release.json",
+    "tag": "v0.1.7",
+    "version": "0.1.7"
+  }
+}

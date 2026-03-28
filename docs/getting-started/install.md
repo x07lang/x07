@@ -11,6 +11,7 @@ The recommended installer is `x07up` (toolchain manager). It installs:
 - the toolchain under `~/.x07/toolchains/<tag>/`
 - shims under `~/.x07/bin/` (put this on `PATH`)
 - offline docs + the agent skills pack (default profile)
+- optional runtime components via `x07up component add ...`
 
 Quickstart and full installer reference:
 
@@ -85,12 +86,29 @@ Verify:
 - `x07up doctor --json` (installer/toolchain + host prerequisites)
 - optional (advanced): `x07c --help`, `x07-os-runner --help`
 
+### Add optional runtime components
+
+Use `x07up` for runtime components that must stay compatible with the installed core release:
+
+```bash
+x07up component add wasm
+x07up component add device-host
+x07up component list
+x07 wasm doctor --json
+```
+
+Fallbacks:
+
+- preferred fallback for `x07-wasm`: `cargo install --locked x07-wasm --version <VERSION>`
+- preferred fallback for `x07-device-host-desktop`: `cargo install --locked x07-device-host-desktop --version <VERSION>`
+- use `cargo install --locked --git ...` only for local development against unreleased repo state
+
 ### Pin a toolchain per project
 
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.1.40
+x07up override set v0.1.102
 ```
 
 This makes toolchain selection deterministic for agents and CI.

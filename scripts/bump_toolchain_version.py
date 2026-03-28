@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 
 SEMVER_TAG_RE = re.compile(r"^v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)$")
+SEMVER_VERSION_RE = re.compile(r"^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)$")
 SEMVER_TAG_IN_TEXT_RE = re.compile(r"v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)")
+COMPAT_FILENAME_RE = re.compile(r"^(?P<version>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))\.json$")
+BUNDLE_INPUT_FILENAME_RE = re.compile(r"^(?P<version>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))\.input\.json$")
 
 
 def read_text(path: Path) -> str:
@@ -16,6 +21,14 @@ def read_text(path: Path) -> str:
 
 def write_text(path: Path, data: str) -> None:
     path.write_text(data, encoding="utf-8")
+
+
+def read_json(path: Path) -> object:
+    return json.loads(read_text(path))
+
+
+def write_json(path: Path, data: object) -> None:
+    write_text(path, json.dumps(data, indent=2) + "\n")
 
 
 def parse_tag(raw: str) -> tuple[str, str]:
@@ -27,6 +40,13 @@ def parse_tag(raw: str) -> tuple[str, str]:
     if SEMVER_TAG_RE.fullmatch(tag) is None:
         raise ValueError(f"invalid tag (expected vX.Y.Z): {tag!r}")
     return tag, tag[1:]
+
+
+def parse_version(raw: str) -> tuple[int, int, int]:
+    m = SEMVER_VERSION_RE.fullmatch(raw)
+    if m is None:
+        raise ValueError(f"invalid version (expected X.Y.Z): {raw!r}")
+    return (int(m.group("major")), int(m.group("minor")), int(m.group("patch")))
 
 
 def replace_package_version_in_cargo_toml(src: str, *, new_version: str) -> tuple[str, bool]:
@@ -140,6 +160,75 @@ def replace_x07_registry_git_tag_dependency(src: str, *, dep: str, new_tag: str)
     return out, out != src
 
 
+def workspace_lock_is_current(repo_root: Path) -> bool:
+    proc = subprocess.run(
+        ["cargo", "metadata", "--locked", "--format-version", "1", "--no-deps"],
+        cwd=repo_root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
+def refresh_workspace_lock(repo_root: Path) -> bool:
+    cargo_lock = repo_root / "Cargo.lock"
+    before = cargo_lock.read_bytes() if cargo_lock.is_file() else None
+    subprocess.run(["cargo", "update", "-w"], cwd=repo_root, check=True)
+    after = cargo_lock.read_bytes() if cargo_lock.is_file() else None
+    return before != after
+
+
+def latest_versioned_file(dir_path: Path, *, pattern: re.Pattern[str]) -> Path:
+    candidates: list[tuple[tuple[int, int, int], Path]] = []
+    for path in dir_path.iterdir():
+        if not path.is_file():
+            continue
+        m = pattern.fullmatch(path.name)
+        if m is None:
+            continue
+        candidates.append((parse_version(m.group("version")), path))
+    if not candidates:
+        raise ValueError(f"no versioned files found in {dir_path}")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def ensure_release_compat(repo_root: Path, *, new_version: str, check: bool) -> str | None:
+    compat_dir = repo_root / "releases" / "compat"
+    target = compat_dir / f"{new_version}.json"
+    source = target if target.is_file() else latest_versioned_file(compat_dir, pattern=COMPAT_FILENAME_RE)
+    doc = read_json(source)
+    if not isinstance(doc, dict):
+        raise ValueError(f"expected JSON object in {source.relative_to(repo_root)}")
+    expected = dict(doc)
+    expected["x07_core"] = f">={new_version},<0.2.0"
+    rel = str(target.relative_to(repo_root))
+    if target.is_file() and read_json(target) == expected:
+        return None
+    if check:
+        return rel
+    write_json(target, expected)
+    return rel
+
+
+def ensure_bundle_input(repo_root: Path, *, new_version: str, check: bool) -> str | None:
+    bundles_dir = repo_root / "releases" / "bundles"
+    target = bundles_dir / f"{new_version}.input.json"
+    source = target if target.is_file() else latest_versioned_file(bundles_dir, pattern=BUNDLE_INPUT_FILENAME_RE)
+    doc = read_json(source)
+    if not isinstance(doc, dict):
+        raise ValueError(f"expected JSON object in {source.relative_to(repo_root)}")
+    expected = dict(doc)
+    expected["min_x07up_version"] = new_version
+    rel = str(target.relative_to(repo_root))
+    if target.is_file() and read_json(target) == expected:
+        return None
+    if check:
+        return rel
+    write_json(target, expected)
+    return rel
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True, help="New release tag (for example: v0.0.21)")
@@ -158,6 +247,7 @@ def main(argv: list[str]) -> int:
     old_tag = f"v{old_version}"
 
     changed: list[str] = []
+    crate_manifest_changed = False
 
     crate_tomls = sorted((repo_root / "crates").glob("*/Cargo.toml"))
     for cargo_toml in crate_tomls:
@@ -169,10 +259,17 @@ def main(argv: list[str]) -> int:
                 changed.append(str(cargo_toml.relative_to(repo_root)))
                 continue
             write_text(cargo_toml, out)
+            crate_manifest_changed = True
             changed.append(str(cargo_toml.relative_to(repo_root)))
         else:
             _ = replaced_pkg
             _ = dep_rewrites
+
+    if args.check:
+        if not workspace_lock_is_current(repo_root):
+            changed.append("Cargo.lock")
+    elif crate_manifest_changed and refresh_workspace_lock(repo_root):
+        changed.append("Cargo.lock")
 
     versioned_literal_files = [
         repo_root / "docs" / "getting-started" / "install.md",
@@ -198,6 +295,12 @@ def main(argv: list[str]) -> int:
                 continue
             write_text(path, out)
             changed.append(rel)
+
+    release_metadata_updates = [
+        ensure_release_compat(repo_root, new_version=new_version, check=args.check),
+        ensure_bundle_input(repo_root, new_version=new_version, check=args.check),
+    ]
+    changed.extend(rel for rel in release_metadata_updates if rel is not None)
 
     registry_repo_root = repo_root.parent / "x07-registry"
     registry_cargo = registry_repo_root / "Cargo.toml"

@@ -6,11 +6,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Args;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, X07_BUNDLE_REPORT_SCHEMA_VERSION,
-    X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
+    X07_COMPILE_ATTEST_SCHEMA_VERSION, X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
 };
 use x07_host_runner::{apply_cc_profile, CcProfile, NativeCliWrapperOpts, NativeToolchainConfig};
 use x07_runner_common::sandbox_backend::{
@@ -27,11 +27,15 @@ use x07c::project;
 
 use crate::policy_overrides::{PolicyOverrides, PolicyResolution};
 use crate::repair::RepairArgs;
+use crate::report_common;
+use crate::util;
 
 const DEFAULT_SOLVE_FUEL: u64 = 50_000_000;
 const DEFAULT_MAX_MEMORY_BYTES: usize = 64 * 1024 * 1024;
 
 static VM_RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
+const X07_COMPILE_ATTEST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-compile.attest.schema.json");
 
 #[derive(Debug, Clone, Args)]
 pub struct BundleArgs {
@@ -39,7 +43,10 @@ pub struct BundleArgs {
     #[arg(long, value_name = "PATH")]
     pub project: Option<PathBuf>,
 
-    /// Compile a single `*.x07.json` file (expert mode; requires --module-root).
+    /// Compile a single `*.x07.json` file.
+    ///
+    /// With `--project`, this overrides the project entry for the current bundle.
+    /// Without `--project`, this is expert mode and requires explicit `--module-root`.
     #[arg(long, value_name = "PATH")]
     pub program: Option<PathBuf>,
 
@@ -103,6 +110,10 @@ pub struct BundleArgs {
     #[arg(long, value_name = "N")]
     pub cpu_time_limit_seconds: Option<u64>,
 
+    /// Override the initial solve fuel cap (default: profile.solve_fuel, then built-in default).
+    #[arg(long, value_name = "FUEL")]
+    pub solve_fuel: Option<u64>,
+
     #[arg(long)]
     pub debug_borrow_checks: bool,
 
@@ -118,7 +129,11 @@ pub struct BundleArgs {
     #[arg(long, value_name = "DIR", alias = "emit")]
     pub emit_dir: Option<PathBuf>,
 
-    /// Module root directory for resolving module ids (required for --program).
+    /// Emit source-to-binary attestation JSON.
+    #[arg(long, value_name = "PATH")]
+    pub emit_attestation: Option<PathBuf>,
+
+    /// Module root directory for resolving module ids (required for `--program` without `--project`).
     /// May be passed multiple times.
     #[arg(long, value_name = "DIR")]
     pub module_root: Vec<PathBuf>,
@@ -214,6 +229,88 @@ struct BundleReport {
     target: BundleTarget,
     bundle: BundleSection,
     report: Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CompileAttestation {
+    schema_version: &'static str,
+    world: &'static str,
+    bundle_kind: &'static str,
+    output_path: String,
+    inputs: CompileAttestInputs,
+    artifacts: CompileAttestArtifacts,
+    compiler: CompileAttestCompiler,
+    rebuild: CompileAttestRebuild,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CompileAttestInputs {
+    target_kind: &'static str,
+    target_path: String,
+    project_path: Option<String>,
+    lockfile_path: Option<String>,
+    program_sha256: String,
+    lockfile_sha256: Option<String>,
+    module_roots: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CompileAttestArtifacts {
+    freestanding_c_sha256: Option<String>,
+    wrapper_c_sha256: Option<String>,
+    combined_c_sha256: String,
+    binary_sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CompileAttestCompiler {
+    lang_id: String,
+    ok: bool,
+    exit_status: Option<i32>,
+    stdout_sha256: Option<String>,
+    stderr_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CompileAttestRebuild {
+    deterministic_match: bool,
+    binary_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestation {
+    inputs: GuestCompileAttestInputs,
+    artifacts: GuestCompileAttestArtifacts,
+    compiler: GuestCompileAttestCompiler,
+    rebuild: GuestCompileAttestRebuild,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestInputs {
+    program_sha256: String,
+    lockfile_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestArtifacts {
+    freestanding_c_sha256: Option<String>,
+    wrapper_c_sha256: Option<String>,
+    combined_c_sha256: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestCompiler {
+    lang_id: String,
+    ok: bool,
+    exit_status: Option<i32>,
+    stdout_sha256: Option<String>,
+    stderr_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestRebuild {
+    deterministic_match: bool,
+    binary_sha256: Option<String>,
 }
 
 #[derive(Debug)]
@@ -380,9 +477,9 @@ pub fn cmd_bundle(
         .map(|p| p.display().to_string())
         .collect::<Vec<_>>();
 
-    let solve_fuel = selected_profile
-        .as_ref()
-        .and_then(|p| p.solve_fuel)
+    let solve_fuel = args
+        .solve_fuel
+        .or(selected_profile.as_ref().and_then(|p| p.solve_fuel))
         .unwrap_or(DEFAULT_SOLVE_FUEL);
     let max_memory_bytes = args
         .max_memory_bytes
@@ -455,6 +552,56 @@ pub fn cmd_bundle(
         &out_path,
         &wrapper,
     )?;
+
+    if let Some(attestation_path) = &args.emit_attestation {
+        if !compile_out.compile.ok {
+            anyhow::bail!("--emit-attestation requires a successful bundle");
+        }
+        let binary_sha256 = sha256_hex_for_path(&out_path)?;
+        let rebuild = compute_double_build_rebuild(
+            &program_bytes,
+            &compile_options,
+            &toolchain,
+            &wrapper,
+            &out_path,
+        )?;
+        let attestation = CompileAttestation {
+            schema_version: X07_COMPILE_ATTEST_SCHEMA_VERSION,
+            world: world.as_str(),
+            bundle_kind: "native",
+            output_path: out_path.display().to_string(),
+            inputs: CompileAttestInputs {
+                target_kind: target_kind.as_str(),
+                target_path: target_path.display().to_string(),
+                project_path: project_manifest.as_ref().map(|p| p.display().to_string()),
+                lockfile_path: lockfile.as_ref().map(|p| p.display().to_string()),
+                program_sha256: util::sha256_hex(&program_bytes),
+                lockfile_sha256: lockfile
+                    .as_ref()
+                    .map(std::fs::read)
+                    .transpose()?
+                    .map(|bytes| util::sha256_hex(&bytes)),
+                module_roots: resolved_module_roots.clone(),
+            },
+            artifacts: CompileAttestArtifacts {
+                freestanding_c_sha256: Some(util::sha256_hex(
+                    compile_out.freestanding_c.as_bytes(),
+                )),
+                wrapper_c_sha256: Some(util::sha256_hex(compile_out.wrapper_c.as_bytes())),
+                combined_c_sha256: util::sha256_hex(compile_out.combined_c.as_bytes()),
+                binary_sha256,
+            },
+            compiler: CompileAttestCompiler {
+                lang_id: compile_out.compile.lang_id.clone(),
+                ok: compile_out.compile.ok,
+                exit_status: Some(compile_out.compile.exit_status),
+                stdout_sha256: Some(util::sha256_hex(&compile_out.compile.stdout)),
+                stderr_sha256: Some(util::sha256_hex(&compile_out.compile.stderr)),
+            },
+            rebuild,
+        };
+        write_compile_attestation(attestation_path, &attestation)?;
+    }
 
     let host_report_mode = match target_kind {
         TargetKind::Project => "project-compile",
@@ -561,6 +708,10 @@ struct CmdBundleVmParams<'a> {
     cpu_time_limit_seconds: Option<u64>,
 }
 
+fn vm_compile_attestation_path(sidecar: &Path) -> PathBuf {
+    sidecar.join("compile.attest.json")
+}
+
 fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode> {
     let CmdBundleVmParams {
         args,
@@ -653,6 +804,48 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
     })?;
 
     copy_executable_atomic(&guest_payload.payload_path, &payload_dst)?;
+
+    if let Some(attestation) = guest_payload.compile_attestation {
+        let payload_sha256 = sha256_hex_for_path(&payload_dst)?;
+        let attestation = CompileAttestation {
+            schema_version: X07_COMPILE_ATTEST_SCHEMA_VERSION,
+            world: world.as_str(),
+            bundle_kind: "vm",
+            output_path: payload_dst.display().to_string(),
+            inputs: CompileAttestInputs {
+                target_kind: target_kind.as_str(),
+                target_path: target_path.display().to_string(),
+                project_path: project_root.map(|p| p.display().to_string()),
+                lockfile_path: lockfile.map(|p| p.display().to_string()),
+                program_sha256: attestation.inputs.program_sha256,
+                lockfile_sha256: attestation.inputs.lockfile_sha256,
+                module_roots: resolved_module_roots.to_vec(),
+            },
+            artifacts: CompileAttestArtifacts {
+                freestanding_c_sha256: attestation.artifacts.freestanding_c_sha256,
+                wrapper_c_sha256: attestation.artifacts.wrapper_c_sha256,
+                combined_c_sha256: attestation.artifacts.combined_c_sha256,
+                binary_sha256: payload_sha256.clone(),
+            },
+            compiler: CompileAttestCompiler {
+                lang_id: attestation.compiler.lang_id,
+                ok: attestation.compiler.ok,
+                exit_status: attestation.compiler.exit_status,
+                stdout_sha256: attestation.compiler.stdout_sha256,
+                stderr_sha256: attestation.compiler.stderr_sha256,
+            },
+            rebuild: CompileAttestRebuild {
+                deterministic_match: attestation.rebuild.deterministic_match,
+                binary_sha256: attestation.rebuild.binary_sha256.map(|_| payload_sha256),
+            },
+        };
+
+        let sidecar_attestation = vm_compile_attestation_path(&sidecar);
+        write_compile_attestation(&sidecar_attestation, &attestation)?;
+        if let Some(attestation_path) = &args.emit_attestation {
+            write_compile_attestation(attestation_path, &attestation)?;
+        }
+    }
 
     let guest_report = guest_payload.report;
 
@@ -765,6 +958,7 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
 struct VmPayloadBundleOut {
     report: Value,
     payload_path: PathBuf,
+    compile_attestation: Option<GuestCompileAttestation>,
 }
 
 struct VmPayloadBundleParams<'a> {
@@ -909,6 +1103,11 @@ fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloa
         guest_argv.push(profile.clone());
     }
 
+    if let Some(fuel) = args.solve_fuel {
+        guest_argv.push("--solve-fuel".to_string());
+        guest_argv.push(fuel.to_string());
+    }
+
     guest_argv.push("--world".to_string());
     guest_argv.push(WorldId::RunOsSandboxed.as_str().to_string());
 
@@ -960,6 +1159,10 @@ fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloa
     if emit_dir.is_some() {
         guest_argv.push("--emit-dir".to_string());
         guest_argv.push("/x07/out/emit".to_string());
+    }
+    if args.emit_attestation.is_some() {
+        guest_argv.push("--emit-attestation".to_string());
+        guest_argv.push("/x07/out/compile.attest.json".to_string());
     }
 
     let mounts: Vec<MountSpec> = vec![
@@ -1056,10 +1259,31 @@ fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloa
         .get("report")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
+    let compile_attestation = if args.emit_attestation.is_some() {
+        let path = job_out.join("compile.attest.json");
+        if path.is_file() {
+            Some({
+                let bytes = std::fs::read(&path).with_context(|| {
+                    format!("read guest compile attestation: {}", path.display())
+                })?;
+                serde_json::from_slice::<GuestCompileAttestation>(&bytes).with_context(|| {
+                    format!("parse guest compile attestation JSON: {}", path.display())
+                })?
+            })
+        } else {
+            anyhow::bail!(
+                "guest x07 bundle did not emit compile attestation at {}",
+                path.display()
+            );
+        }
+    } else {
+        None
+    };
 
     Ok(VmPayloadBundleOut {
         report: runner_report,
         payload_path,
+        compile_attestation,
     })
 }
 
@@ -1124,17 +1348,6 @@ fn now_unix_ms() -> Result<u64> {
 }
 
 fn resolve_target(cwd: &Path, args: &BundleArgs) -> Result<(TargetKind, PathBuf, Option<PathBuf>)> {
-    let mut count = 0;
-    if args.project.is_some() {
-        count += 1;
-    }
-    if args.program.is_some() {
-        count += 1;
-    }
-    if count > 1 {
-        anyhow::bail!("set exactly one of --project or --program");
-    }
-
     if let Some(path) = &args.project {
         return Ok((
             TargetKind::Project,
@@ -1221,6 +1434,50 @@ fn resolve_auto_ffi(args: &BundleArgs, profile: Option<&crate::run::ResolvedProf
     true
 }
 
+fn read_bundle_program_bytes(
+    program_path: &Path,
+    world: WorldId,
+    args: &BundleArgs,
+    label: &str,
+) -> Result<Vec<u8>> {
+    if !program_path
+        .as_os_str()
+        .to_string_lossy()
+        .ends_with(".x07.json")
+    {
+        anyhow::bail!(
+            "{label} must be an x07AST JSON file (*.x07.json), got {}",
+            program_path.display()
+        );
+    }
+
+    let repair_result = crate::repair::maybe_repair_x07ast_file(program_path, world, &args.repair)
+        .with_context(|| format!("repair {label}: {}", program_path.display()))?;
+    let bytes = if let Some(r) = repair_result {
+        r.formatted.into_bytes()
+    } else {
+        std::fs::read(program_path)
+            .with_context(|| format!("read {label}: {}", program_path.display()))?
+    };
+
+    normalize_bundle_entry_module_id(bytes)
+}
+
+fn normalize_bundle_entry_module_id(bytes: Vec<u8>) -> Result<Vec<u8>> {
+    let mut doc: Value = serde_json::from_slice(&bytes).context("parse bundle program JSON")?;
+    if doc.get("kind").and_then(Value::as_str) != Some("entry") {
+        return Ok(bytes);
+    }
+    if doc.get("module_id").and_then(Value::as_str) == Some("main") {
+        return Ok(bytes);
+    }
+    let Some(obj) = doc.as_object_mut() else {
+        return Ok(bytes);
+    };
+    obj.insert("module_id".to_string(), Value::String("main".to_string()));
+    crate::util::canonical_jcs_bytes(&doc)
+}
+
 fn prepare_project_target(
     project_path: &Path,
     world: WorldId,
@@ -1258,15 +1515,16 @@ fn prepare_project_target(
     };
     project::verify_lockfile(project_path, &manifest, &lock)?;
 
-    let entry_path = base.join(&manifest.entry);
-    let repair_result = crate::repair::maybe_repair_x07ast_file(&entry_path, world, &args.repair)
-        .with_context(|| format!("repair entry: {}", entry_path.display()))?;
-    let program = if let Some(r) = repair_result {
-        r.formatted.into_bytes()
+    let entry_path = if let Some(program_override) = args.program.as_ref() {
+        if program_override.is_absolute() {
+            program_override.clone()
+        } else {
+            base.join(program_override)
+        }
     } else {
-        std::fs::read(&entry_path)
-            .with_context(|| format!("read entry: {}", entry_path.display()))?
+        base.join(&manifest.entry)
     };
+    let program = read_bundle_program_bytes(&entry_path, world, args, "entry")?;
 
     let mut module_roots = project::collect_module_roots(project_path, &manifest, &lock)?;
     if world.is_standalone_only() {
@@ -1295,24 +1553,7 @@ fn prepare_program_target(
     world: WorldId,
     args: &BundleArgs,
 ) -> Result<PreparedTarget> {
-    if !program_path
-        .as_os_str()
-        .to_string_lossy()
-        .ends_with(".x07.json")
-    {
-        anyhow::bail!(
-            "--program must be an x07AST JSON file (*.x07.json), got {}",
-            program_path.display()
-        );
-    }
-    let repair_result = crate::repair::maybe_repair_x07ast_file(program_path, world, &args.repair)
-        .with_context(|| format!("repair program: {}", program_path.display()))?;
-    let program = if let Some(r) = repair_result {
-        r.formatted.into_bytes()
-    } else {
-        std::fs::read(program_path)
-            .with_context(|| format!("read program: {}", program_path.display()))?
-    };
+    let program = read_bundle_program_bytes(program_path, world, args, "--program")?;
 
     let mut module_roots = args.module_root.clone();
     if world.is_standalone_only() {
@@ -1413,4 +1654,81 @@ fn host_compile_report_json(
         },
         "solve": serde_json::Value::Null,
     }))
+}
+
+fn write_compile_attestation(path: &Path, attestation: &CompileAttestation) -> Result<()> {
+    let value = serde_json::to_value(attestation).context("serialize compile attestation JSON")?;
+    let diags = report_common::validate_schema(
+        X07_COMPILE_ATTEST_SCHEMA_BYTES,
+        "spec/x07-compile.attest.schema.json",
+        &value,
+    )?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "internal error: compile attestation JSON is not schema-valid: {}",
+            diags[0].message
+        );
+    }
+    let bytes = report_common::canonical_pretty_json_bytes(&value)
+        .context("canon compile attestation JSON")?;
+    util::write_atomic(path, &bytes)
+        .with_context(|| format!("write compile attestation: {}", path.display()))
+}
+
+fn sha256_hex_for_path(path: &Path) -> Result<String> {
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read file for sha256: {}", path.display()))?;
+    Ok(util::sha256_hex(&bytes))
+}
+
+fn compute_double_build_rebuild(
+    program: &[u8],
+    compile_options: &x07c::compile::CompileOptions,
+    toolchain: &NativeToolchainConfig,
+    wrapper: &NativeCliWrapperOpts,
+    out_path: &Path,
+) -> Result<CompileAttestRebuild> {
+    let first_sha256 = sha256_hex_for_path(out_path)?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "x07-bundle-attest-{}-{}",
+        std::process::id(),
+        nonce
+    ));
+    std::fs::create_dir_all(&tmp_dir)
+        .with_context(|| format!("create temp attestation dir: {}", tmp_dir.display()))?;
+    let tmp_out = tmp_dir.join(
+        out_path
+            .file_name()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("x07-rebuild")),
+    );
+
+    let rebuild_result =
+        x07_host_runner::compile_bundle_exe(program, compile_options, toolchain, &tmp_out, wrapper);
+
+    let rebuild = match rebuild_result {
+        Ok(rebuild) if rebuild.compile.ok && tmp_out.is_file() => {
+            let second_sha256 = sha256_hex_for_path(&tmp_out)?;
+            CompileAttestRebuild {
+                deterministic_match: second_sha256 == first_sha256,
+                binary_sha256: Some(second_sha256),
+            }
+        }
+        Ok(_) => CompileAttestRebuild {
+            deterministic_match: false,
+            binary_sha256: None,
+        },
+        Err(_) => CompileAttestRebuild {
+            deterministic_match: false,
+            binary_sha256: None,
+        },
+    };
+
+    let _ = std::fs::remove_file(&tmp_out);
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    Ok(rebuild)
 }

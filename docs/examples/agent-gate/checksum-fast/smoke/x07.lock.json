@@ -11,7 +11,8 @@
         "ext.checksum.crc32c": "86dbd6095a6830ebf6e30c9499c6da7d1be199596f705d1a1e5d2e009a98555b",
         "ext.checksum.tests": "67d5175bba37e39d93020eddb3c99ee00285787a0eda6cf6b74734276b7ea169",
         "ext.checksum.xxhash64": "c759eeb4bc2521bf343440bcbeab1fa9f20d836ab123eb3c8173f11be649a8e5"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-u64-rs",
@@ -22,7 +23,8 @@
       "modules_sha256": {
         "ext.u64": "c3ba79f0554026716bfa1feea479c1eaa5b31be0ad7a8d166416a6a35d8b9a43",
         "ext.u64.tests": "f4a739c17deb1dd369d9fb144111a87ce4f7c99f65f28265dfc1ce7f56eff86f"
-      }
+      },
+      "yanked": false
     }
   ]
 }

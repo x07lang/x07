@@ -83,6 +83,7 @@ pub fn compile_options_for_world(
         enable_rr: features.enable_rr,
         enable_kv: features.enable_kv,
         module_roots,
+        prefer_module_roots_first: false,
         arch_root: None,
         emit_main: true,
         freestanding: false,
@@ -90,6 +91,7 @@ pub fn compile_options_for_world(
         contract_mode: compile::ContractMode::RuntimeTrap,
         allow_unsafe: features.allow_unsafe,
         allow_ffi: features.allow_ffi,
+        allow_internal_only_heads_in_entry: false,
     }
 }
 

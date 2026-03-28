@@ -1,0 +1,125 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.time.rfc3339/parse_epoch_z",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_parse_epoch_z",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/parse_frac_nanos_123",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_parse_frac_nanos_123",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/parse_offset_minus_0030",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_parse_offset_minus_0030",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/parse_ixdtf_tzid",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_parse_ixdtf_tzid",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/parse_invalid_space_instead_of_t",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_parse_invalid_space_instead_of_t",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/format_epoch_z",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_format_epoch_z",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/format_frac_nanos_123",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_format_frac_nanos_123",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/format_offset_minus_0030",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_format_offset_minus_0030",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/format_invalid_offset_not_multiple_of_60",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_format_invalid_offset_not_multiple_of_60",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/parse_v2_u32_overflow_ok",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_parse_v2_u32_overflow_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/format_v2_u32_overflow_ok",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_format_v2_u32_overflow_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.rfc3339/roundtrip_v2_9999",
+      "world": "solve-pure",
+      "entry": "ext.time.rfc3339.tests.test_roundtrip_v2_9999",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/make_invalid_nanos",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_make_invalid_nanos",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/add_invalid_doc",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_add_invalid_doc",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/add_ok",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_add_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/add_nanos_carry",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_add_nanos_carry",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/add_overflow",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_add_overflow",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/sub_ok",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_sub_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/sub_nanos_borrow",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_sub_nanos_borrow",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.time.duration/sub_underflow",
+      "world": "solve-pure",
+      "entry": "ext.time.duration.tests.test_sub_underflow",
+      "expect": "pass"
+    }
+  ]
+}

@@ -4747,6 +4747,38 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "os.obj.s3.dispatch_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_OBJ_S3,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.obj.s3.dispatch_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.obj.s3.dispatch_v1 expects (bytes req, bytes caps)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_obj_s3_dispatch_v1({}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "os.db.mysql.open_v1" => {
                         self.require_native_backend(
                             native::BACKEND_ID_EXT_DB_MYSQL,
@@ -9606,6 +9638,36 @@ impl<'a> Emitter<'a> {
                 Ok(())
             }
 
+            fn emit_async_protocol_exit_checks(
+                &mut self,
+                state: usize,
+                cont: usize,
+                await_invariant: &[crate::x07ast::ContractClauseAst],
+                scope_invariant: &[crate::x07ast::ContractClauseAst],
+            ) -> Result<(), CompilerError> {
+                let mut clauses: Vec<(
+                    &'static str,
+                    ContractClauseKind,
+                    usize,
+                    &crate::x07ast::ContractClauseAst,
+                )> = Vec::new();
+                for (idx, c) in await_invariant.iter().enumerate() {
+                    clauses.push(("await_invariant", ContractClauseKind::Invariant, idx, c));
+                }
+                for (idx, c) in scope_invariant.iter().enumerate() {
+                    clauses.push(("scope_invariant", ContractClauseKind::Invariant, idx, c));
+                }
+
+                let mut next = cont;
+                for (kind, id_kind, idx, clause) in clauses.into_iter().rev() {
+                    let st = self.new_state();
+                    self.emit_contract_clause_check(st, next, kind, id_kind, idx, clause)?;
+                    next = st;
+                }
+                self.line(state, format!("goto st_{next};"));
+                Ok(())
+            }
+
             fn emit_contract_clause_check(
                 &mut self,
                 state: usize,
@@ -9774,8 +9836,15 @@ impl<'a> Emitter<'a> {
             );
         }
 
-        let has_contracts =
-            !(f.requires.is_empty() && f.ensures.is_empty() && f.invariant.is_empty());
+        let protocol = f.protocol.clone();
+        let has_contracts = !(f.requires.is_empty()
+            && f.ensures.is_empty()
+            && f.invariant.is_empty()
+            && protocol.as_ref().is_none_or(|p| {
+                p.await_invariant.is_empty()
+                    && p.scope_invariant.is_empty()
+                    && p.cancellation_ensures.is_empty()
+            }));
 
         let out_state = if has_contracts {
             let entry_state = machine.new_state();
@@ -9815,7 +9884,28 @@ impl<'a> Emitter<'a> {
                     moved_ptr: None,
                 },
             );
-            machine.emit_contract_exit_checks(exit_state, out_state, &f.ensures, &f.invariant)?;
+            let contract_exit_state = if let Some(protocol) = protocol.as_ref() {
+                if !protocol.await_invariant.is_empty() || !protocol.scope_invariant.is_empty() {
+                    let st = machine.new_state();
+                    machine.emit_async_protocol_exit_checks(
+                        exit_state,
+                        st,
+                        &protocol.await_invariant,
+                        &protocol.scope_invariant,
+                    )?;
+                    st
+                } else {
+                    exit_state
+                }
+            } else {
+                exit_state
+            };
+            machine.emit_contract_exit_checks(
+                contract_exit_state,
+                out_state,
+                &f.ensures,
+                &f.invariant,
+            )?;
             machine.pop_scope();
             out_state
         } else {
@@ -9906,6 +9996,78 @@ impl<'a> Emitter<'a> {
         self.indent += 1;
         self.line("if (!fut) return;");
         self.line(&format!("{fut_type}* f = ({fut_type}*)fut;"));
+        if let Some(protocol) = protocol.as_ref() {
+            if !protocol.cancellation_ensures.is_empty() {
+                let saved_scopes = self.scopes.clone();
+                self.scopes.clear();
+                self.scopes.push(BTreeMap::new());
+                self.push_scope();
+                self.bind(
+                    "input".to_string(),
+                    VarRef {
+                        ty: Ty::BytesView,
+                        brand: TyBrand::None,
+                        c_name: "f->input".to_string(),
+                        moved: false,
+                        moved_ptr: None,
+                        borrow_count: 0,
+                        borrow_of: None,
+                        borrow_ptr: None,
+                        borrow_is_full: false,
+                        is_temp: false,
+                    },
+                );
+                for (i, p) in f.params.iter().enumerate() {
+                    self.bind(
+                        p.name.clone(),
+                        VarRef {
+                            ty: p.ty,
+                            brand: ty_brand_from_opt(&p.brand),
+                            c_name: format!("f->p{i}"),
+                            moved: false,
+                            moved_ptr: None,
+                            borrow_count: 0,
+                            borrow_of: None,
+                            borrow_ptr: None,
+                            borrow_is_full: false,
+                            is_temp: false,
+                        },
+                    );
+                }
+                let cancel_result = self.alloc_local("t_cancel_result_")?;
+                self.decl_local(f.ret_ty, &cancel_result);
+                if f.ret_ty == Ty::ResultBytes {
+                    self.line(&format!(
+                        "{cancel_result} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = UINT32_C(2) }};"
+                    ));
+                }
+                self.bind(
+                    "__result".to_string(),
+                    VarRef {
+                        ty: f.ret_ty,
+                        brand: ty_brand_from_opt(&f.ret_brand),
+                        c_name: cancel_result,
+                        moved: false,
+                        moved_ptr: None,
+                        borrow_count: 0,
+                        borrow_of: None,
+                        borrow_ptr: None,
+                        borrow_is_full: false,
+                        is_temp: false,
+                    },
+                );
+                for (idx, clause) in protocol.cancellation_ensures.iter().enumerate() {
+                    self.emit_contract_clause_check(
+                        "cancellation_ensures",
+                        ContractClauseKind::Ensures,
+                        idx,
+                        clause,
+                    )?;
+                }
+                self.pop_scope()?;
+                self.scopes = saved_scopes;
+            }
+        }
         for (name, ty) in &machine.fields {
             if !is_owned_ty(*ty) {
                 continue;

@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-trust.profile.schema.json",
+  "title": "x07.trust.profile@0.4.0",
+  "description": "Certification profile consumed by `x07 trust profile check` and `x07 trust certify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "claims",
+    "entrypoints",
+    "worlds_allowed",
+    "language_subset",
+    "arch_requirements",
+    "evidence_requirements",
+    "sandbox_requirements"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.trust.profile@0.4.0" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "uniqueItems": true
+    },
+    "entrypoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$"
+      },
+      "uniqueItems": true
+    },
+    "worlds_allowed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "solve-pure",
+          "solve-fs",
+          "solve-rr",
+          "solve-kv",
+          "solve-full",
+          "run-os",
+          "run-os-sandboxed"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "language_subset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_defasync",
+        "allow_recursion",
+        "allow_extern",
+        "allow_unsafe",
+        "allow_ffi",
+        "allow_dynamic_dispatch"
+      ],
+      "properties": {
+        "allow_defasync": { "type": "boolean" },
+        "allow_recursion": { "type": "boolean" },
+        "allow_extern": { "type": "boolean" },
+        "allow_unsafe": { "type": "boolean" },
+        "allow_ffi": { "type": "boolean" },
+        "allow_dynamic_dispatch": { "type": "boolean" }
+      }
+    },
+    "arch_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_min_version",
+        "require_allowlist_mode",
+        "require_deny_cycles",
+        "require_deny_orphans",
+        "require_visibility",
+        "require_world_caps",
+        "require_brand_boundaries"
+      ],
+      "properties": {
+        "manifest_min_version": {
+          "type": "string",
+          "enum": ["x07.arch.manifest@0.2.0", "x07.arch.manifest@0.3.0"]
+        },
+        "require_allowlist_mode": { "type": "boolean" },
+        "require_deny_cycles": { "type": "boolean" },
+        "require_deny_orphans": { "type": "boolean" },
+        "require_visibility": { "type": "boolean" },
+        "require_world_caps": { "type": "boolean" },
+        "require_brand_boundaries": { "type": "boolean" }
+      }
+    },
+    "evidence_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "require_boundary_index",
+        "require_schema_derive_check",
+        "require_smoke_harnesses",
+        "require_unit_tests",
+        "require_pbt",
+        "require_proof_mode",
+        "require_proof_coverage",
+        "require_async_proof_coverage",
+        "require_per_symbol_prove_reports_defn",
+        "require_per_symbol_prove_reports_async",
+        "allow_coverage_summary_imports",
+        "require_capsule_attestations",
+        "require_runtime_attestation",
+        "require_effect_log_digests",
+        "require_peer_policies",
+        "require_network_capsules",
+        "require_dependency_closure_attestation",
+        "require_compile_attestation",
+        "require_trust_report_clean",
+        "require_sbom"
+      ],
+      "properties": {
+        "require_boundary_index": { "type": "boolean" },
+        "require_schema_derive_check": { "type": "boolean" },
+        "require_smoke_harnesses": { "type": "boolean" },
+        "require_unit_tests": { "type": "boolean" },
+        "require_pbt": {
+          "type": "string",
+          "enum": ["none", "public_boundaries_only", "all_public_boundaries", "all"]
+        },
+        "require_proof_mode": { "type": "string", "enum": ["prove"] },
+        "require_proof_coverage": {
+          "type": "string",
+          "enum": ["all_reachable_defn", "all_reachable_user_defn"]
+        },
+        "require_async_proof_coverage": { "type": "boolean" },
+        "require_per_symbol_prove_reports_defn": { "type": "boolean" },
+        "require_per_symbol_prove_reports_async": { "type": "boolean" },
+        "allow_coverage_summary_imports": { "type": "boolean" },
+        "require_capsule_attestations": { "type": "boolean" },
+        "require_runtime_attestation": { "type": "boolean" },
+        "require_effect_log_digests": { "type": "boolean" },
+        "require_peer_policies": { "type": "boolean" },
+        "require_network_capsules": { "type": "boolean" },
+        "require_dependency_closure_attestation": { "type": "boolean" },
+        "require_compile_attestation": { "type": "boolean" },
+        "require_trust_report_clean": { "type": "boolean" },
+        "require_sbom": { "type": "boolean" }
+      }
+    },
+    "sandbox_requirements": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sandbox_backend",
+            "forbid_weaker_isolation",
+            "network_mode",
+            "network_enforcement"
+          ],
+          "properties": {
+            "sandbox_backend": {
+              "type": "string",
+              "enum": ["any", "vm", "os", "none"]
+            },
+            "forbid_weaker_isolation": { "type": "boolean" },
+            "network_mode": {
+              "type": "string",
+              "enum": ["any", "none", "allowlist"]
+            },
+            "network_enforcement": {
+              "type": "string",
+              "enum": [
+                "any",
+                "none",
+                "vm_boundary_allowlist",
+                "guest_allowlist",
+                "unsupported"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

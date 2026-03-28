@@ -15,6 +15,7 @@
 ## Agent
 - [Agent contracts](agent/contract.md)
 - [Readiness checks](agent/readiness-checks.md)
+- [Platform (x07lp)](agent/platform.md)
 - [Roadmap apps](agent/apps.md)
 
 ## Recipes
@@ -39,7 +40,7 @@
 ## Toolchain
 - [CLI](toolchain/cli.md)
 - [MCP kit](toolchain/mcp-kit.md)
-- [WASM (Phases 0–1)](toolchain/wasm.md)
+- [WASM (Phases 0–10)](toolchain/wasm.md)
 - [Benchmarks](toolchain/benchmarks.md)
 - [Compiler limits](toolchain/compiler-limits.md)
 - [Optimizer](toolchain/optimizer.md)
@@ -52,6 +53,7 @@
 - [Agent context packs](toolchain/agent-context.md)
 - [Diagnostics & repair](toolchain/diagnostics-repair.md)
 - [Diagnostic codes](toolchain/diagnostic-codes.md)
+- [Formal verification & certification](toolchain/formal-verification.md)
 - [Review & trust artifacts](toolchain/review-trust.md)
 - [Testing](toolchain/testing.md)
 - [Property-based testing](toolchain/pbt.md)
@@ -133,6 +135,9 @@
 ## Guides
 - [CLI apps](guides/cli-apps.md)
 - [Data interoperability](guides/data-interop.md)
+- [Kernel/shell in production](guides/kernel-shell-production.md)
+- [Performance tuning](guides/performance-tuning.md)
+- [Extract core migration](guides/extract-core.md)
 - [Web services](guides/web-apps.md)
 - [Crawling](guides/crawling.md)
 - [Messaging](guides/messaging.md)

@@ -5,6 +5,28 @@ Status: stable
 Applies-to: toolchain >= v0.0.95
 Related schemas: ["x07.spec.index@0.1.0"]
 
+## v0.1.81
+
+- Added proof-only verification schemas:
+  - `x07.verify.proof_summary@0.2.0`
+  - `x07.verify.proof_object@0.2.0`
+  - `x07.verify.proof_check.report@0.2.0`
+- Added `x07.project@0.4.0` and the frozen `spec/x07-project.v0.4.0.schema.json` public manifest line, preserving the existing project world/run-profile controls and adding operational-entry certification fields.
+- Bumped formal-verification and trust schemas:
+  - `x07.verify.report@0.8.0`
+  - `x07.verify.coverage@0.4.0`
+  - `x07.verify.summary@0.2.0`
+  - `x07.verify.primitives@0.2.0`
+  - `x07.review.diff@0.5.0`
+  - `x07.trust.profile@0.4.0`
+  - `x07.trust.certificate@0.7.0`
+- Added tool wrapper schemas for the public proof-check surface:
+  - `x07.tool.prove.report@0.2.0`
+  - `x07.tool.prove.check.report@0.2.0`
+- Proof objects now record source-replay inputs, imported proof-summary digests, primitive-manifest digests, recursion metadata, and async scheduler-model digests so `x07 prove check` can semantically replay the proof.
+- Proof-check reports now record replayed obligation and solver truth, and accepted certificates require proof-check success instead of only proof-check artifact presence.
+- Certificates now expose explicit formal-verification scope so reviewers can distinguish operational-entry proof from capsule/runtime-backed trust posture.
+
 ## v0.0.95
 
 - Introduced published spec sync flow (`scripts/sync_published_spec.py`).

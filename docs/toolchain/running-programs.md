@@ -135,6 +135,8 @@ The sidecar includes a versioned manifest (`x07.vm.bundle.manifest@0.2.0`) that 
 
 The bundled binary encodes `argc/argv` to `argv_v1` input bytes and writes the program output bytes directly to stdout.
 
+For native host bundles, `x07 bundle --emit-attestation <path>` writes a compile attestation artifact (`spec/x07-compile.attest.schema.json`) that records input digests, emitted artifacts, compiler output digests, and a deterministic rebuild check. VM-backed sandbox bundles do not support `--emit-attestation`.
+
 ### Sandbox bundle environment overrides
 
 For sandbox bundles, the generated native wrapper always forces sandboxing on:
@@ -150,8 +152,10 @@ Other `X07_OS_*` environment variables embedded into the wrapper are treated as 
 
 Report modes:
 
-- `--report runner` (default): pass through the runner JSON (`spec/x07-os-runner.report.schema.json`)
-- `--report wrapped`: wrap the runner JSON in `spec/x07-run.report.schema.json` (`schema_version: "x07.run.report@0.1.0"`)
+- `--report runner` (default): pass through the runner JSON (`spec/x07-os-runner.report.schema.json`, `schema_version: "x07-os-runner.report@0.5.0"`)
+- `--report wrapped`: wrap the runner JSON in `spec/x07-run.report.schema.json` (`schema_version: "x07.run.report@0.3.0"`)
+
+For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes a deterministic runtime attestation (`spec/x07-runtime.attest.schema.json`, `schema_version: "x07.runtime.attest@0.2.0"`). The attestation binds the effective policy digest, network mode, network enforcement posture, effective allow/deny host sets, bundled binary digest, compile attestation digest, capsule attestation digests, and effect-log digests. The runner report then records `sandbox_backend`, `network_mode`, and a `runtime_attestation` reference so trust/certification tooling can bind the observed execution.
 
 ### Runtime traps (AST pointers)
 

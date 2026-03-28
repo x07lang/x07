@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.boundaries.index.schema.json",
+  "title": "x07.arch.boundaries.index@0.1.0",
+  "description": "Pinned public boundary catalog consumed by `x07 arch check` and `x07 trust certify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "boundaries"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.boundaries.index@0.1.0" },
+    "boundaries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/boundary" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$"
+    },
+    "node_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "trust_zone": {
+      "type": "string",
+      "enum": ["verified_core", "certified_capsule", "test_only", "untrusted"]
+    },
+    "brand_or_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "brand": { "$ref": "#/$defs/symbol" },
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+        }
+      },
+      "anyOf": [
+        { "required": ["brand"] },
+        { "required": ["schema"] }
+      ]
+    },
+    "input_param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ty"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "ty": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "brand": { "$ref": "#/$defs/symbol" },
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ty"],
+      "properties": {
+        "ty": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "brand": { "$ref": "#/$defs/symbol" },
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+        },
+        "error_space": { "$ref": "#/$defs/symbol" }
+      }
+    },
+    "smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "tests"],
+      "properties": {
+        "entry": { "$ref": "#/$defs/symbol" },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "default": []
+        }
+      }
+    },
+    "pbt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "tests"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "default": []
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "mode"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "mode": {
+          "type": "string",
+          "enum": ["prove", "runtime", "off"]
+        }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "symbol",
+        "node_id",
+        "kind",
+        "from_zone",
+        "to_zone",
+        "worlds_allowed",
+        "input",
+        "output",
+        "smoke",
+        "pbt",
+        "verify"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "symbol": { "$ref": "#/$defs/symbol" },
+        "node_id": { "$ref": "#/$defs/node_id" },
+        "kind": {
+          "type": "string",
+          "enum": ["public_function", "cross_zone_function"]
+        },
+        "from_zone": { "$ref": "#/$defs/trust_zone" },
+        "to_zone": { "$ref": "#/$defs/trust_zone" },
+        "worlds_allowed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/world_id" },
+          "default": []
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["params"],
+          "properties": {
+            "params": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/input_param" },
+              "default": []
+            }
+          }
+        },
+        "output": { "$ref": "#/$defs/output" },
+        "smoke": { "$ref": "#/$defs/smoke" },
+        "pbt": { "$ref": "#/$defs/pbt" },
+        "verify": { "$ref": "#/$defs/verify" }
+      }
+    }
+  }
+}

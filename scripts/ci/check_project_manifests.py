@@ -13,9 +13,16 @@ SEMVER_RE = re.compile(
 )
 PKG_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,127}$")
 PROFILE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)+$")
 
 SOLVE_WORLDS = {"solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full"}
 ALL_WORLDS = SOLVE_WORLDS | {"run-os", "run-os-sandboxed"}
+
+ALLOWED_PROJECT_SCHEMA_VERSIONS = {
+    "x07.project@0.2.0",
+    "x07.project@0.3.0",
+    "x07.project@0.4.0",
+}
 
 
 def repo_root() -> Path:
@@ -81,6 +88,26 @@ def validate_dep(dep: Any, rel: str, idx: int) -> list[str]:
     return errs
 
 
+def validate_patch(name: str, spec: Any, rel: str) -> list[str]:
+    errs: list[str] = []
+    if not PKG_NAME_RE.match(name):
+        errs.append(f"{rel}: patch key {name!r} must match {PKG_NAME_RE.pattern!r}")
+        return errs
+    if not isinstance(spec, dict):
+        errs.append(f"{rel}: patch[{name!r}] must be an object")
+        return errs
+
+    version = spec.get("version")
+    path = spec.get("path")
+
+    if not isinstance(version, str) or parse_semver(version) is None:
+        errs.append(f"{rel}: patch[{name!r}].version must be semver")
+    if path is not None and (not isinstance(path, str) or not is_rel_path(path)):
+        errs.append(f"{rel}: patch[{name!r}].path must be a relative path when present")
+
+    return errs
+
+
 def validate_profile(name: str, prof: Any, rel: str) -> list[str]:
     errs: list[str] = []
     if not PROFILE_NAME_RE.match(name):
@@ -142,8 +169,10 @@ def validate_project(doc: Any, rel: str) -> list[str]:
     if not isinstance(doc, dict):
         return [f"{rel}: root must be a JSON object"]
 
-    if doc.get("schema_version") != "x07.project@0.2.0":
-        errs.append(f"{rel}: schema_version must be 'x07.project@0.2.0'")
+    schema_version = doc.get("schema_version")
+    if schema_version not in ALLOWED_PROJECT_SCHEMA_VERSIONS:
+        allowed = ", ".join(sorted(ALLOWED_PROJECT_SCHEMA_VERSIONS))
+        errs.append(f"{rel}: schema_version must be one of [{allowed}]")
 
     world = doc.get("world")
     if not isinstance(world, str) or world not in ALL_WORLDS:
@@ -152,6 +181,29 @@ def validate_project(doc: Any, rel: str) -> list[str]:
     entry = doc.get("entry")
     if not isinstance(entry, str) or not entry.endswith(".x07.json") or not is_rel_path(entry):
         errs.append(f"{rel}: entry must be a relative *.x07.json path")
+
+    operational_entry_symbol = doc.get("operational_entry_symbol")
+    if operational_entry_symbol is not None:
+        if schema_version != "x07.project@0.4.0":
+            errs.append(
+                f"{rel}: operational_entry_symbol requires schema_version x07.project@0.4.0"
+            )
+        elif not isinstance(operational_entry_symbol, str) or not SYMBOL_RE.match(
+            operational_entry_symbol
+        ):
+            errs.append(f"{rel}: operational_entry_symbol must match {SYMBOL_RE.pattern!r}")
+
+    certification_entry_symbol = doc.get("certification_entry_symbol")
+    if certification_entry_symbol is not None:
+        if schema_version != "x07.project@0.4.0":
+            errs.append(
+                f"{rel}: certification_entry_symbol requires schema_version x07.project@0.4.0"
+            )
+        elif certification_entry_symbol is not None and (
+            not isinstance(certification_entry_symbol, str)
+            or not SYMBOL_RE.match(certification_entry_symbol)
+        ):
+            errs.append(f"{rel}: certification_entry_symbol must match {SYMBOL_RE.pattern!r}")
 
     module_roots = doc.get("module_roots")
     if not isinstance(module_roots, list) or not module_roots:
@@ -177,6 +229,16 @@ def validate_project(doc: Any, rel: str) -> list[str]:
         else:
             for i, dep in enumerate(deps):
                 errs.extend(validate_dep(dep, rel, i))
+
+    patch = doc.get("patch")
+    if patch is not None:
+        if schema_version == "x07.project@0.2.0":
+            errs.append(f"{rel}: patch requires schema_version x07.project@0.3.0 or newer")
+        elif not isinstance(patch, dict):
+            errs.append(f"{rel}: patch must be an object when present")
+        else:
+            for name, spec in patch.items():
+                errs.extend(validate_patch(str(name), spec, rel))
 
     link = doc.get("link")
     if link is not None:

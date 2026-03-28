@@ -42,6 +42,8 @@ jobs:
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
 
       - name: Install deps (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu-')
@@ -58,10 +60,15 @@ jobs:
             zlib1g-dev \
             libsqlite3-dev
 
+      - name: Install formal verification tools (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu-')
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
+
       - name: Install deps (macOS)
         if: startsWith(matrix.os, 'macos-')
         run: |
-          brew install openssl@3 pkg-config
+          brew install cbmc openssl@3 pkg-config z3
 
       - name: CI gate
         shell: bash
@@ -70,3 +77,19 @@ jobs:
       - name: Installer smoke (local channels)
         shell: bash
         run: ./scripts/ci/check_installer_smoke.sh
+
+      - name: Verified core pure smoke
+        shell: bash
+        run: ./scripts/ci/check_verified_core_pure_example.sh
+
+      - name: Verified core fixture smoke
+        shell: bash
+        run: ./scripts/ci/check_verified_core_fixture.sh
+
+      - name: Trusted network service static smoke
+        shell: bash
+        run: ./scripts/ci/check_trusted_network_service_static.sh
+
+      - name: Certified network capsule static smoke
+        shell: bash
+        run: ./scripts/ci/check_certified_network_capsule_static.sh

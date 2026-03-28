@@ -3,47 +3,68 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
+        type: string
+      run_vm_examples:
+        description: Run self-hosted VM trust example gates
+        required: false
+        default: false
+        type: boolean
 
-permissions:
-  contents: write
-  packages: write
+concurrency:
+  group: x07-release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  X07_PYTHON: python
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
 jobs:
-  build-matrix:
-    name: release / build-matrix (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-22.04
-          - macos-15-intel
-          - macos-14
-    env:
-      X07_PYTHON: python
+  verify_tag:
+    name: verify-tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Verify tag matches repo version
+        shell: bash
+        run: |
+          bash scripts/release/verify-tag.sh --repo-kind x07 --tag "${RELEASE_TAG}"
 
+  test:
+    name: test
+    needs: verify_tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install Python deps
         shell: bash
         run: ./scripts/ci/install_python_deps.sh
-
-      - name: Set up Rust (rust-toolchain.toml)
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
-
-      - name: Install deps (Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Install Linux deps
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -54,68 +75,208 @@ jobs:
             libcurl4-openssl-dev \
             liblzma-dev \
             zlib1g-dev \
-            libsqlite3-dev
+            libsqlite3-dev \
+            xz-utils
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
+      - name: Run release-readiness CI
+        shell: bash
+        env:
+          X07_REQUIRE_SOLVERS: "1"
+          X07_REVIEW_ARTIFACTS_DIR: dist/review
+          X07_FORMAL_PERF_REPORT_OUT: dist/review/formal_verification.perf_report.json
+        run: |
+          ./scripts/ci/check_release_ready.sh
+      - name: Upload formal verification review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-verification-review
+          path: dist/review
+          if-no-files-found: error
+          retention-days: 7
 
+  trust_vm_examples:
+    name: trust-vm-examples
+    needs: verify_tag
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_vm_examples == 'true'
+    runs-on: [self-hosted, x07-vm-linux-firecracker]
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      X07_VM_BACKEND: firecracker-ctr
+      X07_REVIEW_ARTIFACTS_DIR: dist/review-vm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install system deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            clang \
+            build-essential \
+            curl \
+            pkg-config \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            unzip
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
+      - name: Build and import guest runner image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/build_guest_runner_image.sh --image x07-guest-runner --tag release-ci
+
+          tmp="$(mktemp -d 2>/dev/null || mktemp -d -t x07_guest_image)"
+          image_tar="${tmp}/guest-runner.tar"
+          docker save "x07-guest-runner:release-ci" -o "$image_tar"
+
+          sock="${X07_VM_FIRECRACKER_CONTAINERD_SOCK:-/run/firecracker-containerd/containerd.sock}"
+          ns="${X07_VM_CONTAINERD_NAMESPACE:-x07}"
+          firecracker-ctr --address "$sock" --namespace "$ns" images import "$image_tar"
+
+          echo "X07_VM_GUEST_IMAGE=x07-guest-runner:release-ci" >> "$GITHUB_ENV"
+      - name: Run strict VM trust example gates
+        shell: bash
+        run: |
+          ./scripts/ci/check_trusted_sandbox_program_example.sh
+          ./scripts/ci/check_trusted_network_service_example.sh
+      - name: Upload formal verification VM review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-verification-review-vm
+          path: dist/review-vm
+          if-no-files-found: error
+          retention-days: 7
+
+  trust_vm_examples_skipped:
+    name: trust-vm-examples-skipped
+    needs: verify_tag
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.run_vm_examples != 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Record skipped VM release lane
+        shell: bash
+        run: |
+          mkdir -p dist/review-vm
+          cat > dist/review-vm/README.txt <<EOF
+          Skipped strict VM trust example gates for ${RELEASE_TAG}. Re-run this workflow manually with run_vm_examples=true when the x07-vm-linux-firecracker self-hosted runner is available.
+          EOF
+      - name: Upload formal verification VM review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-verification-review-vm
+          path: dist/review-vm
+          if-no-files-found: error
+          retention-days: 7
+
+  build_matrix:
+    name: build-${{ matrix.target }}
+    needs:
+      - verify_tag
+      - test
+      - trust_vm_examples
+      - trust_vm_examples_skipped
+    if: |
+      always() &&
+      needs.verify_tag.result == 'success' &&
+      needs.test.result == 'success' &&
+      (needs.trust_vm_examples.result == 'success' || needs.trust_vm_examples.result == 'skipped') &&
+      (needs.trust_vm_examples_skipped.result == 'success' || needs.trust_vm_examples_skipped.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-14
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    env:
+      X07_CARGO: cargo
+      X07_CARGO_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            xz-utils
       - name: Install deps (macOS)
         if: runner.os == 'macOS'
+        shell: bash
         run: |
           brew install openssl@3 pkg-config
-
-      - name: CI gate
-        shell: bash
-        run: ./scripts/ci/check_all.sh
-
       - name: Build release binaries
         shell: bash
         run: |
-          set -euo pipefail
-          cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07-vm-launcher -p x07-vm-reaper -p x07import-cli -p x07up
-
+          cargo build --locked --release --target "${{ matrix.target }}" \
+            -p x07 \
+            -p x07c \
+            -p x07-host-runner \
+            -p x07-os-runner \
+            -p x07-vm-launcher \
+            -p x07-vm-reaper \
+            -p x07import-cli \
+            -p x07up
       - name: Build x07-vz-helper (macOS)
         if: runner.os == 'macOS'
         shell: bash
-        run: ./scripts/build_vz_helper.sh ./target/release/x07-vz-helper
-
-      - name: Detect Rust host target triple
-        shell: bash
         run: |
-          set -euo pipefail
-          target="$(rustc -vV | awk -F': ' '/^host:/{print $2}')"
-          if [[ -z "$target" ]]; then
-            echo "ERROR: failed to detect rustc host triple" >&2
-            exit 2
-          fi
-          echo "X07_TARGET=$target" >> "$GITHUB_ENV"
-
-      - name: Smoke x07-host-runner cache fallback
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # Simulate an "end-user machine" where the original workspace cache directory
-          # is unavailable (the build path is baked into the binary at compile time).
-          rm -rf target/x07-native-cache || true
-          mkdir -p target
-          echo "blocked" > target/x07-native-cache
-
-          tmp="$(mktemp -d)"
-          cat >"${tmp}/program.x07.json" <<'JSON'
-          {"schema_version":"x07.x07ast@0.3.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
-          JSON
-          printf 'hi' >"${tmp}/input.bin"
-
-          target/release/x07-host-runner --program "${tmp}/program.x07.json" --world solve-pure --input "${tmp}/input.bin" \
-            | python -c 'import base64,json,sys; report=json.load(sys.stdin); expected=base64.b64encode(b"hi").decode("ascii"); exit_code=report.get("exit_code"); out=(report.get("solve") or {}).get("solve_output_b64"); assert exit_code==0, report; assert out==expected, (out, expected); print("ok: relocated host-runner smoke passed")'
-
+          ./scripts/build_vz_helper.sh "./target/${{ matrix.target }}/release/x07-vz-helper"
       - name: Build and stage native backends
+        if: runner.os != 'Windows'
         shell: bash
         run: |
-          set -euo pipefail
           ./scripts/build_ext_regex.sh
           ./scripts/build_ext_fs.sh
           ./scripts/build_ext_stdio.sh
           ./scripts/build_ext_rand.sh
           ./scripts/build_ext_jsonschema.sh
+          ./scripts/build_ext_obj_s3.sh
           ./scripts/build_ext_math.sh
           ./scripts/build_ext_stream_xf.sh
           ./scripts/build_ext_time.sh
@@ -123,130 +284,68 @@ jobs:
           ./scripts/build_ext_db_pg.sh
           ./scripts/build_ext_db_mysql.sh
           ./scripts/build_ext_db_redis.sh
-
-      - name: Package toolchain
+      - name: Build release archives
+        id: pack
         shell: bash
         run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          target="${X07_TARGET}"
-          out="dist/x07-${tag}-${target}.tar.gz"
-          mkdir -p dist
-          scripts/build_toolchain_tarball.sh --tag "$tag" --platform "${{ runner.os }}" --out "$out"
-
-      - name: Package x07up
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          target="${X07_TARGET}"
-          out="dist/x07up-${tag}-${target}.tar.gz"
-          stage="dist/.tmp_x07up_${tag}_${target}"
-          rm -rf "$stage"
-          mkdir -p "$stage"
-          cp -f "target/release/x07up" "$stage/x07up"
-          chmod 0755 "$stage/x07up"
-          tar -czf "$out" -C "$stage" x07up
-
-      - name: Upload artifact
+          VERSION="${RELEASE_TAG#v}"
+          TOOLCHAIN_PATH="$(bash scripts/release/build-core-archive.sh \
+            --component x07 \
+            --version "${VERSION}" \
+            --target "${{ matrix.target }}" \
+            --out-dir dist/release)"
+          X07UP_PATH="$(bash scripts/release/build-x07up-archive.sh \
+            --version "${VERSION}" \
+            --target "${{ matrix.target }}" \
+            --out-dir dist/release)"
+          echo "toolchain_path=${TOOLCHAIN_PATH}" >> "$GITHUB_OUTPUT"
+          echo "x07up_path=${X07UP_PATH}" >> "$GITHUB_OUTPUT"
+      - name: Attest built archives
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            ${{ steps.pack.outputs.toolchain_path }}
+            ${{ steps.pack.outputs.x07up_path }}
+      - name: Upload release archives
         uses: actions/upload-artifact@v4
         with:
-          name: x07-${{ github.ref_name }}-${{ matrix.os }}
+          name: archives-${{ matrix.target }}
           path: |
-            dist/x07-${{ github.ref_name }}-*.tar.gz
-            dist/x07up-${{ github.ref_name }}-*.tar.gz
+            ${{ steps.pack.outputs.toolchain_path }}
+            ${{ steps.pack.outputs.x07up_path }}
+          if-no-files-found: error
+          retention-days: 7
 
-  build-linux-aarch64:
-    name: release / build-linux-aarch64
-    runs-on: ubuntu-22.04
-    timeout-minutes: 180
-    env:
-      X07_PYTHON: python3
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Rust (rust-toolchain.toml)
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cross (aarch64)
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-
-      - name: Build and package (aarch64)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          tag="${GITHUB_REF_NAME}"
-          target="aarch64-unknown-linux-gnu"
-
-          cross build --release --target "$target" -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07-vm-launcher -p x07-vm-reaper -p x07import-cli -p x07up
-
-          export X07_CARGO=cross
-          export X07_CARGO_TARGET="$target"
-
-          ./scripts/build_ext_regex.sh
-          ./scripts/build_ext_fs.sh
-          ./scripts/build_ext_stdio.sh
-          ./scripts/build_ext_rand.sh
-          ./scripts/build_ext_jsonschema.sh
-          ./scripts/build_ext_math.sh
-          ./scripts/build_ext_stream_xf.sh
-          ./scripts/build_ext_time.sh
-          ./scripts/build_ext_db_sqlite.sh
-          ./scripts/build_ext_db_pg.sh
-          ./scripts/build_ext_db_mysql.sh
-          ./scripts/build_ext_db_redis.sh
-
-          mkdir -p dist
-          scripts/build_toolchain_tarball.sh --tag "$tag" --platform Linux --target-dir "target/${target}" --out "dist/x07-${tag}-${target}.tar.gz"
-
-          stage="dist/.tmp_x07up_${tag}_${target}"
-          rm -rf "$stage"
-          mkdir -p "$stage"
-          cp -f "target/${target}/release/x07up" "$stage/x07up"
-          chmod 0755 "$stage/x07up"
-          tar -czf "dist/x07up-${tag}-${target}.tar.gz" -C "$stage" x07up
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: x07-${{ github.ref_name }}-linux-aarch64
-          path: |
-            dist/x07-${{ github.ref_name }}-*.tar.gz
-            dist/x07up-${{ github.ref_name }}-*.tar.gz
-
-  guest-runner-image:
-    name: release / guest-runner-image
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+  guest_runner_image:
+    name: guest-runner-image
     needs:
-      - build-matrix
-      - build-linux-aarch64
+      - build_matrix
+    if: |
+      always() &&
+      needs.build_matrix.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push guest runner image
         shell: bash
         run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${RELEASE_TAG#v}"
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             -f ci/x07-guest-runner/Dockerfile \
@@ -254,73 +353,166 @@ jobs:
             --push \
             .
 
-  publish:
-    name: release / publish
-    runs-on: ubuntu-latest
+  finalize_release:
+    name: finalize-release
     needs:
-      - build-matrix
-      - build-linux-aarch64
+      - build_matrix
+      - guest_runner_image
+    if: |
+      always() &&
+      needs.build_matrix.result == 'success' &&
+      needs.guest_runner_image.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-
-      - name: Flatten toolchain artifacts
+      - name: Prepare release asset workspace
         shell: bash
         run: |
-          set -euo pipefail
-          files=()
-          while IFS= read -r -d '' f; do
-            files+=("$f")
-          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07up-*.tar.gz' \) -print0)
-
-          for f in "${files[@]}"; do
-            base="$(basename "$f")"
-            cp -f "$f" "dist/$base"
-          done
-
+          rm -rf dist/release
+          mkdir -p dist/release
+      - name: Download matrix artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: archives-*
+          path: dist/release
+          merge-multiple: true
+      - name: Compute release metadata
+        id: meta
+        shell: bash
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "checksums=dist/release/x07-${VERSION}-checksums.txt" >> "$GITHUB_OUTPUT"
+          echo "component_manifest=dist/release/x07-${VERSION}-release.json" >> "$GITHUB_OUTPUT"
+          echo "bundle_manifest=dist/release/x07-${VERSION}-bundle.json" >> "$GITHUB_OUTPUT"
+          echo "attestations_jsonl=dist/release/x07-${VERSION}-attestations.jsonl" >> "$GITHUB_OUTPUT"
       - name: Build release manifest
-        run: python3 scripts/build_release_manifest.py --out dist/release-manifest.json
-
+        shell: bash
+        run: |
+          python3 scripts/build_release_manifest.py --out dist/release-manifest.json
       - name: Build skills pack
-        run: python3 scripts/build_skills_pack.py --tag "${{ github.ref_name }}" --out "dist/x07-skills-${{ github.ref_name }}.tar.gz"
-
+        shell: bash
+        run: |
+          python3 scripts/build_skills_pack.py --tag "${RELEASE_TAG}" --out "dist/x07-skills-${RELEASE_TAG}.tar.gz"
       - name: Build docs bundle
-        run: python3 scripts/build_docs_bundle.py --tag "${{ github.ref_name }}"
-
+        shell: bash
+        run: |
+          python3 scripts/build_docs_bundle.py --tag "${RELEASE_TAG}"
+      - name: Export attestations bundle
+        shell: bash
+        run: |
+          bash scripts/release/export-attestations-jsonl.sh \
+            --in-dir dist/release \
+            --out "${{ steps.meta.outputs.attestations_jsonl }}"
+      - name: Generate checksums
+        shell: bash
+        run: |
+          python3 scripts/release/gen-checksums.py \
+            --in-dir dist/release \
+            --out "${{ steps.meta.outputs.checksums }}"
+      - name: Generate component release manifest
+        shell: bash
+        run: |
+          python3 scripts/release/gen-component-release.py \
+            --schema x07.component.release@0.1.0 \
+            --component x07_core \
+            --version "${{ steps.meta.outputs.version }}" \
+            --tag "${RELEASE_TAG}" \
+            --repo "https://github.com/${GITHUB_REPOSITORY}" \
+            --assets-dir dist/release \
+            --compat-file "releases/compat/${{ steps.meta.outputs.version }}.json" \
+            --out "${{ steps.meta.outputs.component_manifest }}"
+      - name: Validate component release manifest
+        shell: bash
+        run: |
+          python3 scripts/release/validate-json.py \
+            --schema x07.component.release@0.1.0 \
+            --in "${{ steps.meta.outputs.component_manifest }}" \
+            --require component \
+            --require version \
+            --require assets \
+            --require compatibility
+      - name: Generate release bundle manifest
+        shell: bash
+        run: |
+          python3 scripts/release/gen-bundle.py \
+            --schema x07.release.bundle@0.1.0 \
+            --channel stable \
+            --input "releases/bundles/${{ steps.meta.outputs.version }}.input.json" \
+            --core-manifest "${{ steps.meta.outputs.component_manifest }}" \
+            --out "${{ steps.meta.outputs.bundle_manifest }}"
+      - name: Validate release bundle manifest
+        shell: bash
+        run: |
+          python3 scripts/release/validate-json.py \
+            --schema x07.release.bundle@0.1.0 \
+            --in "${{ steps.meta.outputs.bundle_manifest }}" \
+            --require channel \
+            --require x07_core \
+            --require x07_wasm \
+            --require x07_web_ui_host \
+            --require x07_device_host \
+            --require packages
+      - name: Attest manifest assets
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            ${{ steps.meta.outputs.attestations_jsonl }}
+            ${{ steps.meta.outputs.checksums }}
+            ${{ steps.meta.outputs.component_manifest }}
+            ${{ steps.meta.outputs.bundle_manifest }}
       - name: Build channels manifest (install)
-        run: python3 scripts/build_channels_json.py --tag "${{ github.ref_name }}" --out dist/channels.json
-
-      - name: Publish GitHub Release
+        shell: bash
+        run: |
+          python3 scripts/build_channels_json.py \
+            --tag "${RELEASE_TAG}" \
+            --dist dist/release \
+            --bundle "${{ steps.meta.outputs.bundle_manifest }}" \
+            --out dist/channels.json \
+            --channel-out-dir dist/channels
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          set -euo pipefail
-
-          tag="${GITHUB_REF_NAME}"
-
-          if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" --title "$tag" --generate-notes --verify-tag
+          if ! gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --verify-tag \
+              --title "${RELEASE_TAG}" \
+              --generate-notes
           fi
-
-          files=()
-          while IFS= read -r -d '' f; do
-            files+=("$f")
-          done < <(find dist -maxdepth 1 -type f \( -name 'x07-*.tar.gz' -o -name 'x07up-*.tar.gz' -o -name 'release-manifest.json' -o -name 'channels.json' \) -print0)
-
-          if (( ${#files[@]} == 0 )); then
-            echo "ERROR: no release assets found under dist/" >&2
-            exit 2
-          fi
-
-          gh release upload "$tag" "${files[@]}" --clobber
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release upload "${RELEASE_TAG}" \
+            dist/release/* \
+            dist/release-manifest.json \
+            dist/channels.json \
+            dist/channels/*.json \
+            dist/x07-docs-${RELEASE_TAG}.tar.gz \
+            dist/x07-skills-${RELEASE_TAG}.tar.gz \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
+      - name: Publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release edit "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false

@@ -5,7 +5,7 @@ This page is a hands-on tutorial for the built-in test harness.
 `x07 test` is designed for agents:
 
 - a single canonical command
-- stable, machine-readable JSON report output (`x07.x07test@0.3.0`)
+- stable, machine-readable JSON report output (`x07.x07test@0.4.0`)
 - runs in declared worlds (`solve-*`, `run-os`, `run-os-sandboxed`)
 
 Companion example (in the `x07` repo):
@@ -46,7 +46,7 @@ Replace `tests/smoke.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.5.0",
+  "schema_version": "x07.x07ast@0.8.0",
   "kind": "module",
   "module_id": "smoke",
   "imports": ["std.test"],
@@ -80,7 +80,21 @@ Replace `tests/tests.json` with:
 }
 ```
 
-If you want your unit tests to run under the sandboxed world, change `world` to `run-os-sandboxed` and keep tests pure (no filesystem/network I/O) unless you also provide a policy-driven integration harness.
+If you want your unit tests to run under the sandboxed world, change `world` to `run-os-sandboxed` and keep tests pure (no filesystem/network I/O) unless you also provide a policy-driven integration harness. On the current trust/certification line, sandbox smoke runs can also record `runtime_attestation` and `sandbox_backend` evidence in the x07test report.
+
+For a certification-oriented sandbox smoke entry, add the sandbox evidence requirements directly in the manifest:
+
+```json
+{
+  "id": "sandbox/smoke",
+  "world": "run-os-sandboxed",
+  "entry": "smoke.main",
+  "policy_json": "policy/run-os.json",
+  "require_runtime_attestation": true,
+  "required_capsules": ["capsule.main_v1"],
+  "sandbox_smoke": true
+}
+```
 
 ### Step 3: run tests
 
@@ -93,7 +107,8 @@ x07 test --manifest tests/tests.json
 `x07 test` prints a JSON report with:
 
 - `summary` (counts + duration)
-- `tests[]` entries with per-test `status`, plus optional `compile` / `run` sections
+- `tests[]` entries with per-test `status`, `entry_kind`, plus optional `compile` / `run` sections
+- sandboxed `run` sections can also carry `sandbox_backend`, `runtime_attestation`, `effect_log_digests`, and `capsule_ids` when the underlying runner emits them or the harness resolves them from the declared capsule set
 
 Contract failures:
 

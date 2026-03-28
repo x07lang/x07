@@ -141,7 +141,7 @@ import json
 import sys
 
 r = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-assert r.get("schema_version") == "x07.run.report@0.1.0", r.get("schema_version")
+assert r.get("schema_version") == "x07.run.report@0.3.0", r.get("schema_version")
 rep = r.get("report") or {}
 assert (rep.get("compile") or {}).get("ok") is True, rep.get("compile")
 assert (rep.get("solve") or {}).get("ok") is True, rep.get("solve")
@@ -151,4 +151,3 @@ print("ok: ext.toml.data_model.parse")
 PY
 
 echo "ok: check_ext_toml_data_model_parse_smoke"
-

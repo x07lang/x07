@@ -39,6 +39,97 @@ pub fn resolve_existing_path_upwards_from(base_dir: &Path, path: &Path) -> PathB
     path.to_path_buf()
 }
 
+pub(crate) fn parse_semver_triplet(v: &str) -> Option<(u32, u32, u32)> {
+    let parts: Vec<&str> = v.trim().split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let major: u32 = parts[0].parse().ok()?;
+    let minor: u32 = parts[1].parse().ok()?;
+    let patch: u32 = parts[2].parse().ok()?;
+    Some((major, minor, patch))
+}
+
+pub(crate) fn detect_toolchain_root_best_effort(cwd: &Path) -> Option<PathBuf> {
+    let cand = resolve_existing_path_upwards_from(cwd, Path::new("stdlib.lock"));
+    if cand.is_file() {
+        return cand.parent().map(|p| p.to_path_buf());
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        for anc in exe.ancestors() {
+            if anc.join("stdlib.lock").is_file() {
+                return Some(anc.to_path_buf());
+            }
+        }
+    }
+
+    let home = std::env::var_os("HOME").map(PathBuf::from)?;
+    let toolchains_dir = home.join(".x07").join("toolchains");
+    let mut best: Option<((u32, u32, u32), PathBuf)> = None;
+    for entry in std::fs::read_dir(&toolchains_dir).ok()? {
+        let entry = entry.ok()?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = path.file_name()?.to_string_lossy();
+        let dir_name = dir_name.strip_prefix('v').unwrap_or(&dir_name);
+        let Some(ver) = parse_semver_triplet(dir_name) else {
+            continue;
+        };
+        if !path.join("stdlib.lock").is_file() {
+            continue;
+        }
+        if best.as_ref().map(|(b, _)| ver > *b).unwrap_or(true) {
+            best = Some((ver, path));
+        }
+    }
+
+    best.map(|(_, p)| p)
+}
+
+pub(crate) fn semver_dirs_sorted_desc(base: &Path) -> Vec<PathBuf> {
+    let mut out: Vec<((u32, u32, u32), PathBuf)> = Vec::new();
+    let Ok(entries) = std::fs::read_dir(base) else {
+        return Vec::new();
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Some(v) = parse_semver_triplet(name) else {
+            continue;
+        };
+        out.push((v, path));
+    }
+    out.sort_by(|(a, _), (b, _)| b.cmp(a));
+    out.into_iter().map(|(_, p)| p).collect()
+}
+
+pub(crate) fn toolchain_stdlib_module_roots(toolchain_root: &Path) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    let stdlib_dir = toolchain_root.join("stdlib");
+    for family in ["os", "std"] {
+        let base = stdlib_dir.join(family);
+        if !base.is_dir() {
+            continue;
+        }
+        if let Some(modules) = semver_dirs_sorted_desc(&base)
+            .into_iter()
+            .map(|ver| ver.join("modules"))
+            .find(|modules| modules.is_dir())
+        {
+            roots.push(modules);
+        }
+    }
+    roots
+}
+
 pub fn hex_lower(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);
     for b in bytes {

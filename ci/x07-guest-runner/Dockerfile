@@ -17,6 +17,19 @@ WORKDIR /src
 COPY . /src
 
 RUN cargo build --release -p x07 -p x07-os-runner -p x07-guestd \
+    && ./scripts/build_os_helpers.sh \
+    && ./scripts/build_ext_db_mysql.sh \
+    && ./scripts/build_ext_db_pg.sh \
+    && ./scripts/build_ext_db_redis.sh \
+    && ./scripts/build_ext_db_sqlite.sh \
+    && ./scripts/build_ext_fs.sh \
+    && ./scripts/build_ext_jsonschema.sh \
+    && ./scripts/build_ext_math.sh \
+    && ./scripts/build_ext_rand.sh \
+    && ./scripts/build_ext_regex.sh \
+    && ./scripts/build_ext_stdio.sh \
+    && ./scripts/build_ext_stream_xf.sh \
+    && ./scripts/build_ext_time.sh \
     && install -m 0755 target/release/x07 /usr/local/bin/x07 \
     && install -m 0755 target/release/x07-os-runner /usr/local/bin/x07-os-runner \
     && install -m 0755 target/release/x07-guestd /usr/local/bin/x07-guestd
@@ -43,6 +56,8 @@ COPY --from=builder /usr/local/bin/x07-os-runner /usr/local/bin/x07-os-runner
 COPY --from=builder /usr/local/bin/x07-guestd /usr/local/bin/x07-guestd
 
 WORKDIR /opt/x07
+ENV X07_WORKSPACE_ROOT=/opt/x07
+COPY --from=builder /src/deps/x07/ ./deps/x07/
 COPY stdlib/ ./stdlib/
 COPY stdlib.lock ./stdlib.lock
 COPY stdlib.os.lock ./stdlib.os.lock

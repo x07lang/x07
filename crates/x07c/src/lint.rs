@@ -9,7 +9,10 @@ use crate::mem_provenance::{
     Violation, ViolationKind,
 };
 use crate::x07ast::{self, X07AstFile, X07AstKind};
-use x07_contracts::{X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0};
+use x07_contracts::{
+    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
+};
 
 fn expr_ident(name: impl Into<String>) -> Expr {
     Expr::Ident {
@@ -190,6 +193,23 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             &ctx,
             &mut diagnostics,
         );
+        let decreases = x07ast::defn_decreases(file, &f.name)
+            .expect("internal decreases should decode")
+            .unwrap_or_default();
+        lint_contract_clauses(
+            &decreases,
+            &format!("/decls/{decl_idx}/decreases"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
+        lint_loop_contracts(
+            &f.loop_contracts,
+            &format!("/decls/{decl_idx}/loop_contracts"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
 
         let ptr = format!("/decls/{decl_idx}/body");
         lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
@@ -217,6 +237,20 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             &ctx,
             &mut diagnostics,
         );
+        lint_async_protocol(
+            f.protocol.as_ref(),
+            &format!("/decls/{decl_idx}/protocol"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
+        lint_loop_contracts(
+            &f.loop_contracts,
+            &format!("/decls/{decl_idx}/loop_contracts"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
 
         let ptr = format!("/decls/{decl_idx}/body");
         lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
@@ -224,7 +258,10 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
 
     if run_typecheck
         && (file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
-            || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0)
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0)
     {
         let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
         diagnostics.extend(tc.diagnostics);
@@ -257,6 +294,65 @@ fn lint_contract_clauses(
                 diagnostics,
             );
         }
+    }
+}
+
+fn lint_async_protocol(
+    protocol: Option<&x07ast::AsyncProtocolAst>,
+    base_ptr: &str,
+    options: LintOptions,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(protocol) = protocol else {
+        return;
+    };
+    lint_contract_clauses(
+        &protocol.await_invariant,
+        &format!("{base_ptr}/await_invariant"),
+        options,
+        ctx,
+        diagnostics,
+    );
+    lint_contract_clauses(
+        &protocol.scope_invariant,
+        &format!("{base_ptr}/scope_invariant"),
+        options,
+        ctx,
+        diagnostics,
+    );
+    lint_contract_clauses(
+        &protocol.cancellation_ensures,
+        &format!("{base_ptr}/cancellation_ensures"),
+        options,
+        ctx,
+        diagnostics,
+    );
+}
+
+fn lint_loop_contracts(
+    loop_contracts: &[x07ast::LoopContractAst],
+    base_ptr: &str,
+    options: LintOptions,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for (idx, loop_contract) in loop_contracts.iter().enumerate() {
+        let lcptr = format!("{base_ptr}/{idx}");
+        lint_contract_clauses(
+            &loop_contract.invariant,
+            &format!("{lcptr}/invariant"),
+            options,
+            ctx,
+            diagnostics,
+        );
+        lint_contract_clauses(
+            &loop_contract.decreases,
+            &format!("{lcptr}/decreases"),
+            options,
+            ctx,
+            diagnostics,
+        );
     }
 }
 
@@ -295,6 +391,13 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
                 requires: &f.requires,
                 ensures: &f.ensures,
                 invariant: &f.invariant,
+                decreases: x07ast::defn_decreases(file, &f.name)
+                    .expect("internal decreases should decode")
+                    .as_deref()
+                    .unwrap_or(&[]),
+                await_invariant: &[],
+                scope_invariant: &[],
+                cancellation_ensures: &[],
                 body: Some(&f.body),
             },
             diagnostics,
@@ -313,6 +416,22 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
                 requires: &f.requires,
                 ensures: &f.ensures,
                 invariant: &f.invariant,
+                decreases: &[],
+                await_invariant: f
+                    .protocol
+                    .as_ref()
+                    .map(|p| p.await_invariant.as_slice())
+                    .unwrap_or(&[]),
+                scope_invariant: f
+                    .protocol
+                    .as_ref()
+                    .map(|p| p.scope_invariant.as_slice())
+                    .unwrap_or(&[]),
+                cancellation_ensures: f
+                    .protocol
+                    .as_ref()
+                    .map(|p| p.cancellation_ensures.as_slice())
+                    .unwrap_or(&[]),
                 body: Some(&f.body),
             },
             diagnostics,
@@ -329,6 +448,10 @@ struct FnDeclRefs<'a> {
     requires: &'a [x07ast::ContractClauseAst],
     ensures: &'a [x07ast::ContractClauseAst],
     invariant: &'a [x07ast::ContractClauseAst],
+    decreases: &'a [x07ast::ContractClauseAst],
+    await_invariant: &'a [x07ast::ContractClauseAst],
+    scope_invariant: &'a [x07ast::ContractClauseAst],
+    cancellation_ensures: &'a [x07ast::ContractClauseAst],
     body: Option<&'a Expr>,
 }
 
@@ -382,6 +505,34 @@ fn lint_type_params_usage(
     );
     collect_type_vars_from_contract_clauses(
         decl.invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.decreases,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.await_invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.scope_invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.cancellation_ensures,
         &declared,
         &mut used,
         &mut quickfix_ctx,
@@ -1332,9 +1483,9 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
     }
 }
 
-fn borrow_tmp_name(ptr: &str) -> String {
-    let mut out = String::with_capacity(ptr.len() + 32);
-    out.push_str("_x07_tmp_borrow");
+fn tmp_name(prefix: &str, ptr: &str) -> String {
+    let mut out = String::with_capacity(prefix.len() + ptr.len() + 8);
+    out.push_str(prefix);
     for ch in ptr.chars() {
         match ch {
             'a'..='z' | 'A'..='Z' | '0'..='9' => out.push(ch),
@@ -1342,6 +1493,14 @@ fn borrow_tmp_name(ptr: &str) -> String {
         }
     }
     out
+}
+
+fn borrow_tmp_name(ptr: &str) -> String {
+    tmp_name("_x07_tmp_borrow", ptr)
+}
+
+fn copy_tmp_name(ptr: &str) -> String {
+    tmp_name("_x07_tmp_copy", ptr)
 }
 
 fn lint_core_borrow_rules(
@@ -1614,14 +1773,14 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
                 .map(|o| o.borrow_call_ptr.clone())
                 .unwrap_or_else(|| ptr.to_string());
 
-            let tmp = "_x07_tmp_copy";
-            let cond_fixed = rewrite_bytes_view_owner(cond, name, tmp);
+            let tmp = copy_tmp_name(ptr);
+            let cond_fixed = rewrite_bytes_view_owner(cond, name, &tmp);
 
             let fixed = expr_list(vec![
                 expr_ident("begin"),
                 expr_list(vec![
                     expr_ident("let"),
-                    expr_ident(tmp.to_string()),
+                    expr_ident(tmp.clone()),
                     expr_list(vec![
                         expr_ident("view.to_bytes"),
                         expr_list(vec![expr_ident("bytes.view"), expr_ident(name.to_string())]),

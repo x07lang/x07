@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.arch.app.ops.index@0.1.0",
+  "profiles": [
+    {
+      "id": "ops_dev",
+      "path": "arch/app/ops/ops_dev.json"
+    },
+    {
+      "id": "ops_release",
+      "path": "arch/app/ops/ops_release.json"
+    }
+  ],
+  "defaults": {
+    "default_profile_id": "ops_dev"
+  }
+}

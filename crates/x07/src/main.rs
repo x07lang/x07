@@ -10,6 +10,7 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::{Args, Parser};
+use serde_json::Value;
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
     X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
@@ -40,6 +41,7 @@ mod pbt_fix;
 mod pkg;
 mod policy;
 mod policy_overrides;
+mod prove;
 mod repair;
 mod report_common;
 mod reporting;
@@ -48,6 +50,9 @@ mod review;
 mod rr;
 mod run;
 mod schema;
+mod service;
+mod service_genpack;
+mod service_validate;
 mod sm;
 mod tool_api;
 mod tool_report_schemas;
@@ -111,10 +116,14 @@ enum Command {
     Build(toolchain::BuildArgs),
     /// Check a project (lint + typecheck + backend-check; no emit).
     Check(toolchain::CheckArgs),
+    /// Service authoring, archetype discovery, and validation.
+    Service(service::ServiceArgs),
     /// Work with CLI specrows schemas and tooling.
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
     Pkg(pkg::PkgArgs),
+    /// Proof-object tooling.
+    Prove(prove::ProveArgs),
     /// Produce human review artifacts (semantic diffs).
     Review(review::ReviewArgs),
     /// Emit CI trust artifacts (budgets/caps, capabilities, nondeterminism, SBOM artifacts).
@@ -181,18 +190,39 @@ enum TestReturns {
     BytesStatusV1,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestEntryKind {
+    Defn,
+    Defasync,
+}
+
+impl TestEntryKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            TestEntryKind::Defn => "defn",
+            TestEntryKind::Defasync => "defasync",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct TestDecl {
     id: String,
     world: WorldId,
     entry: String,
+    entry_kind: TestEntryKind,
+    entry_result_ty: String,
     expect: Expect,
     returns: TestReturns,
     pbt: Option<pbt::PbtDecl>,
     input: Option<Vec<u8>>,
     fixture_root: Option<PathBuf>,
     policy_json: Option<PathBuf>,
+    require_runtime_attestation: bool,
+    required_capsules: Vec<String>,
+    sandbox_smoke: bool,
     timeout_ms: Option<u64>,
+    solve_fuel: Option<u64>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -221,6 +251,10 @@ struct TestArgs {
 
     #[arg(long)]
     exact: bool,
+
+    /// Allow filters that select zero tests (default: treat as an error).
+    #[arg(long)]
+    allow_empty: bool,
 
     /// Run property-based tests only (tests where `pbt` is set in the manifest).
     #[arg(long)]
@@ -298,12 +332,27 @@ fn main() -> std::process::ExitCode {
         }
     }
 
-    match try_main() {
+    let run_main = || match try_main() {
         Ok(code) => code,
         Err(err) => {
             eprintln!("{err:#}");
             std::process::ExitCode::from(2)
         }
+    };
+
+    match std::thread::Builder::new()
+        .name("x07-main".to_string())
+        .stack_size(32 * 1024 * 1024)
+        .spawn(run_main)
+    {
+        Ok(handle) => match handle.join() {
+            Ok(code) => code,
+            Err(_) => {
+                eprintln!("x07 main thread panicked");
+                std::process::ExitCode::from(101)
+            }
+        },
+        Err(_) => run_main(),
     }
 }
 
@@ -372,6 +421,20 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Fix(_)) => vec!["fix"],
             Some(Command::Build(_)) => vec!["build"],
             Some(Command::Check(_)) => vec!["check"],
+            Some(Command::Service(args)) => match &args.cmd {
+                None => vec!["service"],
+                Some(service::ServiceCommand::Archetypes(_)) => vec!["service", "archetypes"],
+                Some(service::ServiceCommand::Genpack(args)) => match &args.cmd {
+                    None => vec!["service", "genpack"],
+                    Some(service_genpack::ServiceGenpackCommand::Schema(_)) => {
+                        vec!["service", "genpack", "schema"]
+                    }
+                    Some(service_genpack::ServiceGenpackCommand::Grammar(_)) => {
+                        vec!["service", "genpack", "grammar"]
+                    }
+                },
+                Some(service::ServiceCommand::Validate(_)) => vec!["service", "validate"],
+            },
             Some(Command::Cli(args)) => match &args.cmd {
                 None => vec!["cli"],
                 Some(cli::CliCommand::Spec(args)) => match &args.cmd {
@@ -388,9 +451,13 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Versions(_)) => vec!["pkg", "versions"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
+                Some(pkg::PkgCommand::AttestClosure(_)) => vec!["pkg", "attest-closure"],
                 Some(pkg::PkgCommand::Provides(_)) => vec!["pkg", "provides"],
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
+            },
+            Some(Command::Prove(args)) => match &args.cmd {
+                prove::ProveCommand::Check(_) => vec!["prove", "check"],
             },
             Some(Command::Review(args)) => match &args.cmd {
                 None => vec!["review"],
@@ -399,6 +466,22 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Trust(args)) => match &args.cmd {
                 None => vec!["trust"],
                 Some(trust::TrustCommand::Report(_)) => vec!["trust", "report"],
+                Some(trust::TrustCommand::Profile(args)) => match &args.cmd {
+                    None => vec!["trust", "profile"],
+                    Some(trust::TrustProfileCommand::Check(_)) => {
+                        vec!["trust", "profile", "check"]
+                    }
+                },
+                Some(trust::TrustCommand::Capsule(args)) => match &args.cmd {
+                    None => vec!["trust", "capsule"],
+                    Some(trust::TrustCapsuleCommand::Check(_)) => {
+                        vec!["trust", "capsule", "check"]
+                    }
+                    Some(trust::TrustCapsuleCommand::Attest(_)) => {
+                        vec!["trust", "capsule", "attest"]
+                    }
+                },
+                Some(trust::TrustCommand::Certify(_)) => vec!["trust", "certify"],
             },
             Some(Command::Patch(args)) => match &args.cmd {
                 None => vec!["patch"],
@@ -452,8 +535,10 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),
         Command::Build(args) => toolchain::cmd_build(&cli.machine, args),
         Command::Check(args) => toolchain::cmd_check(&cli.machine, args),
+        Command::Service(args) => service::cmd_service(&cli.machine, args),
         Command::Cli(args) => cli::cmd_cli(&cli.machine, args),
         Command::Pkg(args) => pkg::cmd_pkg(&cli.machine, args),
+        Command::Prove(args) => prove::cmd_prove(&cli.machine, args),
         Command::Review(args) => review::cmd_review(&cli.machine, args),
         Command::Trust(args) => trust::cmd_trust(&cli.machine, args),
         Command::Patch(args) => patch::cmd_patch(&cli.machine, args),
@@ -523,6 +608,15 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
     let module_roots = compute_test_module_roots(&args, &validated)?;
 
     let mut tests = validated.tests;
+    let entry_diags = hydrate_test_entry_info(&module_roots, &mut tests);
+    if !entry_diags.is_empty() {
+        for d in &entry_diags {
+            eprintln!("{}: {} ({})", d.code, d.message, d.path);
+        }
+        let report = X07TestReport::error_from_manifest(&args, started.elapsed(), entry_diags);
+        return write_report_and_exit(machine, args, report, 12);
+    }
+    let total_tests = tests.len();
     if let Some(world) = args.world {
         tests.retain(|t| t.world == world);
     }
@@ -548,6 +642,36 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
     }
     tests.sort_by(|a, b| a.id.cmp(&b.id));
 
+    if args.pbt_repro.is_some() && tests.is_empty() {
+        anyhow::bail!(
+            "--pbt-repro: referenced test id was not found in the manifest (after filters)"
+        );
+    }
+
+    if tests.is_empty() && !args.allow_empty {
+        let mut selectors: Vec<String> = Vec::new();
+        if let Some(world) = args.world {
+            selectors.push(format!("world={}", world.as_str()));
+        }
+        if let Some(filter) = args.filter.as_deref() {
+            let kind = if args.exact { "exact" } else { "substr" };
+            selectors.push(format!("filter({kind})={filter:?}"));
+        }
+        if args.pbt {
+            selectors.push("pbt_only=true".to_string());
+        } else if !args.all {
+            selectors.push("pbt_only=false".to_string());
+        }
+        if selectors.is_empty() {
+            selectors.push("no filters".to_string());
+        }
+        anyhow::bail!(
+            "0 tests selected (manifest had {total_tests}; {})\n\
+             hint: pass --allow-empty to treat this as success",
+            selectors.join(", ")
+        );
+    }
+
     if args.list {
         for t in &tests {
             println!(
@@ -559,12 +683,6 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
             );
         }
         return Ok(std::process::ExitCode::SUCCESS);
-    }
-
-    if args.pbt_repro.is_some() && tests.is_empty() {
-        anyhow::bail!(
-            "--pbt-repro: referenced test id was not found in the manifest (after filters)"
-        );
     }
 
     let stdlib_lock_raw = args.stdlib_lock.clone();
@@ -618,6 +736,15 @@ fn compute_test_module_roots(
         util::resolve_existing_path_upwards_from(manifest_dir, Path::new("x07.json"));
     if !project_path.is_file() {
         return Ok(vec![manifest_dir.clone()]);
+    }
+
+    let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.clone())
+        .context("hydrate project deps")?;
+    if hydrated {
+        eprintln!(
+            "x07 test: hydrated project dependencies via `x07 pkg lock --project {}`",
+            project_path.display()
+        );
     }
 
     let project_manifest =
@@ -687,6 +814,282 @@ fn normalize_module_root_path(path: &Path) -> PathBuf {
         out.push(Path::new(component.as_os_str()));
     }
     out
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedTestEntry {
+    kind: TestEntryKind,
+    result: String,
+}
+
+fn resolve_test_entry(module_roots: &[PathBuf], entry: &str) -> Result<ResolvedTestEntry> {
+    let (module_id, _) = entry
+        .rsplit_once('.')
+        .context("test entry must contain '.'")?;
+    let rel = format!("{}.x07.json", module_id.replace('.', "/"));
+    for root in module_roots {
+        let path = root.join(&rel);
+        if !path.is_file() {
+            continue;
+        }
+        let doc = report_common::read_json_file(&path)
+            .with_context(|| format!("read test entry module: {}", path.display()))?;
+        let decls = doc
+            .get("decls")
+            .and_then(Value::as_array)
+            .context("test entry module is missing decls[]")?;
+        for decl in decls {
+            if decl.get("name").and_then(Value::as_str) != Some(entry) {
+                continue;
+            }
+            let kind = match decl.get("kind").and_then(Value::as_str).unwrap_or("") {
+                "defn" => TestEntryKind::Defn,
+                "defasync" => TestEntryKind::Defasync,
+                other => anyhow::bail!("unsupported test entry declaration kind: {other}"),
+            };
+            let result = decl
+                .get("result")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            return Ok(ResolvedTestEntry { kind, result });
+        }
+    }
+    anyhow::bail!("entry {entry:?} was not found under the resolved module roots");
+}
+
+fn hydrate_test_entry_info(module_roots: &[PathBuf], tests: &mut [TestDecl]) -> Vec<ManifestDiag> {
+    let mut diags = Vec::new();
+    for test in tests {
+        match resolve_test_entry(module_roots, &test.entry) {
+            Ok(resolved) => {
+                test.entry_kind = resolved.kind;
+                test.entry_result_ty = resolved.result.clone();
+                if resolved.kind == TestEntryKind::Defasync {
+                    let returns_supported = match test.returns {
+                        TestReturns::ResultI32 => resolved.result == "result_i32",
+                        TestReturns::BytesStatusV1 => {
+                            resolved.result == "bytes" || resolved.result == "result_bytes"
+                        }
+                    };
+                    if !returns_supported {
+                        diags.push(ManifestDiag {
+                            code: "X07TEST_ASYNC_ENTRY_UNSUPPORTED",
+                            message: format!(
+                                "async entry {:?} returns {:?}, which is incompatible with x07 test returns={:?}",
+                                test.entry,
+                                resolved.result,
+                                match test.returns {
+                                    TestReturns::ResultI32 => "result_i32",
+                                    TestReturns::BytesStatusV1 => "bytes_status_v1",
+                                }
+                            ),
+                            path: test.entry.clone(),
+                        });
+                    }
+                }
+            }
+            Err(err) => diags.push(ManifestDiag {
+                code: "ETEST_ENTRY_INVALID",
+                message: err.to_string(),
+                path: test.entry.clone(),
+            }),
+        }
+    }
+    diags
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleIndex {
+    #[serde(default)]
+    capsules: Vec<TestCapsuleRef>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleRef {
+    id: String,
+    contract_path: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleContract {
+    effect_log: TestCapsuleEffectLog,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleEffectLog {
+    schema_path: String,
+}
+
+fn resolve_runtime_attestation_path(manifest_path: &Path, raw_path: &str) -> PathBuf {
+    let candidate = PathBuf::from(raw_path);
+    if candidate.is_absolute() {
+        candidate
+    } else {
+        manifest_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(candidate)
+    }
+}
+
+fn collect_required_capsule_effect_log_digests(
+    manifest_path: &Path,
+    required_capsules: &[String],
+) -> Result<Vec<String>> {
+    if required_capsules.is_empty() {
+        return Ok(Vec::new());
+    }
+    let manifest_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let project_path =
+        util::resolve_existing_path_upwards_from(manifest_dir, Path::new("x07.json"));
+    if !project_path.is_file() {
+        anyhow::bail!(
+            "could not resolve project root for capsule evidence from {}",
+            manifest_path.display()
+        );
+    }
+    let project_root = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let index_path = project_root
+        .join("arch")
+        .join("capsules")
+        .join("index.x07capsule.json");
+    let index: TestCapsuleIndex = serde_json::from_slice(
+        &std::fs::read(&index_path)
+            .with_context(|| format!("read capsule index: {}", index_path.display()))?,
+    )
+    .with_context(|| format!("parse capsule index JSON: {}", index_path.display()))?;
+    let index_root = index_path.parent().unwrap_or_else(|| Path::new("."));
+    let by_id = index
+        .capsules
+        .into_iter()
+        .map(|capsule| (capsule.id.clone(), capsule))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut digests = Vec::new();
+    for capsule_id in required_capsules {
+        let Some(capsule) = by_id.get(capsule_id) else {
+            anyhow::bail!(
+                "required capsule {:?} is missing from {}",
+                capsule_id,
+                index_path.display()
+            );
+        };
+        let contract_path = index_root.join(&capsule.contract_path);
+        let contract: TestCapsuleContract = serde_json::from_slice(
+            &std::fs::read(&contract_path)
+                .with_context(|| format!("read capsule contract: {}", contract_path.display()))?,
+        )
+        .with_context(|| format!("parse capsule contract JSON: {}", contract_path.display()))?;
+        let effect_log_path = index_root.join(&contract.effect_log.schema_path);
+        let bytes = std::fs::read(&effect_log_path).with_context(|| {
+            format!(
+                "read capsule effect-log schema: {}",
+                effect_log_path.display()
+            )
+        })?;
+        digests.push(format!("sha256:{}", util::sha256_hex(&bytes)));
+    }
+    digests.sort();
+    digests.dedup();
+    Ok(digests)
+}
+
+fn attach_test_sandbox_evidence(
+    manifest_path: &Path,
+    test: &TestDecl,
+    result: &mut TestCaseResult,
+) -> bool {
+    let Some(run) = result.run.as_ref() else {
+        return false;
+    };
+    let mut failed = false;
+
+    let runtime_attestation = run.runtime_attestation.clone();
+    let mut effect_log_digests = Vec::new();
+
+    if test.require_runtime_attestation && runtime_attestation.is_none() {
+        result.diags.push(Diag::new(
+            "X07TEST_RUNTIME_ATTEST_REQUIRED",
+            if test.sandbox_smoke {
+                "sandbox_smoke test requires runtime attestation evidence, but no runtime attestation was emitted"
+            } else {
+                "test requires runtime attestation evidence, but no runtime attestation was emitted"
+            },
+        ));
+        result.failure_kind = Some("runtime_attestation_missing".to_string());
+        result.status = "error".to_string();
+        failed = true;
+    }
+    if let Some(attestation_ref) = runtime_attestation.as_ref() {
+        let resolved = resolve_runtime_attestation_path(manifest_path, &attestation_ref.path);
+        match std::fs::read(&resolved) {
+            Ok(bytes) => match serde_json::from_slice::<RuntimeAttestationDoc>(&bytes) {
+                Ok(doc) => effect_log_digests = doc.effect_log_digests,
+                Err(err) => {
+                    if test.require_runtime_attestation {
+                        result.diags.push(Diag::new(
+                            "X07TEST_RUNTIME_ATTEST_REQUIRED",
+                            format!(
+                                "required runtime attestation is not valid JSON: {} ({err})",
+                                resolved.display()
+                            ),
+                        ));
+                        result.failure_kind = Some("runtime_attestation_missing".to_string());
+                        result.status = "error".to_string();
+                        failed = true;
+                    }
+                }
+            },
+            Err(err) => {
+                if test.require_runtime_attestation {
+                    result.diags.push(Diag::new(
+                        "X07TEST_RUNTIME_ATTEST_REQUIRED",
+                        format!(
+                            "required runtime attestation is missing or unreadable: {} ({err})",
+                            resolved.display()
+                        ),
+                    ));
+                    result.failure_kind = Some("runtime_attestation_missing".to_string());
+                    result.status = "error".to_string();
+                    failed = true;
+                }
+            }
+        }
+    }
+    if effect_log_digests.is_empty() && !test.required_capsules.is_empty() {
+        match collect_required_capsule_effect_log_digests(manifest_path, &test.required_capsules) {
+            Ok(digests) => effect_log_digests = digests,
+            Err(err) => {
+                result.diags.push(Diag::new(
+                    "X07TEST_CAPSULE_EVIDENCE_MISSING",
+                    err.to_string(),
+                ));
+                result.failure_kind = Some("capsule_evidence_missing".to_string());
+                result.status = "error".to_string();
+                failed = true;
+            }
+        }
+    }
+    if !test.required_capsules.is_empty() && effect_log_digests.len() < test.required_capsules.len()
+    {
+        result.diags.push(Diag::new(
+            "X07TEST_CAPSULE_EVIDENCE_MISSING",
+            format!(
+                "test requires capsule evidence for {:?}, but only {} effect-log digest(s) were available",
+                test.required_capsules,
+                effect_log_digests.len()
+            ),
+        ));
+        result.failure_kind = Some("capsule_evidence_missing".to_string());
+        result.status = "error".to_string();
+        failed = true;
+    }
+    if let Some(run) = result.run.as_mut() {
+        run.capsule_ids = test.required_capsules.clone();
+        run.effect_log_digests = effect_log_digests;
+    }
+    failed
 }
 
 fn run_tests(
@@ -856,6 +1259,7 @@ fn run_one_test(
             expect: test.expect.as_str().to_string(),
             status: "skip".to_string(),
             duration_ms: start.elapsed().as_millis() as u64,
+            entry_kind: test.entry_kind.as_str().to_string(),
             failure_kind: None,
             contract_repro_path: None,
             entry: Some(test.entry.clone()),
@@ -915,6 +1319,7 @@ fn run_one_test(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        entry_kind: test.entry_kind.as_str().to_string(),
         failure_kind: None,
         contract_repro_path: None,
         entry: Some(test.entry.clone()),
@@ -980,7 +1385,7 @@ fn run_one_test(
 
     let run_res = last_run.context("internal error: missing run result")?;
 
-    if !run_res.ok {
+    if !run_res.ok || run_res.exit_status != 0 {
         if let Some(trap) = run_res.trap.as_deref() {
             match contract_repro::try_parse_contract_trap(trap) {
                 Ok(Some(info)) => {
@@ -1030,6 +1435,29 @@ fn run_one_test(
                 }
             }
         }
+
+        if let Some(trap) = run_res.trap.as_deref() {
+            result
+                .diags
+                .push(Diag::new("X07T_RUN_TRAP", "runner trapped").with_details(
+                    serde_json::json!({
+                        "trap": trap,
+                    }),
+                ));
+        } else {
+            result.diags.push(Diag::new(
+                "ETEST_RUN",
+                format!(
+                    "runner failed: ok={} exit_status={}",
+                    run_res.ok, run_res.exit_status
+                ),
+            ));
+        }
+
+        result.run = Some(RunSection::from_runner_result(&run_res));
+        result.status = "error".to_string();
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        return Ok(result);
     }
 
     let status_bytes = run_res.solve_output.clone();
@@ -1163,6 +1591,7 @@ fn run_one_pbt_test(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        entry_kind: test.entry_kind.as_str().to_string(),
         failure_kind: None,
         contract_repro_path: None,
         entry: Some(test.entry.clone()),
@@ -1238,6 +1667,15 @@ fn run_one_pbt_test(
         result.run = Some(RunSection::from_runner_result(&run_res));
 
         if !run_res.ok {
+            if let Some(trap) = run_res.trap.as_deref() {
+                result
+                    .diags
+                    .push(Diag::new("X07T_RUN_TRAP", "runner trapped").with_details(
+                        serde_json::json!({
+                            "trap": trap,
+                        }),
+                    ));
+            }
             result.diags.push(
                 Diag::new("X07T_EPBT_FAIL", "repro case failed (runner trap)")
                     .with_details(pbt::repro_to_details_value(&repro)?),
@@ -1349,6 +1787,10 @@ struct OsRunnerReportRaw {
     compile: OsRunnerCompileRaw,
     #[serde(default)]
     solve: Option<OsRunnerSolveRaw>,
+    #[serde(default)]
+    sandbox_backend: Option<String>,
+    #[serde(default)]
+    runtime_attestation: Option<RuntimeAttestationRef>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1375,6 +1817,23 @@ struct OsRunnerSolveRaw {
     sched_stats: Option<x07_host_runner::SchedStats>,
     #[serde(default)]
     trap: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+struct RuntimeAttestationRef {
+    path: String,
+    sandbox_backend: String,
+    weaker_isolation: bool,
+    #[serde(default)]
+    network_mode: String,
+    #[serde(default)]
+    network_enforcement: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct RuntimeAttestationDoc {
+    #[serde(default)]
+    effect_log_digests: Vec<String>,
 }
 
 static X07TEST_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1414,6 +1873,7 @@ fn run_one_test_os(
             expect: test.expect.as_str().to_string(),
             status: "error".to_string(),
             duration_ms: start.elapsed().as_millis() as u64,
+            entry_kind: test.entry_kind.as_str().to_string(),
             failure_kind: None,
             contract_repro_path: None,
             entry: Some(test.entry.clone()),
@@ -1449,6 +1909,19 @@ fn run_one_test_os(
         .with_context(|| format!("write driver: {}", driver_path.display()))?;
 
     let exe_out_path = out_dir.join("solver");
+    let runtime_attestation_path = if test.world == WorldId::RunOsSandboxed {
+        let path = args
+            .artifact_dir
+            .join("runtime-attest")
+            .join(format!("{}.json", util::safe_artifact_dir_name(&test.id)));
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create runtime attestation dir: {}", parent.display()))?;
+        }
+        Some(path)
+    } else {
+        None
+    };
 
     let mut cmd = std::process::Command::new(crate::util::resolve_sibling_or_path("x07-os-runner"));
     let manifest_dir = args.manifest.parent().map(Path::to_path_buf);
@@ -1476,10 +1949,10 @@ fn run_one_test_os(
     let cmd_cwd = if test.world == WorldId::RunOsSandboxed {
         let current_dir = std::env::current_dir().ok();
         let mut candidates: Vec<PathBuf> = Vec::new();
-        if let Some(d) = &manifest_dir {
+        if let Some(d) = &arch_root {
             candidates.push(d.clone());
         }
-        if let Some(d) = &arch_root {
+        if let Some(d) = &manifest_dir {
             if !candidates.iter().any(|c| c == d) {
                 candidates.push(d.clone());
             }
@@ -1517,6 +1990,9 @@ fn run_one_test_os(
             .as_deref()
             .context("internal error: missing resolved policy path")?;
         cmd.arg("--policy").arg(policy_path);
+        if let Some(path) = runtime_attestation_path.as_ref() {
+            cmd.arg("--attest-runtime").arg(path);
+        }
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for root in module_roots {
@@ -1534,7 +2010,8 @@ fn run_one_test_os(
     };
     cmd.arg("--cpu-time-limit-seconds")
         .arg(cpu_time_limit_seconds.to_string());
-    cmd.arg("--solve-fuel").arg(X07TEST_SOLVE_FUEL.to_string());
+    cmd.arg("--solve-fuel")
+        .arg(test.solve_fuel.unwrap_or(X07TEST_SOLVE_FUEL).to_string());
 
     let output = cmd.output().with_context(|| {
         format!(
@@ -1549,6 +2026,7 @@ fn run_one_test_os(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        entry_kind: test.entry_kind.as_str().to_string(),
         failure_kind: None,
         contract_repro_path: None,
         entry: Some(test.entry.clone()),
@@ -1578,17 +2056,23 @@ fn run_one_test_os(
             return Ok(result);
         }
     };
+    let OsRunnerReportRaw {
+        compile,
+        solve,
+        sandbox_backend,
+        runtime_attestation,
+    } = report;
 
     result.compile = Some(CompileSection {
-        ok: report.compile.ok,
-        exit_code: Some(report.compile.exit_status),
+        ok: compile.ok,
+        exit_code: Some(compile.exit_status),
         compiler_diags: Vec::new(),
         artifact_path: Some(display_path(&exe_out_path)),
-        c_bytes: Some(report.compile.c_source_size),
+        c_bytes: Some(compile.c_source_size),
     });
 
-    if !report.compile.ok {
-        if let Some(msg) = report.compile.compile_error {
+    if !compile.ok {
+        if let Some(msg) = compile.compile_error {
             result.diags.push(Diag::new("ETEST_COMPILE", msg));
         } else {
             result
@@ -1602,7 +2086,7 @@ fn run_one_test_os(
         return Ok(result);
     }
 
-    let Some(solve) = report.solve else {
+    let Some(solve) = solve else {
         result.diags.push(Diag::new(
             "ETEST_RUN",
             "missing solve section in x07-os-runner report",
@@ -1624,7 +2108,19 @@ fn run_one_test_os(
         stdout_b64: Some(solve.stdout_b64),
         stderr_b64: Some(solve.stderr_b64),
         failure_code_u32: None,
+        sandbox_backend,
+        runtime_attestation,
+        effect_log_digests: Vec::new(),
+        capsule_ids: Vec::new(),
     });
+
+    if attach_test_sandbox_evidence(&args.manifest, test, &mut result) {
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        if cleanup_dir {
+            rm_rf(&out_dir);
+        }
+        return Ok(result);
+    }
 
     if !solve.ok || solve.exit_status != 0 {
         if let Some(trap) = solve.trap.as_deref() {
@@ -1646,7 +2142,7 @@ fn run_one_test_os(
                         fixture_rr_dir: None,
                         fixture_kv_dir: None,
                         fixture_kv_seed: None,
-                        solve_fuel: X07TEST_SOLVE_FUEL,
+                        solve_fuel: test.solve_fuel.unwrap_or(X07TEST_SOLVE_FUEL),
                         max_memory_bytes: 64 * 1024 * 1024,
                         max_output_bytes: 1024 * 1024,
                         cpu_time_limit_seconds,
@@ -1695,6 +2191,15 @@ fn run_one_test_os(
             }
         }
 
+        if let Some(trap) = solve.trap.as_deref() {
+            result
+                .diags
+                .push(Diag::new("X07T_RUN_TRAP", "runner trapped").with_details(
+                    serde_json::json!({
+                        "trap": trap,
+                    }),
+                ));
+        }
         result.diags.push(Diag::new(
             "ETEST_RUN",
             format!(
@@ -1778,7 +2283,7 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
         fixture_rr_dir: None,
         fixture_kv_dir: None,
         fixture_kv_seed: None,
-        solve_fuel: X07TEST_SOLVE_FUEL,
+        solve_fuel: test.solve_fuel.unwrap_or(X07TEST_SOLVE_FUEL),
         max_memory_bytes: 64 * 1024 * 1024,
         max_output_bytes: 1024 * 1024,
         cpu_time_limit_seconds,
@@ -1965,11 +2470,33 @@ fn build_test_driver_x07ast_json(test: &TestDecl) -> Result<Vec<u8>> {
     imports.dedup();
 
     let call_entry = serde_json::json!([test.entry]);
-    let solve = match test.returns {
-        TestReturns::ResultI32 => {
+    let solve = match (test.entry_kind, test.returns) {
+        (TestEntryKind::Defn, TestReturns::ResultI32) => {
             serde_json::json!(["std.test.status_from_result_i32", call_entry])
         }
-        TestReturns::BytesStatusV1 => call_entry,
+        (TestEntryKind::Defn, TestReturns::BytesStatusV1) => call_entry,
+        (TestEntryKind::Defasync, TestReturns::ResultI32) => serde_json::json!([
+            "begin",
+            ["let", "task", call_entry],
+            ["task.spawn", "task"],
+            ["std.test.status_from_result_i32", ["await", "task"]]
+        ]),
+        (TestEntryKind::Defasync, TestReturns::BytesStatusV1) => serde_json::json!([
+            "begin",
+            ["let", "task", call_entry],
+            ["task.spawn", "task"],
+            ["let", "out", ["await", "task"]],
+            if test.entry_result_ty == "result_bytes" {
+                serde_json::json!([
+                    "if",
+                    ["result_bytes.is_ok", "out"],
+                    ["std.test.status_ok"],
+                    ["std.test.status_fail", ["result_bytes.err_code", "out"]]
+                ])
+            } else {
+                serde_json::json!(["std.test.status_ok"])
+            }
+        ]),
     };
 
     let file = serde_json::json!({
@@ -1999,6 +2526,8 @@ struct TestRaw {
     world: String,
     entry: String,
     #[serde(default)]
+    solve_fuel: Option<u64>,
+    #[serde(default)]
     input_b64: Option<String>,
     #[serde(default)]
     input_path: Option<String>,
@@ -2012,6 +2541,12 @@ struct TestRaw {
     fixture_root: Option<String>,
     #[serde(default)]
     policy_json: Option<String>,
+    #[serde(default)]
+    require_runtime_attestation: bool,
+    #[serde(default)]
+    required_capsules: Vec<String>,
+    #[serde(default)]
+    sandbox_smoke: bool,
     #[serde(default)]
     timeout_ms: Option<u64>,
 }
@@ -2684,17 +3219,64 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             }
         };
 
+        if (t.require_runtime_attestation || t.sandbox_smoke) && world != WorldId::RunOsSandboxed {
+            diags.push(ManifestDiag {
+                code: "X07TEST_RUNTIME_ATTEST_REQUIRED",
+                message: "sandbox smoke and runtime attestation evidence are only supported for run-os-sandboxed tests".to_string(),
+                path: format!("{base}/world"),
+            });
+            continue;
+        }
+
+        let mut required_capsules = t.required_capsules.clone();
+        required_capsules.sort();
+        required_capsules.dedup();
+        for (ci, capsule_id) in required_capsules.iter().enumerate() {
+            if capsule_id.trim().is_empty() {
+                diags.push(ManifestDiag {
+                    code: "X07TEST_CAPSULE_EVIDENCE_MISSING",
+                    message: "required_capsules entries must be non-empty".to_string(),
+                    path: format!("{base}/required_capsules/{ci}"),
+                });
+                continue;
+            }
+            if let Err(msg) = x07c::validate::validate_symbol(capsule_id) {
+                diags.push(ManifestDiag {
+                    code: "X07TEST_CAPSULE_EVIDENCE_MISSING",
+                    message: format!("invalid required_capsules entry: {msg}"),
+                    path: format!("{base}/required_capsules/{ci}"),
+                });
+                continue;
+            }
+        }
+
         out.push(TestDecl {
             id: t.id.clone(),
             world,
             entry: t.entry.clone(),
+            entry_kind: TestEntryKind::Defn,
+            entry_result_ty: "result_i32".to_string(),
             expect,
             returns,
             pbt: pbt_decl,
             input,
             fixture_root,
             policy_json,
+            require_runtime_attestation: t.require_runtime_attestation || t.sandbox_smoke,
+            required_capsules,
+            sandbox_smoke: t.sandbox_smoke,
             timeout_ms: t.timeout_ms,
+            solve_fuel: match t.solve_fuel {
+                Some(0) => {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_SOLVE_FUEL_INVALID",
+                        message: "solve_fuel must be > 0".to_string(),
+                        path: format!("{base}/solve_fuel"),
+                    });
+                    continue;
+                }
+                other => other,
+            },
         });
     }
 
@@ -2803,6 +3385,7 @@ struct TestCaseResult {
     expect: String,
     status: String,
     duration_ms: u64,
+    entry_kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     failure_kind: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2827,6 +3410,7 @@ impl TestCaseResult {
             expect: test.expect.as_str().to_string(),
             status: "skip".to_string(),
             duration_ms: 0,
+            entry_kind: test.entry_kind.as_str().to_string(),
             failure_kind: None,
             contract_repro_path: None,
             entry: Some(test.entry.clone()),
@@ -2872,6 +3456,14 @@ struct RunSection {
     stderr_b64: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     failure_code_u32: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sandbox_backend: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runtime_attestation: Option<RuntimeAttestationRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    effect_log_digests: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    capsule_ids: Vec<String>,
 }
 
 impl RunSection {
@@ -2887,6 +3479,10 @@ impl RunSection {
             stdout_b64: Some(b64.encode(&r.stdout)),
             stderr_b64: Some(b64.encode(&r.stderr)),
             failure_code_u32: None,
+            sandbox_backend: None,
+            runtime_attestation: None,
+            effect_log_digests: Vec::new(),
+            capsule_ids: Vec::new(),
         }
     }
 }

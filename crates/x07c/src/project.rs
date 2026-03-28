@@ -8,7 +8,7 @@ use x07_contracts::{
     PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSION,
     PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, PROJECT_LOCKFILE_SCHEMA_VERSION_V0_2_0,
     PROJECT_MANIFEST_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED,
-    PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0,
+    PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0, PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0,
 };
 
 fn workspace_path_remainder(raw: &str) -> Option<&str> {
@@ -16,6 +16,16 @@ fn workspace_path_remainder(raw: &str) -> Option<&str> {
         return Some("");
     }
     raw.strip_prefix("$workspace/")
+}
+
+pub fn is_vendored_dep_path(raw: &str) -> bool {
+    let raw = raw.trim();
+    if raw.starts_with(".x07/deps/") || raw.starts_with("$workspace/.x07/deps/") {
+        return true;
+    }
+
+    workspace_path_remainder(raw)
+        .is_some_and(|remainder| remainder == ".x07/deps" || remainder.contains("/.x07/deps/"))
 }
 
 fn discover_workspace_root_from_git(base: &Path) -> Option<PathBuf> {
@@ -173,6 +183,10 @@ pub struct ProjectManifest {
     pub schema_version: String,
     pub world: String,
     pub entry: String,
+    #[serde(default)]
+    pub operational_entry_symbol: Option<String>,
+    #[serde(default)]
+    pub certification_entry_symbol: Option<String>,
     pub module_roots: Vec<String>,
     #[serde(default)]
     pub link: LinkConfig,
@@ -311,6 +325,26 @@ pub fn parse_project_manifest_bytes(bytes: &[u8], path: &Path) -> Result<Project
     normalize_string_in_place(&mut m.schema_version);
     normalize_string_in_place(&mut m.world);
     normalize_string_in_place(&mut m.entry);
+    if let Some(symbol) = m.operational_entry_symbol.as_mut() {
+        normalize_string_in_place(symbol);
+    }
+    if m.operational_entry_symbol
+        .as_deref()
+        .unwrap_or("")
+        .is_empty()
+    {
+        m.operational_entry_symbol = None;
+    }
+    if let Some(symbol) = m.certification_entry_symbol.as_mut() {
+        normalize_string_in_place(symbol);
+    }
+    if m.certification_entry_symbol
+        .as_deref()
+        .unwrap_or("")
+        .is_empty()
+    {
+        m.certification_entry_symbol = None;
+    }
     normalize_vec_in_place(&mut m.module_roots);
     m.link.normalize();
     for dep in &mut m.dependencies {
@@ -364,6 +398,20 @@ pub fn parse_project_manifest_bytes(bytes: &[u8], path: &Path) -> Result<Project
             PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0
         );
     }
+    if m.schema_version != PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0 {
+        if m.operational_entry_symbol.is_some() {
+            anyhow::bail!(
+                "project.operational_entry_symbol requires project schema_version {}",
+                PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0
+            );
+        }
+        if m.certification_entry_symbol.is_some() {
+            anyhow::bail!(
+                "project.certification_entry_symbol requires project schema_version {}",
+                PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0
+            );
+        }
+    }
     crate::world_config::parse_world_id(&m.world)
         .with_context(|| format!("invalid project world {:?}", m.world))?;
     if m.entry.trim().is_empty() {
@@ -394,6 +442,16 @@ pub fn parse_project_manifest_bytes(bytes: &[u8], path: &Path) -> Result<Project
     }
     if let Some(lockfile) = &m.lockfile {
         validate_rel_path("project.lockfile", lockfile)?;
+    }
+    if let Some(symbol) = &m.operational_entry_symbol {
+        crate::validate::validate_symbol(symbol)
+            .map_err(anyhow::Error::msg)
+            .with_context(|| format!("invalid project operational_entry_symbol {:?}", symbol))?;
+    }
+    if let Some(symbol) = &m.certification_entry_symbol {
+        crate::validate::validate_symbol(symbol)
+            .map_err(anyhow::Error::msg)
+            .with_context(|| format!("invalid project certification_entry_symbol {:?}", symbol))?;
     }
     Ok(m)
 }
@@ -483,7 +541,7 @@ pub fn compute_lockfile(project_path: &Path, manifest: &ProjectManifest) -> Resu
             module_root: pkg.module_root.clone(),
             modules_sha256,
             overridden_by: None,
-            yanked: None,
+            yanked: is_vendored_dep_path(&dep.path).then_some(false),
             advisories: Vec::new(),
         });
     }
@@ -520,23 +578,47 @@ pub fn verify_lockfile(
     }
 
     let expected = compute_lockfile(project_path, manifest)?;
+    let hint = {
+        let uses_workspace_paths = manifest
+            .module_roots
+            .iter()
+            .any(|p| workspace_path_remainder(p).is_some())
+            || manifest
+                .dependencies
+                .iter()
+                .any(|d| workspace_path_remainder(&d.path).is_some());
+        if uses_workspace_paths {
+            format!(
+                " (hint: run `X07_WORKSPACE_ROOT=... x07 pkg lock --project {}`)",
+                project_path.display()
+            )
+        } else {
+            format!(
+                " (hint: run `x07 pkg lock --project {}`)",
+                project_path.display()
+            )
+        }
+    };
 
     if lock.dependencies.len() != expected.dependencies.len() {
-        anyhow::bail!("lockfile dependency list does not match project");
+        anyhow::bail!("lockfile dependency list does not match project{hint}");
     }
 
     for (a, b) in lock.dependencies.iter().zip(expected.dependencies.iter()) {
         if a.name != b.name || a.version != b.version || a.path != b.path {
-            anyhow::bail!("lockfile dependencies do not match project manifest");
+            anyhow::bail!("lockfile dependencies do not match project manifest{hint}");
         }
         if a.package_manifest_sha256 != b.package_manifest_sha256 {
-            anyhow::bail!("lockfile package manifest hash mismatch for {:?}", a.name);
+            anyhow::bail!(
+                "lockfile package manifest hash mismatch for {:?}{hint}",
+                a.name
+            );
         }
         if a.module_root != b.module_root {
-            anyhow::bail!("lockfile module_root mismatch for {:?}", a.name);
+            anyhow::bail!("lockfile module_root mismatch for {:?}{hint}", a.name);
         }
         if a.modules_sha256 != b.modules_sha256 {
-            anyhow::bail!("lockfile module hashes mismatch for {:?}", a.name);
+            anyhow::bail!("lockfile module hashes mismatch for {:?}{hint}", a.name);
         }
     }
 
@@ -588,4 +670,51 @@ fn sha256_hex(bytes: &[u8]) -> String {
         out.push_str(&format!("{:02x}", b));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(prefix: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "x07c_project_{prefix}_{}_{}",
+            std::process::id(),
+            unique
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    #[test]
+    fn load_project_manifest_accepts_v0_4_0_operational_entry() {
+        let dir = temp_dir("manifest_v0_4");
+        let path = dir.join("x07.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": "x07.project@0.4.0",
+                "world": "solve-pure",
+                "entry": "src/main.x07.json",
+                "operational_entry_symbol": "app.main",
+                "module_roots": ["src"],
+                "dependencies": []
+            }))
+            .expect("serialize manifest"),
+        )
+        .expect("write manifest");
+
+        let manifest = load_project_manifest(&path).expect("load project manifest");
+        assert_eq!(manifest.schema_version, "x07.project@0.4.0");
+        assert_eq!(
+            manifest.operational_entry_symbol.as_deref(),
+            Some("app.main")
+        );
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
 }

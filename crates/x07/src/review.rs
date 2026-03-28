@@ -10,6 +10,7 @@ use x07_contracts::X07_REVIEW_DIFF_SCHEMA_VERSION;
 use x07c::diagnostics;
 
 use crate::report_common;
+use crate::reporting;
 use crate::util;
 
 const X07_REVIEW_DIFF_SCHEMA_BYTES: &[u8] =
@@ -51,6 +52,28 @@ pub enum ReviewFailOn {
     BudgetIncrease,
     AllowUnsafe,
     AllowFfi,
+    ProofCoverageDecrease,
+    RecursionProofCoverageDecrease,
+    AsyncProofCoverageDecrease,
+    SummaryDowngrade,
+    AssumptionSurfaceWiden,
+    DevOnlyAssumptionIntroduced,
+    BoundedProofIntroduced,
+    CoverageSummaryImported,
+    OperationalEntryDiverges,
+    BoundaryRelaxation,
+    CapsuleContractRelaxation,
+    CapsuleSetChange,
+    SandboxPolicyWiden,
+    RuntimeAttestationRegression,
+    WeakerIsolationEnabled,
+    TrustedSubsetExpansion,
+    NetworkAllowlistWiden,
+    PeerPolicyRelaxation,
+    CapsuleNetworkSurfaceWiden,
+    PackageSetChange,
+    LockfileHashChange,
+    AdvisoryAllowanceEnabled,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -146,8 +169,24 @@ impl Summary {
 struct Highlights {
     world_changes: Vec<Value>,
     budget_changes: Vec<Value>,
+    summary_changes: Vec<Value>,
     policy_changes: Vec<Value>,
+    network_policy_changes: Vec<Value>,
     capability_changes: Vec<Value>,
+    proof_changes: Vec<Value>,
+    assumption_changes: Vec<Value>,
+    boundedness_changes: Vec<Value>,
+    operational_entry_changes: Vec<Value>,
+    recursive_proof_changes: Vec<Value>,
+    boundary_changes: Vec<Value>,
+    subset_changes: Vec<Value>,
+    async_proof_changes: Vec<Value>,
+    capsule_changes: Vec<Value>,
+    peer_policy_changes: Vec<Value>,
+    capsule_network_changes: Vec<Value>,
+    dependency_closure_changes: Vec<Value>,
+    runtime_attestation_changes: Vec<Value>,
+    sandbox_policy_changes: Vec<Value>,
 }
 
 impl Highlights {
@@ -155,8 +194,24 @@ impl Highlights {
         Self {
             world_changes: Vec::new(),
             budget_changes: Vec::new(),
+            summary_changes: Vec::new(),
             policy_changes: Vec::new(),
+            network_policy_changes: Vec::new(),
             capability_changes: Vec::new(),
+            proof_changes: Vec::new(),
+            assumption_changes: Vec::new(),
+            boundedness_changes: Vec::new(),
+            operational_entry_changes: Vec::new(),
+            recursive_proof_changes: Vec::new(),
+            boundary_changes: Vec::new(),
+            subset_changes: Vec::new(),
+            async_proof_changes: Vec::new(),
+            capsule_changes: Vec::new(),
+            peer_policy_changes: Vec::new(),
+            capsule_network_changes: Vec::new(),
+            dependency_closure_changes: Vec::new(),
+            runtime_attestation_changes: Vec::new(),
+            sandbox_policy_changes: Vec::new(),
         }
     }
 }
@@ -425,6 +480,46 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
                     &mut ctx,
                     &mut report.highlights,
                 ),
+                "proof" => diff_proof(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
+                "trust_certificate" => diff_trust_certificate(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
+                "lockfile" => diff_lockfile(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
+                "peer_policy" => diff_peer_policy(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
+                "dependency_closure" => diff_dependency_closure(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
                 "policy" => diff_policy(
                     &rel_str,
                     before_json.as_ref(),
@@ -433,13 +528,28 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
                     &mut ctx,
                     &mut report.highlights,
                 ),
-                "json" => push_simple_file_change(
-                    &mut file_diff,
-                    &mut ctx,
-                    "json_changed",
-                    "info",
-                    "JSON file changed",
-                ),
+                "json" => {
+                    if rel_str.contains("runtime-attest/")
+                        || rel_str.ends_with("runtime.attest.json")
+                    {
+                        diff_runtime_attestation(
+                            &rel_str,
+                            before_json.as_ref(),
+                            after_json.as_ref(),
+                            &mut file_diff,
+                            &mut ctx,
+                            &mut report.highlights,
+                        );
+                    } else {
+                        push_simple_file_change(
+                            &mut file_diff,
+                            &mut ctx,
+                            "json_changed",
+                            "info",
+                            "JSON file changed",
+                        );
+                    }
+                }
                 _ => push_simple_file_change(
                     &mut file_diff,
                     &mut ctx,
@@ -466,6 +576,12 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
 
     if !diags.is_empty() {
         report.diags.append(&mut diags);
+        report_value = serde_json::to_value(&report)?;
+    }
+
+    let mut posture_diags = posture_gate_diags(&report, &args.fail_on);
+    if !posture_diags.is_empty() {
+        report.diags.append(&mut posture_diags);
         report_value = serde_json::to_value(&report)?;
     }
 
@@ -527,9 +643,435 @@ fn fail_on_triggered(report: &ReviewDiffReport, fail_on: &[ReviewFailOn]) -> boo
                     return true;
                 }
             }
+            ReviewFailOn::ProofCoverageDecrease => {
+                if !report.highlights.proof_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::RecursionProofCoverageDecrease => {
+                if !report.highlights.recursive_proof_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::AsyncProofCoverageDecrease => {
+                if !report.highlights.async_proof_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::SummaryDowngrade => {
+                if report
+                    .highlights
+                    .summary_changes
+                    .iter()
+                    .any(summary_change_is_downgrade)
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::AssumptionSurfaceWiden => {
+                if !report.highlights.assumption_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::DevOnlyAssumptionIntroduced => {
+                if report.highlights.assumption_changes.iter().any(|change| {
+                    change.get("kind").and_then(Value::as_str) == Some("dev_only_assumption")
+                }) {
+                    return true;
+                }
+            }
+            ReviewFailOn::BoundedProofIntroduced => {
+                if !report.highlights.boundedness_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::CoverageSummaryImported => {
+                if report.highlights.assumption_changes.iter().any(|change| {
+                    change.get("kind").and_then(Value::as_str) == Some("coverage_summary_import")
+                }) {
+                    return true;
+                }
+            }
+            ReviewFailOn::OperationalEntryDiverges => {
+                if !report.highlights.operational_entry_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::BoundaryRelaxation => {
+                if !report.highlights.boundary_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::CapsuleContractRelaxation => {
+                if report.highlights.capsule_changes.iter().any(|change| {
+                    change.get("kind").and_then(Value::as_str) == Some("capsule_contract")
+                }) {
+                    return true;
+                }
+            }
+            ReviewFailOn::CapsuleSetChange => {
+                if report
+                    .highlights
+                    .capsule_changes
+                    .iter()
+                    .any(|change| change.get("kind").and_then(Value::as_str) == Some("capsule_set"))
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::SandboxPolicyWiden => {
+                if !report.highlights.sandbox_policy_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::RuntimeAttestationRegression => {
+                if !report.highlights.runtime_attestation_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::WeakerIsolationEnabled => {
+                if report
+                    .highlights
+                    .sandbox_policy_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("weaker_isolation")
+                    })
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::TrustedSubsetExpansion => {
+                if !report.highlights.subset_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::NetworkAllowlistWiden => {
+                if !report.highlights.network_policy_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::PeerPolicyRelaxation => {
+                if !report.highlights.peer_policy_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::CapsuleNetworkSurfaceWiden => {
+                if !report.highlights.capsule_network_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::PackageSetChange => {
+                if report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .any(|change| change.get("kind").and_then(Value::as_str) == Some("package_set"))
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::LockfileHashChange => {
+                if report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("lockfile_hash")
+                    })
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::AdvisoryAllowanceEnabled => {
+                if report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("advisory_allowance")
+                    })
+                {
+                    return true;
+                }
+            }
         }
     }
     false
+}
+
+fn posture_gate_diags(
+    report: &ReviewDiffReport,
+    fail_on: &[ReviewFailOn],
+) -> Vec<diagnostics::Diagnostic> {
+    let mut diags = Vec::new();
+    for flag in fail_on {
+        match flag {
+            ReviewFailOn::RecursionProofCoverageDecrease => {
+                if !report.highlights.recursive_proof_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_RECURSION_PROOF_COVERAGE_DECREASE",
+                        format!(
+                            "recursive proof coverage regressed across {} reviewed file(s)",
+                            report.highlights.recursive_proof_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::AsyncProofCoverageDecrease => {
+                if !report.highlights.async_proof_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_ASYNC_PROOF_COVERAGE_DECREASE",
+                        format!(
+                            "async proof coverage regressed across {} reviewed file(s)",
+                            report.highlights.async_proof_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::SummaryDowngrade => {
+                let count = report
+                    .highlights
+                    .summary_changes
+                    .iter()
+                    .filter(|change| summary_change_is_downgrade(change))
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_SUMMARY_DOWNGRADE",
+                        format!("proof summary posture downgraded in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::AssumptionSurfaceWiden => {
+                if !report.highlights.assumption_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_ASSUMPTION_SURFACE_WIDEN",
+                        format!(
+                            "proof assumption surface widened across {} reviewed change(s)",
+                            report.highlights.assumption_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::DevOnlyAssumptionIntroduced => {
+                let count = report
+                    .highlights
+                    .assumption_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("dev_only_assumption")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_DEV_ONLY_ASSUMPTION_INTRODUCED",
+                        format!("developer-only assumptions were introduced in {count} reviewed change(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::BoundedProofIntroduced => {
+                if !report.highlights.boundedness_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_BOUNDED_PROOF_INTRODUCED",
+                        format!(
+                            "bounded proof posture changed across {} reviewed change(s)",
+                            report.highlights.boundedness_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::CoverageSummaryImported => {
+                let count = report
+                    .highlights
+                    .assumption_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str)
+                            == Some("coverage_summary_import")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_COVERAGE_SUMMARY_IMPORTED",
+                        format!("coverage-summary imports were introduced in {count} reviewed change(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::OperationalEntryDiverges => {
+                if !report.highlights.operational_entry_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_OPERATIONAL_ENTRY_DIVERGES",
+                        format!(
+                            "operational entry changed across {} reviewed change(s)",
+                            report.highlights.operational_entry_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::CapsuleContractRelaxation => {
+                let count = report
+                    .highlights
+                    .capsule_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("capsule_contract")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_CAPSULE_CONTRACT_RELAXATION",
+                        format!("capsule contract review detected {count} relaxation candidate(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::CapsuleSetChange => {
+                let count = report
+                    .highlights
+                    .capsule_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("capsule_set")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_CAPSULE_SET_CHANGE",
+                        format!("capsule index membership changed in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::SandboxPolicyWiden => {
+                if !report.highlights.sandbox_policy_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_SANDBOX_POLICY_WIDEN",
+                        format!(
+                            "sandbox policy widened across {} reviewed change(s)",
+                            report.highlights.sandbox_policy_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::WeakerIsolationEnabled => {
+                if report
+                    .highlights
+                    .sandbox_policy_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("weaker_isolation")
+                    })
+                    && !diags
+                        .iter()
+                        .any(|diag| diag.code == "X07RD_SANDBOX_POLICY_WIDEN")
+                {
+                    diags.push(review_diag(
+                        "X07RD_SANDBOX_POLICY_WIDEN",
+                        "weaker isolation was enabled for a reviewed sandbox policy",
+                    ));
+                }
+            }
+            ReviewFailOn::RuntimeAttestationRegression => {
+                if !report.highlights.runtime_attestation_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_RUNTIME_ATTEST_REGRESSION",
+                        format!(
+                            "runtime attestation posture regressed across {} reviewed file(s)",
+                            report.highlights.runtime_attestation_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::NetworkAllowlistWiden => {
+                if !report.highlights.network_policy_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_NETWORK_ALLOWLIST_WIDEN",
+                        format!(
+                            "network allowlist widened across {} reviewed change(s)",
+                            report.highlights.network_policy_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::PeerPolicyRelaxation => {
+                if !report.highlights.peer_policy_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_PEER_POLICY_RELAXATION",
+                        format!(
+                            "peer policy relaxed across {} reviewed file(s)",
+                            report.highlights.peer_policy_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::CapsuleNetworkSurfaceWiden => {
+                if !report.highlights.capsule_network_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_CAPSULE_NETWORK_SURFACE_WIDEN",
+                        format!(
+                            "network capsule surface widened across {} reviewed file(s)",
+                            report.highlights.capsule_network_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::PackageSetChange => {
+                let count = report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("package_set")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_PACKAGE_SET_CHANGE",
+                        format!("dependency package set changed in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::LockfileHashChange => {
+                let count = report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("lockfile_hash")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_LOCKFILE_HASH_CHANGE",
+                        format!("lockfile digest changed in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::AdvisoryAllowanceEnabled => {
+                let count = report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("advisory_allowance")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_ADVISORY_ALLOWANCE_ENABLED",
+                        format!(
+                            "disallowed advisory or yanked dependency state appeared in {count} reviewed file(s)"
+                        ),
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    diags
+}
+
+fn review_diag(code: &str, message: impl Into<String>) -> diagnostics::Diagnostic {
+    reporting::diag_error(code, diagnostics::Stage::Run, &message.into())
 }
 
 fn budget_change_is_increase(v: &Value) -> bool {
@@ -589,6 +1131,35 @@ fn push_simple_file_change(
 
 fn classify_file(rel: &str, before: Option<&Value>, after: Option<&Value>) -> &'static str {
     let lower = rel.to_ascii_lowercase();
+    let schema_version = before
+        .and_then(|doc| doc.get("schema_version"))
+        .or_else(|| after.and_then(|doc| doc.get("schema_version")))
+        .and_then(Value::as_str);
+    if lower.ends_with("verify.coverage.json")
+        || lower.ends_with("verify.summary.json")
+        || matches!(
+            schema_version,
+            Some("x07.verify.coverage@0.4.0") | Some("x07.verify.summary@0.2.0")
+        )
+    {
+        return "proof";
+    }
+    if lower.ends_with("certificate.json")
+        || schema_version.is_some_and(|value| value.starts_with("x07.trust.certificate@"))
+    {
+        return "trust_certificate";
+    }
+    if schema_version == Some("x07.peer.policy@0.1.0") {
+        return "peer_policy";
+    }
+    if schema_version == Some("x07.dep.closure.attest@0.1.0")
+        || lower.ends_with("dep.closure.attest.json")
+    {
+        return "dependency_closure";
+    }
+    if lower == "x07.lock.json" {
+        return "lockfile";
+    }
     if lower.ends_with(".x07.json") {
         return "x07ast";
     }
@@ -617,8 +1188,12 @@ fn build_globsets(args: &ReviewDiffArgs) -> Result<(GlobSet, GlobSet)> {
         ReviewMode::Project => &[
             "**/*.x07.json",
             "x07.json",
+            "x07.lock.json",
             "**/*.x07project.json",
             "arch/**",
+            "runtime-attest/**",
+            "runtime.attest.json",
+            "**/runtime.attest.json",
             ".x07/policies/**",
             "**/*.policy.json",
         ],
@@ -1287,6 +1862,21 @@ fn diff_arch(
     ctx: &mut BuildCtx,
     highlights: &mut Highlights,
 ) {
+    if path.ends_with("index.x07boundary.json") {
+        diff_boundary_index(path, before, after, file_diff, ctx, highlights);
+        return;
+    }
+
+    if path.contains("/capsules/") || path.starts_with("arch/capsules/") {
+        diff_capsule(path, before, after, file_diff, ctx, highlights);
+        return;
+    }
+
+    if path.contains("/trust/profiles/") || path.starts_with("arch/trust/profiles/") {
+        diff_trust_profile(path, before, after, file_diff, ctx, highlights);
+        return;
+    }
+
     if path.ends_with("manifest.x07arch.json") {
         let before_nodes = arch_node_worlds(before);
         let after_nodes = arch_node_worlds(after);
@@ -1330,6 +1920,47 @@ fn diff_arch(
                     "meta": {}
                 }),
             );
+        }
+
+        let before_zones = arch_node_trust_zones(before);
+        let after_zones = arch_node_trust_zones(after);
+        let mut zone_keys: BTreeSet<String> = BTreeSet::new();
+        zone_keys.extend(before_zones.keys().cloned());
+        zone_keys.extend(after_zones.keys().cloned());
+        for node in zone_keys {
+            let b = before_zones.get(&node).cloned();
+            let a = after_zones.get(&node).cloned();
+            if b == a {
+                continue;
+            }
+            if trust_zone_rank_str(a.as_deref()) > trust_zone_rank_str(b.as_deref()) {
+                ctx.push(
+                    &mut highlights.subset_changes,
+                    json!({
+                        "kind": "trusted_subset",
+                        "severity": "high",
+                        "subject": format!("arch trust zone {}", node),
+                        "path": path,
+                        "before": b,
+                        "after": a,
+                    }),
+                );
+            }
+            if a.as_deref() == Some("certified_capsule")
+                || b.as_deref() == Some("certified_capsule")
+            {
+                ctx.push(
+                    &mut highlights.capsule_changes,
+                    json!({
+                        "kind": "capsule_set",
+                        "severity": "high",
+                        "subject": format!("arch trust zone {}", node),
+                        "path": path,
+                        "before": b,
+                        "after": a,
+                    }),
+                );
+            }
         }
         return;
     }
@@ -1394,6 +2025,28 @@ fn arch_node_worlds(v: Option<&Value>) -> BTreeMap<String, String> {
     out
 }
 
+fn arch_node_trust_zones(v: Option<&Value>) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    let Some(v) = v else {
+        return out;
+    };
+    let Some(nodes) = v.get("nodes").and_then(Value::as_array) else {
+        return out;
+    };
+
+    for node in nodes {
+        let Some(node_id) = node.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(zone) = node.get("trust_zone").and_then(Value::as_str) else {
+            continue;
+        };
+        out.insert(node_id.to_string(), zone.to_string());
+    }
+
+    out
+}
+
 fn arch_budget_profiles(v: Option<&Value>) -> BTreeMap<String, Value> {
     let mut out = BTreeMap::new();
     let Some(v) = v else {
@@ -1419,6 +2072,1387 @@ fn arch_budget_profiles(v: Option<&Value>) -> BTreeMap<String, Value> {
         );
     }
     out
+}
+
+fn diff_proof(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    let before_summary = proof_summary(before);
+    let after_summary = proof_summary(after);
+    let decreased = after_summary
+        .get("supported_defn")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        < before_summary
+            .get("supported_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+        || after_summary
+            .get("unsupported_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_summary
+                .get("unsupported_defn")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+        || after_summary
+            .get("uncovered_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_summary
+                .get("uncovered_defn")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+
+    if before_summary != after_summary && decreased {
+        ctx.push(
+            &mut highlights.proof_changes,
+            json!({
+                "kind": "proof_coverage",
+                "severity": "high",
+                "subject": "proof coverage summary",
+                "path": path,
+                "before": before_summary,
+                "after": after_summary,
+            }),
+        );
+    }
+
+    let before_recursive = recursive_proof_summary(&before_summary);
+    let after_recursive = recursive_proof_summary(&after_summary);
+    let recursive_regressed = after_recursive
+        .get("supported_recursive_defn")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        < before_recursive
+            .get("supported_recursive_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+        || after_recursive
+            .get("unsupported_recursive_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_recursive
+                .get("unsupported_recursive_defn")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+    if before_recursive != after_recursive && recursive_regressed {
+        ctx.push(
+            &mut highlights.recursive_proof_changes,
+            json!({
+                "kind": "recursive_proof",
+                "severity": "high",
+                "subject": "recursive proof coverage summary",
+                "path": path,
+                "before": before_recursive,
+                "after": after_recursive,
+            }),
+        );
+    }
+
+    let before_async = proof_async_summary(before);
+    let after_async = proof_async_summary(after);
+    let async_regressed = after_async
+        .get("proven_async")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        < before_async
+            .get("proven_async")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+        || after_async
+            .get("unsupported_async")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_async
+                .get("unsupported_async")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+        || after_async
+            .get("uncovered_async")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_async
+                .get("uncovered_async")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+    if before_async != after_async && async_regressed {
+        ctx.push(
+            &mut highlights.async_proof_changes,
+            json!({
+                "kind": "async_proof",
+                "severity": "high",
+                "subject": "async proof coverage summary",
+                "path": path,
+                "before": before_async,
+                "after": after_async,
+            }),
+        );
+    }
+
+    let before_function_summaries = proof_function_summaries(before);
+    let after_function_summaries = proof_function_summaries(after);
+    let summary_symbols = before_function_summaries
+        .keys()
+        .chain(after_function_summaries.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for symbol in summary_symbols {
+        let before_function = before_function_summaries
+            .get(&symbol)
+            .cloned()
+            .unwrap_or(Value::Null);
+        let after_function = after_function_summaries
+            .get(&symbol)
+            .cloned()
+            .unwrap_or(Value::Null);
+        if before_function == after_function {
+            continue;
+        }
+        let downgraded = proof_function_summary_regressed(&before_function, &after_function);
+        ctx.push(
+            &mut highlights.summary_changes,
+            json!({
+                "kind": "proof_summary",
+                "severity": if downgraded { "high" } else { "info" },
+                "subject": format!("proof summary for {symbol}"),
+                "path": path,
+                "before": before_function,
+                "after": after_function,
+            }),
+        );
+    }
+
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "proof_changed",
+        if decreased || recursive_regressed || async_regressed {
+            "high"
+        } else {
+            "info"
+        },
+        "proof coverage changed",
+    );
+}
+
+fn proof_summary(v: Option<&Value>) -> Value {
+    let summary = v
+        .and_then(|doc| doc.get("summary"))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    json!({
+        "reachable_defn": summary.get("reachable_defn").cloned().unwrap_or(Value::from(0)),
+        "supported_defn": summary
+            .get("supported_defn")
+            .cloned()
+            .or_else(|| summary.get("proven_defn").cloned())
+            .unwrap_or(Value::from(0)),
+        "recursive_defn": summary.get("recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "supported_recursive_defn": summary
+            .get("supported_recursive_defn")
+            .cloned()
+            .or_else(|| summary.get("proven_recursive_defn").cloned())
+            .unwrap_or(Value::from(0)),
+        "imported_proof_summary_defn": summary
+            .get("imported_proof_summary_defn")
+            .cloned()
+            .unwrap_or(Value::from(0)),
+        "termination_proven_defn": summary
+            .get("termination_proven_defn")
+            .cloned()
+            .unwrap_or(Value::from(0)),
+        "unsupported_recursive_defn": summary.get("unsupported_recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "uncovered_defn": summary.get("uncovered_defn").cloned().unwrap_or(Value::from(0)),
+        "unsupported_defn": summary.get("unsupported_defn").cloned().unwrap_or(Value::from(0)),
+    })
+}
+
+fn recursive_proof_summary(summary: &Value) -> Value {
+    json!({
+        "recursive_defn": summary.get("recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "supported_recursive_defn": summary
+            .get("supported_recursive_defn")
+            .cloned()
+            .unwrap_or(Value::from(0)),
+        "unsupported_recursive_defn": summary.get("unsupported_recursive_defn").cloned().unwrap_or(Value::from(0)),
+    })
+}
+
+fn proof_async_summary(v: Option<&Value>) -> Value {
+    let mut reachable_async = 0u64;
+    let mut proven_async = 0u64;
+    let mut uncovered_async = 0u64;
+    let mut unsupported_async = 0u64;
+
+    if let Some(functions) = v
+        .and_then(|doc| doc.get("functions"))
+        .and_then(Value::as_array)
+    {
+        for function in functions {
+            if function.get("kind").and_then(Value::as_str) != Some("defasync") {
+                continue;
+            }
+            reachable_async += 1;
+            match function.get("status").and_then(Value::as_str).unwrap_or("") {
+                "supported_async" | "proven_async" => proven_async += 1,
+                "uncovered" => uncovered_async += 1,
+                "unsupported" => unsupported_async += 1,
+                _ => {}
+            }
+        }
+    }
+
+    json!({
+        "reachable_async": reachable_async,
+        "proven_async": proven_async,
+        "uncovered_async": uncovered_async,
+        "unsupported_async": unsupported_async,
+    })
+}
+
+fn proof_function_summaries(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(functions) = v
+        .and_then(|doc| doc.get("functions"))
+        .and_then(Value::as_array)
+    else {
+        return out;
+    };
+
+    for function in functions {
+        let Some(symbol) = function.get("symbol").and_then(Value::as_str) else {
+            continue;
+        };
+        out.insert(
+            symbol.to_string(),
+            json!({
+                "kind": function.get("kind").cloned().unwrap_or(Value::Null),
+                "status": function.get("status").cloned().unwrap_or(Value::Null),
+                "support_summary": function
+                    .get("support_summary")
+                    .cloned()
+                    .or_else(|| function.get("proof_summary").cloned())
+                    .unwrap_or(Value::Null),
+            }),
+        );
+    }
+    out
+}
+
+fn summary_change_is_downgrade(change: &Value) -> bool {
+    proof_function_summary_regressed(
+        change.get("before").unwrap_or(&Value::Null),
+        change.get("after").unwrap_or(&Value::Null),
+    )
+}
+
+fn proof_function_summary_regressed(before: &Value, after: &Value) -> bool {
+    if before.is_null() {
+        return false;
+    }
+    if after.is_null() {
+        return true;
+    }
+
+    let before_status = before.get("status").and_then(Value::as_str).unwrap_or("");
+    let after_status = after.get("status").and_then(Value::as_str).unwrap_or("");
+    if proof_status_rank(after_status) < proof_status_rank(before_status) {
+        return true;
+    }
+
+    let before_prove_supported = before
+        .pointer("/support_summary/prove_supported")
+        .or_else(|| before.pointer("/proof_summary/prove_supported"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let after_prove_supported = after
+        .pointer("/support_summary/prove_supported")
+        .or_else(|| after.pointer("/proof_summary/prove_supported"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if before_prove_supported && !after_prove_supported {
+        return true;
+    }
+
+    let before_decreases = before
+        .pointer("/support_summary/has_decreases")
+        .or_else(|| before.pointer("/proof_summary/has_decreases"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let after_decreases = after
+        .pointer("/support_summary/has_decreases")
+        .or_else(|| after.pointer("/proof_summary/has_decreases"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if before_decreases && !after_decreases {
+        return true;
+    }
+
+    let before_recursive = before
+        .pointer("/support_summary/recursion_kind")
+        .or_else(|| before.pointer("/proof_summary/recursion_kind"))
+        .and_then(Value::as_str)
+        .unwrap_or("none");
+    let after_recursive = after
+        .pointer("/support_summary/recursion_kind")
+        .or_else(|| after.pointer("/proof_summary/recursion_kind"))
+        .and_then(Value::as_str)
+        .unwrap_or("none");
+    recursion_kind_rank(after_recursive) < recursion_kind_rank(before_recursive)
+}
+
+fn proof_status_rank(status: &str) -> u8 {
+    match status {
+        "supported_recursive" | "proven_recursive" => 5,
+        "supported" | "supported_async" | "proven" | "proven_async" => 4,
+        "termination_proven" | "imported_proof_summary" | "imported_summary" => 3,
+        "trusted_primitive" | "trusted_scheduler_model" | "capsule_boundary" => 2,
+        "uncovered" => 1,
+        "unsupported" => 0,
+        _ => 0,
+    }
+}
+
+fn recursion_kind_rank(kind: &str) -> u8 {
+    match kind {
+        "self_recursive" => 2,
+        "none" => 1,
+        "mutual" => 0,
+        _ => 0,
+    }
+}
+
+fn diff_boundary_index(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    let before_boundaries = boundary_index_map(before);
+    let after_boundaries = boundary_index_map(after);
+    let mut keys: BTreeSet<String> = BTreeSet::new();
+    keys.extend(before_boundaries.keys().cloned());
+    keys.extend(after_boundaries.keys().cloned());
+
+    for id in keys {
+        let b = before_boundaries.get(&id);
+        let a = after_boundaries.get(&id);
+        if b == a {
+            continue;
+        }
+        if boundary_relaxed(b, a) {
+            ctx.push(
+                &mut highlights.boundary_changes,
+                json!({
+                    "kind": "boundary_contract",
+                    "severity": "high",
+                    "subject": id,
+                    "path": path,
+                    "before": b.cloned().unwrap_or(Value::Null),
+                    "after": a.cloned().unwrap_or(Value::Null),
+                }),
+            );
+        }
+    }
+
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "boundary_changed",
+        if highlights.boundary_changes.is_empty() {
+            "info"
+        } else {
+            "high"
+        },
+        "boundary catalog changed",
+    );
+}
+
+fn diff_capsule(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let kind = if path.ends_with("index.x07capsule.json") {
+        "capsule_set"
+    } else {
+        "capsule_contract"
+    };
+    let title = if kind == "capsule_set" {
+        "capsule index changed"
+    } else {
+        "capsule contract changed"
+    };
+    let change = json!({
+        "kind": kind,
+        "severity": "high",
+        "subject": path,
+        "path": path,
+        "before": before.cloned().unwrap_or(Value::Null),
+        "after": after.cloned().unwrap_or(Value::Null),
+    });
+    ctx.push(&mut highlights.capsule_changes, change);
+    let before_network = before.and_then(|doc| doc.get("network")).cloned();
+    let after_network = after.and_then(|doc| doc.get("network")).cloned();
+    if before_network != after_network {
+        ctx.push(
+            &mut highlights.capsule_network_changes,
+            json!({
+                "kind": "capsule_network",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_network.unwrap_or(Value::Null),
+                "after": after_network.unwrap_or(Value::Null),
+            }),
+        );
+    }
+    push_simple_file_change(file_diff, ctx, "capsule_changed", "high", title);
+}
+
+fn diff_runtime_attestation(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let after_backend = after.and_then(|doc| doc.get("sandbox_backend")).cloned();
+    let before_weaker = before
+        .and_then(|doc| doc.get("weaker_isolation"))
+        .cloned()
+        .unwrap_or(Value::Bool(false));
+    let after_weaker = after
+        .and_then(|doc| doc.get("weaker_isolation"))
+        .cloned()
+        .unwrap_or(Value::Bool(false));
+    let severity = if before_weaker != after_weaker
+        || after_backend != Some(Value::String("vm".to_string()))
+    {
+        "high"
+    } else {
+        "warn"
+    };
+
+    ctx.push(
+        &mut highlights.runtime_attestation_changes,
+        json!({
+            "kind": "runtime_attestation",
+            "severity": severity,
+            "subject": path,
+            "path": path,
+            "before": before.cloned().unwrap_or(Value::Null),
+            "after": after.cloned().unwrap_or(Value::Null),
+        }),
+    );
+    if before_weaker != after_weaker && after_weaker == Value::Bool(true) {
+        ctx.push(
+            &mut highlights.sandbox_policy_changes,
+            json!({
+                "kind": "weaker_isolation",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_weaker,
+                "after": after_weaker,
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "runtime_attestation_changed",
+        severity,
+        "runtime attestation changed",
+    );
+}
+
+fn diff_lockfile(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let before_packages = lockfile_packages(before);
+    let after_packages = lockfile_packages(after);
+    if before_packages != after_packages {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "package_set",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_packages,
+                "after": after_packages,
+            }),
+        );
+    }
+    ctx.push(
+        &mut highlights.dependency_closure_changes,
+        json!({
+            "kind": "lockfile_hash",
+            "severity": "high",
+            "subject": path,
+            "path": path,
+            "before": before.cloned().unwrap_or(Value::Null),
+            "after": after.cloned().unwrap_or(Value::Null),
+        }),
+    );
+    if lockfile_has_advisory_allowance(after) && !lockfile_has_advisory_allowance(before) {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "advisory_allowance",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before.cloned().unwrap_or(Value::Null),
+                "after": after.cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "lockfile_changed",
+        "high",
+        "lockfile changed",
+    );
+}
+
+fn diff_peer_policy(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+    let severity = if peer_policy_relaxed(before, after) {
+        "high"
+    } else {
+        "warn"
+    };
+    ctx.push(
+        &mut highlights.peer_policy_changes,
+        json!({
+            "kind": "peer_policy",
+            "severity": severity,
+            "subject": path,
+            "path": path,
+            "before": before.cloned().unwrap_or(Value::Null),
+            "after": after.cloned().unwrap_or(Value::Null),
+        }),
+    );
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "peer_policy_changed",
+        severity,
+        "peer policy changed",
+    );
+}
+
+fn diff_dependency_closure(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+    let before_digest = before
+        .and_then(|doc| doc.get("package_set_digest"))
+        .cloned();
+    let after_digest = after.and_then(|doc| doc.get("package_set_digest")).cloned();
+    if before_digest != after_digest {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "package_set",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_digest.unwrap_or(Value::Null),
+                "after": after_digest.unwrap_or(Value::Null),
+            }),
+        );
+    }
+    if before.and_then(|doc| doc.get("lockfile_digest")).cloned()
+        != after.and_then(|doc| doc.get("lockfile_digest")).cloned()
+    {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "lockfile_hash",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before.and_then(|doc| doc.get("lockfile_digest")).cloned().unwrap_or(Value::Null),
+                "after": after.and_then(|doc| doc.get("lockfile_digest")).cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+    let before_ok = before
+        .and_then(|doc| doc.pointer("/advisory_check/ok"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    let after_ok = after
+        .and_then(|doc| doc.pointer("/advisory_check/ok"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    if before_ok && !after_ok {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "advisory_allowance",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before.cloned().unwrap_or(Value::Null),
+                "after": after.cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "dependency_closure_changed",
+        "high",
+        "dependency closure changed",
+    );
+}
+
+fn boundary_index_map(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(v) = v else {
+        return out;
+    };
+    let Some(boundaries) = v.get("boundaries").and_then(Value::as_array) else {
+        return out;
+    };
+    for boundary in boundaries {
+        let Some(id) = boundary.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        out.insert(id.to_string(), boundary.clone());
+    }
+    out
+}
+
+fn boundary_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(after) = after else {
+        return before.is_some();
+    };
+    let Some(before) = before else {
+        return false;
+    };
+
+    if bool_relaxed(
+        before.pointer("/verify/required"),
+        after.pointer("/verify/required"),
+    ) || verify_mode_rank(after.pointer("/verify/mode"))
+        < verify_mode_rank(before.pointer("/verify/mode"))
+    {
+        return true;
+    }
+
+    if bool_relaxed(
+        before.pointer("/pbt/required"),
+        after.pointer("/pbt/required"),
+    ) || !allowlist_entries(
+        after
+            .pointer("/worlds_allowed")
+            .unwrap_or(&Value::Array(Vec::new())),
+    )
+    .is_subset(&allowlist_entries(
+        before
+            .pointer("/worlds_allowed")
+            .unwrap_or(&Value::Array(Vec::new())),
+    )) || boundary_test_list_relaxed(
+        before.pointer("/smoke/tests"),
+        after.pointer("/smoke/tests"),
+    ) || boundary_test_list_relaxed(before.pointer("/pbt/tests"), after.pointer("/pbt/tests"))
+    {
+        return true;
+    }
+
+    if before.pointer("/smoke/entry").is_some()
+        && before.pointer("/smoke/entry") != after.pointer("/smoke/entry")
+    {
+        return true;
+    }
+
+    if trust_zone_rank(after.pointer("/from_zone")) < trust_zone_rank(before.pointer("/from_zone"))
+        || trust_zone_rank(after.pointer("/to_zone")) < trust_zone_rank(before.pointer("/to_zone"))
+    {
+        return true;
+    }
+
+    if boundary_output_contract_relaxed(before.pointer("/output"), after.pointer("/output")) {
+        return true;
+    }
+
+    let before_params = boundary_input_param_map(before);
+    let after_params = boundary_input_param_map(after);
+    for (key, before_param) in before_params {
+        let after_param = after_params.get(&key);
+        if boundary_param_contract_relaxed(Some(&before_param), after_param) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn diff_trust_profile(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    let before_subset = trust_profile_subset(before);
+    let after_subset = trust_profile_subset(after);
+    if before_subset == after_subset {
+        return;
+    }
+    if trust_subset_expanded(&before_subset, &after_subset) {
+        ctx.push(
+            &mut highlights.subset_changes,
+            json!({
+                "kind": "trusted_subset",
+                "severity": "high",
+                "subject": "trust profile relaxation",
+                "path": path,
+                "before": before_subset,
+                "after": after_subset,
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "trust_profile_changed",
+        if highlights.subset_changes.is_empty() {
+            "info"
+        } else {
+            "high"
+        },
+        "trust profile changed",
+    );
+}
+
+fn trust_profile_subset(v: Option<&Value>) -> Value {
+    let lang = v.and_then(|doc| doc.get("language_subset"));
+    let evidence = v.and_then(|doc| doc.get("evidence_requirements"));
+    let arch = v.and_then(|doc| doc.get("arch_requirements"));
+    json!({
+        "claims": v
+            .and_then(|doc| doc.get("claims"))
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
+        "entrypoints": v
+            .and_then(|doc| doc.get("entrypoints"))
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
+        "worlds_allowed": v
+            .and_then(|doc| doc.get("worlds_allowed"))
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
+        "allow_defasync": lang.and_then(|doc| doc.get("allow_defasync")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_recursion": lang.and_then(|doc| doc.get("allow_recursion")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_extern": lang.and_then(|doc| doc.get("allow_extern")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_unsafe": lang.and_then(|doc| doc.get("allow_unsafe")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_ffi": lang.and_then(|doc| doc.get("allow_ffi")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_dynamic_dispatch": lang.and_then(|doc| doc.get("allow_dynamic_dispatch")).cloned().unwrap_or(Value::Bool(false)),
+        "manifest_min_version": arch
+            .and_then(|doc| doc.get("manifest_min_version"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_deny_cycles": arch
+            .and_then(|doc| doc.get("require_deny_cycles"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_deny_orphans": arch
+            .and_then(|doc| doc.get("require_deny_orphans"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_visibility": arch
+            .and_then(|doc| doc.get("require_visibility"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_world_caps": arch
+            .and_then(|doc| doc.get("require_world_caps"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_brand_boundaries": arch
+            .and_then(|doc| doc.get("require_brand_boundaries"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_proof_coverage": evidence
+            .and_then(|doc| doc.get("require_proof_coverage"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_async_proof_coverage": evidence
+            .and_then(|doc| doc.get("require_async_proof_coverage"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_per_symbol_prove_reports_defn": evidence
+            .and_then(|doc| doc.get("require_per_symbol_prove_reports_defn"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_per_symbol_prove_reports_async": evidence
+            .and_then(|doc| doc.get("require_per_symbol_prove_reports_async"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "allow_coverage_summary_imports": evidence
+            .and_then(|doc| doc.get("allow_coverage_summary_imports"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_capsule_attestations": evidence
+            .and_then(|doc| doc.get("require_capsule_attestations"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_runtime_attestation": evidence
+            .and_then(|doc| doc.get("require_runtime_attestation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_effect_log_digests": evidence
+            .and_then(|doc| doc.get("require_effect_log_digests"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_peer_policies": evidence
+            .and_then(|doc| doc.get("require_peer_policies"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_network_capsules": evidence
+            .and_then(|doc| doc.get("require_network_capsules"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_dependency_closure_attestation": evidence
+            .and_then(|doc| doc.get("require_dependency_closure_attestation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_proof_mode": evidence
+            .and_then(|doc| doc.get("require_proof_mode"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_pbt": evidence
+            .and_then(|doc| doc.get("require_pbt"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_compile_attestation": evidence
+            .and_then(|doc| doc.get("require_compile_attestation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_boundary_index": evidence
+            .and_then(|doc| doc.get("require_boundary_index"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_schema_derive_check": evidence
+            .and_then(|doc| doc.get("require_schema_derive_check"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_smoke_harnesses": evidence
+            .and_then(|doc| doc.get("require_smoke_harnesses"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_unit_tests": evidence
+            .and_then(|doc| doc.get("require_unit_tests"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_trust_report_clean": evidence
+            .and_then(|doc| doc.get("require_trust_report_clean"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_sbom": evidence
+            .and_then(|doc| doc.get("require_sbom"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "sandbox_backend": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("sandbox_backend"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "forbid_weaker_isolation": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("forbid_weaker_isolation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "network_mode": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("network_mode"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "network_enforcement": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("network_enforcement"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_allowlist_mode": arch
+            .and_then(|doc| doc.get("require_allowlist_mode"))
+            .cloned()
+            .unwrap_or(Value::Bool(false))
+    })
+}
+
+fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
+    for key in ["claims", "entrypoints", "worlds_allowed"] {
+        let before_set = allowlist_entries(before.get(key).unwrap_or(&Value::Null));
+        let after_set = allowlist_entries(after.get(key).unwrap_or(&Value::Null));
+        if !after_set.is_subset(&before_set) {
+            return true;
+        }
+    }
+
+    for key in [
+        "allow_defasync",
+        "allow_recursion",
+        "allow_extern",
+        "allow_unsafe",
+        "allow_ffi",
+        "allow_dynamic_dispatch",
+    ] {
+        if before.get(key).and_then(Value::as_bool) == Some(false)
+            && after.get(key).and_then(Value::as_bool) == Some(true)
+        {
+            return true;
+        }
+    }
+
+    for key in [
+        "require_deny_cycles",
+        "require_deny_orphans",
+        "require_visibility",
+        "require_world_caps",
+        "require_brand_boundaries",
+        "require_async_proof_coverage",
+        "require_per_symbol_prove_reports_defn",
+        "require_per_symbol_prove_reports_async",
+        "require_capsule_attestations",
+        "require_runtime_attestation",
+        "require_effect_log_digests",
+        "require_peer_policies",
+        "require_network_capsules",
+        "require_dependency_closure_attestation",
+        "require_compile_attestation",
+        "require_boundary_index",
+        "require_schema_derive_check",
+        "require_smoke_harnesses",
+        "require_unit_tests",
+        "require_trust_report_clean",
+        "require_sbom",
+        "require_allowlist_mode",
+    ] {
+        if before.get(key).and_then(Value::as_bool) == Some(true)
+            && after.get(key).and_then(Value::as_bool) == Some(false)
+        {
+            return true;
+        }
+    }
+    if before
+        .get("allow_coverage_summary_imports")
+        .and_then(Value::as_bool)
+        == Some(false)
+        && after
+            .get("allow_coverage_summary_imports")
+            .and_then(Value::as_bool)
+            == Some(true)
+    {
+        return true;
+    }
+
+    if before.get("sandbox_backend") == Some(&Value::String("vm".to_string()))
+        && after.get("sandbox_backend") != Some(&Value::String("vm".to_string()))
+    {
+        return true;
+    }
+    if before
+        .get("forbid_weaker_isolation")
+        .and_then(Value::as_bool)
+        == Some(true)
+        && after
+            .get("forbid_weaker_isolation")
+            .and_then(Value::as_bool)
+            == Some(false)
+    {
+        return true;
+    }
+    if before.get("network_mode") == Some(&Value::String("none".to_string()))
+        && after.get("network_mode") != Some(&Value::String("none".to_string()))
+    {
+        return true;
+    }
+    if before.get("network_enforcement")
+        == Some(&Value::String("vm_boundary_allowlist".to_string()))
+        && after.get("network_enforcement")
+            != Some(&Value::String("vm_boundary_allowlist".to_string()))
+    {
+        return true;
+    }
+
+    if pbt_requirement_rank(after.get("require_pbt"))
+        < pbt_requirement_rank(before.get("require_pbt"))
+        || proof_coverage_rank(after.get("require_proof_coverage"))
+            < proof_coverage_rank(before.get("require_proof_coverage"))
+    {
+        return true;
+    }
+
+    false
+}
+
+fn diff_trust_certificate(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let mut severity = "warn";
+
+    for assumption in added_certificate_assumptions(before, after) {
+        let assumption_kind = assumption
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or("proof_assumption");
+        let certifiable = assumption
+            .get("certifiable")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        let subject = assumption
+            .get("subject")
+            .and_then(Value::as_str)
+            .unwrap_or("<unknown>");
+        let (kind, change_severity) = if !certifiable {
+            ("dev_only_assumption", "high")
+        } else {
+            (assumption_kind, "warn")
+        };
+        if change_severity == "high" {
+            severity = "high";
+        }
+        ctx.push(
+            &mut highlights.assumption_changes,
+            json!({
+                "kind": kind,
+                "severity": change_severity,
+                "subject": format!("proof assumption {subject}"),
+                "path": path,
+                "before": Value::Null,
+                "after": assumption,
+            }),
+        );
+    }
+
+    for imported_summary in added_imported_summary_inventory(before, after) {
+        severity = "high";
+        let subject = imported_summary
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("<unknown>");
+        ctx.push(
+            &mut highlights.assumption_changes,
+            json!({
+                "kind": "coverage_summary_import",
+                "severity": "high",
+                "subject": format!("coverage summary import {subject}"),
+                "path": path,
+                "before": Value::Null,
+                "after": imported_summary,
+            }),
+        );
+    }
+
+    let before_bounded = certificate_bounded_acceptance(before);
+    let after_bounded = certificate_bounded_acceptance(after);
+    if !before_bounded && after_bounded {
+        severity = "high";
+        ctx.push(
+            &mut highlights.boundedness_changes,
+            json!({
+                "kind": "bounded_proof",
+                "severity": "high",
+                "subject": "certificate acceptance depends on bounded proof",
+                "path": path,
+                "before": before.and_then(|doc| doc.get("recursive_proof_summary")).cloned().unwrap_or(Value::Null),
+                "after": after.and_then(|doc| doc.get("recursive_proof_summary")).cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+
+    let before_bounded_count = certificate_recursive_count(before, "bounded_recursive_defn");
+    let after_bounded_count = certificate_recursive_count(after, "bounded_recursive_defn");
+    if after_bounded_count > before_bounded_count {
+        severity = "high";
+        ctx.push(
+            &mut highlights.boundedness_changes,
+            json!({
+                "kind": "bounded_recursive_defn",
+                "severity": "high",
+                "subject": "accepted bounded recursive definitions",
+                "path": path,
+                "before": before_bounded_count,
+                "after": after_bounded_count,
+            }),
+        );
+    }
+
+    let before_operational = certificate_operational_entry(before);
+    let after_operational = certificate_operational_entry(after);
+    let before_certification = certificate_certification_entry(before);
+    let after_certification = certificate_certification_entry(after);
+    if before_operational != after_operational
+        || before_certification != after_certification
+        || after_operational.as_deref() != after_certification.as_deref()
+    {
+        let change_severity = if after_operational.as_deref() != after_certification.as_deref() {
+            "high"
+        } else {
+            "warn"
+        };
+        if change_severity == "high" {
+            severity = "high";
+        }
+        ctx.push(
+            &mut highlights.operational_entry_changes,
+            json!({
+                "kind": "operational_entry",
+                "severity": change_severity,
+                "subject": "certificate operational entry",
+                "path": path,
+                "before": {
+                    "entry": before_certification,
+                    "operational_entry_symbol": before_operational
+                },
+                "after": {
+                    "entry": after_certification,
+                    "operational_entry_symbol": after_operational
+                },
+            }),
+        );
+    }
+
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "trust_certificate_changed",
+        severity,
+        "trust certificate changed",
+    );
+}
+
+fn added_certificate_assumptions(before: Option<&Value>, after: Option<&Value>) -> Vec<Value> {
+    let before_map = certificate_assumption_map(before);
+    let after_map = certificate_assumption_map(after);
+    after_map
+        .into_iter()
+        .filter_map(|(key, value)| (!before_map.contains_key(&key)).then_some(value))
+        .collect()
+}
+
+fn certificate_assumption_map(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(items) = v
+        .and_then(|doc| doc.get("proof_assumptions"))
+        .and_then(Value::as_array)
+    else {
+        return out;
+    };
+    for item in items {
+        out.insert(canonical_json_compact(item), item.clone());
+    }
+    out
+}
+
+fn added_imported_summary_inventory(before: Option<&Value>, after: Option<&Value>) -> Vec<Value> {
+    let before_map = imported_summary_inventory_map(before);
+    let after_map = imported_summary_inventory_map(after);
+    after_map
+        .into_iter()
+        .filter_map(|(key, value)| (!before_map.contains_key(&key)).then_some(value))
+        .collect()
+}
+
+fn imported_summary_inventory_map(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(items) = v
+        .and_then(|doc| doc.get("imported_summary_inventory"))
+        .and_then(Value::as_array)
+    else {
+        return out;
+    };
+    for item in items {
+        out.insert(canonical_json_compact(item), item.clone());
+    }
+    out
+}
+
+fn certificate_bounded_acceptance(v: Option<&Value>) -> bool {
+    v.and_then(|doc| doc.get("accepted_depends_on_bounded_proof"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || v.and_then(|doc| {
+            doc.pointer("/recursive_proof_summary/accepted_depends_on_bounded_proof")
+        })
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn certificate_recursive_count(v: Option<&Value>, field: &str) -> u64 {
+    v.and_then(|doc| doc.pointer(&format!("/recursive_proof_summary/{field}")))
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+}
+
+fn certificate_operational_entry(v: Option<&Value>) -> Option<String> {
+    v.and_then(|doc| doc.get("operational_entry_symbol"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn certificate_certification_entry(v: Option<&Value>) -> Option<String> {
+    v.and_then(|doc| doc.get("entry"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn boundary_input_param_map(v: &Value) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(params) = v.pointer("/input/params").and_then(Value::as_array) else {
+        return out;
+    };
+    for (idx, param) in params.iter().enumerate() {
+        let key = param
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(|| idx.to_string());
+        out.insert(key, param.clone());
+    }
+    out
+}
+
+fn boundary_param_contract_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(before) = before else {
+        return false;
+    };
+    let Some(after) = after else {
+        return before.get("brand").is_some() || before.get("schema").is_some();
+    };
+    contract_field_removed(before.get("brand"), after.get("brand"))
+        || contract_field_removed(before.get("schema"), after.get("schema"))
+}
+
+fn boundary_output_contract_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(before) = before else {
+        return false;
+    };
+    let Some(after) = after else {
+        return before.get("brand").is_some()
+            || before.get("schema").is_some()
+            || before.get("error_space").is_some();
+    };
+    contract_field_removed(before.get("brand"), after.get("brand"))
+        || contract_field_removed(before.get("schema"), after.get("schema"))
+        || contract_field_removed(before.get("error_space"), after.get("error_space"))
+}
+
+fn boundary_test_list_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let before_set = allowlist_entries(before.unwrap_or(&Value::Array(Vec::new())));
+    let after_set = allowlist_entries(after.unwrap_or(&Value::Array(Vec::new())));
+    !before_set.is_subset(&after_set)
+}
+
+fn contract_field_removed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    before.is_some() && after.is_none()
+}
+
+fn bool_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    before.and_then(Value::as_bool) == Some(true) && after.and_then(Value::as_bool) == Some(false)
+}
+
+fn verify_mode_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("off") {
+        "prove" => 2,
+        "runtime" => 1,
+        _ => 0,
+    }
+}
+
+fn trust_zone_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("untrusted") {
+        "verified_core" => 3,
+        "certified_capsule" => 2,
+        "test_only" => 1,
+        _ => 0,
+    }
+}
+
+fn trust_zone_rank_str(v: Option<&str>) -> u8 {
+    match v.unwrap_or("untrusted") {
+        "verified_core" => 3,
+        "certified_capsule" => 2,
+        "test_only" => 1,
+        _ => 0,
+    }
+}
+
+fn pbt_requirement_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("none") {
+        "all" => 3,
+        "all_public_boundaries" => 2,
+        "public_boundaries_only" => 1,
+        _ => 0,
+    }
+}
+
+fn proof_coverage_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("") {
+        "all_reachable_defn" => 2,
+        "all_reachable_user_defn" => 1,
+        _ => 0,
+    }
 }
 
 fn diff_policy(
@@ -1736,6 +3770,30 @@ fn compare_policy_allowlist(
     sinks
         .ctx
         .push(&mut sinks.highlights.policy_changes, value.clone());
+    if widened && subject == "policy.net.allow_hosts" {
+        sinks.ctx.push(
+            &mut sinks.highlights.network_policy_changes,
+            json!({
+                "kind": "network_allowlist",
+                "severity": "high",
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+        sinks.ctx.push(
+            &mut sinks.highlights.sandbox_policy_changes,
+            json!({
+                "kind": "sandbox_policy",
+                "severity": "high",
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+    }
 
     sinks.ctx.push(
         &mut sinks.file_diff.changes,
@@ -1765,6 +3823,40 @@ fn allowlist_delta(before: &Value, after: &Value) -> (Vec<String>, Vec<String>) 
     (added, removed)
 }
 
+fn lockfile_packages(v: Option<&Value>) -> Value {
+    let deps = v
+        .and_then(|doc| doc.get("dependencies"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut packages = deps
+        .iter()
+        .filter_map(|dep| {
+            let name = dep.get("name").and_then(Value::as_str)?;
+            let version = dep.get("version").and_then(Value::as_str)?;
+            Some(format!("{name}@{version}"))
+        })
+        .collect::<Vec<_>>();
+    packages.sort();
+    json!(packages)
+}
+
+fn lockfile_has_advisory_allowance(v: Option<&Value>) -> bool {
+    let Some(deps) = v
+        .and_then(|doc| doc.get("dependencies"))
+        .and_then(Value::as_array)
+    else {
+        return false;
+    };
+    deps.iter().any(|dep| {
+        dep.get("yanked").and_then(Value::as_bool) == Some(true)
+            || dep
+                .get("advisories")
+                .and_then(Value::as_array)
+                .is_some_and(|advisories| !advisories.is_empty())
+    })
+}
+
 fn allowlist_entries(v: &Value) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     let Some(items) = v.as_array() else {
@@ -1780,6 +3872,57 @@ fn canonical_json_compact(v: &Value) -> String {
     let mut clone = v.clone();
     x07c::x07ast::canon_value_jcs(&mut clone);
     serde_json::to_string(&clone).unwrap_or_else(|_| "null".to_string())
+}
+
+fn peer_policy_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(after) = after else {
+        return before.is_some();
+    };
+    let Some(before) = before else {
+        return true;
+    };
+    if before.get("host") != after.get("host") {
+        return true;
+    }
+    let before_ports = allowlist_entries(before.get("ports").unwrap_or(&Value::Array(Vec::new())));
+    let after_ports = allowlist_entries(after.get("ports").unwrap_or(&Value::Array(Vec::new())));
+    if !after_ports.is_subset(&before_ports) {
+        return true;
+    }
+    if before.get("transport") != after.get("transport") {
+        return true;
+    }
+    if tls_mode_rank(after.get("tls_mode")) < tls_mode_rank(before.get("tls_mode")) {
+        return true;
+    }
+    let before_roots =
+        allowlist_entries(before.get("ca_paths").unwrap_or(&Value::Array(Vec::new())));
+    let after_roots = allowlist_entries(after.get("ca_paths").unwrap_or(&Value::Array(Vec::new())));
+    if !before_roots.is_subset(&after_roots) {
+        return true;
+    }
+    let before_pins = allowlist_entries(
+        before
+            .get("spki_sha256")
+            .unwrap_or(&Value::Array(Vec::new())),
+    );
+    let after_pins = allowlist_entries(
+        after
+            .get("spki_sha256")
+            .unwrap_or(&Value::Array(Vec::new())),
+    );
+    if !before_pins.is_subset(&after_pins) {
+        return true;
+    }
+    false
+}
+
+fn tls_mode_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("none") {
+        "mtls" => 3,
+        "tls" => 2,
+        _ => 1,
+    }
 }
 
 fn compare_policy_bool(
@@ -1824,6 +3967,32 @@ fn compare_policy_bool(
     sinks
         .ctx
         .push(&mut sinks.highlights.policy_changes, value.clone());
+    if subject.starts_with("policy.net.") {
+        sinks.ctx.push(
+            &mut sinks.highlights.network_policy_changes,
+            json!({
+                "kind": "network_policy",
+                "severity": severity,
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+    }
+    if subject == "policy.net.enabled" && a == Some(true) {
+        sinks.ctx.push(
+            &mut sinks.highlights.sandbox_policy_changes,
+            json!({
+                "kind": "sandbox_policy",
+                "severity": "high",
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+    }
 
     sinks.ctx.push(
         &mut sinks.file_diff.changes,
@@ -1930,11 +4099,87 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
     s.push_str("<h2>High-Signal Deltas</h2>");
     render_change_list(&mut s, "World Changes", &report.highlights.world_changes);
     render_change_list(&mut s, "Budget Changes", &report.highlights.budget_changes);
+    render_change_list(
+        &mut s,
+        "Summary Changes",
+        &report.highlights.summary_changes,
+    );
     render_change_list(&mut s, "Policy Changes", &report.highlights.policy_changes);
+    render_change_list(
+        &mut s,
+        "Network Policy Changes",
+        &report.highlights.network_policy_changes,
+    );
     render_change_list(
         &mut s,
         "Capability Changes",
         &report.highlights.capability_changes,
+    );
+    render_change_list(&mut s, "Proof Changes", &report.highlights.proof_changes);
+    render_change_list(
+        &mut s,
+        "Assumption Changes",
+        &report.highlights.assumption_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Boundedness Changes",
+        &report.highlights.boundedness_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Operational Entry Changes",
+        &report.highlights.operational_entry_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Recursive Proof Changes",
+        &report.highlights.recursive_proof_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Async Proof Changes",
+        &report.highlights.async_proof_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Boundary Changes",
+        &report.highlights.boundary_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Capsule Changes",
+        &report.highlights.capsule_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Peer Policy Changes",
+        &report.highlights.peer_policy_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Capsule Network Changes",
+        &report.highlights.capsule_network_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Dependency Closure Changes",
+        &report.highlights.dependency_closure_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Runtime Attestation Changes",
+        &report.highlights.runtime_attestation_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Sandbox Policy Changes",
+        &report.highlights.sandbox_policy_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Trusted Subset Changes",
+        &report.highlights.subset_changes,
     );
 
     s.push_str("<h2>File Diffs</h2>");
@@ -2003,6 +4248,32 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
                 ReviewFailOn::BudgetIncrease => "budget-increase",
                 ReviewFailOn::AllowUnsafe => "allow-unsafe",
                 ReviewFailOn::AllowFfi => "allow-ffi",
+                ReviewFailOn::ProofCoverageDecrease => "proof-coverage-decrease",
+                ReviewFailOn::RecursionProofCoverageDecrease => {
+                    "recursion-proof-coverage-decrease"
+                }
+                ReviewFailOn::AsyncProofCoverageDecrease => "async-proof-coverage-decrease",
+                ReviewFailOn::SummaryDowngrade => "summary-downgrade",
+                ReviewFailOn::AssumptionSurfaceWiden => "assumption-surface-widen",
+                ReviewFailOn::DevOnlyAssumptionIntroduced => {
+                    "dev-only-assumption-introduced"
+                }
+                ReviewFailOn::BoundedProofIntroduced => "bounded-proof-introduced",
+                ReviewFailOn::CoverageSummaryImported => "coverage-summary-imported",
+                ReviewFailOn::OperationalEntryDiverges => "operational-entry-diverges",
+                ReviewFailOn::BoundaryRelaxation => "boundary-relaxation",
+                ReviewFailOn::CapsuleContractRelaxation => "capsule-contract-relaxation",
+                ReviewFailOn::CapsuleSetChange => "capsule-set-change",
+                ReviewFailOn::SandboxPolicyWiden => "sandbox-policy-widen",
+                ReviewFailOn::RuntimeAttestationRegression => "runtime-attestation-regression",
+                ReviewFailOn::WeakerIsolationEnabled => "weaker-isolation-enabled",
+                ReviewFailOn::TrustedSubsetExpansion => "trusted-subset-expansion",
+                ReviewFailOn::NetworkAllowlistWiden => "network-allowlist-widen",
+                ReviewFailOn::PeerPolicyRelaxation => "peer-policy-relaxation",
+                ReviewFailOn::CapsuleNetworkSurfaceWiden => "capsule-network-surface-widen",
+                ReviewFailOn::PackageSetChange => "package-set-change",
+                ReviewFailOn::LockfileHashChange => "lockfile-hash-change",
+                ReviewFailOn::AdvisoryAllowanceEnabled => "advisory-allowance-enabled",
             })
             .collect::<Vec<&str>>()
     });
@@ -2044,8 +4315,24 @@ fn review_risk(report: &ReviewDiffReport) -> (&'static str, &'static str, &'stat
         .world_changes
         .iter()
         .chain(report.highlights.budget_changes.iter())
+        .chain(report.highlights.summary_changes.iter())
         .chain(report.highlights.policy_changes.iter())
+        .chain(report.highlights.network_policy_changes.iter())
         .chain(report.highlights.capability_changes.iter())
+        .chain(report.highlights.proof_changes.iter())
+        .chain(report.highlights.assumption_changes.iter())
+        .chain(report.highlights.boundedness_changes.iter())
+        .chain(report.highlights.operational_entry_changes.iter())
+        .chain(report.highlights.recursive_proof_changes.iter())
+        .chain(report.highlights.async_proof_changes.iter())
+        .chain(report.highlights.boundary_changes.iter())
+        .chain(report.highlights.capsule_changes.iter())
+        .chain(report.highlights.peer_policy_changes.iter())
+        .chain(report.highlights.capsule_network_changes.iter())
+        .chain(report.highlights.dependency_closure_changes.iter())
+        .chain(report.highlights.runtime_attestation_changes.iter())
+        .chain(report.highlights.sandbox_policy_changes.iter())
+        .chain(report.highlights.subset_changes.iter())
         .any(|v| {
             v.get("severity")
                 .and_then(Value::as_str)

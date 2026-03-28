@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 191
-- quickfix support (`sometimes` or `always`): 162
-- quickfix coverage: 84.82%
+- total codes: 449
+- quickfix support (`sometimes` or `always`): 408
+- quickfix coverage: 90.87%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -37,18 +37,145 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `ETEST_POLICY_UNSAFE_PATH` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_POLICY_UNSAFE_PATH`. |
 | `ETEST_RETURNS_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_RETURNS_INVALID`. |
 | `ETEST_SCHEMA_VERSION` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_SCHEMA_VERSION`. |
+| `ETEST_SOLVE_FUEL_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_SOLVE_FUEL_INVALID`. |
 | `ETEST_TESTS_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TESTS_EMPTY`. |
 | `ETEST_TIMEOUT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TIMEOUT_INVALID`. |
 | `ETEST_WORLD_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_WORLD_INVALID`. |
+| `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_ARCHIVE_OP_UNKNOWN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_OP_UNKNOWN`. |
+| `E_ARCH_ARCHIVE_SCHEMA_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_SCHEMA_INVALID`. |
+| `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED`. |
+| `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED`. |
+| `E_ARCH_BOUNDARY_INDEX_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_INDEX_INVALID`. |
+| `E_ARCH_BOUNDARY_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_MISSING`. |
+| `E_ARCH_BOUNDARY_VERIFY_REQUIRED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_VERIFY_REQUIRED`. |
+| `E_ARCH_BUDGETS_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGETS_DIR_MISSING`. |
+| `E_ARCH_BUDGETS_GEN_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGETS_GEN_DIR_MISSING`. |
+| `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_BUDGET_PROFILE_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_NOT_FOUND`. |
+| `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION`. |
 | `E_ARCH_BUDGET_SCOPE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_SCOPE_MISSING`. |
+| `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND`. |
+| `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND`. |
+| `E_ARCH_BUDGET_WORLD_VIOLATION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_WORLD_VIOLATION`. |
+| `E_ARCH_CLI_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CLI_INDEX_MISSING`. |
+| `E_ARCH_CLI_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CLI_PROFILE_INVALID`. |
+| `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED`. |
+| `E_ARCH_CONTRACTS_LOCK_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_INVALID`. |
+| `E_ARCH_CONTRACTS_LOCK_JSON_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_JSON_PARSE`. |
+| `E_ARCH_CONTRACTS_LOCK_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_MISMATCH`. |
+| `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION`. |
+| `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_CRAWL_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRAWL_INDEX_MISSING`. |
+| `E_ARCH_CRAWL_POLICY_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRAWL_POLICY_INVALID`. |
+| `E_ARCH_CRYPTO_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRYPTO_INDEX_MISSING`. |
+| `E_ARCH_CRYPTO_JWT_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`. |
+| `E_ARCH_CRYPTO_KEY_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRYPTO_KEY_MISSING`. |
+| `E_ARCH_CYCLE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CYCLE`. |
+| `E_ARCH_DB_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_DB_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_INDEX_MISSING`. |
+| `E_ARCH_DB_MIGRATE_PLAN_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_MIGRATE_PLAN_MISSING`. |
+| `E_ARCH_DB_QUERY_CATALOG_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_QUERY_CATALOG_INVALID`. |
+| `E_ARCH_DB_SQL_HASH_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_SQL_HASH_MISMATCH`. |
+| `E_ARCH_DB_SQL_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_SQL_MISSING`. |
+| `E_ARCH_DEPS_DENY` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DEPS_DENY`. |
+| `E_ARCH_DUPLICATE_MODULE_ID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DUPLICATE_MODULE_ID`. |
+| `E_ARCH_EDGE_NOT_ALLOWED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_EDGE_NOT_ALLOWED`. |
+| `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`. |
+| `E_ARCH_IMPORT_PREFIX_DENIED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_DENIED`. |
+| `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`. |
+| `E_ARCH_LAYERS_VIOLATION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LAYERS_VIOLATION`. |
+| `E_ARCH_LOCK_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_INVALID`. |
+| `E_ARCH_LOCK_JSON_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_JSON_PARSE`. |
+| `E_ARCH_LOCK_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_MISMATCH`. |
 | `E_ARCH_LOCK_READ` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_READ`. |
+| `E_ARCH_MANIFEST_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MANIFEST_INVALID`. |
+| `E_ARCH_MANIFEST_JSON_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_MANIFEST_JSON_PARSE`. |
+| `E_ARCH_MANIFEST_READ` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MANIFEST_READ`. |
 | `E_ARCH_MODULE_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_MODULE_PARSE`. |
+| `E_ARCH_MSG_AMQP_BUDGET_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_BUDGET_MISSING`. |
+| `E_ARCH_MSG_AMQP_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_INDEX_MISSING`. |
+| `E_ARCH_MSG_AMQP_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_PROFILE_INVALID`. |
+| `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID`. |
+| `E_ARCH_MSG_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_INDEX_MISSING`. |
+| `E_ARCH_MSG_KAFKA_BUDGET_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_KAFKA_BUDGET_MISSING`. |
+| `E_ARCH_MSG_KAFKA_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_KAFKA_INDEX_MISSING`. |
+| `E_ARCH_MSG_KAFKA_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_KAFKA_PROFILE_INVALID`. |
+| `E_ARCH_NET_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_NET_GRPC_SERVICES_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_GRPC_SERVICES_INVALID`. |
+| `E_ARCH_NET_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_INDEX_MISSING`. |
+| `E_ARCH_NET_LIMITS_EXCESSIVE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_LIMITS_EXCESSIVE`. |
+| `E_ARCH_NODE_ORPHAN_MODULE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NODE_ORPHAN_MODULE`. |
+| `E_ARCH_NODE_OVERLAP_MODULE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NODE_OVERLAP_MODULE`. |
+| `E_ARCH_OBS_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_OBS_EXPORTER_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`. |
+| `E_ARCH_OBS_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_INDEX_MISSING`. |
+| `E_ARCH_OBS_REGISTRY_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_REGISTRY_MISSING`. |
+| `E_ARCH_PUBLIC_BYTES_UNBRANDED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_PUBLIC_BYTES_UNBRANDED`. |
+| `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED`. |
+| `E_ARCH_RR_DIR_MISSING` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_DIR_MISSING`. |
+| `E_ARCH_RR_GEN_DIR_MISSING` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_GEN_DIR_MISSING`. |
+| `E_ARCH_RR_INDEX_DEFAULTS_DUP` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_DUP`. |
+| `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED`. |
+| `E_ARCH_RR_INDEX_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_NOT_SORTED`. |
+| `E_ARCH_RR_INDEX_SCHEMA_VERSION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_RR_OP_KIND_NOT_ALLOWED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_OP_KIND_NOT_ALLOWED`. |
+| `E_ARCH_RR_OP_KIND_UNKNOWN` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_OP_KIND_UNKNOWN`. |
+| `E_ARCH_RR_OP_NOT_ALLOWED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_OP_NOT_ALLOWED`. |
+| `E_ARCH_RR_POLICY_ID_MISMATCH` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_ID_MISMATCH`. |
+| `E_ARCH_RR_POLICY_KINDS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_KINDS_NOT_SORTED`. |
+| `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED`. |
+| `E_ARCH_RR_POLICY_NOT_FOUND` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_NOT_FOUND`. |
+| `E_ARCH_RR_POLICY_OPS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_OPS_NOT_SORTED`. |
+| `E_ARCH_RR_POLICY_REQUIRED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_REQUIRED`. |
+| `E_ARCH_RR_POLICY_SCHEMA_VERSION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_SCHEMA_VERSION`. |
+| `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED`. |
+| `E_ARCH_RR_SANITIZER_ID_MISMATCH` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_SANITIZER_ID_MISMATCH`. |
+| `E_ARCH_RR_SANITIZER_SCHEMA_VERSION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_SANITIZER_SCHEMA_VERSION`. |
+| `E_ARCH_RR_WORLD_VIOLATION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_WORLD_VIOLATION`. |
+| `E_ARCH_SMOKE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SMOKE_MISSING`. |
+| `E_ARCH_SM_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_DIR_MISSING`. |
+| `E_ARCH_SM_GEN_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_DIR_MISSING`. |
+| `E_ARCH_SM_GEN_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_MISSING`. |
+| `E_ARCH_SM_GEN_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_PARSE`. |
+| `E_ARCH_SM_GEN_STALE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_STALE`. |
+| `E_ARCH_SM_IMPORT_NOT_INDEXED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_IMPORT_NOT_INDEXED`. |
+| `E_ARCH_SM_INDEX_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH`. |
+| `E_ARCH_SM_SPEC_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_SCHEMA_VERSION`. |
+| `E_ARCH_SM_SPEC_VERSION_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_VERSION_MISMATCH`. |
+| `E_ARCH_SM_SPEC_WORLD_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_WORLD_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGINS_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_DIR_MISSING`. |
+| `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`. |
+| `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`. |
+| `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`. |
+| `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`. |
+| `E_ARCH_STREAM_PLUGIN_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_NOT_FOUND`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`. |
 | `E_ARCH_TOOL_BUDGET_EXCEEDED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TOOL_BUDGET_EXCEEDED`. |
-| `E_DEPS_CAP_POLICY_DENY` | x07 / lint / error | never | Dependency violates capability policy. |
-| `E_SBOM_GENERATION_FAILED` | x07 / lint / error | never | SBOM generation failed. |
+| `E_ARCH_TRUST_ZONE_EDGE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TRUST_ZONE_EDGE`. |
+| `E_ARCH_VISIBILITY` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_VISIBILITY`. |
+| `E_ARCH_WEB_API_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_API_INVALID`. |
+| `E_ARCH_WEB_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_WEB_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_INDEX_MISSING`. |
+| `E_ARCH_WEB_OPENAPI_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_OPENAPI_PROFILE_INVALID`. |
+| `E_ARCH_WORLD_EDGE_FORBIDDEN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WORLD_EDGE_FORBIDDEN`. |
+| `E_BENCH_SUITE_LOAD` | x07 / lint / error | sometimes | Diagnostic code `E_BENCH_SUITE_LOAD`. |
+| `E_DEPS_CAP_POLICY_DENY` | x07 / lint / error | sometimes | Diagnostic code `E_DEPS_CAP_POLICY_DENY`. |
+| `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
 | `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
-| `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | never | Dependency capability policy missing. |
+| `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | sometimes | Diagnostic code `W_DEPS_CAP_POLICY_MISSING`. |
 | `X07-ARITY-0000` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-0000`. |
 | `X07-ARITY-BEGIN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-BEGIN-0001`. |
 | `X07-ARITY-FOR-0001` | x07c / lint / error | sometimes | `for` has invalid arity. |
@@ -57,22 +184,33 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-RETURN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-RETURN-0001`. |
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
-| `X07-AST-SLICE-0001` | x07 / run / info | never | AST slice truncated `X07-AST-SLICE-0001`. |
-| `X07-BOOL-0001` | x07c / lint / warning | sometimes | Eager '&' / '\|' in an if condition can trigger traps. |
+| `X07-ASYNC-CONTRACT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0001`. |
+| `X07-ASYNC-CONTRACT-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0002`. |
+| `X07-ASYNC-CONTRACT-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0003`. |
+| `X07-BOOL-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-BOOL-0001`. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
-| `X07-BORROW-0002` | x07c / lint / error | sometimes | Statement block returns a bytes_view borrowing from a local binding. |
-| `X07-CONTRACT-0001` | x07c / type / error | sometimes | Contract clause must typecheck to i32. |
-| `X07-CONTRACT-0002` | x07c / type / error | sometimes | Contract expression is not contract-pure. |
-| `X07-CONTRACT-0003` | x07c / type / error | sometimes | Reserved identifier `__result` is only available in ensures. |
-| `X07-CONTRACT-0004` | x07c / type / error | sometimes | Reserved name collision with `__result`. |
-| `X07-CONTRACT-0005` | x07c / type / error | sometimes | Contract witness has an unsupported type. |
-| `X07-GENERICS-0001` | x07c / lint / error | sometimes | Type variable is not declared in type_params. |
-| `X07-GENERICS-0002` | x07c / lint / warning | always | Unused type parameter. |
-| `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
+| `X07-BORROW-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-BORROW-0002`. |
+| `X07-CLI-ARGS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0001`. |
+| `X07-CLI-ARGS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0002`. |
+| `X07-CONTRACT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0001`. |
+| `X07-CONTRACT-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0002`. |
+| `X07-CONTRACT-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0003`. |
+| `X07-CONTRACT-0004` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0004`. |
+| `X07-CONTRACT-0005` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0005`. |
+| `X07-CONTRACT-0009` | x07c / lint / error | sometimes | Recursive decreases clause is invalid. |
+| `X07-CONTRACT-0010` | x07c / lint / error | sometimes | Recursive decreases metadata is attached to a non-certifiable target. |
+| `X07-CONTRACT-0011` | x07c / lint / error | sometimes | Recursive self-call is missing decreases evidence. |
+| `X07-FIX-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FIX-0003`. |
+| `X07-FMT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FMT-0001`. |
+| `X07-GENERICS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0001`. |
+| `X07-GENERICS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0002`. |
+| `X07-INTERNAL-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-INTERNAL-0001`. |
+| `X07-IO-READ-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-READ-0001`. |
+| `X07-IO-WRITE-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-WRITE-0001`. |
+| `X07-JSON-PARSE-0001` | x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-JSON-PARSE-0001`. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
-| `X07-MOVE-0901` | x07 / codegen / error | sometimes | Use-after-move detected during backend checking. |
-| `X07-MOVE-0902` | x07 / codegen / error | never | Borrow/move rule violation detected during backend checking. |
+| `X07-PATCHSET-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PATCHSET-0001`. |
 | `X07-PBT-FIX-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-ARGS-0001`. |
 | `X07-PBT-FIX-CONFLICT-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-CONFLICT-0001`. |
 | `X07-PBT-FIX-INFO-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-INFO-0001`. |
@@ -84,21 +222,21 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-PBT-REPRO-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-REPRO-SCHEMA-0001`. |
 | `X07-POLICY-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`. |
 | `X07-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0001`. |
-| `X07-SCHEMA-0002` | x07 / parse / error | always | Unsupported x07AST schema_version. |
-| `X07-TAPP-ELAB-0001` | x07c / rewrite / error | always | Typechecker inferred generic type arguments and proposes inserting an explicit `tapp`. |
-| `X07-TAPP-INFER-0001` | x07c / type / info | never | Typechecker cannot infer generic type arguments; explicit `tapp` is required. |
-| `X07-TOOL-ARGS-0001` | x07 / parse / error | never | Tool wrapper argument error `X07-TOOL-ARGS-0001`. |
-| `X07-TOOL-EXEC-0001` | x07 / run / error | never | Tool wrapper execution error `X07-TOOL-EXEC-0001`. |
-| `X07-TYPE-0001` | x07c / type / info | never | Unknown identifier during local typechecking. |
-| `X07-TYPE-CALL-0001` | x07c / type / info | never | Call refers to an unknown callee during local typechecking. |
-| `X07-TYPE-CALL-0002` | x07c / type / info | never | Call argument type mismatch during local typechecking. |
-| `X07-TYPE-CALL-0003` | x07c / type / info | never | Call arity mismatch during local typechecking. |
-| `X07-TYPE-IF-0001` | x07c / type / info | never | `if` condition must be an `i32` (boolean-as-i32) during local typechecking. |
-| `X07-TYPE-IF-0002` | x07c / type / info | never | `if` branches have incompatible types during local typechecking. |
-| `X07-TYPE-RET-0001` | x07c / type / info | never | Return expression type does not match the function result type. |
-| `X07-TYPE-SET-0001` | x07c / type / info | never | `set` references an unknown local during local typechecking. |
-| `X07-TYPE-SET-0002` | x07c / type / info | never | `set` assignment type mismatch during local typechecking. |
-| `X07-TYPE-UNIFY-0001` | x07c / type / info | never | Type unification failed during local inference. |
+| `X07-SCHEMA-0002` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0002`. |
+| `X07-TAPP-ELAB-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-TAPP-ELAB-0001`. |
+| `X07-TAPP-INFER-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-TAPP-INFER-0001`. |
+| `X07-TOOL-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-ARGS-0001`. |
+| `X07-TOOL-EXEC-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-EXEC-0001`. |
+| `X07-TYPE-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-0001`. |
+| `X07-TYPE-CALL-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0001`. |
+| `X07-TYPE-CALL-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0002`. |
+| `X07-TYPE-CALL-0003` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0003`. |
+| `X07-TYPE-IF-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-IF-0001`. |
+| `X07-TYPE-IF-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-IF-0002`. |
+| `X07-TYPE-RET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-RET-0001`. |
+| `X07-TYPE-SET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0001`. |
+| `X07-TYPE-SET-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0002`. |
+| `X07-TYPE-UNIFY-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-UNIFY-0001`. |
 | `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
 | `X07-WORLD-0001` | x07c / lint / error | always | Program imports capabilities not allowed by the selected world flags. |
 | `X07-WORLD-FFI-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-FFI-0001`. |
@@ -109,7 +247,20 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-WORLD-RR-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-RR-0001`. |
 | `X07-WORLD-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0001`. |
 | `X07-WORLD-UNSAFE-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0002`. |
-| `X07-X07AST-PARSE-0001` | x07 / parse / error | sometimes | Core lint/schema diagnostic `X07-X07AST-PARSE-0001`. |
+| `X07-X07AST-PARSE-0001` | x07 / parse / error<br/>x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-X07AST-PARSE-0001`. |
+| `X07CAP_ATTEST_DIGEST_MISMATCH` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_ATTEST_DIGEST_MISMATCH`. |
+| `X07CAP_CONFORMANCE_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_CONFORMANCE_MISSING`. |
+| `X07CAP_CONFORMANCE_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_CONFORMANCE_REQUIRED`. |
+| `X07CAP_CONTRACT_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_CONTRACT_INVALID`. |
+| `X07CAP_EFFECT_LOG_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_EFFECT_LOG_REQUIRED`. |
+| `X07CAP_INDEX_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_INDEX_INVALID`. |
+| `X07CAP_PEER_POLICY_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_PEER_POLICY_REQUIRED`. |
+| `X07CAP_TLS_POLICY_INCOMPLETE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_TLS_POLICY_INCOMPLETE`. |
+| `X07C_WASM_BACKEND_FEATURE_REQUIRED` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_FORM` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_OP` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_TYPE` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`. |
 | `X07INIT_AGENT` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT`. |
 | `X07INIT_AGENT_DIR` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT_DIR`. |
 | `X07INIT_ARGS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_ARGS`. |
@@ -124,6 +275,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07INIT_PKG_LOCK` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_PKG_LOCK`. |
 | `X07INIT_SRC` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_SRC`. |
 | `X07INIT_TESTS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TESTS`. |
+| `X07INIT_TRUST` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TRUST`. |
 | `X07PKG_ADVISED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_ADVISED_DEP`. |
 | `X07PKG_API_URL` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_API_URL`. |
 | `X07PKG_DEP_EXISTS` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_EXISTS`. |
@@ -132,7 +284,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_INDEX_CONFIG` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_CONFIG`. |
 | `X07PKG_INDEX_FETCH` | x07 / lint / error | never | Diagnostic code `X07PKG_INDEX_FETCH`. |
 | `X07PKG_INDEX_NO_MATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`. |
-| `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Local dependency is missing on disk. |
+| `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`. |
 | `X07PKG_LOCK_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISMATCH`. |
 | `X07PKG_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISSING`. |
 | `X07PKG_LOGIN_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_LOGIN_FAILED`. |
@@ -145,6 +297,35 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
 | `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
+| `X07PROOF_ECHECK_FAILED` | x07 / run / error | sometimes | Independent proof check rejected the proof bundle. |
+| `X07PROOF_EIMPORTED_SUMMARY_MISMATCH` | x07 / run / error | sometimes | Semantic proof replay found imported proof-summary drift. |
+| `X07PROOF_EOBJECT_INVALID` | x07 / run / error | sometimes | Proof object failed schema or structural validation. |
+| `X07PROOF_EOBLIGATION_MISMATCH` | x07 / run / error | sometimes | Semantic proof replay regenerated a different verification obligation. |
+| `X07PROOF_ESCHEDULER_MODEL_MISMATCH` | x07 / run / error | sometimes | Semantic async proof replay found a scheduler-model mismatch. |
+| `X07PROOF_ESOLVER_REPLAY_FAILED` | x07 / run / error | sometimes | Semantic proof replay did not reproduce the expected solver verdict. |
+| `X07PROOF_ESOURCE_REPLAY_FAILED` | x07 / run / error | sometimes | Semantic proof replay could not reconstruct the proved source surface. |
+| `X07RD_ADVISORY_ALLOWANCE_ENABLED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_ADVISORY_ALLOWANCE_ENABLED`. |
+| `X07RD_ASSUMPTION_SURFACE_WIDEN` | x07 / lint / error | never | Review diff gate rejected a wider proof-assumption surface. |
+| `X07RD_ASYNC_PROOF_COVERAGE_DECREASE` | x07 / lint / error | never | Review diff gate rejected an async proof coverage regression. |
+| `X07RD_BOUNDED_PROOF_INTRODUCED` | x07 / lint / error | never | Review diff gate rejected bounded proof usage. |
+| `X07RD_CAPSULE_CONTRACT_RELAXATION` | x07 / lint / error | never | Review diff gate rejected a capsule contract relaxation. |
+| `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN`. |
+| `X07RD_CAPSULE_SET_CHANGE` | x07 / lint / error | never | Review diff gate rejected a capsule inventory change. |
+| `X07RD_COVERAGE_SUMMARY_IMPORTED` | x07 / lint / error | never | Review diff gate rejected a coverage-only import. |
+| `X07RD_DEV_ONLY_ASSUMPTION_INTRODUCED` | x07 / lint / error | never | Review diff gate rejected a developer-only proof assumption. |
+| `X07RD_LOCKFILE_HASH_CHANGE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_LOCKFILE_HASH_CHANGE`. |
+| `X07RD_NETWORK_ALLOWLIST_WIDEN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_NETWORK_ALLOWLIST_WIDEN`. |
+| `X07RD_OPERATIONAL_ENTRY_DIVERGES` | x07 / lint / error | never | Review diff gate rejected operational-entry divergence. |
+| `X07RD_PACKAGE_SET_CHANGE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PACKAGE_SET_CHANGE`. |
+| `X07RD_PEER_POLICY_RELAXATION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PEER_POLICY_RELAXATION`. |
+| `X07RD_RECURSION_PROOF_COVERAGE_DECREASE` | x07 / lint / error | never | Review diff gate rejected a recursive proof coverage regression. |
+| `X07RD_RUNTIME_ATTEST_REGRESSION` | x07 / run / error | never | Review diff gate rejected a runtime attestation regression. |
+| `X07RD_SANDBOX_POLICY_WIDEN` | x07 / lint / error | never | Review diff gate rejected a sandbox policy widening. |
+| `X07RD_SUMMARY_DOWNGRADE` | x07 / lint / error | never | Review diff gate rejected a proof-summary downgrade. |
+| `X07REL_EBOUNDED_PROOF` | x07 / lint / error | sometimes | Release guard rejected bounded proof usage in the strict fixture. |
+| `X07REL_ECOVERAGE_ONLY_IMPORT` | x07 / lint / error | sometimes | Release guard rejected a coverage-only imported summary in the strict fixture. |
+| `X07REL_EDEV_ONLY_ASSUMPTION` | x07 / lint / error | sometimes | Release guard rejected a developer-only proof assumption in the strict fixture. |
+| `X07REL_ESURROGATE_ENTRY` | x07 / lint / error | sometimes | Release guard rejected surrogate-entry certification in the strict fixture. |
 | `X07RR_ENTRY_EXISTS` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`. |
 | `X07RR_HTTP` | x07 / run / error | never | Diagnostic code `X07RR_HTTP`. |
 | `X07RR_KEY_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_KEY_EMPTY`. |
@@ -152,32 +333,109 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RR_LATENCY_OUT_OF_RANGE` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_LATENCY_OUT_OF_RANGE`. |
 | `X07RR_OP_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_OP_EMPTY`. |
 | `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
-| `X07T_ASSERT_BYTES_EQ` | x07 / run / error | never | `std.test.assert_bytes_eq` failed with expected vs got payload. |
+| `X07TC_EARCH_STRICT` | x07 / run / error | sometimes | Strict architecture evidence failed certification. |
+| `X07TC_EASYNC_PROOF` | x07 / run / error | never | Async proof coverage or async proof obligations failed certification. |
+| `X07TC_EASYNC_PROVE_REPORT_MISSING` | x07 / run / error | sometimes | Required async prove report is missing. |
+| `X07TC_EBOUNDARY_MISSING` | x07 / run / error | sometimes | Boundary declarations are missing or incomplete for certification. |
+| `X07TC_EBOUNDARY_RELAXED` | x07 / run / error | never | The candidate relaxes a certified boundary contract relative to the baseline. |
+| `X07TC_EBOUNDED_PROOF_FORBIDDEN` | x07 / run / error | never | Bounded recursion proof is forbidden for the active trust profile. |
+| `X07TC_ECAPSULE_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ECAPSULE_ATTEST`. |
+| `X07TC_ECAPSULE_NETWORK_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ECAPSULE_NETWORK_ATTEST`. |
+| `X07TC_ECOMPILE_ATTEST` | x07 / run / error | never | Compile attestation failed or could not bind the emitted binary. |
+| `X07TC_ECOVERAGE_ONLY` | x07 / run / error | never | Coverage/support evidence cannot satisfy certification. |
+| `X07TC_EDEP_CLOSURE` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EDEP_CLOSURE`. |
+| `X07TC_EDEV_ONLY_ASSUMPTION` | x07 / run / error | never | Developer-only proof assumptions are forbidden for the active trust profile. |
+| `X07TC_EDIFF_POSTURE` | x07 / run / error | never | Baseline review or trust-posture diff gate failed certification. |
+| `X07TC_EEFFECT_LOG` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EEFFECT_LOG`. |
+| `X07TC_ENET_POLICY` | x07 / run / error | never | Network policy posture changed relative to the reviewed baseline. |
+| `X07TC_ENONDET` | x07 / run / error | never | Trust report detected nondeterminism in the certified closure. |
+| `X07TC_EOP_ENTRY_MISMATCH` | x07 / run / error | sometimes | Certification entry does not match the operational entry. |
+| `X07TC_EOP_ENTRY_REQUIRED` | x07 / run / error | sometimes | Operational-entry metadata is required for the active trust profile. |
+| `X07TC_EPBT` | x07 / run / error | sometimes | Boundary-required property tests are missing, malformed, or failing. |
+| `X07TC_EPEER_POLICY` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EPEER_POLICY`. |
+| `X07TC_EPROFILE` | x07 / run / error | sometimes | Certification trust profile is missing or invalid. |
+| `X07TC_EPROJECT` | x07 / run / error | sometimes | Certification could not resolve the project manifest or source closure. |
+| `X07TC_EPROOF_CHECK_ENGINE_MISMATCH` | x07 / run / error | sometimes | Certification found a proof-check report whose engine did not match the proved symbol metadata. |
+| `X07TC_EPROOF_CHECK_MISSING` | x07 / run / error | never | Required proof-check report is missing from prove evidence. |
+| `X07TC_EPROOF_CHECK_REJECTED` | x07 / run / error | sometimes | Certification rejected a proof whose proof-check report was not accepted. |
+| `X07TC_EPROOF_CHECK_SCHEMA_INVALID` | x07 / run / error | sometimes | Proof-check report failed schema validation during certification. |
+| `X07TC_EPROOF_COVERAGE` | x07 / run / error | never | Reachable proof coverage is incomplete for certification. |
+| `X07TC_EPROOF_OBJECT_MISSING` | x07 / run / error | never | Required proof object is missing from prove evidence. |
+| `X07TC_EPROVE` | x07 / run / error | sometimes | At least one reachable proof obligation failed. |
+| `X07TC_EPROVE_REPORT_MISSING` | x07 / run / error | sometimes | Required per-symbol prove report is missing. |
+| `X07TC_EPROVE_UNSUPPORTED` | x07 / run / error | sometimes | A reachable symbol is outside the supported proof subset. |
+| `X07TC_ERECURSION_FORBIDDEN` | x07 / run / error | never | Reachable recursion is forbidden by the active trust profile. |
+| `X07TC_ERUNTIME_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ERUNTIME_ATTEST`. |
+| `X07TC_ERUNTIME_NETWORK_EVIDENCE` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ERUNTIME_NETWORK_EVIDENCE`. |
+| `X07TC_ESANDBOX_PROFILE` | x07 / run / error | never | Sandbox runtime evidence violates the certification profile. |
+| `X07TC_ESCHEMA_DRIFT` | x07 / run / error | sometimes | Boundary-referenced schema outputs drifted or are missing. |
+| `X07TC_ESURROGATE_ENTRY_FORBIDDEN` | x07 / run / error | sometimes | Surrogate certification entries are forbidden for the active trust profile. |
+| `X07TC_ETESTS` | x07 / run / error | sometimes | Deterministic certification tests are missing or failing. |
+| `X07TC_ETRUST_REPORT` | x07 / run / error | never | Trust report evidence failed certification. |
+| `X07TC_EUNSUPPORTED_DEFASYNC` | x07 / run / error | sometimes | Reachable `defasync` logic is outside the certifiable subset. |
+| `X07TC_EUNSUPPORTED_RECURSION` | x07 / run / error | sometimes | Reachable recursion is outside the certifiable subset. |
+| `X07TEST_ASYNC_ENTRY_UNSUPPORTED` | x07 / lint / error | never | x07 test could not build or run the selected async entrypoint. |
+| `X07TEST_CAPSULE_EVIDENCE_MISSING` | x07 / lint / error | never | A test that requires capsule evidence did not provide it. |
+| `X07TEST_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | A test that requires runtime attestation did not produce it. |
+| `X07TP_ARCH` | x07 / run / error | sometimes | Project architecture posture is weaker than the trust profile requires. |
+| `X07TP_ASYNC_PROOF_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing async proof coverage. |
+| `X07TP_BACKEND_NOT_CERTIFIABLE` | x07 / run / error | sometimes | Networked trusted-program profile allows a backend posture that is not certifiable. |
+| `X07TP_BOUNDARY` | x07 / run / error | sometimes | Project boundary index wiring is missing or incomplete for certification. |
+| `X07TP_CAPSULES` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_CAPSULES`. |
+| `X07TP_CAPSULE_ATTEST_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing capsule attestation requirements. |
+| `X07TP_DEP_CLOSURE_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_DEP_CLOSURE_REQUIRED`. |
+| `X07TP_EFFECT_LOG_REQUIRED` | x07 / run / error | sometimes | Trust profile is missing required effect-log evidence semantics. |
+| `X07TP_ENTRY_FORBIDDEN` | x07 / run / error | sometimes | Requested entrypoint is not allowed by the trust profile. |
+| `X07TP_INVALID` | x07 / run / error | sometimes | Trust profile JSON is missing or invalid. |
+| `X07TP_LANGUAGE` | x07 / run / error | sometimes | Project uses language or policy features forbidden by the trust profile. |
+| `X07TP_NETWORK_MODE_FORBIDDEN` | x07 / run / error | sometimes | Sandboxed-local trust profile allows networking where it should not. |
+| `X07TP_NETWORK_PROFILE_REQUIRED` | x07 / run / error | sometimes | Networked trust profile is missing required network certification posture. |
+| `X07TP_NOT_CERTIFIABLE` | x07 / run / error | sometimes | Trust profile is weaker than the current certification floor. |
+| `X07TP_PEER_POLICY_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_PEER_POLICY_REQUIRED`. |
+| `X07TP_PROJECT_MISMATCH` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
+| `X07TP_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing runtime attestation requirements. |
+| `X07TP_SANDBOX_BACKEND_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing the VM-only isolation requirement. |
+| `X07TP_WORLD` | x07 / run / error | sometimes | Project world is outside the trust profile allowlist. |
 | `X07T_EPBT_MANIFEST_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`. |
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
 | `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
 | `X07T_EPBT_UNSUPPORTED_WORLD` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`. |
-| `X07V_EARGS` | x07 / run / error | sometimes | Invalid `x07 verify` arguments. |
-| `X07V_ECBMC_ERROR` | x07 / run / error | sometimes | CBMC reported an error. |
-| `X07V_ECBMC_FAILURE` | x07 / run / error | sometimes | CBMC reported a failing property that is not a contract. |
-| `X07V_ECBMC_JSON_PARSE` | x07 / run / error | sometimes | Failed to parse CBMC JSON output. |
-| `X07V_ECBMC_MISSING` | x07 / run / error | sometimes | CBMC is missing. |
-| `X07V_ECBMC_SMT2` | x07 / run / error | sometimes | CBMC failed to emit SMT2. |
-| `X07V_ECBMC_STDERR` | x07 / run / error | sometimes | CBMC wrote unexpected stderr output. |
-| `X07V_EMODULE_ROOTS` | x07 / run / error | sometimes | Could not resolve module roots for `x07 verify`. |
-| `X07V_EPROJECT` | x07 / run / error | sometimes | Could not resolve project manifest for `x07 verify`. |
-| `X07V_ETARGET` | x07 / run / error | sometimes | Verification target could not be loaded. |
-| `X07V_EZ3_MISSING` | x07 / run / error | sometimes | Z3 is missing. |
-| `X07V_EZ3_RUN` | x07 / run / error | sometimes | Z3 failed to run. |
-| `X07V_INTERNAL` | x07 / run / error | never | Internal `x07 verify` error. |
-| `X07V_NO_CONTRACTS` | x07 / run / error | sometimes | Target has no contracts to verify. |
-| `X07V_SMT_SAT` | x07 / run / error | sometimes | SMT solver returned SAT (counterexample found). |
-| `X07V_SMT_UNKNOWN` | x07 / run / error | sometimes | SMT solver returned an unknown status. |
-| `X07V_UNSUPPORTED_ASYNC` | x07 / run / error | sometimes | `x07 verify` does not support `defasync` targets. |
-| `X07V_UNSUPPORTED_FOR_BOUNDS` | x07 / run / error | sometimes | `for` loop bounds must be literal for `x07 verify` v0.1. |
-| `X07V_UNSUPPORTED_PARAM` | x07 / run / error | sometimes | Unsupported parameter type for `x07 verify`. |
-| `X07V_UNSUPPORTED_RECURSION` | x07 / run / error | sometimes | Recursive targets are not supported by `x07 verify` v0.1. |
-| `X07V_UNWIND_INCOMPLETE` | x07 / run / error | sometimes | CBMC unwinding is incomplete. |
+| `X07V_ASYNC_COUNTEREXAMPLE` | x07 / lint / error | never | The async proof found a counterexample. |
+| `X07V_CANCELLATION_ENSURE_FAILED` | x07 / lint / error | never | The async cancellation postcondition failed under proof. |
+| `X07V_COVERAGE_NOT_PROOF` | x07 / lint / warning | sometimes | Coverage/support summary is not proof evidence. |
+| `X07V_COVERAGE_SUMMARY_FORBIDDEN` | x07 / lint / error | sometimes | Coverage/support summaries cannot be imported as proof. |
+| `X07V_EARGS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EARGS`. |
+| `X07V_ECBMC_ERROR` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_ERROR`. |
+| `X07V_ECBMC_FAILURE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_FAILURE`. |
+| `X07V_ECBMC_JSON_PARSE` | x07 / parse / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_JSON_PARSE`. |
+| `X07V_ECBMC_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_MISSING`. |
+| `X07V_ECBMC_SMT2` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_SMT2`. |
+| `X07V_ECBMC_STDERR` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_STDERR`. |
+| `X07V_EMODULE_ROOTS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EMODULE_ROOTS`. |
+| `X07V_EPROJECT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EPROJECT`. |
+| `X07V_ETARGET` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ETARGET`. |
+| `X07V_EZ3_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_MISSING`. |
+| `X07V_EZ3_RUN` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_RUN`. |
+| `X07V_IMPORTED_STUB_FORBIDDEN` | x07 / lint / error | sometimes | Imported stub assumptions are disabled in prove mode. |
+| `X07V_INTERNAL` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_INTERNAL`. |
+| `X07V_NO_CONTRACTS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_NO_CONTRACTS`. |
+| `X07V_PROOF_SUMMARY_REQUIRED` | x07 / lint / error | sometimes | A reachable proof summary dependency is required but missing. |
+| `X07V_PROVE_UNSUPPORTED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_PROVE_UNSUPPORTED`. |
+| `X07V_RECURSION_TERMINATION_FAILED` | x07 / lint / error | sometimes | Recursive proof could not justify the declared termination rank. |
+| `X07V_RECURSIVE_DECREASES_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_RECURSIVE_DECREASES_REQUIRED`. |
+| `X07V_SCHEDULER_MODEL_UNTRUSTED` | x07 / lint / error | sometimes | Async proof cannot proceed without the trusted scheduler model. |
+| `X07V_SCOPE_INVARIANT_FAILED` | x07 / lint / error | never | An async scope invariant failed under proof. |
+| `X07V_SMT_SAT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_SAT`. |
+| `X07V_SMT_UNKNOWN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_UNKNOWN`. |
+| `X07V_SUMMARY_MISMATCH` | x07 / lint / error | never | An imported proof summary does not match the current declaration. |
+| `X07V_SUMMARY_MISSING` | x07 / lint / error | sometimes | A reachable imported proof summary dependency is missing. |
+| `X07V_UNSUPPORTED_DEFASYNC_FORM` | x07 / lint / error | sometimes | The selected `defasync` target is outside the supported proof subset. |
+| `X07V_UNSUPPORTED_FOR_BOUNDS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_FOR_BOUNDS`. |
+| `X07V_UNSUPPORTED_HEAP_EFFECT` | x07 / lint / error | sometimes | The proved core uses heap or pointer effects outside the supported subset. |
+| `X07V_UNSUPPORTED_MUTUAL_RECURSION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_MUTUAL_RECURSION`. |
+| `X07V_UNSUPPORTED_RECURSION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_RECURSION`. |
+| `X07V_UNSUPPORTED_RICH_TYPE` | x07 / type / error | sometimes | The target signature is outside the supported richer-data proof subset. |
+| `X07V_UNWIND_INCOMPLETE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNWIND_INCOMPLETE`. |
 | `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
 | `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
 | `X7I0110` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0110`. |
@@ -780,6 +1038,26 @@ Agent strategy:
 - Re-run `x07 test`.
 
 
+## `ETEST_SOLVE_FUEL_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_SOLVE_FUEL_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
 ## `ETEST_TESTS_EMPTY`
 
 Summary: Test manifest validation diagnostic `ETEST_TESTS_EMPTY`.
@@ -840,9 +1118,929 @@ Agent strategy:
 - Re-run `x07 test`.
 
 
+## `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_ARCHIVE_OP_UNKNOWN`
+
+Summary: Architecture contract diagnostic `E_ARCH_ARCHIVE_OP_UNKNOWN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_ARCHIVE_SCHEMA_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_ARCHIVE_SCHEMA_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_INDEX_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_INDEX_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_VERIFY_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_VERIFY_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGETS_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGETS_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGETS_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGETS_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_PROFILE_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
 ## `E_ARCH_BUDGET_SCOPE_MISSING`
 
 Summary: Architecture contract diagnostic `E_ARCH_BUDGET_SCOPE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_WORLD_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_WORLD_VIOLATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CLI_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CLI_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CLI_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CLI_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_JSON_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_JSON_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRAWL_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRAWL_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRAWL_POLICY_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRAWL_POLICY_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRYPTO_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRYPTO_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRYPTO_KEY_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRYPTO_KEY_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CYCLE`
+
+Summary: Architecture contract diagnostic `E_ARCH_CYCLE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_MIGRATE_PLAN_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_MIGRATE_PLAN_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_QUERY_CATALOG_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_QUERY_CATALOG_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_SQL_HASH_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_SQL_HASH_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_SQL_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_SQL_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DEPS_DENY`
+
+Summary: Architecture contract diagnostic `E_ARCH_DEPS_DENY`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DUPLICATE_MODULE_ID`
+
+Summary: Architecture contract diagnostic `E_ARCH_DUPLICATE_MODULE_ID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_EDGE_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_EDGE_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_IMPORT_PREFIX_DENIED`
+
+Summary: Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_DENIED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LAYERS_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_LAYERS_VIOLATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LOCK_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_LOCK_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LOCK_JSON_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_LOCK_JSON_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LOCK_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_LOCK_MISMATCH`.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -880,12 +2078,1452 @@ Agent strategy:
 - Re-run `x07 arch check` until green.
 
 
+## `E_ARCH_MANIFEST_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MANIFEST_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MANIFEST_JSON_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_MANIFEST_JSON_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MANIFEST_READ`
+
+Summary: Architecture contract diagnostic `E_ARCH_MANIFEST_READ`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
 ## `E_ARCH_MODULE_PARSE`
 
 Summary: Architecture contract diagnostic `E_ARCH_MODULE_PARSE`.
 
 Origins:
 - x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_BUDGET_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_BUDGET_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_KAFKA_BUDGET_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_KAFKA_BUDGET_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_KAFKA_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_KAFKA_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_KAFKA_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_KAFKA_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_GRPC_SERVICES_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_GRPC_SERVICES_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_LIMITS_EXCESSIVE`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_LIMITS_EXCESSIVE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NODE_ORPHAN_MODULE`
+
+Summary: Architecture contract diagnostic `E_ARCH_NODE_ORPHAN_MODULE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NODE_OVERLAP_MODULE`
+
+Summary: Architecture contract diagnostic `E_ARCH_NODE_OVERLAP_MODULE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_REGISTRY_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_REGISTRY_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_PUBLIC_BYTES_UNBRANDED`
+
+Summary: Architecture contract diagnostic `E_ARCH_PUBLIC_BYTES_UNBRANDED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_DIR_MISSING`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_DEFAULTS_DUP`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_DUP`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_OP_KIND_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_OP_KIND_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_OP_KIND_UNKNOWN`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_OP_KIND_UNKNOWN`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_OP_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_OP_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_KINDS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_KINDS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_NOT_FOUND`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_OPS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_OPS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_SANITIZER_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_SANITIZER_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_SANITIZER_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_SANITIZER_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_WORLD_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_WORLD_VIOLATION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SMOKE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SMOKE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_STALE`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_STALE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_IMPORT_NOT_INDEXED`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_IMPORT_NOT_INDEXED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_VERSION_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_VERSION_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_WORLD_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_WORLD_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
@@ -920,51 +3558,204 @@ Agent strategy:
 - Re-run `x07 arch check` until green.
 
 
-## `E_DEPS_CAP_POLICY_DENY`
+## `E_ARCH_TRUST_ZONE_EDGE`
 
-Summary: Dependency violates capability policy.
+Summary: Architecture contract diagnostic `E_ARCH_TRUST_ZONE_EDGE`.
 
 Origins:
 - x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires a policy decision (allow vs deny) and/or changing the dependency code.
+Quickfix support: `sometimes`
 
 Details:
 
-A locked dependency statically uses one or more sensitive namespaces that are denied by the dependency capability policy.
-
-This gate is based on the same sensitive namespace scan surfaced in `x07 trust report` (for example `std.os.net.` or `std.os.process.`).
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
 
 Agent strategy:
 
-- Inspect `diagnostics[].data.offending_namespaces` and the `policy` fields (path/rule).
-- If the dependency is expected to use the capability, add an explicit allow entry for that package.
-- Otherwise, replace the dependency or remove the sensitive namespace usage.
-- Re-run `x07 trust report --fail-on deps-capability` to verify the policy is enforced.
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_VISIBILITY`
+
+Summary: Architecture contract diagnostic `E_ARCH_VISIBILITY`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_API_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_API_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_OPENAPI_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_OPENAPI_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WORLD_EDGE_FORBIDDEN`
+
+Summary: Architecture contract diagnostic `E_ARCH_WORLD_EDGE_FORBIDDEN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_BENCH_SUITE_LOAD`
+
+Summary: Diagnostic code `E_BENCH_SUITE_LOAD`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Fallback catalog entry for `E_BENCH_SUITE_LOAD`. Investigate producer-specific remediation.
+
+Agent strategy:
+
+- Reproduce `E_BENCH_SUITE_LOAD` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
+
+
+## `E_DEPS_CAP_POLICY_DENY`
+
+Summary: Diagnostic code `E_DEPS_CAP_POLICY_DENY`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Fallback catalog entry for `E_DEPS_CAP_POLICY_DENY`. Investigate producer-specific remediation.
+
+Agent strategy:
+
+- Reproduce `E_DEPS_CAP_POLICY_DENY` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
 
 
 ## `E_SBOM_GENERATION_FAILED`
 
-Summary: SBOM generation failed.
+Summary: Diagnostic code `E_SBOM_GENERATION_FAILED`.
 
 Origins:
 - x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: SBOM output depends on filesystem availability and explicit configuration.
+Quickfix support: `sometimes`
 
 Details:
 
-`x07 trust report` failed to generate or write a deterministic SBOM artifact (CycloneDX/SPDX).
-
-If CI is gating on `--fail-on sbom-missing`, this will cause the trust report command to fail.
+Fallback catalog entry for `E_SBOM_GENERATION_FAILED`. Investigate producer-specific remediation.
 
 Agent strategy:
 
-- Check the `diagnostics[].data.path` and filesystem permissions for the output directory.
-- If SBOM output is intentionally disabled, avoid gating on `sbom-missing` or remove `--sbom-format none`.
-- Re-run `x07 trust report` to confirm the SBOM artifact is generated and stable.
+- Reproduce `E_SBOM_GENERATION_FAILED` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
 
 
 ## `W_ARCH_CONTRACTS_LOCK_MISSING`
@@ -1009,25 +3800,22 @@ Agent strategy:
 
 ## `W_DEPS_CAP_POLICY_MISSING`
 
-Summary: Dependency capability policy missing.
+Summary: Diagnostic code `W_DEPS_CAP_POLICY_MISSING`.
 
 Origins:
 - x07 (stage: lint, severity: warning)
 
-Quickfix support: `never`
-No quickfix reason: Requires author intent (define a deny/allow policy for the project dependencies).
+Quickfix support: `sometimes`
 
 Details:
 
-The project declares dependencies but `x07 trust report` did not find a dependency capability policy file.
-
-By default, the policy is discovered at `x07.deps.capability-policy.json` in the project root (or overridden via `--deps-cap-policy`).
+Fallback catalog entry for `W_DEPS_CAP_POLICY_MISSING`. Investigate producer-specific remediation.
 
 Agent strategy:
 
-- Create `x07.deps.capability-policy.json` in the project root (schema: `x07.deps.capability_policy@0.1.0`).
-- Or pass `--deps-cap-policy <path>` to point at an existing policy file.
-- To enforce in CI, add `--fail-on deps-capability`.
+- Reproduce `W_DEPS_CAP_POLICY_MISSING` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
 
 
 ## `X07-ARITY-0000`
@@ -1192,46 +3980,84 @@ Agent strategy:
 - Re-run compile/test.
 
 
-## `X07-AST-SLICE-0001`
+## `X07-ASYNC-CONTRACT-0001`
 
-Summary: AST slice truncated `X07-AST-SLICE-0001`.
+Summary: Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0001`.
 
 Origins:
-- x07 (stage: run, severity: info)
+- x07c (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Truncation is controlled by slice bounds.
+Quickfix support: `sometimes`
 
 Details:
 
-Emitted when `x07 ast slice` truncates the output due to `--max_nodes` or `--max_bytes`. The slice remains deterministic but may omit context needed for repair.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Re-run with a higher `--max_nodes` / `--max_bytes` bound.
-- Use `--enclosure=module` and/or `--closure=all` if more context is required.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ASYNC-CONTRACT-0002`
+
+Summary: Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0002`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ASYNC-CONTRACT-0003`
+
+Summary: Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0003`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-BOOL-0001`
 
-Summary: Eager '&' / '|' in an if condition can trigger traps.
+Summary: Core lint/schema diagnostic `X07-BOOL-0001`.
 
 Origins:
-- x07c (stage: lint, severity: warning)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
 
 Details:
 
-`&` and `|` evaluate both sides eagerly (no short-circuit). When used in `if` conditions with trap-prone view ops, this can evaluate a failing RHS even when a LHS guard would otherwise reject.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Prefer `&&` / `||` in `if` conditions that guard trap-prone ops.
-- Keep guards ordered so cheap checks run before trap-prone checks.
-- Re-run `x07 lint` to confirm the warning is resolved.
-- Optionally run `x07 fix --input <file> --write` to rewrite the first eager boolean operator to `&&` / `||`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-BORROW-0001`
@@ -1250,196 +4076,393 @@ Quickfix is context-dependent: when a safe insertion point exists, linter emits 
 
 Agent strategy:
 
-- Read `diagnostics[].data.mem_provenance` to identify the temporary owner and the borrow call.
 - Prefer binding owner expressions to locals before `bytes.view`/`bytes.subview`/`vec_u8.as_view`.
-- If `mem_provenance.hints[]` contains `bind_owner_to_local`, introduce `let tmp = <owner>` and borrow from `tmp`.
 - Apply quickfix when present.
 - If quickfix is absent, perform equivalent manual rewrite and re-run lint.
 
 
 ## `X07-BORROW-0002`
 
-Summary: Statement block returns a bytes_view borrowing from a local binding.
+Summary: Core lint/schema diagnostic `X07-BORROW-0002`.
 
 Origins:
 - x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
 
 Details:
 
-A `begin`/`unsafe` statement block returned a `bytes_view` that borrows from a value bound inside that block. The local owner does not outlive the block, so the view would escape its borrow source.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Hoist the owned value `let` binding outside the statement block so the borrow source outlives the view.
-- Or return owned `bytes` instead of a `bytes_view`.
-- Re-run `x07 lint` (and `x07 check --project ...` if applicable).
-- If the borrow source is a `bytes.lit`, `x07 fix --input <file> --write` can rewrite it to `bytes.view_lit`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CLI-ARGS-0001`
+
+Summary: Core lint/schema diagnostic `X07-CLI-ARGS-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CLI-ARGS-0002`
+
+Summary: Core lint/schema diagnostic `X07-CLI-ARGS-0002`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-CONTRACT-0001`
 
-Summary: Contract clause must typecheck to i32.
-
-Origins:
-- x07c (stage: type, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-Contract expressions in `requires[]`, `ensures[]`, and `invariant[]` must typecheck to `i32` (x07 uses `i32` as a boolean: `0` = false, non-zero = true).
-
-Agent strategy:
-
-- Locate the reported clause expression and ensure it evaluates to an `i32` predicate.
-- Add an explicit comparison (for example `i32.eq`, `i32.lt`, etc.) when the expression currently returns a non-`i32` value.
-- Re-run `x07 lint` / `x07 test` to confirm the contract typechecks.
-
-
-## `X07-CONTRACT-0002`
-
-Summary: Contract expression is not contract-pure.
-
-Origins:
-- x07c (stage: type, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-Contract clause expressions (and witness expressions) must be contract-pure so they do not change program semantics. Disallowed operations include `world.*`, `task.*`, mutation forms (for example `set`, `unsafe`), module calls, and other impure/nondeterministic constructs. The diagnostic includes a note enumerating the allowed contract-pure builtins/operators.
-
-Agent strategy:
-
-- Inspect the main message for the disallowed head/operator and the allowlist note in `notes[]`.
-- Replace the impure subexpression with a contract-pure computation (or compute in the main body and reference the pure value in the contract).
-- If the clause needs external state, move that check into program logic/tests instead of a contract.
-- Re-run `x07 lint` to confirm the impurity is gone.
-
-
-## `X07-CONTRACT-0003`
-
-Summary: Reserved identifier `__result` is only available in ensures.
-
-Origins:
-- x07c (stage: type, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-`__result` is reserved for postconditions: it is bound to the function return value only while checking `ensures[]`. It is an error to reference `__result` in `requires[]`, `invariant[]`, or their witnesses.
-
-Agent strategy:
-
-- If you need the return value, move the clause to `ensures[]`.
-- Otherwise, remove/replace the `__result` reference with an expression over parameters/locals available at the clause site.
-- Re-run `x07 lint` to confirm the contract is valid.
-
-
-## `X07-CONTRACT-0004`
-
-Summary: Reserved name collision with `__result`.
-
-Origins:
-- x07c (stage: type, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-When a function has contracts, `__result` is reserved for the postcondition binding used in `ensures[]`. It is an error for a parameter or local binding to be named `__result`.
-
-Agent strategy:
-
-- Rename the parameter/local to a non-reserved name.
-- If you need a local alias of the return value, use a different identifier and reference `__result` only inside `ensures[]`.
-- Re-run `x07 lint` to confirm there are no remaining collisions.
-
-
-## `X07-CONTRACT-0005`
-
-Summary: Contract witness has an unsupported type.
-
-Origins:
-- x07c (stage: type, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-Witness expressions are evaluated only on contract failure and are recorded in the failure payload. In v0.1, witnesses are restricted to simple, serializable types (currently `i32`, `bytes`, `bytes_view`, and `result_*`).
-
-Agent strategy:
-
-- Change the witness expression to an allowed type (for example witness `view.len` as `i32`, or include a `bytes_view` slice).
-- If you need richer context, encode it into `bytes`/`bytes_view` explicitly.
-- Re-run `x07 lint` to confirm witness types are accepted.
-
-
-## `X07-GENERICS-0001`
-
-Summary: Type variable is not declared in type_params.
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0001`.
 
 Origins:
 - x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
 
 Details:
 
-A type expression references a type variable like `["t","A"]`, but the surrounding function does not declare `A` in `type_params`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- If the function should be generic, add `{"name":"A"}` (and optional `bound`) to `type_params`.
-- Otherwise, replace the type variable with a concrete type name (e.g. `"u32"`).
-- Re-run `x07 lint` to confirm the signature is consistent.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CONTRACT-0002`
+
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0002`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CONTRACT-0003`
+
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0003`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CONTRACT-0004`
+
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0004`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CONTRACT-0005`
+
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0005`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CONTRACT-0009`
+
+Summary: Recursive decreases clause is invalid.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A `decreases[]` clause must stay contract-pure, typecheck to `i32`, and keep its witness payload within the supported contract witness subset.
+
+Agent strategy:
+
+- Keep `decreases[].expr` in the contract-pure subset.
+- Make each `decreases[].expr` typecheck to `i32`.
+- Keep `decreases[].witness[]` values in the supported contract witness subset.
+- Re-run `x07 lint` or `x07 check`.
+
+
+## `X07-CONTRACT-0010`
+
+Summary: Recursive decreases metadata is attached to a non-certifiable target.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The enclosing `defn` declares `decreases[]`, but the function is not a directly self-recursive proof target or it lacks the surrounding contract clauses needed for certification.
+
+Agent strategy:
+
+- Keep `decreases[]` only on directly self-recursive `defn` targets.
+- Add at least one `requires`, `ensures`, or `invariant` clause when the function is meant to be proved.
+- Remove `decreases[]` from non-recursive helpers.
+- Re-run `x07 lint` or `x07 check`.
+
+
+## `X07-CONTRACT-0011`
+
+Summary: Recursive self-call is missing decreases evidence.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The function body makes a direct self-recursive call, but the enclosing `defn` does not declare `decreases[]` to justify the termination rank.
+
+Agent strategy:
+
+- Add `decreases[]` to the enclosing `defn`.
+- Keep the recursive target inside the certifiable pure subset.
+- Re-run `x07 lint` or `x07 check`.
+
+
+## `X07-FIX-0003`
+
+Summary: Core lint/schema diagnostic `X07-FIX-0003`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-FMT-0001`
+
+Summary: Core lint/schema diagnostic `X07-FMT-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-GENERICS-0001`
+
+Summary: Core lint/schema diagnostic `X07-GENERICS-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-GENERICS-0002`
 
-Summary: Unused type parameter.
+Summary: Core lint/schema diagnostic `X07-GENERICS-0002`.
 
 Origins:
-- x07c (stage: lint, severity: warning)
+- x07c (stage: lint, severity: error)
 
-Quickfix support: `always`
-Quickfix kinds: `json_patch`
+Quickfix support: `sometimes`
 
 Details:
 
-A function declares a `type_params` entry that is never referenced in its signature types.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Remove the unused type param from `type_params`, or reference it from `params[].ty` / `result`.
-- Re-run `x07 lint`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-INTERNAL-0001`
 
-Summary: Internal tool failure `X07-INTERNAL-0001`.
+Summary: Core lint/schema diagnostic `X07-INTERNAL-0001`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires a toolchain fix; no safe source-level quickfix exists.
+Quickfix support: `sometimes`
 
 Details:
 
-The toolchain encountered an internal error or panic while producing a machine report. In machine mode, the wrapper emits this stable code with `exit_code=3`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Re-run with `--verbose` / `--debug` if available.
-- Reduce to a minimal repro.
-- File a toolchain bug with the machine report JSON (especially `diagnostics[].data`).
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-IO-READ-0001`
+
+Summary: Core lint/schema diagnostic `X07-IO-READ-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-IO-WRITE-0001`
+
+Summary: Core lint/schema diagnostic `X07-IO-WRITE-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-JSON-PARSE-0001`
+
+Summary: Core lint/schema diagnostic `X07-JSON-PARSE-0001`.
+
+Origins:
+- x07c (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-MOVE-0001`
@@ -1458,8 +4481,6 @@ Linter emits a JSON Patch quickfix that copies one side using `view.to_bytes(byt
 
 Agent strategy:
 
-- Read `diagnostics[].data.mem_provenance` to confirm the use-after-move chain.
-- If `mem_provenance.hints[]` contains `clone_before_use`, copy one side (for example via `view.to_bytes(bytes.view(name))`) before reuse.
 - Apply quickfix.
 - Confirm resulting expression keeps ownership semantics.
 - Re-run lint/build.
@@ -1477,55 +4498,33 @@ Quickfix kinds: `json_patch`
 
 Details:
 
-Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tmp_copy`) and rewrites the condition to use the copy (via `view.to_bytes(bytes.view(name))`) to avoid move conflicts.
+Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tmp_copy`) and rewrites the condition to avoid move conflicts.
 
 Agent strategy:
 
-- Read `diagnostics[].data.mem_provenance` to see the conflicting `bytes.view` borrows across condition/branch.
-- If `mem_provenance.hints[]` contains `introduce_tmp_copy`, copy bytes for the `if` condition and use the copy in the condition.
 - Apply quickfix.
 - Validate condition logic still matches intent.
 - Re-run lint/build.
 
 
-## `X07-MOVE-0901`
+## `X07-PATCHSET-0001`
 
-Summary: Use-after-move detected during backend checking.
+Summary: Core lint/schema diagnostic `X07-PATCHSET-0001`.
 
 Origins:
-- x07 (stage: codegen, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
 
 Details:
 
-`x07 check` runs a backend-check pass that can detect ownership errors that are not caught by front-end lint patterns. The compiler error message typically includes `moved_ptr=/...` pointing at the moved identifier.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- If a `quickfix` is present, apply it (it replaces the moved identifier at `moved_ptr` with `view.to_bytes(bytes.view(name))`).
-- Otherwise, insert a copy before the move site and re-run `x07 check`.
-
-
-## `X07-MOVE-0902`
-
-Summary: Borrow/move rule violation detected during backend checking.
-
-Origins:
-- x07 (stage: codegen, severity: error)
-
-Quickfix support: `never`
-No quickfix reason: Backend-check borrow diagnostics are not safely auto-fixable in general.
-
-Details:
-
-`x07 check` runs a backend-check pass that can detect borrow-rule violations during lowering/codegen. See the compiler message for pointer fields like `ptr=/...` and `borrowed_ptr=/...` when present.
-
-Agent strategy:
-
-- Inspect the reported pointers and rewrite the expression to avoid conflicting borrows/moves.
-- Re-run `x07 check` to verify.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-PBT-FIX-ARGS-0001`
@@ -1750,305 +4749,302 @@ Agent strategy:
 
 ## `X07-SCHEMA-0002`
 
-Summary: Unsupported x07AST schema_version.
+Summary: Core lint/schema diagnostic `X07-SCHEMA-0002`.
 
 Origins:
-- x07 (stage: parse, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `always`
-Quickfix kinds: `json_patch`
+Quickfix support: `sometimes`
 
 Details:
 
-The x07AST file declares a `schema_version` that is not supported by this toolchain.
-
-Use one of the supported schema versions, or upgrade/downgrade your toolchain to match the file.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect `/schema_version` in the failing `*.x07.json` file.
-- Replace it with a supported value (see the diagnostic `data.supported`).
-- Re-run `x07 ast validate` (or `x07 fmt` / `x07 lint`).
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TAPP-ELAB-0001`
 
-Summary: Typechecker inferred generic type arguments and proposes inserting an explicit `tapp`.
+Summary: Core lint/schema diagnostic `X07-TAPP-ELAB-0001`.
 
 Origins:
-- x07c (stage: rewrite, severity: error)
+- x07c (stage: lint, severity: error)
 
-Quickfix support: `always`
-Quickfix kinds: `json_patch`
+Quickfix support: `sometimes`
 
 Details:
 
-The local typecheck pass inferred concrete type arguments for a generic call that omitted `tapp`. Applying the quickfix rewrites the call into the canonical `tapp` form so later compiler stages see an explicit specialization.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Run `x07 fix --write` to apply the JSON Patch quickfix.
-- Re-run `x07 lint` or `x07 build` to confirm the rewrite eliminated the diagnostic.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TAPP-INFER-0001`
 
-Summary: Typechecker cannot infer generic type arguments; explicit `tapp` is required.
+Summary: Core lint/schema diagnostic `X07-TAPP-INFER-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires choosing explicit type arguments; cannot be inferred deterministically from local constraints.
+Quickfix support: `sometimes`
 
 Details:
 
-The local type inference pass could not determine one or more type arguments for a generic call from the available argument and expected-result constraints.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Add an explicit `tapp` with concrete type arguments.
-- Or rewrite the code to provide additional constraints so inference can resolve the type parameters deterministically.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TOOL-ARGS-0001`
 
-Summary: Tool wrapper argument error `X07-TOOL-ARGS-0001`.
+Summary: Core lint/schema diagnostic `X07-TOOL-ARGS-0001`.
 
 Origins:
-- x07 (stage: parse, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing the CLI invocation.
+Quickfix support: `sometimes`
 
 Details:
 
-The invocation requested machine output (`--json`, `--jsonl`, `--json-schema`, etc.) but the wrapper flags were invalid or inconsistent.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Fix the CLI flags (for example: add a missing path for `--report-out`, remove conflicting flags).
-- Re-run the command.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TOOL-EXEC-0001`
 
-Summary: Tool wrapper execution error `X07-TOOL-EXEC-0001`.
+Summary: Core lint/schema diagnostic `X07-TOOL-EXEC-0001`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Depends on the underlying wrapped command failure.
+Quickfix support: `sometimes`
 
 Details:
 
-The wrapped command exited non-zero but did not produce a structured diagnostic. The wrapper emitted this stable tool-level error and captured stdout/stderr in the report payload.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect `diagnostics[].message` and any captured stderr/stdout fields in the report.
-- Fix the underlying failure and re-run the command.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-0001`
 
-Summary: Unknown identifier during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires a semantic choice (rename vs introduce a binding).
+Quickfix support: `sometimes`
 
 Details:
 
-A referenced identifier was not found in the local environment (parameters or `let` bindings).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Check spelling and scope.
-- If the name is intended to be a local, introduce it with `let` before use.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-CALL-0001`
 
-Summary: Call refers to an unknown callee during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires selecting the intended callee symbol or updating imports/exports.
+Quickfix support: `sometimes`
 
 Details:
 
-The typechecker could not find a signature for the callee symbol and cannot typecheck the call.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Check the callee name and module prefix.
-- Ensure the defining module is imported and the symbol is exported.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-CALL-0002`
 
-Summary: Call argument type mismatch during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0002`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing program semantics; no single deterministic patch applies.
+Quickfix support: `sometimes`
 
 Details:
 
-An argument did not match the expected parameter type for the callee signature.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Adjust the argument expression so its inferred type matches the parameter.
-- Or call a different function whose signature matches the provided arguments.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-CALL-0003`
 
-Summary: Call arity mismatch during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0003`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires selecting the correct argument list for the intended call.
+Quickfix support: `sometimes`
 
 Details:
 
-The number of arguments at a call site does not match the callee signature.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Add or remove arguments to match the function signature.
-- Or switch to a different callee with the intended arity.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-IF-0001`
 
-Summary: `if` condition must be an `i32` (boolean-as-i32) during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-IF-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires choosing the intended condition semantics.
+Quickfix support: `sometimes`
 
 Details:
 
-The condition expression of an `if` was inferred to a non-`i32` type.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rewrite the condition to produce an `i32` (for example, comparisons yield `i32`).
-- Or adjust the condition expression so it matches boolean-as-i32 conventions.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-IF-0002`
 
-Summary: `if` branches have incompatible types during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-IF-0002`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing program structure or semantics to align branch result types.
+Quickfix support: `sometimes`
 
 Details:
 
-The then/else branches could not be unified to a single result type for the `if` expression.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Make both branches produce the same type.
-- Or add an explicit structure that normalizes types (for example, return in one branch and a value in the other).
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-RET-0001`
 
-Summary: Return expression type does not match the function result type.
+Summary: Core lint/schema diagnostic `X07-TYPE-RET-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires deciding whether to change the expression or the function signature.
+Quickfix support: `sometimes`
 
 Details:
 
-A `return` expression was inferred to a type that does not match the declared function result type.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Adjust the returned expression to match the function result type.
-- Or update the function signature if the intended return type is different.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-SET-0001`
 
-Summary: `set` references an unknown local during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-SET-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires choosing whether to introduce a new binding or rename the target.
+Quickfix support: `sometimes`
 
 Details:
 
-A `set` attempted to assign to a local name that is not currently bound in the environment.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Introduce the local with `let` before `set`.
-- Or correct the target name to an existing binding.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-SET-0002`
 
-Summary: `set` assignment type mismatch during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-SET-0002`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing program semantics (assignment or variable structure).
+Quickfix support: `sometimes`
 
 Details:
 
-The assigned expression type does not match the previously inferred type of the target local.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Keep locals monomorphic: assign the same type across all `set` uses.
-- If a new value of a different type is needed, introduce a new local with `let`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-UNIFY-0001`
 
-Summary: Type unification failed during local inference.
+Summary: Core lint/schema diagnostic `X07-TYPE-UNIFY-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Unification failures are context-dependent and do not have a single deterministic fix.
+Quickfix support: `sometimes`
 
 Details:
 
-The local type inference engine encountered an unsatisfiable constraint while unifying types.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect the diagnostic data payload for the conflicting types.
-- Rewrite the expression(s) at the reported ptr so the inferred types unify.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-UNSAFE-0001`
@@ -2259,6 +5255,267 @@ Summary: Core lint/schema diagnostic `X07-X07AST-PARSE-0001`.
 
 Origins:
 - x07 (stage: parse, severity: error)
+- x07c (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_ATTEST_DIGEST_MISMATCH`
+
+Summary: Core lint/schema diagnostic `X07CAP_ATTEST_DIGEST_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_CONFORMANCE_MISSING`
+
+Summary: Core lint/schema diagnostic `X07CAP_CONFORMANCE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_CONFORMANCE_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07CAP_CONFORMANCE_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_CONTRACT_INVALID`
+
+Summary: Core lint/schema diagnostic `X07CAP_CONTRACT_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_EFFECT_LOG_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07CAP_EFFECT_LOG_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_INDEX_INVALID`
+
+Summary: Core lint/schema diagnostic `X07CAP_INDEX_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_PEER_POLICY_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07CAP_PEER_POLICY_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_TLS_POLICY_INCOMPLETE`
+
+Summary: Core lint/schema diagnostic `X07CAP_TLS_POLICY_INCOMPLETE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07C_WASM_BACKEND_FEATURE_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`
+
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_FORM`
+
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_OP`
+
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`
+
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`.
+
+Origins:
+- x07c (stage: type, severity: error)
 
 Quickfix support: `sometimes`
 
@@ -2425,12 +5682,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-`x07-mcp scaffold init` returned a non-success result or error report.
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
 
 Agent strategy:
 
-- Run `x07-mcp scaffold init --template mcp-server-stdio --dir <DIR> --machine json` to reproduce.
-- Fix the reported issue and re-run `x07 init`.
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
 
 
 ## `X07INIT_MCP_MISSING`
@@ -2444,12 +5702,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-The MCP server templates are provided by `x07-mcp` (an external tool).
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
 
 Agent strategy:
 
-- Install `x07-mcp` and ensure it is discoverable on PATH.
-- Re-run `x07 init --template mcp-server-stdio` (or another MCP template).
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
 
 
 ## `X07INIT_MCP_REPORT`
@@ -2463,12 +5722,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-The `x07-mcp scaffold init --machine json` report could not be parsed as JSON.
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
 
 Agent strategy:
 
-- Ensure `x07-mcp` is up to date and on PATH.
-- Re-run the command and capture stdout/stderr for debugging.
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
 
 
 ## `X07INIT_MODULES`
@@ -2551,6 +5811,26 @@ Agent strategy:
 - Re-run `x07 init` command variant.
 
 
+## `X07INIT_TRUST`
+
+Summary: Project/package scaffold diagnostic `X07INIT_TRUST`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
 ## `X07PKG_ADVISED_DEP`
 
 Summary: Package workflow diagnostic `X07PKG_ADVISED_DEP`.
@@ -2562,14 +5842,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-A resolved dependency has active advisories in the package index. Use an updated version or an explicit override (`project.patch`) to move to a safe version, or explicitly allow advisories if you have audited and accept the risk.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Inspect the advisory IDs/summaries in the error output.
-- Run `x07 pkg versions <name>` and pick an unaffected version.
-- Update `x07.json` or `project.patch` to use the chosen version.
-- Re-run `x07 pkg lock` (or `x07 pkg lock --check --allow-advisories` if you intentionally accept the advisories).
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
 
 
 ## `X07PKG_API_URL`
@@ -2716,7 +5995,7 @@ Agent strategy:
 
 ## `X07PKG_LOCAL_MISSING_DEP`
 
-Summary: Local dependency is missing on disk.
+Summary: Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -2725,12 +6004,12 @@ Quickfix support: `sometimes`
 
 Details:
 
-A dependency whose `path` is not under `.x07/deps/` is treated as local-only. The package directory must exist and contain `x07-package.json`.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Verify the dependency `path` exists and contains `x07-package.json`.
-- If this dep should be fetched from the registry, use a `.x07/deps/...` path and rerun `x07 pkg lock`.
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
 - Re-run the original package command.
 
 
@@ -2846,13 +6125,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-A `project.patch` entry uses a local `path` override, but the dependency is missing on disk or does not contain `x07-package.json`. Local overrides are not downloaded automatically.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Ensure the patched dependency exists at the configured `path` and contains `x07-package.json`.
-- If you intended a registry dependency, remove `project.patch[<name>].path` so `x07 pkg lock` can fetch it.
-- Re-run `x07 pkg lock`.
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
 
 
 ## `X07PKG_PUBLISH_FAILED`
@@ -2967,13 +6246,605 @@ Quickfix support: `sometimes`
 
 Details:
 
-A resolved dependency is currently yanked in the package index. Use an updated version or an explicit override (`project.patch`) to move off the yanked version, or explicitly allow yanked deps if you have a reason to keep it.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Run `x07 pkg versions <name>` and choose a non-yanked version.
-- Update `x07.json` (direct dep) or `project.patch` (transitive) to use the chosen version.
-- Re-run `x07 pkg lock` (or `x07 pkg lock --check --allow-yanked` if you intentionally accept the yank).
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PROOF_ECHECK_FAILED`
+
+Summary: Independent proof check rejected the proof bundle.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker found a digest mismatch or missing bundled artifact while replaying the emitted proof object against its proof-summary, SMT obligation, and solver transcript evidence.
+
+Agent strategy:
+
+- Keep the proof object together with its emitted `verify.proof-summary.json`, `verify.smt2`, and `z3.out.txt` bundle files.
+- Re-run `x07 verify --prove --emit-proof <path>` if any bundle artifact was edited or lost.
+- Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.
+
+
+## `X07PROOF_EIMPORTED_SUMMARY_MISMATCH`
+
+Summary: Semantic proof replay found imported proof-summary drift.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker could not validate the bundled imported proof-summary artifacts against the digests recorded in the proof object or the replayed reachable summary surface.
+
+Agent strategy:
+
+- Keep the bundled imported proof-summary artifacts exactly as emitted by the prove flow.
+- Re-run `x07 verify --prove --proof-summary <path> --emit-proof <path>` if any imported proof summary changed.
+- Re-run `x07 prove check --proof <path>`.
+
+
+## `X07PROOF_EOBJECT_INVALID`
+
+Summary: Proof object failed schema or structural validation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker read a `x07.verify.proof_object@0.2.0` file that was malformed, schema-invalid, or otherwise could not be decoded as a valid proof object.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --emit-proof <path>` to regenerate the proof object.
+- Ensure the proof object file is the exact emitted artifact, not a coverage summary or edited JSON.
+- Re-run `x07 prove check --proof <path>`.
+
+
+## `X07PROOF_EOBLIGATION_MISMATCH`
+
+Summary: Semantic proof replay regenerated a different verification obligation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker successfully replayed the source surface but the regenerated SMT obligation digest did not match the obligation recorded in the proof object.
+
+Agent strategy:
+
+- Treat this as source/proof drift: re-run `x07 verify --prove --emit-proof <path>` on the current source tree.
+- Keep imported proof summaries, prove bounds, and project manifest state aligned with the emitted proof bundle.
+- Re-run `x07 prove check --proof <path>` until it returns `result=accepted`.
+
+
+## `X07PROOF_ESCHEDULER_MODEL_MISMATCH`
+
+Summary: Semantic async proof replay found a scheduler-model mismatch.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker replayed an async proof but the trusted scheduler-model digest did not match the one recorded in the proof object.
+
+Agent strategy:
+
+- Use the canonical checked-in scheduler model from the same toolchain release that emitted the proof object.
+- Re-run `x07 verify --prove --emit-proof <path>` for the async symbol.
+- Re-run `x07 prove check --proof <path>`.
+
+
+## `X07PROOF_ESOLVER_REPLAY_FAILED`
+
+Summary: Semantic proof replay did not reproduce the expected solver verdict.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker regenerated the obligation but solver replay failed or returned a different result than the proof object expected.
+
+Agent strategy:
+
+- Ensure `z3` is installed and reachable in the replay environment.
+- Re-run `x07 verify --prove --emit-proof <path>` from the current source tree if the obligation or imported proof-summary inputs changed.
+- Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.
+
+
+## `X07PROOF_ESOURCE_REPLAY_FAILED`
+
+Summary: Semantic proof replay could not reconstruct the proved source surface.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker could not replay the proof against the current project manifest, resolved declaration graph, or bundled proof-summary inputs, so it rejected the proof before obligation comparison.
+
+Agent strategy:
+
+- Run `x07 prove check --proof <path>` from the same project tree that emitted the proof object.
+- Keep the emitted proof bundle together with the matching `x07.json` state and bundled proof-summary inputs.
+- Re-run `x07 verify --prove --emit-proof <path>` if the source or manifest changed.
+
+
+## `X07RD_ADVISORY_ALLOWANCE_ENABLED`
+
+Summary: Core lint/schema diagnostic `X07RD_ADVISORY_ALLOWANCE_ENABLED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_ASSUMPTION_SURFACE_WIDEN`
+
+Summary: Review diff gate rejected a wider proof-assumption surface.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or a narrower assumption surface.
+
+Details:
+
+The candidate introduces new proof assumptions or widens the accepted assumption classes relative to the baseline certificate posture.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `assumption_changes` highlights.
+- Remove the new assumption surface or intentionally reset the review baseline after review.
+- Re-run `x07 review diff --fail-on assumption-surface-widen`.
+
+
+## `X07RD_ASYNC_PROOF_COVERAGE_DECREASE`
+
+Summary: Review diff gate rejected an async proof coverage regression.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or proof-surface repair.
+
+Details:
+
+The candidate change reduced proven async coverage or introduced newly uncovered/unsupported async proof surface relative to the baseline.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `async_proof_changes` highlight set.
+- Restore the lost async proof coverage or intentionally reset the baseline after review.
+- Re-run `x07 review diff --fail-on async-proof-coverage-decrease`.
+
+
+## `X07RD_BOUNDED_PROOF_INTRODUCED`
+
+Summary: Review diff gate rejected bounded proof usage.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair or an explicit review reset.
+
+Details:
+
+The candidate begins depending on bounded recursion proof evidence in accepted certificate posture.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `boundedness_changes` highlights.
+- Remove bounded recursion from the accepted proof closure or move that code out of the strong profile.
+- Re-run `x07 review diff --fail-on bounded-proof-introduced`.
+
+
+## `X07RD_CAPSULE_CONTRACT_RELAXATION`
+
+Summary: Review diff gate rejected a capsule contract relaxation.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic capsule-contract change.
+
+Details:
+
+The candidate weakened a certified capsule contract relative to the reviewed baseline.
+
+Agent strategy:
+
+- Inspect the `capsule_changes` highlights in the review report.
+- Restore the stricter capsule contract or intentionally update the review baseline.
+- Re-run `x07 review diff --fail-on capsule-contract-relaxation`.
+
+
+## `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN`
+
+Summary: Core lint/schema diagnostic `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_CAPSULE_SET_CHANGE`
+
+Summary: Review diff gate rejected a capsule inventory change.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or capsule inventory change.
+
+Details:
+
+The candidate added, removed, or reordered certified capsule membership relative to the baseline review set.
+
+Agent strategy:
+
+- Inspect the capsule index diff and confirm whether the inventory change is intentional.
+- Restore the baseline capsule set or intentionally update the review baseline.
+- Re-run `x07 review diff --fail-on capsule-set-change`.
+
+
+## `X07RD_COVERAGE_SUMMARY_IMPORTED`
+
+Summary: Review diff gate rejected a coverage-only import.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof evidence, not a coverage-only summary.
+
+Details:
+
+The candidate started importing a coverage/support summary where proof evidence is required.
+
+Agent strategy:
+
+- Inspect the `assumption_changes` and `summary_changes` highlights in the review report.
+- Replace the coverage/support import with a proof-summary import or a local prove run.
+- Re-run `x07 review diff --fail-on coverage-summary-imported`.
+
+
+## `X07RD_DEV_ONLY_ASSUMPTION_INTRODUCED`
+
+Summary: Review diff gate rejected a developer-only proof assumption.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair, not a mechanical patch.
+
+Details:
+
+The candidate begins depending on a non-certifiable proof assumption such as an imported stub in accepted certificate posture.
+
+Agent strategy:
+
+- Inspect the `assumption_changes` highlights in the review report.
+- Remove the developer-only assumption or move the flow out of the strong profile.
+- Re-run `x07 review diff --fail-on dev-only-assumption-introduced`.
+
+
+## `X07RD_LOCKFILE_HASH_CHANGE`
+
+Summary: Core lint/schema diagnostic `X07RD_LOCKFILE_HASH_CHANGE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_NETWORK_ALLOWLIST_WIDEN`
+
+Summary: Core lint/schema diagnostic `X07RD_NETWORK_ALLOWLIST_WIDEN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_OPERATIONAL_ENTRY_DIVERGES`
+
+Summary: Review diff gate rejected operational-entry divergence.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires an explicit certification-entry decision.
+
+Details:
+
+The candidate changed the certified operational entry or caused `--entry` and `project.operational_entry_symbol` to diverge.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `operational_entry_changes` highlights.
+- Realign the manifest and certification command to the shipped operational entry.
+- Re-run `x07 review diff --fail-on operational-entry-diverges`.
+
+
+## `X07RD_PACKAGE_SET_CHANGE`
+
+Summary: Core lint/schema diagnostic `X07RD_PACKAGE_SET_CHANGE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_PEER_POLICY_RELAXATION`
+
+Summary: Core lint/schema diagnostic `X07RD_PEER_POLICY_RELAXATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_RECURSION_PROOF_COVERAGE_DECREASE`
+
+Summary: Review diff gate rejected a recursive proof coverage regression.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or recursive proof-surface repair.
+
+Details:
+
+The candidate reduced proved recursive coverage or introduced newly unsupported recursive proof surface relative to the reviewed baseline.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `recursive_proof_changes` highlight set.
+- Restore the lost recursive proof coverage or intentionally reset the review baseline.
+- Re-run `x07 review diff --fail-on recursion-proof-coverage-decrease`.
+
+
+## `X07RD_RUNTIME_ATTEST_REGRESSION`
+
+Summary: Review diff gate rejected a runtime attestation regression.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or runtime-evidence repair.
+
+Details:
+
+The candidate changed runtime attestation posture relative to the baseline in a way the requested review gate forbids.
+
+Agent strategy:
+
+- Inspect the `runtime_attestation_changes` highlights in the review report.
+- Restore the baseline attestation posture or intentionally update the review baseline.
+- Re-run `x07 review diff --fail-on runtime-attestation-regression`.
+
+
+## `X07RD_SANDBOX_POLICY_WIDEN`
+
+Summary: Review diff gate rejected a sandbox policy widening.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or runtime-policy tightening.
+
+Details:
+
+The candidate widened the sandbox runtime posture, including enabling weaker isolation or otherwise relaxing the reviewed sandbox policy.
+
+Agent strategy:
+
+- Inspect the `sandbox_policy_changes` highlights in the review report.
+- Restore the stricter sandbox policy or intentionally update the review baseline.
+- Re-run the requested `x07 review diff --fail-on ...` gate.
+
+
+## `X07RD_SUMMARY_DOWNGRADE`
+
+Summary: Review diff gate rejected a proof-summary downgrade.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or a stronger summary posture.
+
+Details:
+
+The candidate weakened reachable proof-summary posture relative to the baseline, such as dropping prove-supported status or degrading a reviewed proof status.
+
+Agent strategy:
+
+- Inspect the `summary_changes` highlights in the review report.
+- Restore the stronger proof-summary posture or intentionally reset the review baseline.
+- Re-run `x07 review diff --fail-on summary-downgrade`.
+
+
+## `X07REL_EBOUNDED_PROOF`
+
+Summary: Release guard rejected bounded proof usage in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture accepted a certificate that still depended on bounded proof evidence, which the release guard forbids for the strong internal baseline.
+
+Agent strategy:
+
+- Remove the bounded-proof dependency from the strict fixture certificate path.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate no longer marks bounded proof.
+- Re-run the release-readiness CI gate.
+
+
+## `X07REL_ECOVERAGE_ONLY_IMPORT`
+
+Summary: Release guard rejected a coverage-only imported summary in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture imported coverage-only summary evidence where the release guard requires checked proof evidence.
+
+Agent strategy:
+
+- Replace the imported coverage-only summary with per-symbol prove artifacts and checked proof evidence.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the certificate proof inventory is strict.
+- Re-run the release-readiness CI gate.
+
+
+## `X07REL_EDEV_ONLY_ASSUMPTION`
+
+Summary: Release guard rejected a developer-only proof assumption in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture accepted certificate evidence that still depended on developer-only assumptions such as imported stubs.
+
+Agent strategy:
+
+- Remove the developer-only assumption from the strict fixture proof surface.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate has no developer-only assumptions.
+- Re-run the release-readiness CI gate.
+
+
+## `X07REL_ESURROGATE_ENTRY`
+
+Summary: Release guard rejected surrogate-entry certification in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture accepted certification for an entry that diverged from `project.operational_entry_symbol`, which the release guard forbids.
+
+Agent strategy:
+
+- Keep the certification entry aligned with `project.operational_entry_symbol`.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm surrogate-entry rejection still fires.
+- Re-run the release-readiness CI gate.
 
 
 ## `X07RR_ENTRY_EXISTS`
@@ -3117,24 +6988,1290 @@ Agent strategy:
 - Re-run `x07 rr` operation.
 
 
-## `X07T_ASSERT_BYTES_EQ`
+## `X07TC_EARCH_STRICT`
 
-Summary: `std.test.assert_bytes_eq` failed with expected vs got payload.
+Summary: Strict architecture evidence failed certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Certification requires the arch manifest and arch check result to stay at the verified-core posture.
+
+Agent strategy:
+
+- Run `x07 arch check --manifest arch/manifest.x07arch.json` and inspect the report.
+- Apply the deterministic manifest JSON Patch scaffolding to align allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary wiring with `verified_core_pure_v1`.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EASYNC_PROOF`
+
+Summary: Async proof coverage or async proof obligations failed certification.
 
 Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `never`
-No quickfix reason: Test assertion failures require intent; no safe automatic source-level patch exists.
+No quickfix reason: Requires proof-focused contract work or semantic refactoring rather than a deterministic quickfix.
 
 Details:
 
-When a test fails with code `1003`, the runtime may append an assertion payload to the `X7TEST_STATUS_V1` bytes. `x07 test` decodes it and emits this diagnostic with bounded prefixes of `got` and `expected`.
+At least one reachable `defasync` symbol is uncovered, hit an async counterexample, failed a protocol clause, or could not be proven with the trusted scheduler model.
 
 Agent strategy:
 
-- Use `details.got` and `details.expected` to update expected bytes or fix serialization/encoding logic.
-- Keep fixes deterministic and re-run `x07 test`.
+- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect the async summary.
+- Re-run `x07 verify --prove --entry <defasync>` for the failing symbol and fix `await_invariant`, `scope_invariant`, or `cancellation_ensures` as needed.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EASYNC_PROVE_REPORT_MISSING`
+
+Summary: Required async prove report is missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification expected a per-symbol async prove report artifact for a reachable `defasync` symbol, but the report file was missing or the proof run did not emit the expected artifact path.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported async symbol and keep the emitted prove report under the certificate out-dir.
+- Ensure the proof run emits `verify_proof_summary_path` in the prove report.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EBOUNDARY_MISSING`
+
+Summary: Boundary declarations are missing or incomplete for certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Public exports must appear in `arch/boundaries/index.x07boundary.json`, and certification requires the boundary index wiring to resolve cleanly.
+
+Agent strategy:
+
+- Run `x07 arch check` and inspect `target/cert/boundaries.report.json`.
+- Apply the deterministic boundary-index JSON Patch or use `x07 schema derive --emit-boundary-stub` to scaffold missing records.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EBOUNDARY_RELAXED`
+
+Summary: The candidate relaxes a certified boundary contract relative to the baseline.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic boundary-contract change.
+
+Details:
+
+Boundary contract review found a trust-surface relaxation in a pinned public boundary.
+
+Agent strategy:
+
+- Run `x07 review diff --fail-on boundary-relaxation` and inspect the highlighted boundary changes.
+- Tighten the candidate boundary contract or explicitly reset the baseline after review.
+- Re-run `x07 trust certify` with the corrected baseline.
+
+
+## `X07TC_EBOUNDED_PROOF_FORBIDDEN`
+
+Summary: Bounded recursion proof is forbidden for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair or profile scope changes.
+
+Details:
+
+Accepted strong certificates cannot depend on bounded-by-unwind recursion proof evidence.
+
+Agent strategy:
+
+- Inspect the emitted proof summaries and certificate recursive-proof fields.
+- Refactor the recursive symbol out of the strong certified closure or move it behind a non-strong flow.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_ECAPSULE_ATTEST`
+
+Summary: Core lint/schema diagnostic `X07TC_ECAPSULE_ATTEST`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ECAPSULE_NETWORK_ATTEST`
+
+Summary: Core lint/schema diagnostic `X07TC_ECAPSULE_NETWORK_ATTEST`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ECOMPILE_ATTEST`
+
+Summary: Compile attestation failed or could not bind the emitted binary.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on host toolchain state and reproducible-build behavior outside AST quickfixes.
+
+Details:
+
+The bundle step failed, no executable was produced, or the double-build digest did not match.
+
+Agent strategy:
+
+- Run `x07 doctor` and ensure a working C toolchain is available.
+- Re-run `x07 bundle --project x07.json --emit-attestation target/cert/compile.attest.json`.
+- Fix reproducibility or toolchain drift before certifying again.
+
+
+## `X07TC_ECOVERAGE_ONLY`
+
+Summary: Coverage/support evidence cannot satisfy certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires prove evidence, not a mechanical patch.
+
+Details:
+
+A reachable symbol or imported dependency is covered by support posture only, without the prove artifacts required by the active trust profile.
+
+Agent strategy:
+
+- Run `x07 verify --prove` for the reachable symbol set required by the active profile.
+- Replace any imported coverage/support summary with a proof summary emitted by a successful prove run.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EDEP_CLOSURE`
+
+Summary: Core lint/schema diagnostic `X07TC_EDEP_CLOSURE`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_EDEV_ONLY_ASSUMPTION`
+
+Summary: Developer-only proof assumptions are forbidden for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair or dependency changes.
+
+Details:
+
+The accepted proof inventory depends on a non-certifiable assumption such as an `imported_stub` primitive.
+
+Agent strategy:
+
+- Re-run prove without `--allow-imported-stubs`.
+- Replace the stubbed dependency with certifiable code or a reviewed proof-summary path.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EDIFF_POSTURE`
+
+Summary: Baseline review or trust-posture diff gate failed certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic change to the candidate.
+
+Details:
+
+The supplied baseline comparison failed, or the candidate introduced a forbidden trust posture delta.
+
+Agent strategy:
+
+- Run `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.
+- Tighten the candidate change or intentionally update the baseline.
+- Re-run `x07 trust certify` with the corrected baseline.
+
+
+## `X07TC_EEFFECT_LOG`
+
+Summary: Core lint/schema diagnostic `X07TC_EEFFECT_LOG`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ENET_POLICY`
+
+Summary: Network policy posture changed relative to the reviewed baseline.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic policy change.
+
+Details:
+
+Certification rejected the candidate because the review diff reported a network allowlist or policy-surface change that must be re-reviewed before shipping.
+
+Agent strategy:
+
+- Run `x07 review diff --fail-on network-allowlist-widen` and inspect the highlighted policy delta.
+- Tighten the candidate policy or intentionally refresh the reviewed baseline.
+- Re-run `x07 trust certify` with the corrected baseline.
+
+
+## `X07TC_ENONDET`
+
+Summary: Trust report detected nondeterminism in the certified closure.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires capability removal or architectural refactoring rather than a deterministic quickfix.
+
+Details:
+
+The trust report found nondeterminism flags or other forbidden runtime effects in the candidate certificate surface.
+
+Agent strategy:
+
+- Run `x07 trust report --project x07.json` and inspect the nondeterminism flags.
+- Split the nondeterministic logic out of the certified closure or remove the forbidden capability.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EOP_ENTRY_MISMATCH`
+
+Summary: Certification entry does not match the operational entry.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Strong trust profiles require `--entry` to match `project.operational_entry_symbol` exactly.
+
+Agent strategy:
+
+- Inspect `x07.json` and the `x07 trust certify --entry ...` argument.
+- Realign the certification command or manifest so the shipped operational entry is certified directly.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EOP_ENTRY_REQUIRED`
+
+Summary: Operational-entry metadata is required for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Strong trust profiles require `project.operational_entry_symbol` in `x07.project@0.4.0` manifests so the shipped entry is explicit.
+
+Agent strategy:
+
+- Add `project.operational_entry_symbol` to `x07.json`.
+- If the project still needs a helper certification symbol, keep it separate with `project.certification_entry_symbol` and certify only non-strong flows against it.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPBT`
+
+Summary: Boundary-required property tests are missing, malformed, or failing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A required PBT harness is absent from `tests/tests.json`, is not declared with a `pbt` stanza, uses the wrong world, or did not pass.
+
+Agent strategy:
+
+- Add the missing test id under `tests/tests.json` with the required `pbt` stanza using the deterministic JSON Patch scaffolding.
+- Keep the test world inside the profile/boundary allowlist.
+- Re-run `x07 test --all` and then `x07 trust certify`.
+
+
+## `X07TC_EPEER_POLICY`
+
+Summary: Core lint/schema diagnostic `X07TC_EPEER_POLICY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_EPROFILE`
+
+Summary: Certification trust profile is missing or invalid.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The profile supplied to `x07 trust certify` could not be parsed or validated.
+
+Agent strategy:
+
+- Validate the profile with `x07 trust profile check` first.
+- Fix schema_version, required fields, or file path issues.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROJECT`
+
+Summary: Certification could not resolve the project manifest or source closure.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The project path is missing, not a project manifest, or failed project-context resolution before evidence collection completed.
+
+Agent strategy:
+
+- Pass `--project x07.json` (or a directory containing it).
+- Ensure the project manifest and lockfile resolve cleanly.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROOF_CHECK_ENGINE_MISMATCH`
+
+Summary: Certification found a proof-check report whose engine did not match the proved symbol metadata.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof-check report replayed a different verification engine than the one recorded in the proof-summary evidence for that symbol, so the certification flow rejected it.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --emit-proof <path>` and `x07 prove check --proof <path>` from the same toolchain build.
+- Keep proof summaries, proof objects, and proof-check reports from the same prove run together.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROOF_CHECK_MISSING`
+
+Summary: Required proof-check report is missing from prove evidence.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires regenerated proof artifacts, not a source-only patch.
+
+Details:
+
+The active trust profile requires an independent proof-check report for each accepted proof object.
+
+Agent strategy:
+
+- Run `x07 prove check --proof <path>` for the missing proof object or rerun the prove flow that emits the check report.
+- Ensure the per-symbol prove report references both the proof object and the proof-check report.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROOF_CHECK_REJECTED`
+
+Summary: Certification rejected a proof whose proof-check report was not accepted.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The loaded proof-check report had `ok=false` or `result!=="accepted"`, so the certification flow failed closed instead of treating the proof as independently replayed evidence.
+
+Agent strategy:
+
+- Inspect the proof-check report diagnostics and repair the source/proof inputs until `x07 prove check` returns `result=accepted`.
+- Re-run the prove flow if the source or imported proof-summary surface changed.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROOF_CHECK_SCHEMA_INVALID`
+
+Summary: Proof-check report failed schema validation during certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification found a malformed, unreadable, or schema-invalid `x07.verify.proof_check.report@0.2.0` artifact where an accepted proof-check report was required.
+
+Agent strategy:
+
+- Re-run `x07 prove check --proof <path>` to regenerate the proof-check report.
+- Ensure the certificate flow is consuming the emitted report rather than an edited JSON file.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROOF_COVERAGE`
+
+Summary: Reachable proof coverage is incomplete for certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires semantic proof work or architectural refactoring, not a mechanical patch.
+
+Details:
+
+Accepted certificates allow only `proven` or `trusted_primitive` statuses in the reachable closure.
+
+Agent strategy:
+
+- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.
+- Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.
+- Re-run `x07 verify --prove` for uncovered symbols before certifying again.
+
+
+## `X07TC_EPROOF_OBJECT_MISSING`
+
+Summary: Required proof object is missing from prove evidence.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires regenerated proof artifacts, not a source-only patch.
+
+Details:
+
+The active trust profile requires a proof object for each accepted prove inventory item, but a referenced prove report did not bind one.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --emit-proof <path>` for the missing symbol.
+- Run `x07 prove check --proof <path>` so the proof-check report exists alongside the proof object.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROVE`
+
+Summary: At least one reachable proof obligation failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A reachable symbol failed `x07 verify --prove` or returned a non-`proven` result.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported symbol.
+- Add missing loop contracts, strengthen `requires[]`/`ensures[]`, or simplify the function into the supported subset.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROVE_REPORT_MISSING`
+
+Summary: Required per-symbol prove report is missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification expected a per-symbol prove report artifact for a reachable `defn` symbol, but the report file was missing or the proof run did not emit the expected artifact path.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported symbol and keep the emitted prove report under the certificate out-dir.
+- Ensure the proof run emits `verify_proof_summary_path` in the prove report.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROVE_UNSUPPORTED`
+
+Summary: A reachable symbol is outside the supported proof subset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+At least one reachable symbol uses a construct the prover cannot certify yet (for example unsupported params, unsupported loop bounds, or unresolved non-certified imports).
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported symbol and inspect the verify diagnostics.
+- Add the missing contracts, loop skeleton, or wrapper function needed to stay in the supported subset.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_ERECURSION_FORBIDDEN`
+
+Summary: Reachable recursion is forbidden by the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires semantic refactoring or an intentional profile change.
+
+Details:
+
+The reachable closure still contains recursive symbols, but the active trust profile sets `language_subset.allow_recursion=false` and therefore fails closed even when recursion would otherwise be supported or imported as reviewed proof.
+
+Agent strategy:
+
+- Refactor recursive helpers out of the certified closure or choose a profile that explicitly allows recursion.
+- Re-run `x07 verify --coverage --entry <entry>` and inspect the recursive symbols in the closure.
+- Re-run `x07 trust certify` after the certified entry is recursion-free.
+
+
+## `X07TC_ERUNTIME_ATTEST`
+
+Summary: Core lint/schema diagnostic `X07TC_ERUNTIME_ATTEST`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ERUNTIME_NETWORK_EVIDENCE`
+
+Summary: Core lint/schema diagnostic `X07TC_ERUNTIME_NETWORK_EVIDENCE`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ESANDBOX_PROFILE`
+
+Summary: Sandbox runtime evidence violates the certification profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires changing runtime policy or execution posture, not a deterministic AST patch.
+
+Details:
+
+The runtime evidence used for certification reports a sandbox backend, weaker-isolation posture, or network posture that is weaker than the selected trusted-program profile allows.
+
+Agent strategy:
+
+- Keep the project on `run-os-sandboxed` with `sandbox_backend=vm`.
+- Disable weaker-isolation opt-ins and keep `policy.net.enabled=false` for the local sandboxed trust profile.
+- Re-run the sandbox smoke tests and `x07 trust certify`.
+
+
+## `X07TC_ESCHEMA_DRIFT`
+
+Summary: Boundary-referenced schema outputs drifted or are missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification rechecks pinned boundary schemas with `x07 schema derive --check`; missing inputs or drifted generated outputs reject the certificate.
+
+Agent strategy:
+
+- Run `x07 schema derive --input <schema> --out-dir . --write` for each boundary schema.
+- If the boundary record is missing, use `x07 schema derive --emit-boundary-stub` to scaffold it.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_ESURROGATE_ENTRY_FORBIDDEN`
+
+Summary: Surrogate certification entries are forbidden for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The selected strong profile requires certifying the shipped operational entry directly, not a separate proof-friendly surrogate entry.
+
+Agent strategy:
+
+- Inspect `project.operational_entry_symbol`, optional `project.certification_entry_symbol`, and the `--entry` argument.
+- Certify the operational entry directly or move the surrogate flow to a non-strong developer check.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_ETESTS`
+
+Summary: Deterministic certification tests are missing or failing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The certification profile requires smoke/unit evidence from `tests/tests.json`, but the manifest is missing, miswired, or the report contains failures.
+
+Agent strategy:
+
+- Ensure `tests/tests.json` exists and includes the boundary-required test ids.
+- Apply the deterministic manifest JSON Patch when adding missing smoke/unit test declarations.
+- Keep the test worlds inside the trust profile allowlist.
+- Re-run `x07 test --all --manifest tests/tests.json` before certifying again.
+
+
+## `X07TC_ETRUST_REPORT`
+
+Summary: Trust report evidence failed certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires capability or environment changes outside JSON quickfix application.
+
+Details:
+
+The trust report found disallowed nondeterminism/capabilities, or failed to emit the required SBOM evidence.
+
+Agent strategy:
+
+- Run `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`.
+- Remove the disallowed capability surface or fix the missing SBOM/trust artifact.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EUNSUPPORTED_DEFASYNC`
+
+Summary: Reachable `defasync` logic is outside the certifiable subset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The reachable closure contains runtime-only `defasync` symbols, which are forbidden by `verified_core_pure_v1`.
+
+Agent strategy:
+
+- Split async logic behind a certified boundary and keep the certified entry closure `defn`-only.
+- Add a pure wrapper if needed.
+- Re-run `x07 verify --coverage` and `x07 trust certify`.
+
+
+## `X07TC_EUNSUPPORTED_RECURSION`
+
+Summary: Reachable recursion is outside the certifiable subset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The reachable closure contains recursive logic, which `verified_core_pure_v1` does not certify.
+
+Agent strategy:
+
+- Refactor recursion into a bounded iterative form and add loop contracts where needed.
+- Re-run `x07 verify --coverage` and `x07 trust certify`.
+
+
+## `X07TEST_ASYNC_ENTRY_UNSUPPORTED`
+
+Summary: x07 test could not build or run the selected async entrypoint.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires fixing the selected entrypoint or its supported test return shape.
+
+Details:
+
+The manifest selected an async entry, but the test harness could not lower it into a supported async driver or return-shape combination.
+
+Agent strategy:
+
+- Keep async test entries on the supported `bytes_status_v1` or `result_i32` driver forms.
+- Re-run `x07 test --manifest tests/tests.json` after fixing the entry declaration.
+- If the entry is not meant to be async, point the manifest at a `defn` wrapper.
+
+
+## `X07TEST_CAPSULE_EVIDENCE_MISSING`
+
+Summary: A test that requires capsule evidence did not provide it.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires fixing emitted sandbox evidence or the declared capsule inventory.
+
+Details:
+
+The manifest declared required capsules, but the emitted test evidence did not include matching capsule ids or effect-log digests.
+
+Agent strategy:
+
+- Keep the test manifest `required_capsules[]` aligned with the sandboxed boundary surface.
+- Ensure the sandbox execution emits capsule/effect-log evidence into the test report.
+- Re-run `x07 test`.
+
+
+## `X07TEST_RUNTIME_ATTEST_REQUIRED`
+
+Summary: A test that requires runtime attestation did not produce it.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The manifest marked the test as requiring runtime attestation, but the run report did not include a runtime attestation reference or the referenced file was missing.
+
+Agent strategy:
+
+- Keep the test on `run-os-sandboxed`.
+- Ensure the harness passes `--attest-runtime` through to `x07-os-runner`.
+- Re-run `x07 test` and inspect the emitted runtime-attest artifact path.
+
+
+## `X07TP_ARCH`
+
+Summary: Project architecture posture is weaker than the trust profile requires.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The arch manifest is missing, on the wrong schema line, or does not enable the strict checks required for certification.
+
+Agent strategy:
+
+- Start from the `verified_core_pure_v1` manifest posture.
+- Apply the deterministic manifest JSON Patch scaffolding to enable allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary contracts.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_ASYNC_PROOF_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing async proof coverage.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The sandboxed local trusted-program contract requires async proof coverage for the reviewed closure.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_async_proof_coverage=true`.
+- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_BACKEND_NOT_CERTIFIABLE`
+
+Summary: Networked trusted-program profile allows a backend posture that is not certifiable.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Networked certification requires VM-backed sandboxing, forbids weaker isolation, and rejects project worlds outside the certifiable sandbox line.
+
+Agent strategy:
+
+- Inspect the selected trust profile JSON and backend requirements.
+- Restore VM-backed sandboxing and the certifiable world restrictions.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_BOUNDARY`
+
+Summary: Project boundary index wiring is missing or incomplete for certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The trust profile requires `contracts_v1.boundaries.index_path`, but the project does not expose a boundary index for the public trust surface.
+
+Agent strategy:
+
+- Add `contracts_v1.boundaries.index_path` to `arch/manifest.x07arch.json` with the deterministic manifest JSON Patch.
+- Create `arch/boundaries/index.x07boundary.json` and keep public boundaries there.
+- Use `x07 schema derive --emit-boundary-stub` when you need deterministic boundary scaffolding.
+
+
+## `X07TP_CAPSULES`
+
+Summary: Core lint/schema diagnostic `X07TP_CAPSULES`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TP_CAPSULE_ATTEST_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing capsule attestation requirements.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The sandboxed local trusted-program contract must require capsule attestations for effect boundaries.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_capsule_attestations=true`.
+- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_DEP_CLOSURE_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07TP_DEP_CLOSURE_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TP_EFFECT_LOG_REQUIRED`
+
+Summary: Trust profile is missing required effect-log evidence semantics.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The selected trust profile must require effect-log digests for certified capsule or sandboxed trusted-program evidence, but the profile leaves that requirement disabled.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_effect_log_digests=true`.
+- Keep the published trust profile aligned with the certified capsule or sandboxed trusted-program contract.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_ENTRY_FORBIDDEN`
+
+Summary: Requested entrypoint is not allowed by the trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The profile's `entrypoints[]` set does not permit the entry you asked to certify.
+
+Agent strategy:
+
+- Either certify one of the profile's declared entrypoints or intentionally widen the profile.
+- Keep `entrypoints[]` aligned with the reviewed trust surface.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_INVALID`
+
+Summary: Trust profile JSON is missing or invalid.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The trust profile could not be read, parsed, or validated against the certification schema.
+
+Agent strategy:
+
+- Compare the profile against `arch/trust/profiles/verified_core_pure_v1.json`.
+- Fix JSON shape, schema_version, and required fields.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_LANGUAGE`
+
+Summary: Project uses language or policy features forbidden by the trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The reachable project surface includes forbidden features such as `defasync`, `extern`, `allow_unsafe`, or `allow_ffi`.
+
+Agent strategy:
+
+- Refactor the certified entry closure into the allowed subset.
+- Keep `verified_core_pure_v1` entry closures free of `defasync`, `extern`, `unsafe`, and FFI.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_NETWORK_MODE_FORBIDDEN`
+
+Summary: Sandboxed-local trust profile allows networking where it should not.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The sandboxed local trust profile must keep networking disabled for the local certification line.
+
+Agent strategy:
+
+- Inspect the selected trust profile JSON.
+- Remove network posture from the local sandbox profile or switch to the networked trust profile intentionally.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_NETWORK_PROFILE_REQUIRED`
+
+Summary: Networked trust profile is missing required network certification posture.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The networked trust profile must require allowlist-backed network posture, attested network capsules, and matching runtime network evidence semantics.
+
+Agent strategy:
+
+- Inspect the selected trust profile JSON.
+- Restore the required network evidence requirements and sandbox posture.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_NOT_CERTIFIABLE`
+
+Summary: Trust profile is weaker than the current certification floor.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The selected trust profile omits required certification posture such as strict operational-entry binding, evidence requirements, or sandbox restrictions needed for accepted source-free review.
+
+Agent strategy:
+
+- Inspect the selected trust profile JSON.
+- Restore the missing certification requirements or switch to a non-strong developer/demo flow intentionally.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_PEER_POLICY_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07TP_PEER_POLICY_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TP_PROJECT_MISMATCH`
+
+Summary: Project manifest could not be resolved for trust profile validation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `--project` path is missing, not a project manifest, or cannot be resolved into a valid X07 project.
+
+Agent strategy:
+
+- Pass `--project x07.json` (or a directory containing it).
+- Ensure `x07.json` exists and resolves cleanly.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_RUNTIME_ATTEST_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing runtime attestation requirements.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The sandboxed local trusted-program contract must require runtime attestation for certified executions.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_runtime_attestation=true`.
+- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_SANDBOX_BACKEND_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing the VM-only isolation requirement.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The sandboxed local trusted-program contract must require `run-os-sandboxed` with `sandbox_backend=vm` and must forbid weaker isolation.
+
+Agent strategy:
+
+- Keep `worlds_allowed` free of `run-os`.
+- Set `sandbox_requirements.sandbox_backend="vm"` and `sandbox_requirements.forbid_weaker_isolation=true`.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_WORLD`
+
+Summary: Project world is outside the trust profile allowlist.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The project or selected run profile resolves to a world not listed in `worlds_allowed`.
+
+Agent strategy:
+
+- Move the project to an allowed solve-world (for `verified_core_pure_v1`, `solve-pure`).
+- Or select a different trust profile that explicitly permits the current world.
+- Re-run `x07 trust profile check`.
 
 
 ## `X07T_EPBT_MANIFEST_INVALID`
@@ -3217,226 +8354,311 @@ Agent strategy:
 - Re-run compile/test.
 
 
-## `X07V_EARGS`
+## `X07V_ASYNC_COUNTEREXAMPLE`
 
-Summary: Invalid `x07 verify` arguments.
+Summary: The async proof found a counterexample.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires understanding and fixing the async proof failure, not applying a deterministic quickfix.
+
+Details:
+
+CBMC produced a concrete async execution trace that violates one of the stated async proof obligations.
+
+Agent strategy:
+
+- Inspect the emitted counterexample JSON and trace.
+- Tighten the async protocol clauses or repair the state machine logic.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_CANCELLATION_ENSURE_FAILED`
+
+Summary: The async cancellation postcondition failed under proof.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires cancellation-path proof work rather than a deterministic quickfix.
+
+Details:
+
+The `cancellation_ensures` clause does not hold on the cancellation path of the proved async function.
+
+Agent strategy:
+
+- Model the cancellation result and cleanup effects explicitly in `cancellation_ensures`.
+- Repair any cancellation-path state updates or resource cleanup.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_COVERAGE_NOT_PROOF`
+
+Summary: Coverage/support summary is not proof evidence.
+
+Origins:
+- x07 (stage: lint, severity: warning)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` requires selecting exactly one verification mode.
+A supplied `x07.verify.summary@0.2.0` artifact describes coverage posture only. It can help review or planning, but it cannot satisfy prove-mode or certification proof requirements.
 
 Agent strategy:
 
-- Pass exactly one of `--bmc` or `--smt`.
-- Re-run the command with the corrected flags.
+- Replace the coverage/support artifact with `x07.verify.proof_summary@0.2.0` emitted by a successful `x07 verify --prove` run.
+- Keep `x07 verify --coverage` outputs for posture review only.
+- Re-run the prove flow with `--proof-summary <path>`.
+
+
+## `X07V_COVERAGE_SUMMARY_FORBIDDEN`
+
+Summary: Coverage/support summaries cannot be imported as proof.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The caller passed `x07.verify.summary@0.2.0` through `--proof-summary`, but prove-mode imports accept only `x07.verify.proof_summary@0.2.0` evidence emitted by successful prove runs.
+
+Agent strategy:
+
+- Remove the coverage/support artifact from `--proof-summary` inputs.
+- Re-run the dependency prove flow that emits `verify.proof-summary.json`.
+- Retry with the proof-summary artifact instead of the coverage/support summary.
+
+
+## `X07V_EARGS`
+
+Summary: Core lint/schema diagnostic `X07V_EARGS`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_ERROR`
 
-Summary: CBMC reported an error.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_ERROR`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC reported one or more `ERROR` messages while running the verification.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect the saved `cbmc.json` artifact (when present) for the reported error messages.
-- Adjust bounds or simplify the target to stay within the supported subset.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_FAILURE`
 
-Summary: CBMC reported a failing property that is not a contract.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_FAILURE`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` expects verification failures to correspond to X07 contract assertions. This diagnostic indicates CBMC reported a failing property that could not be mapped to a contract clause.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect `cbmc.json` and the generated `verify.c` harness to identify the failing property.
-- Simplify the target program and retry.
-- If the failure is reproducible, file a toolchain issue with the artifacts.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_JSON_PARSE`
 
-Summary: Failed to parse CBMC JSON output.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_JSON_PARSE`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: parse, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC did not produce valid JSON output under `--json-ui`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Check the installed CBMC version supports `--json-ui`.
-- Re-run with the same bounds and inspect the raw stdout.
-- If the output is not JSON, upgrade/downgrade CBMC and retry.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_MISSING`
 
-Summary: CBMC is missing.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_MISSING`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` uses CBMC for `--bmc` and to emit SMT2 for `--smt`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Install CBMC (for example `brew install cbmc`) and ensure `cbmc` is on `PATH`.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_SMT2`
 
-Summary: CBMC failed to emit SMT2.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_SMT2`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC returned a non-zero status while emitting an SMT-LIB2 formula (`--smt2`).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Re-run `x07 verify --smt` and inspect CBMC output.
-- Check the installed CBMC version and upgrade/downgrade if needed.
-- Keep the target within the supported subset.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_STDERR`
 
-Summary: CBMC wrote unexpected stderr output.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_STDERR`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-In JSON UI mode, `x07 verify` expects CBMC to write its report to stdout. Stderr output is treated as an error to avoid silently ignoring tool issues.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Re-run the same command and capture stderr.
-- Check the installed CBMC version and consider upgrading/downgrading.
-- If reproducible, file a toolchain issue with the stderr and the generated `verify.c` artifact.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EMODULE_ROOTS`
 
-Summary: Could not resolve module roots for `x07 verify`.
+Summary: Core lint/schema diagnostic `X07V_EMODULE_ROOTS`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-When `--module-root` is not provided, `x07 verify` attempts to infer module roots from the project manifest and lockfile. This diagnostic indicates that inference failed (for example due to a missing/invalid lockfile).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Provide explicit `--module-root` directories.
-- Or ensure the project has a valid lockfile (`x07.lock.json`) by running `x07 pkg lock`.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EPROJECT`
 
-Summary: Could not resolve project manifest for `x07 verify`.
+Summary: Core lint/schema diagnostic `X07V_EPROJECT`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` resolves module roots from a project manifest (`x07.json`) when available. This diagnostic indicates the `--project` path is invalid or a manifest could not be found.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Pass `--project <path-to-x07.json>` (or a directory containing it).
-- If running outside a project, pass one or more `--module-root <dir>` values.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ETARGET`
 
-Summary: Verification target could not be loaded.
+Summary: Core lint/schema diagnostic `X07V_ETARGET`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The `--entry` symbol could not be resolved to a `defn` in the module roots (module file not found, function not found, or module JSON invalid).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Ensure `--entry` is a fully qualified name with a module separator (`mod.fn`).
-- Ensure the module file exists at `<module-root>/<module-id>.x07.json`.
-- Re-run `x07 verify` after fixing the module roots or entry name.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EZ3_MISSING`
 
-Summary: Z3 is missing.
+Summary: Core lint/schema diagnostic `X07V_EZ3_MISSING`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-In `--smt` mode, `x07 verify` can emit SMT2 even without Z3 installed, but solving requires Z3.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Install Z3 (for example `brew install z3`) and ensure `z3` is on `PATH`.
-- Re-run `x07 verify --smt`, or consume the emitted SMT2 artifact with another solver.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EZ3_RUN`
 
-Summary: Z3 failed to run.
+Summary: Core lint/schema diagnostic `X07V_EZ3_RUN`.
 
 Origins:
 - x07 (stage: run, severity: error)
@@ -3445,191 +8667,415 @@ Quickfix support: `sometimes`
 
 Details:
 
-Z3 returned a non-zero exit status while solving the emitted SMT2 formula.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect the saved `verify.smt2` and `z3.out.txt` artifacts.
-- Check the installed Z3 version and retry.
-- If the solver crashes, simplify the target or reduce bounds.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_IMPORTED_STUB_FORBIDDEN`
+
+Summary: Imported stub assumptions are disabled in prove mode.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The requested prove run depends on developer-only `imported_stub` assumptions. Strong certification flows reject those assumptions instead of silently treating them as proof.
+
+Agent strategy:
+
+- Replace the imported stub with a proved or attested implementation on the reachable proof surface.
+- If you only need a developer-only exploration run, re-run `x07 verify --prove --allow-imported-stubs` and do not use that result for strong certification.
+- Re-run the prove or certification command on the strict surface.
 
 
 ## `X07V_INTERNAL`
 
-Summary: Internal `x07 verify` error.
+Summary: Core lint/schema diagnostic `X07V_INTERNAL`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Internal tool failure; requires toolchain fix.
+Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` encountered an unexpected internal error.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Capture the full error text and the generated artifacts under `.x07/artifacts/verify/...`.
-- Minimize a repro (smallest program + bounds).
-- File a toolchain issue; this typically requires a toolchain fix.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_NO_CONTRACTS`
 
-Summary: Target has no contracts to verify.
+Summary: Core lint/schema diagnostic `X07V_NO_CONTRACTS`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` requires at least one `requires[]`, `ensures[]`, or `invariant[]` clause on the target function.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Add at least one contract clause to the target `defn`.
-- Re-run `x07 verify` in the desired mode.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_PROOF_SUMMARY_REQUIRED`
+
+Summary: A reachable proof summary dependency is required but missing.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The current prove flow reached a symbol outside the locally loaded graph, and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that dependency.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --entry <sym>` for the reviewed dependency to emit `verify.proof-summary.json`.
+- Pass the emitted artifact back via `x07 verify --proof-summary <path>`.
+- Re-run the original prove command.
+
+
+## `X07V_PROVE_UNSUPPORTED`
+
+Summary: Core lint/schema diagnostic `X07V_PROVE_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_RECURSION_TERMINATION_FAILED`
+
+Summary: Recursive proof could not justify the declared termination rank.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The target is directly self-recursive and declares `decreases[]`, but at least one recursive self-call does not obviously decrease the declared rank term in the verifier's certifiable recursive subset.
+
+Agent strategy:
+
+- Keep the first `decreases[].expr` aligned with a recursive parameter.
+- Rewrite recursive self-calls so the rank argument decreases by a positive literal step.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_RECURSIVE_DECREASES_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07V_RECURSIVE_DECREASES_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_SCHEDULER_MODEL_UNTRUSTED`
+
+Summary: Async proof cannot proceed without the trusted scheduler model.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The async verifier requires the checked-in deterministic scheduler model to justify the state-machine proof, but that model is missing or could not be loaded.
+
+Agent strategy:
+
+- Restore `catalog/verify_scheduler_model.json` from the canonical toolchain tree.
+- Keep async proof runs on the released deterministic scheduler model only.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_SCOPE_INVARIANT_FAILED`
+
+Summary: An async scope invariant failed under proof.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires contract correction or state-machine changes.
+
+Details:
+
+The `scope_invariant` clause does not hold across the proved async execution.
+
+Agent strategy:
+
+- Re-check the scope state carried across awaits and cancellation.
+- Strengthen or correct `scope_invariant` so it matches the actual state machine.
+- Re-run `x07 verify --prove`.
 
 
 ## `X07V_SMT_SAT`
 
-Summary: SMT solver returned SAT (counterexample found).
+Summary: Core lint/schema diagnostic `X07V_SMT_SAT`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The SMT solver found a satisfying model, which indicates a counterexample within the current bounds.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Treat the result as a counterexample: tighten contracts or fix the function logic.
-- If needed, reduce the search space by strengthening `requires[]` or adding `invariant[]` clauses.
-- Re-run `x07 verify` to confirm the fix.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_SMT_UNKNOWN`
 
-Summary: SMT solver returned an unknown status.
+Summary: Core lint/schema diagnostic `X07V_SMT_UNKNOWN`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The SMT solver did not return `sat` or `unsat` (for example `unknown`). The result is inconclusive.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Treat the result as inconclusive: adjust bounds or simplify the target.
-- If available, use a different solver or solver version.
-- Keep the function within the supported subset and retry.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
-## `X07V_UNSUPPORTED_ASYNC`
+## `X07V_SUMMARY_MISMATCH`
 
-Summary: `x07 verify` does not support `defasync` targets.
+Summary: An imported proof summary does not match the current declaration.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires aligning reviewed summary artifacts with the current declaration graph.
+
+Details:
+
+The supplied `x07.verify.proof_summary@0.2.0` artifact names a reachable symbol, but its declaration digest does not match the currently loaded source graph.
+
+Agent strategy:
+
+- Regenerate the imported proof summary from the exact reviewed declaration set.
+- Keep proof-summary artifacts and source graph revisions aligned.
+- Re-run `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).
+
+
+## `X07V_SUMMARY_MISSING`
+
+Summary: A reachable imported proof summary dependency is missing.
+
+Origins:
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` v0.1 only supports verifying `defn` targets.
+The requested verify run reached a symbol outside the locally loaded graph and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that symbol.
 
 Agent strategy:
 
-- Verify a `defn` wrapper around the async logic (or refactor the core logic into a `defn` helper).
-- Keep the verified function within the supported subset (no async/concurrency).
-- Re-run `x07 verify`.
+- Re-run `x07 verify --prove --entry <sym>` for the reviewed callee to emit a proof summary.
+- Pass the emitted artifact back via `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).
+- Re-run the original verify command.
+
+
+## `X07V_UNSUPPORTED_DEFASYNC_FORM`
+
+Summary: The selected `defasync` target is outside the supported proof subset.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Async proof currently requires a certifiable state-machine form with supported parameters and a `bytes` or `result_bytes` result type.
+
+Agent strategy:
+
+- Refactor the async entry into the supported subset.
+- Keep proof-target `defasync` results in `bytes` or `result_bytes` form.
+- Re-run `x07 verify --prove`.
 
 
 ## `X07V_UNSUPPORTED_FOR_BOUNDS`
 
-Summary: `for` loop bounds must be literal for `x07 verify` v0.1.
+Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_FOR_BOUNDS`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The verification subset supports `for` loops only when bounds are statically known (literal) so CBMC unwinding is well-defined.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Replace variable bounds with a literal bound and add a contract that relates the literal bound to input sizes.
-- Or restructure the logic so loops are statically bounded.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
-## `X07V_UNSUPPORTED_PARAM`
+## `X07V_UNSUPPORTED_HEAP_EFFECT`
 
-Summary: Unsupported parameter type for `x07 verify`.
+Summary: The proved core uses heap or pointer effects outside the supported subset.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The verification subset currently supports only `i32`, `u32`, `bytes`, and `bytes_view` parameters.
+The verifier rejects direct heap mutation, raw pointer operations, and related memory intrinsics inside the certifiable pure proof subset instead of silently weakening proof posture.
 
 Agent strategy:
 
-- Introduce a `defn` wrapper that encodes unsupported types into supported types (for example into `bytes`).
-- Keep the verified target within the supported subset.
-- Re-run `x07 verify`.
+- Move heap or pointer effects behind a reviewed capsule boundary.
+- Keep proof-target logic on pure value transformations.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_UNSUPPORTED_MUTUAL_RECURSION`
+
+Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_MUTUAL_RECURSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_UNSUPPORTED_RECURSION`
 
-Summary: Recursive targets are not supported by `x07 verify` v0.1.
+Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_RECURSION`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The verification subset currently rejects recursion.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Refactor recursion into an iterative loop with a statically bounded `for`, or split the function into a non-recursive helper.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_UNSUPPORTED_RICH_TYPE`
+
+Summary: The target signature is outside the supported richer-data proof subset.
+
+Origins:
+- x07 (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The verifier currently supports the reviewed richer-data carriers for certification: unbranded `bytes` / `bytes_view`, `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`. Schema-derived record and tagged-union documents can sit directly on the proof boundary through branded `bytes_view` inputs. Nested result carriers are still rejected explicitly.
+
+Agent strategy:
+
+- Keep proof-target signatures on the supported richer-data carriers.
+- Schema-derived record and tagged-union documents can use branded `bytes_view` inputs when the validator is reachable through `meta.brands_v1.validate`.
+- Re-run `x07 verify --prove`.
 
 
 ## `X07V_UNWIND_INCOMPLETE`
 
-Summary: CBMC unwinding is incomplete.
+Summary: Core lint/schema diagnostic `X07V_UNWIND_INCOMPLETE`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC reported an unwinding assertion failure, which means the verification result is inconclusive at the current `--unwind` bound.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Increase `--unwind` until unwinding assertions no longer fail.
-- If the function needs unbounded iteration, refactor it to a statically bounded form for v0.1 verification.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X7I0001`
@@ -3647,7 +9093,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3667,7 +9113,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3687,7 +9133,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3707,7 +9153,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3727,7 +9173,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3747,7 +9193,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3767,7 +9213,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3787,7 +9233,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3807,7 +9253,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3827,7 +9273,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3847,7 +9293,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3867,7 +9313,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3887,7 +9333,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3907,7 +9353,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3927,7 +9373,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3947,7 +9393,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3967,7 +9413,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -3987,7 +9433,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -4007,7 +9453,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -4027,7 +9473,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 

@@ -12,6 +12,7 @@ pub const BACKEND_ID_EXT_DB_SQLITE: &str = "x07.ext.db.sqlite";
 pub const BACKEND_ID_EXT_DB_PG: &str = "x07.ext.db.pg";
 pub const BACKEND_ID_EXT_DB_MYSQL: &str = "x07.ext.db.mysql";
 pub const BACKEND_ID_EXT_DB_REDIS: &str = "x07.ext.db.redis";
+pub const BACKEND_ID_EXT_OBJ_S3: &str = "x07.ext.obj.s3";
 pub const BACKEND_ID_EXT_REGEX: &str = "x07.ext.regex";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

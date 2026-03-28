@@ -1,0 +1,16 @@
+{
+  "dependencies": [
+    {
+      "name": "std-web-ui",
+      "path": ".x07/deps/std-web-ui/0.2.6",
+      "version": "0.2.6"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src"
+  ],
+  "schema_version": "x07.project@0.4.0",
+  "world": "solve-pure"
+}

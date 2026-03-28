@@ -1,0 +1,9 @@
+{
+  "schema_version": "x07.verify.scheduler_model@0.1.0",
+  "id": "deterministic_task_scope_v1",
+  "guarantees": [
+    "task.spawn, task.cancel, and task.join use the deterministic scheduler runtime",
+    "task.scope_v1 exit drains or cancels remaining children before scope disposal",
+    "canceled bytes tasks join as bytes.empty and canceled result_bytes tasks join as err=2"
+  ]
+}

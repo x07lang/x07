@@ -49,6 +49,7 @@ fn compile_exe(program: &[u8], module_roots: Vec<PathBuf>) -> PathBuf {
         enable_rr: false,
         enable_kv: false,
         module_roots,
+        prefer_module_roots_first: false,
         arch_root: None,
         emit_main: true,
         freestanding: false,
@@ -56,6 +57,7 @@ fn compile_exe(program: &[u8], module_roots: Vec<PathBuf>) -> PathBuf {
         contract_mode: compile::ContractMode::RuntimeTrap,
         allow_unsafe: None,
         allow_ffi: None,
+        allow_internal_only_heads_in_entry: false,
     };
     let compile = compile_program_with_options(program, &cfg, None, &compile_options, &[])
         .expect("compile ok");

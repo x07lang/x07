@@ -20,6 +20,7 @@ pub mod stream_pipe;
 pub mod typecheck;
 pub mod types;
 pub mod validate;
+pub mod wasm_emit;
 pub mod world_config;
 pub mod x07ast;
 

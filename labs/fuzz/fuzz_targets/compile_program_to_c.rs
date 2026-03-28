@@ -40,17 +40,8 @@ fuzz_target!(|data: &[u8]| {
 
     let opts = compile::CompileOptions {
         world: WorldId::SolvePure,
-        enable_fs: false,
-        enable_rr: false,
-        enable_kv: false,
-        module_roots: Vec::new(),
-        arch_root: None,
         emit_main: false,
-        freestanding: false,
-        optimize: true,
-        contract_mode: compile::ContractMode::RuntimeTrap,
-        allow_unsafe: None,
-        allow_ffi: None,
+        ..compile::CompileOptions::default()
     };
 
     let _ = compile::compile_program_to_c_with_stats(&program_bytes, &opts);

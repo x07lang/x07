@@ -84,7 +84,7 @@ fn golden_sha256_solve_pure_stream_json_canon_pipe() {
     let c = compile(program.as_slice(), CompileOptions::default());
     assert_eq!(
         sha256_hex(&c),
-        "0abe8d6a6e4529a0959ce254e1804f3bcff31f03e9a5521666ffb744a30be875"
+        "7e2e2226645ea51196d6a643859c47e462112685ac83b9b72043efd14672e7f7"
     );
 }
 
@@ -112,7 +112,7 @@ fn golden_sha256_solve_pure_async_tasks() {
     let c = compile(program.as_slice(), CompileOptions::default());
     assert_eq!(
         sha256_hex(&c),
-        "6f8df4f268f3506a6294e10676ac3e9d66d0df750b6b19408209779dbf002af2"
+        "da57aca275ee602a63ddcfbeb4f7434f510ed50d2b03a36b7fd564cb20aec707"
     );
 }
 
@@ -133,7 +133,7 @@ fn golden_sha256_solve_pure_contracts_runtime_trap() {
     let c = compile(program.as_slice(), CompileOptions::default());
     assert_eq!(
         sha256_hex(&c),
-        "7e984fc40d8187fb887e3793a9407713ddece705303c47cb35822955dcc56897"
+        "5c2f20405973d1bed8f02dad4811e19398b7b6165ac81da3d9d8a20321819a07"
     );
 }
 
@@ -147,7 +147,7 @@ fn golden_sha256_run_os_os_fs_read_file() {
     let c = compile(program.as_slice(), options);
     assert_eq!(
         sha256_hex(&c),
-        "c6c695b9f82219c3d5aa95795373b738db145e4757f3b32dd0b1574e529d6b87"
+        "1710a79eb49637bcb8762d5a5006c610e8a03dd6a68de668ca6ab069f17c6c87"
     );
 }
 
@@ -195,6 +195,6 @@ fn golden_sha256_run_os_mega_fixture() {
     let c = compile(program.as_slice(), options);
     assert_eq!(
         sha256_hex(&c),
-        "3375df9d0a3e5d2892d36e065ade575f194f9b70d4954cc436b226f2b5f89e2a"
+        "afe3ea2bf614d33d131adc91f33f92b8b865c7884dafee1b22ea33d709a885f8"
     );
 }

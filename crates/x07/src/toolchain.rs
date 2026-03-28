@@ -90,6 +90,9 @@ pub struct FmtArgs {
     pub check: bool,
     #[arg(long)]
     pub write: bool,
+    /// Deterministic multi-line formatting intended for human editing/review.
+    #[arg(long)]
+    pub pretty: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -142,6 +145,22 @@ pub struct BuildArgs {
     #[arg(long, value_name = "PATH")]
     pub emit_c_header: Option<PathBuf>,
 
+    /// Also emit a core wasm module (solve_pure ABI), written to this path.
+    #[arg(long = "emit-wasm", value_name = "FILE")]
+    pub emit_wasm: Option<PathBuf>,
+
+    /// WebAssembly initial memory size in bytes (must be multiple of 65536).
+    #[arg(long = "wasm-initial-memory-bytes", value_name = "N")]
+    pub wasm_initial_memory_bytes: Option<u64>,
+
+    /// WebAssembly max memory size in bytes (must be multiple of 65536).
+    #[arg(long = "wasm-max-memory-bytes", value_name = "N")]
+    pub wasm_max_memory_bytes: Option<u64>,
+
+    /// If set, emit a non-growable memory (max == initial).
+    #[arg(long = "wasm-no-growable-memory", action = clap::ArgAction::SetTrue)]
+    pub wasm_no_growable_memory: bool,
+
     /// Build in freestanding mode for library embedding (exports `x07_solve_v2`; no `main()`).
     #[arg(long)]
     pub freestanding: bool,
@@ -172,7 +191,18 @@ struct ProjectCtx {
     world: WorldId,
 }
 
-fn load_project_ctx(project_path: &Path) -> Result<ProjectCtx> {
+fn load_project_ctx(project_path: &Path, hydrate_deps: bool) -> Result<ProjectCtx> {
+    if hydrate_deps {
+        let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf())
+            .context("hydrate project deps")?;
+        if hydrated {
+            eprintln!(
+                "x07: hydrated project dependencies via `x07 pkg lock --project {}`",
+                project_path.display()
+            );
+        }
+    }
+
     let manifest = project::load_project_manifest(project_path).context("load project manifest")?;
     let lock_path = project::default_lockfile_path(project_path, &manifest);
     let lock_bytes = std::fs::read(&lock_path)
@@ -248,7 +278,11 @@ pub fn cmd_fmt(
         x07ast::canonicalize_x07ast_file(&mut file);
         let mut v = x07ast::x07ast_file_to_value(&file);
         x07ast::canon_value_jcs(&mut v);
-        let formatted = serde_json::to_string(&v)? + "\n";
+        let formatted = if args.pretty {
+            serde_json::to_string_pretty(&v)? + "\n"
+        } else {
+            serde_json::to_string(&v)? + "\n"
+        };
 
         if args.check && bytes != formatted.as_bytes() {
             not_formatted.push(input.clone());
@@ -478,9 +512,25 @@ pub fn cmd_fix(
             .count();
         if remaining_errors > 0 {
             ok = false;
+            if let Some(next) = final_report
+                .diagnostics
+                .iter()
+                .find(|d| d.severity == diagnostics::Severity::Error)
+            {
+                let loc = match &next.loc {
+                    Some(diagnostics::Location::X07Ast { ptr }) => format!(" ({ptr})"),
+                    Some(diagnostics::Location::Text { span, .. }) => match &span.file {
+                        Some(file) => format!(" ({}:{}:{})", file, span.start.line, span.start.col),
+                        None => format!(" ({}:{})", span.start.line, span.start.col),
+                    },
+                    None => String::new(),
+                };
+                eprintln!("x07 fix: next error: {}: {}{loc}", next.code, next.message);
+            }
             eprintln!(
                 "x07 fix: {remaining_errors} error(s) remain after auto-fix for {}. \
-                 Run `x07 build` to see codegen-stage errors.",
+                 Run `x07 lint --input {}` to see the remaining diagnostics.",
+                input.display(),
                 input.display()
             );
         }
@@ -511,7 +561,7 @@ pub fn cmd_build(
         std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
     }
 
-    let ctx = load_project_ctx(&args.project).context("load project")?;
+    let ctx = load_project_ctx(&args.project, true).context("load project")?;
     let ProjectCtx {
         base,
         manifest: _manifest,
@@ -564,6 +614,43 @@ pub fn cmd_build(
         }
         std::fs::write(&path, h.as_bytes())
             .with_context(|| format!("write: {}", path.display()))?;
+    }
+
+    if let Some(path) = args.emit_wasm {
+        let default_initial = 16 * 1024 * 1024u64;
+        let initial = args.wasm_initial_memory_bytes.unwrap_or(default_initial);
+        let mut max = args.wasm_max_memory_bytes.unwrap_or(initial);
+        let no_growable = if args.wasm_no_growable_memory {
+            true
+        } else {
+            // Default for Phase 7 is "no growable memory" unless max>initial is explicitly set.
+            max == initial
+        };
+        if no_growable {
+            max = initial;
+        }
+
+        let wasm_opts = x07c::wasm_emit::WasmEmitOptions {
+            mem: x07c::wasm_emit::WasmMemLimits {
+                initial_memory_bytes: initial,
+                max_memory_bytes: max,
+                no_growable_memory: no_growable,
+            },
+            features: x07c::wasm_emit::features::supported_features_v1(),
+        };
+
+        let prepared =
+            x07c::compile::compile_program_to_program_with_meta(&program_bytes, &options)
+                .map_err(|e| anyhow::anyhow!("compile failed: {:?}: {}", e.kind, e.message))?;
+        let wasm =
+            x07c::compile::compile_program_to_wasm_v1(&prepared.program, &options, &wasm_opts)
+                .map_err(|e| anyhow::anyhow!("wasm emit failed: {:?}: {}", e.kind, e.message))?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create output dir: {}", parent.display()))?;
+        }
+        std::fs::write(&path, wasm).with_context(|| format!("write: {}", path.display()))?;
     }
 
     Ok(std::process::ExitCode::SUCCESS)
@@ -654,7 +741,7 @@ pub fn cmd_check(
 ) -> Result<std::process::ExitCode> {
     let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
 
-    let ctx = match load_project_ctx(&args.project) {
+    let ctx = match load_project_ctx(&args.project, false) {
         Ok(ctx) => ctx,
         Err(err) => {
             diags.push(crate::reporting::diag_error(
@@ -870,7 +957,7 @@ pub fn cmd_check(
                 code: code.to_string(),
                 severity: diagnostics::Severity::Error,
                 stage: diagnostics::Stage::Codegen,
-                message: err.message.clone(),
+                message: err.message.to_string(),
                 loc: ptr
                     .as_ref()
                     .map(|p| diagnostics::Location::X07Ast { ptr: p.clone() }),

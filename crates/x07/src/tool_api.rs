@@ -15,7 +15,6 @@ use x07c::diagnostics;
 use crate::reporting;
 
 const TOOL_API_CHILD_ENV: &str = "X07_TOOL_API_CHILD";
-const TOOL_REPORT_SEMVER: &str = "0.1.0";
 const X07_DOC_REPORT_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-doc.report.schema.json");
 const X07_TOOL_EVENTS_SCHEMA_BYTES: &[u8] =
@@ -89,8 +88,9 @@ fn handle_machine_request(
     scope: Option<&str>,
     started: Instant,
 ) -> Result<Option<std::process::ExitCode>> {
+    let report_schema_version = report_schema_version_for_scope(scope)?;
     if parsed.json_schema || parsed.json_schema_id {
-        let code = emit_schema_or_id(parsed, scope)?;
+        let code = emit_schema_or_id(parsed, scope, &report_schema_version)?;
         return Ok(Some(code));
     }
 
@@ -118,7 +118,7 @@ fn handle_machine_request(
 
         let report = reporting::build_report(
             scope,
-            TOOL_REPORT_SEMVER,
+            &report_schema_version,
             started,
             raw_args,
             2,
@@ -147,7 +147,7 @@ fn handle_machine_request(
 
         let report = reporting::build_report(
             scope,
-            TOOL_REPORT_SEMVER,
+            &report_schema_version,
             started,
             raw_args,
             2,
@@ -277,7 +277,7 @@ fn wrapped_report(
 
     Ok(reporting::build_report(
         scope,
-        TOOL_REPORT_SEMVER,
+        &report_schema_version_for_scope(scope)?,
         started,
         raw_args,
         exit_code,
@@ -329,6 +329,7 @@ fn collect_meta_paths_from_child(
 fn emit_schema_or_id(
     parsed: &reporting::ParsedMachineFlags,
     scope: Option<&str>,
+    report_schema_version: &str,
 ) -> Result<std::process::ExitCode> {
     if parsed.json_schema {
         let bytes = if parsed.mode == reporting::JsonMode::Jsonl {
@@ -343,10 +344,8 @@ fn emit_schema_or_id(
     if parsed.json_schema_id {
         let id = if parsed.mode == reporting::JsonMode::Jsonl {
             reporting::TOOL_EVENTS_SCHEMA_VERSION.to_string()
-        } else if scope == Some("doc") {
-            x07_contracts::X07_DOC_REPORT_SCHEMA_VERSION.to_string()
         } else {
-            reporting::schema_id_for_scope(scope, TOOL_REPORT_SEMVER)
+            report_schema_version.to_string()
         };
         let mut bytes = id.into_bytes();
         bytes.push(b'\n');
@@ -399,8 +398,28 @@ fn schema_bytes_for_scope(scope: Option<&str>) -> Result<&'static [u8]> {
     }
 }
 
+fn schema_version_from_bytes(schema_bytes: &[u8]) -> Result<String> {
+    let doc: Value = serde_json::from_slice(schema_bytes).context("parse embedded tool schema")?;
+    doc.pointer("/properties/schema_version/const")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .context("embedded tool schema missing properties.schema_version.const")
+}
+
+fn report_schema_version_for_scope(scope: Option<&str>) -> Result<String> {
+    match scope {
+        Some("doc") => Ok(x07_contracts::X07_DOC_REPORT_SCHEMA_VERSION.to_string()),
+        _ => schema_version_from_bytes(schema_bytes_for_scope(scope)?),
+    }
+}
+
+fn fallback_report_schema_version_for_scope(scope: Option<&str>) -> String {
+    report_schema_version_for_scope(scope)
+        .unwrap_or_else(|_| reporting::schema_id_for_scope(scope, "0.1.0"))
+}
+
 fn is_native_json_scope(scope: Option<&str>) -> bool {
-    matches!(scope, Some("doc"))
+    matches!(scope, Some("doc") | Some("wasm"))
 }
 
 fn run_native_json_command(parsed: &reporting::ParsedMachineFlags) -> Result<ChildOutput> {
@@ -720,7 +739,7 @@ fn internal_error_report(
 
     reporting::build_report(
         scope,
-        TOOL_REPORT_SEMVER,
+        &fallback_report_schema_version_for_scope(scope),
         started,
         raw_args,
         3,

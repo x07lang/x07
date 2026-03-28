@@ -2,7 +2,12 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: x07-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -37,12 +42,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             clang \
             build-essential \
+            curl \
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
             liblzma-dev \
             zlib1g-dev \
-            libsqlite3-dev
+            libsqlite3-dev \
+            unzip
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
       - name: Stage native math backend
         shell: bash
         run: ./scripts/ci/ensure_math_backend.sh
@@ -176,6 +186,76 @@ jobs:
         shell: bash
         run: ./scripts/ci/check_x07test_smoke.sh
 
+  verified-core-pure:
+    name: ci / verified-core-pure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            curl \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            unzip
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
+      - name: verified_core_pure_v1 certify
+        shell: bash
+        env:
+          X07_REQUIRE_SOLVERS: "1"
+        run: ./scripts/ci/check_verified_core_pure_example.sh
+      - name: verified_core_fixture_v1 release guard
+        shell: bash
+        env:
+          X07_REQUIRE_SOLVERS: "1"
+        run: ./scripts/ci/check_verified_core_fixture.sh
+
+  network-trust-static:
+    name: ci / network-trust-static / ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - check_trusted_network_service_static.sh
+          - check_certified_network_capsule_static.sh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: Network trust static check
+        shell: bash
+        run: ./scripts/ci/${{ matrix.check }}
+
   determinism:
     name: ci / determinism
     runs-on: ubuntu-latest
@@ -259,6 +339,8 @@ jobs:
           python-version: "3.11"
       - name: Build release manifest (check)
         run: python3 scripts/build_release_manifest.py --check
+      - name: Release script goldens
+        run: python3 scripts/ci/check_release_goldens.py
 
   installer-smoke:
     name: ci / installer-smoke

@@ -1,0 +1,73 @@
+{
+  "schema_version": "x07.arch.boundaries.index@0.1.0",
+  "boundaries": [
+    {
+      "id": "example.main",
+      "symbol": "example.main",
+      "node_id": "program_core",
+      "kind": "public_function",
+      "from_zone": "untrusted",
+      "to_zone": "untrusted",
+      "worlds_allowed": ["run-os-sandboxed"],
+      "input": {
+        "params": [
+          {
+            "name": "payload",
+            "ty": "bytes_view",
+            "brand": "trusted_network_service.request_v1"
+          }
+        ]
+      },
+      "output": {
+        "ty": "bytes",
+        "brand": "trusted_network_service.response_v1"
+      },
+      "smoke": {
+        "entry": "tests.core.smoke_tcp_echo",
+        "tests": ["smoke/tcp_echo"]
+      },
+      "pbt": {
+        "required": false,
+        "tests": []
+      },
+      "verify": {
+        "required": true,
+        "mode": "prove"
+      }
+    },
+    {
+      "id": "capsule.main",
+      "symbol": "capsule.main",
+      "node_id": "capsule_code",
+      "kind": "cross_zone_function",
+      "from_zone": "untrusted",
+      "to_zone": "certified_capsule",
+      "worlds_allowed": ["run-os-sandboxed"],
+      "input": {
+        "params": [
+          {
+            "name": "payload",
+            "ty": "bytes_view",
+            "brand": "trusted_network_service.request_v1"
+          }
+        ]
+      },
+      "output": {
+        "ty": "bytes",
+        "brand": "trusted_network_service.response_v1"
+      },
+      "smoke": {
+        "entry": "tests.core.capsule_tcp_echo_identity",
+        "tests": ["capsule/tcp_echo_identity"]
+      },
+      "pbt": {
+        "required": false,
+        "tests": []
+      },
+      "verify": {
+        "required": true,
+        "mode": "prove"
+      }
+    }
+  ]
+}

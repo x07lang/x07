@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 
 use serde_json::Value;
-use x07_contracts::{X07AST_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION_V0_5_0};
+use x07_contracts::{
+    X07AST_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
+};
 
 use crate::ast::Expr;
 use crate::types::Ty;
@@ -130,12 +133,27 @@ pub struct ContractClauseAst {
 }
 
 #[derive(Debug, Clone)]
+pub struct LoopContractAst {
+    pub ptr: String,
+    pub invariant: Vec<ContractClauseAst>,
+    pub decreases: Vec<ContractClauseAst>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AsyncProtocolAst {
+    pub await_invariant: Vec<ContractClauseAst>,
+    pub scope_invariant: Vec<ContractClauseAst>,
+    pub cancellation_ensures: Vec<ContractClauseAst>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AstFunctionDef {
     pub name: String,
     pub type_params: Vec<TypeParam>,
     pub requires: Vec<ContractClauseAst>,
     pub ensures: Vec<ContractClauseAst>,
     pub invariant: Vec<ContractClauseAst>,
+    pub loop_contracts: Vec<LoopContractAst>,
     pub params: Vec<AstFunctionParam>,
     pub result: TypeRef,
     pub result_brand: Option<String>,
@@ -149,6 +167,8 @@ pub struct AstAsyncFunctionDef {
     pub requires: Vec<ContractClauseAst>,
     pub ensures: Vec<ContractClauseAst>,
     pub invariant: Vec<ContractClauseAst>,
+    pub protocol: Option<AsyncProtocolAst>,
+    pub loop_contracts: Vec<LoopContractAst>,
     pub params: Vec<AstFunctionParam>,
     pub result: TypeRef,
     pub result_brand: Option<String>,
@@ -198,6 +218,29 @@ impl Display for X07AstError {
     }
 }
 
+const INTERNAL_DEFN_DECREASES_META_KEY: &str = "__x07_internal_defn_decreases";
+
+fn supports_contracts(schema_version: &str) -> bool {
+    schema_version == X07AST_SCHEMA_VERSION_V0_5_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_6_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_7_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+}
+
+fn supports_loop_contracts(schema_version: &str) -> bool {
+    schema_version == X07AST_SCHEMA_VERSION_V0_6_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_7_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+}
+
+fn supports_async_protocol(schema_version: &str) -> bool {
+    schema_version == X07AST_SCHEMA_VERSION_V0_7_0 || schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+}
+
+fn supports_defn_decreases(schema_version: &str) -> bool {
+    schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+}
+
 pub fn parse_x07ast_json(bytes: &[u8]) -> Result<X07AstFile, X07AstError> {
     let doc: Value = serde_json::from_slice(bytes).map_err(|e| X07AstError {
         message: e.to_string(),
@@ -225,7 +268,10 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
             ptr: "/schema_version".to_string(),
         });
     }
-    let allow_contracts = schema_version == X07AST_SCHEMA_VERSION_V0_5_0;
+    let allow_contracts = supports_contracts(&schema_version);
+    let allow_loop_contracts = supports_loop_contracts(&schema_version);
+    let allow_async_protocol = supports_async_protocol(&schema_version);
+    let allow_defn_decreases = supports_defn_decreases(&schema_version);
 
     let kind = get_required_string(root_obj, "/kind", "kind")?;
     let kind = match kind.trim() {
@@ -269,6 +315,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
     let mut functions: Vec<AstFunctionDef> = Vec::new();
     let mut async_functions: Vec<AstAsyncFunctionDef> = Vec::new();
     let mut extern_functions: Vec<AstExternFunctionDecl> = Vec::new();
+    let mut defn_decreases_meta = serde_json::Map::new();
 
     let mut function_names: BTreeSet<String> = BTreeSet::new();
 
@@ -306,12 +353,35 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 }
             }
             "defn" => {
-                let parsed = parse_def_like(dobj, &dptr, &module_id, false, allow_contracts)?;
+                let parsed = parse_def_like(
+                    dobj,
+                    &dptr,
+                    &module_id,
+                    false,
+                    DefLikeSchemaCaps {
+                        allow_contracts,
+                        allow_loop_contracts,
+                        allow_async_protocol,
+                        allow_defn_decreases,
+                    },
+                )?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
                         message: format!("duplicate function name: {:?}", parsed.name),
                         ptr: format!("{dptr}/name"),
                     });
+                }
+                if !parsed.decreases.is_empty() {
+                    defn_decreases_meta.insert(
+                        parsed.name.clone(),
+                        Value::Array(
+                            parsed
+                                .decreases
+                                .iter()
+                                .map(contract_clause_to_value)
+                                .collect(),
+                        ),
+                    );
                 }
                 functions.push(AstFunctionDef {
                     name: parsed.name,
@@ -319,6 +389,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     requires: parsed.requires,
                     ensures: parsed.ensures,
                     invariant: parsed.invariant,
+                    loop_contracts: parsed.loop_contracts,
                     params: parsed.params,
                     result: parsed.result,
                     result_brand: parsed.result_brand,
@@ -326,7 +397,18 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 });
             }
             "defasync" => {
-                let parsed = parse_def_like(dobj, &dptr, &module_id, true, allow_contracts)?;
+                let parsed = parse_def_like(
+                    dobj,
+                    &dptr,
+                    &module_id,
+                    true,
+                    DefLikeSchemaCaps {
+                        allow_contracts,
+                        allow_loop_contracts,
+                        allow_async_protocol,
+                        allow_defn_decreases,
+                    },
+                )?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
                         message: format!("duplicate function name: {:?}", parsed.name),
@@ -339,6 +421,8 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     requires: parsed.requires,
                     ensures: parsed.ensures,
                     invariant: parsed.invariant,
+                    protocol: parsed.protocol,
+                    loop_contracts: parsed.loop_contracts,
                     params: parsed.params,
                     result: parsed.result,
                     result_brand: parsed.result_brand,
@@ -378,6 +462,12 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
             }
         }
     }
+    if !defn_decreases_meta.is_empty() {
+        meta.insert(
+            INTERNAL_DEFN_DECREASES_META_KEY.to_string(),
+            Value::Object(defn_decreases_meta),
+        );
+    }
 
     Ok(X07AstFile {
         schema_version,
@@ -400,10 +490,21 @@ struct ParsedDefLike {
     requires: Vec<ContractClauseAst>,
     ensures: Vec<ContractClauseAst>,
     invariant: Vec<ContractClauseAst>,
+    decreases: Vec<ContractClauseAst>,
+    protocol: Option<AsyncProtocolAst>,
+    loop_contracts: Vec<LoopContractAst>,
     params: Vec<AstFunctionParam>,
     result: TypeRef,
     result_brand: Option<String>,
     body: Expr,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DefLikeSchemaCaps {
+    allow_contracts: bool,
+    allow_loop_contracts: bool,
+    allow_async_protocol: bool,
+    allow_defn_decreases: bool,
 }
 
 fn parse_def_like(
@@ -411,7 +512,7 @@ fn parse_def_like(
     ptr: &str,
     module_id: &str,
     is_async: bool,
-    allow_contracts: bool,
+    caps: DefLikeSchemaCaps,
 ) -> Result<ParsedDefLike, X07AstError> {
     let kind_label = if is_async { "defasync" } else { "defn" };
 
@@ -430,20 +531,57 @@ fn parse_def_like(
 
     let type_params = parse_type_params(dobj, ptr)?;
 
-    if !allow_contracts {
-        for field in ["requires", "ensures", "invariant"] {
+    if !caps.allow_contracts {
+        for field in [
+            "requires",
+            "ensures",
+            "invariant",
+            "loop_contracts",
+            "protocol",
+        ] {
             if dobj.contains_key(field) {
                 return Err(X07AstError {
-                    message: format!("{field} is only supported in {X07AST_SCHEMA_VERSION_V0_5_0}"),
+                    message: format!(
+                        "{field} is only supported in {X07AST_SCHEMA_VERSION_V0_5_0}, {X07AST_SCHEMA_VERSION_V0_6_0}, {X07AST_SCHEMA_VERSION_V0_7_0}, or {X07AST_SCHEMA_VERSION_V0_8_0}"
+                    ),
                     ptr: format!("{ptr}/{field}"),
                 });
             }
         }
     }
 
+    if dobj.contains_key("decreases") {
+        if is_async {
+            return Err(X07AstError {
+                message: "decreases is only supported on defn declarations".to_string(),
+                ptr: format!("{ptr}/decreases"),
+            });
+        }
+        if !caps.allow_defn_decreases {
+            return Err(X07AstError {
+                message: format!("decreases is only supported in {X07AST_SCHEMA_VERSION_V0_8_0}"),
+                ptr: format!("{ptr}/decreases"),
+            });
+        }
+    }
+
+    if !is_async && dobj.contains_key("protocol") {
+        return Err(X07AstError {
+            message: "protocol is only supported on defasync declarations".to_string(),
+            ptr: format!("{ptr}/protocol"),
+        });
+    }
+
     let requires = parse_contract_clauses(dobj, ptr, "requires")?;
     let ensures = parse_contract_clauses(dobj, ptr, "ensures")?;
     let invariant = parse_contract_clauses(dobj, ptr, "invariant")?;
+    let decreases = if is_async {
+        Vec::new()
+    } else {
+        parse_contract_clauses(dobj, ptr, "decreases")?
+    };
+    let protocol = parse_async_protocol(dobj, ptr, is_async, caps.allow_async_protocol)?;
+    let loop_contracts = parse_loop_contracts(dobj, ptr, caps.allow_loop_contracts)?;
 
     let params = parse_params(dobj, ptr, kind_label)?;
 
@@ -488,11 +626,96 @@ fn parse_def_like(
         requires,
         ensures,
         invariant,
+        decreases,
+        protocol,
+        loop_contracts,
         params,
         result,
         result_brand,
         body,
     })
+}
+
+fn parse_async_protocol(
+    dobj: &serde_json::Map<String, Value>,
+    ptr: &str,
+    is_async: bool,
+    allow_async_protocol: bool,
+) -> Result<Option<AsyncProtocolAst>, X07AstError> {
+    let Some(v) = dobj.get("protocol") else {
+        return Ok(None);
+    };
+    if !is_async {
+        return Err(X07AstError {
+            message: "protocol is only supported on defasync declarations".to_string(),
+            ptr: format!("{ptr}/protocol"),
+        });
+    }
+    if !allow_async_protocol {
+        return Err(X07AstError {
+            message: format!(
+                "protocol is only supported in {X07AST_SCHEMA_VERSION_V0_7_0} or {X07AST_SCHEMA_VERSION_V0_8_0}"
+            ),
+            ptr: format!("{ptr}/protocol"),
+        });
+    }
+    let obj = v.as_object().ok_or_else(|| X07AstError {
+        message: "protocol must be an object".to_string(),
+        ptr: format!("{ptr}/protocol"),
+    })?;
+    Ok(Some(AsyncProtocolAst {
+        await_invariant: parse_contract_clauses(
+            obj,
+            &format!("{ptr}/protocol"),
+            "await_invariant",
+        )?,
+        scope_invariant: parse_contract_clauses(
+            obj,
+            &format!("{ptr}/protocol"),
+            "scope_invariant",
+        )?,
+        cancellation_ensures: parse_contract_clauses(
+            obj,
+            &format!("{ptr}/protocol"),
+            "cancellation_ensures",
+        )?,
+    }))
+}
+
+fn parse_loop_contracts(
+    dobj: &serde_json::Map<String, Value>,
+    ptr: &str,
+    allow_loop_contracts: bool,
+) -> Result<Vec<LoopContractAst>, X07AstError> {
+    let Some(v) = dobj.get("loop_contracts") else {
+        return Ok(Vec::new());
+    };
+    if !allow_loop_contracts {
+        return Err(X07AstError {
+            message: format!(
+                "loop_contracts is only supported in {X07AST_SCHEMA_VERSION_V0_6_0}, {X07AST_SCHEMA_VERSION_V0_7_0}, or {X07AST_SCHEMA_VERSION_V0_8_0}"
+            ),
+            ptr: format!("{ptr}/loop_contracts"),
+        });
+    }
+    let arr = v.as_array().ok_or_else(|| X07AstError {
+        message: "loop_contracts must be an array".to_string(),
+        ptr: format!("{ptr}/loop_contracts"),
+    })?;
+    let mut out = Vec::with_capacity(arr.len());
+    for (idx, item) in arr.iter().enumerate() {
+        let lcptr = format!("{ptr}/loop_contracts/{idx}");
+        let obj = item.as_object().ok_or_else(|| X07AstError {
+            message: "loop_contracts item must be an object".to_string(),
+            ptr: lcptr.clone(),
+        })?;
+        out.push(LoopContractAst {
+            ptr: get_required_string(obj, &format!("{lcptr}/ptr"), "ptr")?,
+            invariant: parse_contract_clauses(obj, &lcptr, "invariant")?,
+            decreases: parse_contract_clauses(obj, &lcptr, "decreases")?,
+        });
+    }
+    Ok(out)
 }
 
 fn parse_contract_clauses(
@@ -1026,15 +1249,61 @@ pub fn x07ast_file_to_value(file: &X07AstFile) -> Value {
         m.insert("solve".to_string(), expr_to_value(solve));
     }
 
-    if !file.meta.is_empty() {
+    let public_meta: BTreeMap<String, Value> = file
+        .meta
+        .iter()
+        .filter(|(k, _)| k.as_str() != INTERNAL_DEFN_DECREASES_META_KEY)
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    if !public_meta.is_empty() {
         let mut meta = serde_json::Map::new();
-        for (k, v) in &file.meta {
+        for (k, v) in &public_meta {
             meta.insert(k.clone(), v.clone());
         }
         m.insert("meta".to_string(), Value::Object(meta));
     }
 
     Value::Object(m)
+}
+
+fn export_slots(file: &X07AstFile) -> usize {
+    if file.kind == X07AstKind::Module && !file.exports.is_empty() {
+        1usize
+    } else {
+        0usize
+    }
+}
+
+fn defn_decl_index(file: &X07AstFile, name: &str) -> Option<usize> {
+    let defn_base = export_slots(file) + file.extern_functions.len();
+    file.functions
+        .iter()
+        .position(|f| f.name == name)
+        .map(|idx| defn_base + idx)
+}
+
+fn internal_defn_decreases_values<'a>(file: &'a X07AstFile, name: &str) -> Option<&'a Vec<Value>> {
+    file.meta
+        .get(INTERNAL_DEFN_DECREASES_META_KEY)
+        .and_then(Value::as_object)
+        .and_then(|items| items.get(name))
+        .and_then(Value::as_array)
+}
+
+pub fn defn_decreases(
+    file: &X07AstFile,
+    name: &str,
+) -> Result<Option<Vec<ContractClauseAst>>, X07AstError> {
+    let Some(items) = internal_defn_decreases_values(file, name) else {
+        return Ok(None);
+    };
+    let decl_idx = defn_decl_index(file, name).ok_or_else(|| X07AstError {
+        message: format!("internal decreases entry for undeclared function {name:?}"),
+        ptr: "/meta".to_string(),
+    })?;
+    let mut obj = serde_json::Map::new();
+    obj.insert("decreases".to_string(), Value::Array(items.clone()));
+    parse_contract_clauses(&obj, &format!("/decls/{decl_idx}"), "decreases").map(Some)
 }
 
 pub fn canonicalize_x07ast_file(file: &mut X07AstFile) {
@@ -1062,6 +1331,10 @@ fn reptr_x07ast_file(file: &mut X07AstFile) {
         reptr_contract_clauses(&mut f.requires, &format!("/decls/{decl_idx}/requires"));
         reptr_contract_clauses(&mut f.ensures, &format!("/decls/{decl_idx}/ensures"));
         reptr_contract_clauses(&mut f.invariant, &format!("/decls/{decl_idx}/invariant"));
+        reptr_loop_contracts(
+            &mut f.loop_contracts,
+            &format!("/decls/{decl_idx}/loop_contracts"),
+        );
         reptr_expr(&mut f.body, &format!("/decls/{decl_idx}/body"));
     }
     let sync_fns_count = file.functions.len();
@@ -1070,6 +1343,11 @@ fn reptr_x07ast_file(file: &mut X07AstFile) {
         reptr_contract_clauses(&mut f.requires, &format!("/decls/{decl_idx}/requires"));
         reptr_contract_clauses(&mut f.ensures, &format!("/decls/{decl_idx}/ensures"));
         reptr_contract_clauses(&mut f.invariant, &format!("/decls/{decl_idx}/invariant"));
+        reptr_async_protocol(f.protocol.as_mut(), &format!("/decls/{decl_idx}/protocol"));
+        reptr_loop_contracts(
+            &mut f.loop_contracts,
+            &format!("/decls/{decl_idx}/loop_contracts"),
+        );
         reptr_expr(&mut f.body, &format!("/decls/{decl_idx}/body"));
     }
 }
@@ -1080,6 +1358,39 @@ fn reptr_contract_clauses(clauses: &mut [ContractClauseAst], base_ptr: &str) {
         for (widx, w) in clause.witness.iter_mut().enumerate() {
             reptr_expr(w, &format!("{base_ptr}/{cidx}/witness/{widx}"));
         }
+    }
+}
+
+fn reptr_async_protocol(protocol: Option<&mut AsyncProtocolAst>, base_ptr: &str) {
+    let Some(protocol) = protocol else {
+        return;
+    };
+    reptr_contract_clauses(
+        &mut protocol.await_invariant,
+        &format!("{base_ptr}/await_invariant"),
+    );
+    reptr_contract_clauses(
+        &mut protocol.scope_invariant,
+        &format!("{base_ptr}/scope_invariant"),
+    );
+    reptr_contract_clauses(
+        &mut protocol.cancellation_ensures,
+        &format!("{base_ptr}/cancellation_ensures"),
+    );
+}
+
+fn reptr_loop_contracts(loop_contracts: &mut [LoopContractAst], base_ptr: &str) {
+    for (idx, loop_contract) in loop_contracts.iter_mut().enumerate() {
+        let lcptr = format!("{base_ptr}/{idx}");
+        let body_ptr = base_ptr
+            .rsplit_once("/loop_contracts")
+            .map(|(prefix, _)| prefix)
+            .unwrap_or(base_ptr);
+        if let Some((_, suffix)) = loop_contract.ptr.split_once("/body") {
+            loop_contract.ptr = format!("{body_ptr}/body{suffix}");
+        }
+        reptr_contract_clauses(&mut loop_contract.invariant, &format!("{lcptr}/invariant"));
+        reptr_contract_clauses(&mut loop_contract.decreases, &format!("{lcptr}/decreases"));
     }
 }
 
@@ -1108,6 +1419,9 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
         out.push(Value::Object(extern_decl_value(f)));
     }
     for f in &file.functions {
+        let decreases = defn_decreases(file, &f.name)
+            .expect("internal decreases should decode")
+            .unwrap_or_default();
         out.push(Value::Object(def_decl_value(
             "defn",
             &f.name,
@@ -1115,6 +1429,9 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             &f.requires,
             &f.ensures,
             &f.invariant,
+            &decreases,
+            None,
+            &f.loop_contracts,
             &f.params,
             &f.result,
             f.result_brand.as_deref(),
@@ -1129,6 +1446,9 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             &f.requires,
             &f.ensures,
             &f.invariant,
+            &[],
+            f.protocol.as_ref(),
+            &f.loop_contracts,
             &f.params,
             &f.result,
             f.result_brand.as_deref(),
@@ -1218,6 +1538,9 @@ fn def_decl_value(
     requires: &[ContractClauseAst],
     ensures: &[ContractClauseAst],
     invariant: &[ContractClauseAst],
+    decreases: &[ContractClauseAst],
+    protocol: Option<&AsyncProtocolAst>,
+    loop_contracts: &[LoopContractAst],
     params: &[AstFunctionParam],
     result: &TypeRef,
     result_brand: Option<&str>,
@@ -1250,6 +1573,21 @@ fn def_decl_value(
         m.insert(
             "invariant".to_string(),
             Value::Array(invariant.iter().map(contract_clause_to_value).collect()),
+        );
+    }
+    if !decreases.is_empty() {
+        m.insert(
+            "decreases".to_string(),
+            Value::Array(decreases.iter().map(contract_clause_to_value).collect()),
+        );
+    }
+    if let Some(protocol) = protocol {
+        m.insert("protocol".to_string(), async_protocol_to_value(protocol));
+    }
+    if !loop_contracts.is_empty() {
+        m.insert(
+            "loop_contracts".to_string(),
+            Value::Array(loop_contracts.iter().map(loop_contract_to_value).collect()),
         );
     }
 
@@ -1290,6 +1628,73 @@ fn contract_clause_to_value(c: &ContractClauseAst) -> Value {
             Value::Array(c.witness.iter().map(expr_to_value).collect()),
         );
     }
+    Value::Object(m)
+}
+
+fn async_protocol_to_value(protocol: &AsyncProtocolAst) -> Value {
+    let mut m = serde_json::Map::new();
+    if !protocol.await_invariant.is_empty() {
+        m.insert(
+            "await_invariant".to_string(),
+            Value::Array(
+                protocol
+                    .await_invariant
+                    .iter()
+                    .map(contract_clause_to_value)
+                    .collect(),
+            ),
+        );
+    }
+    if !protocol.scope_invariant.is_empty() {
+        m.insert(
+            "scope_invariant".to_string(),
+            Value::Array(
+                protocol
+                    .scope_invariant
+                    .iter()
+                    .map(contract_clause_to_value)
+                    .collect(),
+            ),
+        );
+    }
+    if !protocol.cancellation_ensures.is_empty() {
+        m.insert(
+            "cancellation_ensures".to_string(),
+            Value::Array(
+                protocol
+                    .cancellation_ensures
+                    .iter()
+                    .map(contract_clause_to_value)
+                    .collect(),
+            ),
+        );
+    }
+    Value::Object(m)
+}
+
+fn loop_contract_to_value(loop_contract: &LoopContractAst) -> Value {
+    let mut m = serde_json::Map::new();
+    m.insert("ptr".to_string(), Value::String(loop_contract.ptr.clone()));
+    m.insert(
+        "invariant".to_string(),
+        Value::Array(
+            loop_contract
+                .invariant
+                .iter()
+                .map(contract_clause_to_value)
+                .collect(),
+        ),
+    );
+    m.insert(
+        "decreases".to_string(),
+        Value::Array(
+            loop_contract
+                .decreases
+                .iter()
+                .map(contract_clause_to_value)
+                .collect(),
+        ),
+    );
     Value::Object(m)
 }
 

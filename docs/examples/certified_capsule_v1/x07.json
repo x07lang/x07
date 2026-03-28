@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.project@0.4.0",
+  "world": "run-os-sandboxed",
+  "default_profile": "sandbox",
+  "entry": "src/main.x07.json",
+  "operational_entry_symbol": "capsule.main",
+  "module_roots": ["src", "tests"],
+  "lockfile": "x07.lock.json",
+  "dependencies": [],
+  "profiles": {
+    "sandbox": {
+      "world": "run-os-sandboxed",
+      "policy": "policy/run-os.json"
+    }
+  }
+}

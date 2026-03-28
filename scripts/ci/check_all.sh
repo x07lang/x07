@@ -10,6 +10,7 @@ cd "$root"
 
 export X07_SANDBOX_BACKEND="${X07_SANDBOX_BACKEND:-os}"
 export X07_I_ACCEPT_WEAKER_ISOLATION="${X07_I_ACCEPT_WEAKER_ISOLATION:-1}"
+export X07_REQUIRE_SOLVERS="${X07_REQUIRE_SOLVERS:-0}"
 
 step() {
   echo
@@ -47,6 +48,9 @@ step "licenses"
 
 step "release manifest (check)"
 "$python_bin" scripts/build_release_manifest.py --check
+
+step "release script goldens"
+"$python_bin" scripts/ci/check_release_goldens.py
 
 step "published spec sync"
 "$python_bin" scripts/sync_published_spec.py --check
@@ -86,6 +90,9 @@ step "stage native ext-rand backend"
 step "stage native ext-jsonschema backend"
 ./scripts/ci/ensure_ext_jsonschema_backend.sh
 
+step "stage native ext-obj-s3 backend"
+./scripts/ci/ensure_ext_obj_s3_backend.sh
+
 step "cargo test"
 cargo test
 
@@ -97,6 +104,26 @@ step "generics intrinsics coherence"
 
 step "cargo clippy --all-targets -- -D warnings"
 cargo clippy --all-targets -- -D warnings
+
+step "verified core pure example release guard"
+./scripts/ci/check_verified_core_pure_example.sh
+
+step "verified core fixture release guard"
+./scripts/ci/check_verified_core_fixture.sh
+
+step "service bench harness dry smoke"
+./scripts/ci/check_service_bench_harnesses.sh
+
+if [[ -n "${X07_VM_GUEST_IMAGE:-}" || -n "${X07_VM_VZ_GUEST_BUNDLE:-}" ]]; then
+  step "trusted sandbox program example release guard"
+  ./scripts/ci/check_trusted_sandbox_program_example.sh
+
+  step "trusted network service example release guard"
+  ./scripts/ci/check_trusted_network_service_example.sh
+else
+  echo
+  echo "==> trusted example release guards (skipped; set X07_VM_GUEST_IMAGE or X07_VM_VZ_GUEST_BUNDLE to enable)"
+fi
 
 step "stream plugins smoke"
 ./scripts/ci/check_stream_plugins_smoke.sh
@@ -136,6 +163,14 @@ case "$(uname -s)" in
     fi
     ;;
 esac
+
+if [[ "${X07_SKIP_PERF_BASELINE:-0}" == "1" ]]; then
+  echo
+  echo "==> perf baseline gate (skipped; set X07_SKIP_PERF_BASELINE=0 to enable)"
+else
+  step "perf baseline gate"
+  ./labs/scripts/ci/check_perf_baseline.sh
+fi
 
 echo
 echo "ok: all checks passed"

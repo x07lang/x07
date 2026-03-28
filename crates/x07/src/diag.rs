@@ -950,9 +950,12 @@ fn scan_source_codes(roots: &[PathBuf]) -> Result<ExtractedCodes> {
     let re_code_field = Regex::new(r#"code\s*:\s*"([A-Z][A-Z0-9_-]{0,63})""#)
         .context("compile code-field regex")?;
     let re_diag_call = Regex::new(
-        r#"(?:diag_[A-Za-z0-9_]*|with_code|error_code|warning_code)\s*\(\s*"([A-Z][A-Z0-9_-]{0,63})""#,
+        r#"(?:diag_[A-Za-z0-9_]*|[A-Za-z0-9_]*_diag(?:_[A-Za-z0-9_]+)*|diagnostic_error|with_code|error_code|warning_code)\s*\(\s*"([A-Z][A-Z0-9_-]{0,63})""#,
     )
     .context("compile diagnostic-call regex")?;
+    let re_literal_code =
+        Regex::new(r#""((?:X07(?:TC|V|REL|PROOF)_[A-Z0-9][A-Z0-9_-]{0,63})|(?:X7I[0-9]{4}))""#)
+            .context("compile literal-code regex")?;
     let re_x7i_literal =
         Regex::new(r#""(X7I[0-9]{4})""#).context("compile x07import-code regex")?;
 
@@ -981,22 +984,27 @@ fn scan_source_codes(roots: &[PathBuf]) -> Result<ExtractedCodes> {
         let text = std::fs::read_to_string(&path)
             .with_context(|| format!("read source: {}", path.display()))?;
         let include_x7i_literals = rel_file.ends_with("x07import-core/src/diagnostics.rs");
-        for line in text.lines() {
-            let mut line_codes: BTreeSet<String> = BTreeSet::new();
-            for cap in re_code_field.captures_iter(line) {
-                line_codes.insert(cap[1].to_string());
-            }
-            for cap in re_diag_call.captures_iter(line) {
-                line_codes.insert(cap[1].to_string());
-            }
-            if include_x7i_literals {
-                for cap in re_x7i_literal.captures_iter(line) {
-                    line_codes.insert(cap[1].to_string());
-                }
-            }
-
-            for code in line_codes {
-                let key = (code, component.clone());
+        for cap in re_code_field.captures_iter(&text) {
+            let key = (cap[1].to_string(), component.clone());
+            let entry = by_key.entry(key).or_default();
+            entry.occurrences = entry.occurrences.saturating_add(1);
+            entry.files.insert(rel_file.clone());
+        }
+        for cap in re_diag_call.captures_iter(&text) {
+            let key = (cap[1].to_string(), component.clone());
+            let entry = by_key.entry(key).or_default();
+            entry.occurrences = entry.occurrences.saturating_add(1);
+            entry.files.insert(rel_file.clone());
+        }
+        for cap in re_literal_code.captures_iter(&text) {
+            let key = (cap[1].to_string(), component.clone());
+            let entry = by_key.entry(key).or_default();
+            entry.occurrences = entry.occurrences.saturating_add(1);
+            entry.files.insert(rel_file.clone());
+        }
+        if include_x7i_literals {
+            for cap in re_x7i_literal.captures_iter(&text) {
+                let key = (cap[1].to_string(), component.clone());
                 let entry = by_key.entry(key).or_default();
                 entry.occurrences = entry.occurrences.saturating_add(1);
                 entry.files.insert(rel_file.clone());
@@ -1185,6 +1193,714 @@ struct CatalogClassification {
     no_quickfix_reason: Option<String>,
 }
 
+fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
+    let mk = |summary: &str,
+              details_md: &str,
+              agent_strategy_md: &str,
+              quickfix_support: QuickfixSupport,
+              quickfix_kind: &[QuickfixKind],
+              no_quickfix_reason: Option<&str>| CatalogClassification {
+        summary: summary.to_string(),
+        details_md: details_md.to_string(),
+        agent_strategy_md: agent_strategy_md.to_string(),
+        quickfix_support,
+        quickfix_kind: quickfix_kind.to_vec(),
+        no_quickfix_reason: no_quickfix_reason.map(str::to_string),
+    };
+
+    match code {
+        "X07TP_INVALID" => Some(mk(
+            "Trust profile JSON is missing or invalid.",
+            "The trust profile could not be read, parsed, or validated against the certification schema.",
+            "- Compare the profile against `arch/trust/profiles/verified_core_pure_v1.json`.\n- Fix JSON shape, schema_version, and required fields.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TP_PROJECT_MISMATCH" => Some(mk(
+            "Project manifest could not be resolved for trust profile validation.",
+            "The `--project` path is missing, not a project manifest, or cannot be resolved into a valid X07 project.",
+            "- Pass `--project x07.json` (or a directory containing it).\n- Ensure `x07.json` exists and resolves cleanly.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TP_ENTRY_FORBIDDEN" => Some(mk(
+            "Requested entrypoint is not allowed by the trust profile.",
+            "The profile's `entrypoints[]` set does not permit the entry you asked to certify.",
+            "- Either certify one of the profile's declared entrypoints or intentionally widen the profile.\n- Keep `entrypoints[]` aligned with the reviewed trust surface.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a certification policy decision (change the entry vs widen the profile)."),
+        )),
+        "X07TP_NOT_CERTIFIABLE" => Some(mk(
+            "Trust profile is weaker than the Milestone A certification floor.",
+            "The profile relaxes one or more requirements needed for `verified_core_pure_v1` certification.",
+            "- Tighten the profile to the verified-core floor instead of weakening the certificate contract.\n- Keep the profile immutable once it is published.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires an intentional policy change to the certification contract."),
+        )),
+        "X07TP_NETWORK_PROFILE_REQUIRED" => Some(mk(
+            "Networked trusted-program profile is missing required network certification posture.",
+            "The Milestone C networked trust profile must require the allowlist-backed network posture, attested network capsules, and matching runtime network evidence semantics.",
+            "- Keep `sandbox_requirements.network_mode=\"allowlist\"` and `sandbox_requirements.network_enforcement=\"vm_boundary_allowlist\"`.\n- Set `evidence_requirements.require_network_capsules=true`.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract."),
+        )),
+        "X07TP_BACKEND_NOT_CERTIFIABLE" => Some(mk(
+            "Networked trusted-program profile allows a backend posture that is not certifiable.",
+            "Milestone C networked certification requires VM-backed sandboxing, forbids weaker isolation, and rejects project worlds outside the certifiable sandbox line.",
+            "- Keep `worlds_allowed` free of `run-os`.\n- Set `sandbox_requirements.sandbox_backend=\"vm\"` and `sandbox_requirements.forbid_weaker_isolation=true`.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract or selecting a certifiable runtime posture."),
+        )),
+        "X07TP_ASYNC_PROOF_REQUIRED" => Some(mk(
+            "Sandboxed trusted-program profile is missing async proof coverage.",
+            "The sandboxed local trusted-program contract requires async proof coverage for the reviewed closure.",
+            "- Set `evidence_requirements.require_async_proof_coverage=true`.\n- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract."),
+        )),
+        "X07TP_CAPSULE_ATTEST_REQUIRED" => Some(mk(
+            "Sandboxed trusted-program profile is missing capsule attestation requirements.",
+            "The sandboxed local trusted-program contract must require capsule attestations for effect boundaries.",
+            "- Set `evidence_requirements.require_capsule_attestations=true`.\n- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract."),
+        )),
+        "X07TP_RUNTIME_ATTEST_REQUIRED" => Some(mk(
+            "Sandboxed trusted-program profile is missing runtime attestation requirements.",
+            "The sandboxed local trusted-program contract must require runtime attestation for certified executions.",
+            "- Set `evidence_requirements.require_runtime_attestation=true`.\n- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract."),
+        )),
+        "X07TP_SANDBOX_BACKEND_REQUIRED" => Some(mk(
+            "Sandboxed trusted-program profile is missing the VM-only isolation requirement.",
+            "The sandboxed local trusted-program contract must require `run-os-sandboxed` with `sandbox_backend=vm` and must forbid weaker isolation.",
+            "- Keep `worlds_allowed` free of `run-os`.\n- Set `sandbox_requirements.sandbox_backend=\"vm\"` and `sandbox_requirements.forbid_weaker_isolation=true`.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract."),
+        )),
+        "X07TP_NETWORK_MODE_FORBIDDEN" => Some(mk(
+            "Sandboxed local trusted-program profile allows networking where it should not.",
+            "The Milestone B local sandbox profile keeps networking disabled until VM-boundary allowlist enforcement is fully supported across backends.",
+            "- Keep `sandbox_requirements.network_mode=\"none\"`.\n- Ensure the selected sandbox policy sets `net.enabled=false`.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract or sandbox policy."),
+        )),
+        "X07TP_WORLD" => Some(mk(
+            "Project world is outside the trust profile allowlist.",
+            "The project or selected run profile resolves to a world not listed in `worlds_allowed`.",
+            "- Move the project to an allowed solve-world (for `verified_core_pure_v1`, `solve-pure`).\n- Or select a different trust profile that explicitly permits the current world.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires choosing a different project world or a different trust profile."),
+        )),
+        "X07TP_LANGUAGE" => Some(mk(
+            "Project uses language or policy features forbidden by the trust profile.",
+            "The reachable project surface includes forbidden features such as `defasync`, `extern`, `allow_unsafe`, or `allow_ffi`.",
+            "- Refactor the certified entry closure into the allowed subset.\n- Keep `verified_core_pure_v1` entry closures free of `defasync`, `extern`, `unsafe`, and FFI.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires semantic refactoring or an intentional policy change."),
+        )),
+        "X07TP_ARCH" => Some(mk(
+            "Project architecture posture is weaker than the trust profile requires.",
+            "The arch manifest is missing, on the wrong schema line, or does not enable the strict checks required for certification.",
+            "- Start from the `verified_core_pure_v1` manifest posture.\n- Apply the deterministic manifest JSON Patch scaffolding to enable allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary contracts.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Sometimes,
+            &[QuickfixKind::JsonPatch],
+            None,
+        )),
+        "X07TP_BOUNDARY" => Some(mk(
+            "Project boundary index wiring is missing or incomplete for certification.",
+            "The trust profile requires `contracts_v1.boundaries.index_path`, but the project does not expose a boundary index for the public trust surface.",
+            "- Add `contracts_v1.boundaries.index_path` to `arch/manifest.x07arch.json` with the deterministic manifest JSON Patch.\n- Create `arch/boundaries/index.x07boundary.json` and keep public boundaries there.\n- Use `x07 schema derive --emit-boundary-stub` when you need deterministic boundary scaffolding.",
+            QuickfixSupport::Sometimes,
+            &[QuickfixKind::JsonPatch],
+            None,
+        )),
+        "X07-CONTRACT-0009" => Some(mk(
+            "Recursive decreases clause is invalid.",
+            "A `decreases[]` clause must stay contract-pure, typecheck to `i32`, and keep its witness payload within the supported contract witness subset.",
+            "- Keep `decreases[].expr` in the contract-pure subset.\n- Make each `decreases[].expr` typecheck to `i32`.\n- Keep `decreases[].witness[]` values in the supported contract witness subset.\n- Re-run `x07 lint` or `x07 check`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07-CONTRACT-0010" => Some(mk(
+            "Recursive decreases metadata is attached to a non-certifiable target.",
+            "The enclosing `defn` declares `decreases[]`, but the function is not a directly self-recursive proof target or it lacks the surrounding contract clauses needed for certification.",
+            "- Keep `decreases[]` only on directly self-recursive `defn` targets.\n- Add at least one `requires`, `ensures`, or `invariant` clause when the function is meant to be proved.\n- Remove `decreases[]` from non-recursive helpers.\n- Re-run `x07 lint` or `x07 check`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07-CONTRACT-0011" => Some(mk(
+            "Recursive self-call is missing decreases evidence.",
+            "The function body makes a direct self-recursive call, but the enclosing `defn` does not declare `decreases[]` to justify the termination rank.",
+            "- Add `decreases[]` to the enclosing `defn`.\n- Keep the recursive target inside the certifiable pure subset.\n- Re-run `x07 lint` or `x07 check`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROJECT" => Some(mk(
+            "Certification could not resolve the project manifest or source closure.",
+            "The project path is missing, not a project manifest, or failed project-context resolution before evidence collection completed.",
+            "- Pass `--project x07.json` (or a directory containing it).\n- Ensure the project manifest and lockfile resolve cleanly.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROFILE" => Some(mk(
+            "Certification trust profile is missing or invalid.",
+            "The profile supplied to `x07 trust certify` could not be parsed or validated.",
+            "- Validate the profile with `x07 trust profile check` first.\n- Fix schema_version, required fields, or file path issues.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EARCH_STRICT" => Some(mk(
+            "Strict architecture evidence failed certification.",
+            "Certification requires the arch manifest and arch check result to stay at the verified-core posture.",
+            "- Run `x07 arch check --manifest arch/manifest.x07arch.json` and inspect the report.\n- Apply the deterministic manifest JSON Patch scaffolding to align allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary wiring with `verified_core_pure_v1`.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[QuickfixKind::JsonPatch],
+            None,
+        )),
+        "X07TC_EBOUNDARY_MISSING" => Some(mk(
+            "Boundary declarations are missing or incomplete for certification.",
+            "Public exports must appear in `arch/boundaries/index.x07boundary.json`, and certification requires the boundary index wiring to resolve cleanly.",
+            "- Run `x07 arch check` and inspect `target/cert/boundaries.report.json`.\n- Apply the deterministic boundary-index JSON Patch or use `x07 schema derive --emit-boundary-stub` to scaffold missing records.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[QuickfixKind::JsonPatch],
+            None,
+        )),
+        "X07TC_EPBT" => Some(mk(
+            "Boundary-required property tests are missing, malformed, or failing.",
+            "A required PBT harness is absent from `tests/tests.json`, is not declared with a `pbt` stanza, uses the wrong world, or did not pass.",
+            "- Add the missing test id under `tests/tests.json` with the required `pbt` stanza using the deterministic JSON Patch scaffolding.\n- Keep the test world inside the profile/boundary allowlist.\n- Re-run `x07 test --all` and then `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[QuickfixKind::JsonPatch],
+            None,
+        )),
+        "X07TC_EUNSUPPORTED_DEFASYNC" => Some(mk(
+            "Reachable `defasync` logic is outside the certifiable subset.",
+            "The reachable closure contains runtime-only `defasync` symbols, which are forbidden by `verified_core_pure_v1`.",
+            "- Split async logic behind a certified boundary and keep the certified entry closure `defn`-only.\n- Add a pure wrapper if needed.\n- Re-run `x07 verify --coverage` and `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EUNSUPPORTED_RECURSION" => Some(mk(
+            "Reachable recursion is outside the certifiable subset.",
+            "The reachable closure contains recursive logic, which `verified_core_pure_v1` does not certify.",
+            "- Refactor recursion into a bounded iterative form and add loop contracts where needed.\n- Re-run `x07 verify --coverage` and `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROOF_COVERAGE" => Some(mk(
+            "Reachable proof coverage is incomplete for certification.",
+            "Accepted certificates allow only `proven` or `trusted_primitive` statuses in the reachable closure.",
+            "- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.\n- Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.\n- Re-run `x07 verify --prove` for uncovered symbols before certifying again.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires semantic proof work or architectural refactoring, not a mechanical patch."),
+        )),
+        "X07TC_EPROVE_UNSUPPORTED" => Some(mk(
+            "A reachable symbol is outside the supported proof subset.",
+            "At least one reachable symbol uses a construct the prover cannot certify yet (for example unsupported params, unsupported loop bounds, or unresolved non-certified imports).",
+            "- Re-run `x07 verify --prove` for the reported symbol and inspect the verify diagnostics.\n- Add the missing contracts, loop skeleton, or wrapper function needed to stay in the supported subset.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROVE" => Some(mk(
+            "At least one reachable proof obligation failed.",
+            "A reachable symbol failed `x07 verify --prove` or returned a non-`proven` result.",
+            "- Re-run `x07 verify --prove` for the reported symbol.\n- Add missing loop contracts, strengthen `requires[]`/`ensures[]`, or simplify the function into the supported subset.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EASYNC_PROVE_REPORT_MISSING" => Some(mk(
+            "Required async prove report is missing.",
+            "Certification expected a per-symbol async prove report artifact for a reachable `defasync` symbol, but the report file was missing or the proof run did not emit the expected artifact path.",
+            "- Re-run `x07 verify --prove` for the reported async symbol and keep the emitted prove report under the certificate out-dir.\n- Ensure the proof run emits `verify_proof_summary_path` in the prove report.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROVE_REPORT_MISSING" => Some(mk(
+            "Required per-symbol prove report is missing.",
+            "Certification expected a per-symbol prove report artifact for a reachable `defn` symbol, but the report file was missing or the proof run did not emit the expected artifact path.",
+            "- Re-run `x07 verify --prove` for the reported symbol and keep the emitted prove report under the certificate out-dir.\n- Ensure the proof run emits `verify_proof_summary_path` in the prove report.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROOF_CHECK_MISSING" => Some(mk(
+            "Required proof-check report is missing from prove evidence.",
+            "The active certification flow expected an accepted `x07.verify.proof_check.report@0.2.0` artifact for a proved symbol, but the prove report did not resolve one.",
+            "- Re-run `x07 prove check --proof <path>` for the missing proof object or rerun the prove flow that emits the check report.\n- Ensure the per-symbol prove report references both the proof object and the proof-check report.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROOF_CHECK_SCHEMA_INVALID" => Some(mk(
+            "Proof-check report failed schema validation during certification.",
+            "Certification found a malformed, unreadable, or schema-invalid `x07.verify.proof_check.report@0.2.0` artifact where an accepted proof-check report was required.",
+            "- Re-run `x07 prove check --proof <path>` to regenerate the proof-check report.\n- Ensure the certificate flow is consuming the emitted report rather than an edited JSON file.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROOF_CHECK_REJECTED" => Some(mk(
+            "Certification rejected a proof whose proof-check report was not accepted.",
+            "The loaded proof-check report had `ok=false` or `result!=\"accepted\"`, so the certification flow failed closed instead of treating the proof as independently replayed evidence.",
+            "- Inspect the proof-check report diagnostics and repair the source/proof inputs until `x07 prove check` returns `result=accepted`.\n- Re-run the prove flow if the source or imported proof-summary surface changed.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROOF_CHECK_ENGINE_MISMATCH" => Some(mk(
+            "Certification found a proof-check report whose engine did not match the proved symbol metadata.",
+            "The proof-check report replayed a different verification engine than the one recorded in the proof-summary evidence for that symbol, so the certification flow rejected it.",
+            "- Re-run `x07 verify --prove --emit-proof <path>` and `x07 prove check --proof <path>` from the same toolchain build.\n- Keep proof summaries, proof objects, and proof-check reports from the same prove run together.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_ETESTS" => Some(mk(
+            "Deterministic certification tests are missing or failing.",
+            "The certification profile requires smoke/unit evidence from `tests/tests.json`, but the manifest is missing, miswired, or the report contains failures.",
+            "- Ensure `tests/tests.json` exists and includes the boundary-required test ids.\n- Apply the deterministic manifest JSON Patch when adding missing smoke/unit test declarations.\n- Keep the test worlds inside the trust profile allowlist.\n- Re-run `x07 test --all --manifest tests/tests.json` before certifying again.",
+            QuickfixSupport::Sometimes,
+            &[QuickfixKind::JsonPatch],
+            None,
+        )),
+        "X07TC_ETRUST_REPORT" => Some(mk(
+            "Trust report evidence failed certification.",
+            "The trust report found disallowed nondeterminism/capabilities, or failed to emit the required SBOM evidence.",
+            "- Run `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`.\n- Remove the disallowed capability surface or fix the missing SBOM/trust artifact.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires capability or environment changes outside JSON quickfix application."),
+        )),
+        "X07TC_ENONDET" => Some(mk(
+            "Trust report detected nondeterminism in the certified closure.",
+            "The trust report found nondeterminism flags or other forbidden runtime effects in the candidate certificate surface.",
+            "- Run `x07 trust report --project x07.json` and inspect the nondeterminism flags.\n- Split the nondeterministic logic out of the certified closure or remove the forbidden capability.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires capability removal or architectural refactoring rather than a deterministic quickfix."),
+        )),
+        "X07TC_ECOMPILE_ATTEST" => Some(mk(
+            "Compile attestation failed or could not bind the emitted binary.",
+            "The bundle step failed, no executable was produced, or the double-build digest did not match.",
+            "- Run `x07 doctor` and ensure a working C toolchain is available.\n- Re-run `x07 bundle --project x07.json --emit-attestation target/cert/compile.attest.json`.\n- Fix reproducibility or toolchain drift before certifying again.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Depends on host toolchain state and reproducible-build behavior outside AST quickfixes."),
+        )),
+        "X07TC_EBOUNDARY_RELAXED" => Some(mk(
+            "The candidate relaxes a certified boundary contract relative to the baseline.",
+            "Boundary contract review found a trust-surface relaxation in a pinned public boundary.",
+            "- Run `x07 review diff --fail-on boundary-relaxation` and inspect the highlighted boundary changes.\n- Tighten the candidate boundary contract or explicitly reset the baseline after review.\n- Re-run `x07 trust certify` with the corrected baseline.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a baseline review decision or a semantic boundary-contract change."),
+        )),
+        "X07TC_EDIFF_POSTURE" => Some(mk(
+            "Baseline review or trust-posture diff gate failed certification.",
+            "The supplied baseline comparison failed, or the candidate introduced a forbidden trust posture delta.",
+            "- Run `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.\n- Tighten the candidate change or intentionally update the baseline.\n- Re-run `x07 trust certify` with the corrected baseline.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a baseline review decision or a semantic change to the candidate."),
+        )),
+        "X07TC_ENET_POLICY" => Some(mk(
+            "Network policy posture changed relative to the reviewed baseline.",
+            "Certification rejected the candidate because the review diff reported a network allowlist or policy-surface change that must be re-reviewed before shipping.",
+            "- Run `x07 review diff --fail-on network-allowlist-widen` and inspect the highlighted policy delta.\n- Tighten the candidate policy or intentionally refresh the reviewed baseline.\n- Re-run `x07 trust certify` with the corrected baseline.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a baseline review decision or a semantic policy change."),
+        )),
+        "X07TC_ESCHEMA_DRIFT" => Some(mk(
+            "Boundary-referenced schema outputs drifted or are missing.",
+            "Certification rechecks pinned boundary schemas with `x07 schema derive --check`; missing inputs or drifted generated outputs reject the certificate.",
+            "- Run `x07 schema derive --input <schema> --out-dir . --write` for each boundary schema.\n- If the boundary record is missing, use `x07 schema derive --emit-boundary-stub` to scaffold it.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TP_EFFECT_LOG_REQUIRED" => Some(mk(
+            "Trust profile is missing required effect-log evidence semantics.",
+            "The selected trust profile must require effect-log digests for certified capsule or sandboxed trusted-program evidence, but the profile leaves that requirement disabled.",
+            "- Set `evidence_requirements.require_effect_log_digests=true`.\n- Keep the published trust profile aligned with the certified capsule or sandboxed trusted-program contract.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires editing the published certification contract."),
+        )),
+        "X07TC_EASYNC_PROOF" => Some(mk(
+            "Async proof coverage or async proof obligations failed certification.",
+            "At least one reachable `defasync` symbol is uncovered, hit an async counterexample, failed a protocol clause, or could not be proven with the trusted scheduler model.",
+            "- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect the async summary.\n- Re-run `x07 verify --prove --entry <defasync>` for the failing symbol and fix `await_invariant`, `scope_invariant`, or `cancellation_ensures` as needed.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires proof-focused contract work or semantic refactoring rather than a deterministic quickfix."),
+        )),
+        "X07TC_ERECURSION_FORBIDDEN" => Some(mk(
+            "Reachable recursion is forbidden by the active trust profile.",
+            "The reachable closure still contains recursive symbols, but the active trust profile sets `language_subset.allow_recursion=false` and therefore fails closed even when recursion would otherwise be supported or imported as reviewed proof.",
+            "- Refactor recursive helpers out of the certified closure or choose a profile that explicitly allows recursion.\n- Re-run `x07 verify --coverage --entry <entry>` and inspect the recursive symbols in the closure.\n- Re-run `x07 trust certify` after the certified entry is recursion-free.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires semantic refactoring or an intentional profile change."),
+        )),
+        "X07TC_ESANDBOX_PROFILE" => Some(mk(
+            "Sandbox runtime evidence violates the certification profile.",
+            "The runtime evidence used for certification reports a sandbox backend, weaker-isolation posture, or network posture that is weaker than the selected trusted-program profile allows.",
+            "- Keep the project on `run-os-sandboxed` with `sandbox_backend=vm`.\n- Disable weaker-isolation opt-ins and keep `policy.net.enabled=false` for the local sandboxed trust profile.\n- Re-run the sandbox smoke tests and `x07 trust certify`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires changing runtime policy or execution posture, not a deterministic AST patch."),
+        )),
+        "X07V_COVERAGE_NOT_PROOF" => Some(mk(
+            "Coverage/support summary is not proof evidence.",
+            "A supplied `x07.verify.summary@0.2.0` artifact describes coverage posture only. It can help review or planning, but it cannot satisfy prove-mode or certification proof requirements.",
+            "- Replace the coverage/support artifact with `x07.verify.proof_summary@0.2.0` emitted by a successful `x07 verify --prove` run.\n- Keep `x07 verify --coverage` outputs for posture review only.\n- Re-run the prove flow with `--proof-summary <path>`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_PROOF_SUMMARY_REQUIRED" => Some(mk(
+            "A reachable proof summary dependency is required but missing.",
+            "The current prove flow reached a symbol outside the locally loaded graph, and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that dependency.",
+            "- Re-run `x07 verify --prove --entry <sym>` for the reviewed dependency to emit `verify.proof-summary.json`.\n- Pass the emitted artifact back via `x07 verify --proof-summary <path>`.\n- Re-run the original prove command.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_COVERAGE_SUMMARY_FORBIDDEN" => Some(mk(
+            "Coverage/support summaries cannot be imported as proof.",
+            "The caller passed `x07.verify.summary@0.2.0` through `--proof-summary`, but prove-mode imports accept only `x07.verify.proof_summary@0.2.0` evidence emitted by successful prove runs.",
+            "- Remove the coverage/support artifact from `--proof-summary` inputs.\n- Re-run the dependency prove flow that emits `verify.proof-summary.json`.\n- Retry with the proof-summary artifact instead of the coverage/support summary.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_RECURSION_TERMINATION_FAILED" => Some(mk(
+            "Recursive proof could not justify the declared termination rank.",
+            "The target is directly self-recursive and declares `decreases[]`, but at least one recursive self-call does not obviously decrease the declared rank term in the verifier's certifiable recursive subset.",
+            "- Keep the first `decreases[].expr` aligned with a recursive parameter.\n- Rewrite recursive self-calls so the rank argument decreases by a positive literal step.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_SUMMARY_MISSING" => Some(mk(
+            "A reachable proof summary dependency is missing.",
+            "The requested verify run reached a symbol outside the locally loaded graph and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that symbol.",
+            "- Re-run `x07 verify --prove --entry <sym>` for the reviewed callee to emit `verify.proof-summary.json`.\n- Pass the emitted artifact back via `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).\n- Re-run the original verify command.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_SUMMARY_MISMATCH" => Some(mk(
+            "An imported proof summary does not match the current declaration.",
+            "The supplied `x07.verify.proof_summary@0.2.0` artifact names a reachable symbol, but its declaration digest does not match the currently loaded source graph.",
+            "- Regenerate the imported summary from the exact reviewed declaration set.\n- Keep proof-summary artifacts and source graph revisions aligned.\n- Re-run `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires aligning reviewed summary artifacts with the current declaration graph."),
+        )),
+        "X07V_UNSUPPORTED_RICH_TYPE" => Some(mk(
+            "The target signature is outside the supported richer-data proof subset.",
+            "The verifier currently supports the reviewed richer-data carriers for certification: unbranded `bytes` / `bytes_view`, `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`. Schema-derived record and tagged-union documents can sit directly on the proof boundary through branded `bytes_view` inputs. Nested result carriers are still rejected explicitly.",
+            "- Keep proof-target signatures on the supported richer-data carriers.\n- Schema-derived record and tagged-union documents can use branded `bytes_view` inputs when the validator is reachable through `meta.brands_v1.validate`.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_UNSUPPORTED_HEAP_EFFECT" => Some(mk(
+            "The proved core uses heap or pointer effects outside the supported subset.",
+            "The verifier rejects direct heap mutation, raw pointer operations, and related memory intrinsics inside the certifiable pure proof subset instead of silently weakening proof posture.",
+            "- Move heap or pointer effects behind a reviewed capsule boundary.\n- Keep proof-target logic on pure value transformations.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_UNSUPPORTED_DEFASYNC_FORM" => Some(mk(
+            "The selected `defasync` target is outside the supported proof subset.",
+            "Async proof currently requires a certifiable state-machine form with supported parameters and a `bytes` or `result_bytes` result type.",
+            "- Refactor the async entry into the supported subset.\n- Keep proof-target `defasync` results in `bytes` or `result_bytes` form.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_ASYNC_COUNTEREXAMPLE" => Some(mk(
+            "The async proof found a counterexample.",
+            "CBMC produced a concrete async execution trace that violates one of the stated async proof obligations.",
+            "- Inspect the emitted counterexample JSON and trace.\n- Tighten the async protocol clauses or repair the state machine logic.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires understanding and fixing the async proof failure, not applying a deterministic quickfix."),
+        )),
+        "X07V_SCOPE_INVARIANT_FAILED" => Some(mk(
+            "An async scope invariant failed under proof.",
+            "The `scope_invariant` clause does not hold across the proved async execution.",
+            "- Re-check the scope state carried across awaits and cancellation.\n- Strengthen or correct `scope_invariant` so it matches the actual state machine.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires contract correction or state-machine changes."),
+        )),
+        "X07V_CANCELLATION_ENSURE_FAILED" => Some(mk(
+            "The async cancellation postcondition failed under proof.",
+            "The `cancellation_ensures` clause does not hold on the cancellation path of the proved async function.",
+            "- Model the cancellation result and cleanup effects explicitly in `cancellation_ensures`.\n- Repair any cancellation-path state updates or resource cleanup.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires cancellation-path proof work rather than a deterministic quickfix."),
+        )),
+        "X07V_SCHEDULER_MODEL_UNTRUSTED" => Some(mk(
+            "Async proof cannot proceed without the trusted scheduler model.",
+            "The async verifier requires the checked-in deterministic scheduler model to justify the state-machine proof, but that model is missing or could not be loaded.",
+            "- Restore `catalog/verify_scheduler_model.json` from the canonical toolchain tree.\n- Keep async proof runs on the released deterministic scheduler model only.\n- Re-run `x07 verify --prove`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_IMPORTED_STUB_FORBIDDEN" => Some(mk(
+            "Imported stub assumptions are disabled in prove mode.",
+            "The requested prove run depends on developer-only `imported_stub` assumptions. Strong certification flows reject those assumptions instead of silently treating them as proof.",
+            "- Replace the imported stub with a proved or attested implementation on the reachable proof surface.\n- If you only need a developer-only exploration run, re-run `x07 verify --prove --allow-imported-stubs` and do not use that result for strong certification.\n- Re-run the prove or certification command on the strict surface.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_EOBJECT_INVALID" => Some(mk(
+            "Proof object failed schema or structural validation.",
+            "The proof checker read a `x07.verify.proof_object@0.2.0` file that was malformed, schema-invalid, or otherwise could not be decoded as a valid proof object.",
+            "- Re-run `x07 verify --prove --emit-proof <path>` to regenerate the proof object.\n- Ensure the proof object file is the exact emitted artifact, not a coverage summary or edited JSON.\n- Re-run `x07 prove check --proof <path>`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_ESOURCE_REPLAY_FAILED" => Some(mk(
+            "Semantic proof replay could not reconstruct the proved source surface.",
+            "The proof checker could not replay the proof against the current project manifest, resolved declaration graph, or bundled proof-summary inputs, so it rejected the proof before obligation comparison.",
+            "- Run `x07 prove check --proof <path>` from the same project tree that emitted the proof object.\n- Keep the emitted proof bundle together with the matching `x07.json` state and bundled proof-summary inputs.\n- Re-run `x07 verify --prove --emit-proof <path>` if the source or manifest changed.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_EOBLIGATION_MISMATCH" => Some(mk(
+            "Semantic proof replay regenerated a different verification obligation.",
+            "The proof checker successfully replayed the source surface but the regenerated SMT obligation digest did not match the obligation recorded in the proof object.",
+            "- Treat this as source/proof drift: re-run `x07 verify --prove --emit-proof <path>` on the current source tree.\n- Keep imported proof summaries, prove bounds, and project manifest state aligned with the emitted proof bundle.\n- Re-run `x07 prove check --proof <path>` until it returns `result=accepted`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_ESOLVER_REPLAY_FAILED" => Some(mk(
+            "Semantic proof replay did not reproduce the expected solver verdict.",
+            "The proof checker regenerated the obligation but solver replay failed or returned a different result than the proof object expected.",
+            "- Ensure `z3` is installed and reachable in the replay environment.\n- Re-run `x07 verify --prove --emit-proof <path>` from the current source tree if the obligation or imported proof-summary inputs changed.\n- Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_EIMPORTED_SUMMARY_MISMATCH" => Some(mk(
+            "Semantic proof replay found imported proof-summary drift.",
+            "The proof checker could not validate the bundled imported proof-summary artifacts against the digests recorded in the proof object or the replayed reachable summary surface.",
+            "- Keep the bundled imported proof-summary artifacts exactly as emitted by the prove flow.\n- Re-run `x07 verify --prove --proof-summary <path> --emit-proof <path>` if any imported proof summary changed.\n- Re-run `x07 prove check --proof <path>`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_ESCHEDULER_MODEL_MISMATCH" => Some(mk(
+            "Semantic async proof replay found a scheduler-model mismatch.",
+            "The proof checker replayed an async proof but the trusted scheduler-model digest did not match the one recorded in the proof object.",
+            "- Use the canonical checked-in scheduler model from the same toolchain release that emitted the proof object.\n- Re-run `x07 verify --prove --emit-proof <path>` for the async symbol.\n- Re-run `x07 prove check --proof <path>`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_ECHECK_FAILED" => Some(mk(
+            "Independent proof check rejected the proof bundle.",
+            "The proof checker found a digest mismatch or missing bundled artifact while replaying the emitted proof object against its proof-summary, SMT obligation, and solver transcript evidence.",
+            "- Keep the proof object together with its emitted `verify.proof-summary.json`, `verify.smt2`, and `z3.out.txt` bundle files.\n- Re-run `x07 verify --prove --emit-proof <path>` if any bundle artifact was edited or lost.\n- Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07RA_EWRITE" => Some(mk(
+            "Runtime attestation could not be written.",
+            "The sandbox runner failed to emit the runtime attestation JSON artifact to the requested path.",
+            "- Ensure the output directory exists and is writable.\n- Re-run the sandboxed execution with `--attest-runtime <path>`.\n- Inspect stderr for filesystem or permission errors.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07RA_EPOLICY_DIGEST" => Some(mk(
+            "Runtime attestation could not bind the effective sandbox policy digest.",
+            "The attestation requires a stable digest of the effective runtime policy, but the runner could not read or hash the selected policy file.",
+            "- Ensure the effective sandbox policy path is present and readable.\n- Keep the attested run on the policy file that was actually enforced.\n- Re-run the sandboxed execution.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07RA_EGUEST_DIGEST" => Some(mk(
+            "Runtime attestation could not bind the VM guest image digest.",
+            "Certified sandbox runs require a concrete guest image digest, but the runner did not have one available or it failed validation.",
+            "- Use the VM-backed sandbox backend.\n- Ensure the guest image digest environment is populated by the VM bundle/runtime.\n- Re-run the sandboxed execution.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Depends on the VM bundle/runtime environment rather than an AST quickfix."),
+        )),
+        "X07RA_EWEAKER_ISOLATION" => Some(mk(
+            "Runtime attestation rejected a weaker-isolation sandbox execution.",
+            "The selected execution used an OS or otherwise weaker isolation mode that the certified sandbox contract does not allow.",
+            "- Re-run with `sandbox_backend=vm`.\n- Remove `--i-accept-weaker-isolation` from certified runs.\n- Keep the trusted-program profile on VM-only execution.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a stronger runtime isolation boundary."),
+        )),
+        "X07RA_ENET_FORBIDDEN_IN_LOCAL_PROFILE" => Some(mk(
+            "Runtime attestation rejected networking for the local sandboxed trust profile.",
+            "The local trusted-program sandbox profile keeps networking disabled, but the effective policy enabled it.",
+            "- Set `policy.net.enabled=false` for the certified run.\n- Keep the local sandbox profile on `network_mode=none`.\n- Re-run the sandboxed execution.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a runtime policy change rather than a deterministic quickfix."),
+        )),
+        "X07TEST_ASYNC_ENTRY_UNSUPPORTED" => Some(mk(
+            "x07 test could not build or run the selected async entrypoint.",
+            "The manifest selected an async entry, but the test harness could not lower it into a supported async driver or return-shape combination.",
+            "- Keep async test entries on the supported `bytes_status_v1` or `result_i32` driver forms.\n- Re-run `x07 test --manifest tests/tests.json` after fixing the entry declaration.\n- If the entry is not meant to be async, point the manifest at a `defn` wrapper.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires fixing the selected entrypoint or its supported test return shape."),
+        )),
+        "X07TEST_RUNTIME_ATTEST_REQUIRED" => Some(mk(
+            "A test that requires runtime attestation did not produce it.",
+            "The manifest marked the test as requiring runtime attestation, but the run report did not include a runtime attestation reference or the referenced file was missing.",
+            "- Keep the test on `run-os-sandboxed`.\n- Ensure the harness passes `--attest-runtime` through to `x07-os-runner`.\n- Re-run `x07 test` and inspect the emitted runtime-attest artifact path.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TEST_CAPSULE_EVIDENCE_MISSING" => Some(mk(
+            "A test that requires capsule evidence did not provide it.",
+            "The manifest declared required capsules, but the emitted test evidence did not include matching capsule ids or effect-log digests.",
+            "- Keep the test manifest `required_capsules[]` aligned with the sandboxed boundary surface.\n- Ensure the sandbox execution emits capsule/effect-log evidence into the test report.\n- Re-run `x07 test`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires fixing emitted sandbox evidence or the declared capsule inventory."),
+        )),
+        "X07RD_ASYNC_PROOF_COVERAGE_DECREASE" => Some(mk(
+            "Review diff gate rejected an async proof coverage regression.",
+            "The candidate change reduced proven async coverage or introduced newly uncovered/unsupported async proof surface relative to the baseline.",
+            "- Inspect `x07 review diff --json-out ...` and the `async_proof_changes` highlight set.\n- Restore the lost async proof coverage or intentionally reset the baseline after review.\n- Re-run `x07 review diff --fail-on async-proof-coverage-decrease`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a review decision or proof-surface repair."),
+        )),
+        "X07RD_RECURSION_PROOF_COVERAGE_DECREASE" => Some(mk(
+            "Review diff gate rejected a recursive proof coverage regression.",
+            "The candidate reduced proved recursive coverage or introduced newly unsupported recursive proof surface relative to the reviewed baseline.",
+            "- Inspect `x07 review diff --json-out ...` and the `recursive_proof_changes` highlight set.\n- Restore the lost recursive proof coverage or intentionally reset the review baseline.\n- Re-run `x07 review diff --fail-on recursion-proof-coverage-decrease`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a review decision or recursive proof-surface repair."),
+        )),
+        "X07RD_SUMMARY_DOWNGRADE" => Some(mk(
+            "Review diff gate rejected a proof-summary downgrade.",
+            "The candidate weakened reachable proof-summary posture relative to the baseline, such as dropping prove-supported status or degrading a reviewed proof status.",
+            "- Inspect the `summary_changes` highlights in the review report.\n- Restore the stronger proof-summary posture or intentionally reset the review baseline.\n- Re-run `x07 review diff --fail-on summary-downgrade`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a review decision or a stronger summary posture."),
+        )),
+        "X07RD_CAPSULE_CONTRACT_RELAXATION" => Some(mk(
+            "Review diff gate rejected a capsule contract relaxation.",
+            "The candidate weakened a certified capsule contract relative to the reviewed baseline.",
+            "- Inspect the `capsule_changes` highlights in the review report.\n- Restore the stricter capsule contract or intentionally update the review baseline.\n- Re-run `x07 review diff --fail-on capsule-contract-relaxation`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a baseline review decision or a semantic capsule-contract change."),
+        )),
+        "X07RD_CAPSULE_SET_CHANGE" => Some(mk(
+            "Review diff gate rejected a capsule inventory change.",
+            "The candidate added, removed, or reordered certified capsule membership relative to the baseline review set.",
+            "- Inspect the capsule index diff and confirm whether the inventory change is intentional.\n- Restore the baseline capsule set or intentionally update the review baseline.\n- Re-run `x07 review diff --fail-on capsule-set-change`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a baseline review decision or capsule inventory change."),
+        )),
+        "X07RD_SANDBOX_POLICY_WIDEN" => Some(mk(
+            "Review diff gate rejected a sandbox policy widening.",
+            "The candidate widened the sandbox runtime posture, including enabling weaker isolation or otherwise relaxing the reviewed sandbox policy.",
+            "- Inspect the `sandbox_policy_changes` highlights in the review report.\n- Restore the stricter sandbox policy or intentionally update the review baseline.\n- Re-run the requested `x07 review diff --fail-on ...` gate.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a baseline review decision or runtime-policy tightening."),
+        )),
+        "X07RD_RUNTIME_ATTEST_REGRESSION" => Some(mk(
+            "Review diff gate rejected a runtime attestation regression.",
+            "The candidate changed runtime attestation posture relative to the baseline in a way the requested review gate forbids.",
+            "- Inspect the `runtime_attestation_changes` highlights in the review report.\n- Restore the baseline attestation posture or intentionally update the review baseline.\n- Re-run `x07 review diff --fail-on runtime-attestation-regression`.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires a baseline review decision or runtime-evidence repair."),
+        )),
+        "X07REL_EBOUNDED_PROOF" => Some(mk(
+            "Release guard rejected bounded proof usage in the strict fixture.",
+            "The strict verified-core fixture accepted a certificate that still depended on bounded proof evidence, which the release guard forbids for the strong internal baseline.",
+            "- Remove the bounded-proof dependency from the strict fixture certificate path.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate no longer marks bounded proof.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07REL_ECOVERAGE_ONLY_IMPORT" => Some(mk(
+            "Release guard rejected a coverage-only imported summary in the strict fixture.",
+            "The strict verified-core fixture imported coverage-only summary evidence where the release guard requires checked proof evidence.",
+            "- Replace the imported coverage-only summary with per-symbol prove artifacts and checked proof evidence.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the certificate proof inventory is strict.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07REL_EDEV_ONLY_ASSUMPTION" => Some(mk(
+            "Release guard rejected a developer-only proof assumption in the strict fixture.",
+            "The strict verified-core fixture accepted certificate evidence that still depended on developer-only assumptions such as imported stubs.",
+            "- Remove the developer-only assumption from the strict fixture proof surface.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate has no developer-only assumptions.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07REL_ESURROGATE_ENTRY" => Some(mk(
+            "Release guard rejected surrogate-entry certification in the strict fixture.",
+            "The strict verified-core fixture accepted certification for an entry that diverged from `project.operational_entry_symbol`, which the release guard forbids.",
+            "- Keep the certification entry aligned with `project.operational_entry_symbol`.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm surrogate-entry rejection still fires.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        _ => None,
+    }
+}
+
 fn classify_catalog_entry(code: &str) -> CatalogClassification {
     if let Some(exact) = bootstrap_enrichment(code) {
         return CatalogClassification {
@@ -1195,6 +1911,10 @@ fn classify_catalog_entry(code: &str) -> CatalogClassification {
             quickfix_kind: exact.quickfix_kind.to_vec(),
             no_quickfix_reason: None,
         };
+    }
+
+    if let Some(exact) = exact_catalog_classification(code) {
+        return exact;
     }
 
     if let Some(reason) = no_quickfix_reason(code) {
@@ -1295,7 +2015,7 @@ fn classify_catalog_entry(code: &str) -> CatalogClassification {
             summary: format!("x07import subset compatibility diagnostic `{code}`."),
             details_md: "The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs."
                 .to_string(),
-            agent_strategy_md: "- Inspect importer diagnostic phase/context.\n- Rewrite unsupported Rust/C constructs into supported subset forms.\n- Re-run x07import and tests."
+            agent_strategy_md: "- Inspect importer diagnostic context.\n- Rewrite unsupported Rust/C constructs into supported subset forms.\n- Re-run x07import and tests."
                 .to_string(),
             quickfix_support: QuickfixSupport::Sometimes,
             quickfix_kind: Vec::new(),
@@ -1370,6 +2090,12 @@ fn no_quickfix_reason(code: &str) -> Option<&'static str> {
 
 fn infer_stage(code: &str, sample_file: Option<&str>) -> CatalogStage {
     let uc = code.to_ascii_uppercase();
+    if uc.starts_with("X07TC_") || uc.starts_with("X07TP_") {
+        return CatalogStage::Run;
+    }
+    if uc.starts_with("X07PROOF_") {
+        return CatalogStage::Run;
+    }
     if uc.contains("PARSE") || uc.contains("JSON_PARSE") {
         return CatalogStage::Parse;
     }
@@ -1415,7 +2141,11 @@ fn infer_stage(code: &str, sample_file: Option<&str>) -> CatalogStage {
 }
 
 fn infer_severity(code: &str) -> CatalogSeverity {
-    if code.starts_with("W_") || code.starts_with("W-") || code.starts_with("W_ARCH") {
+    if code == "X07V_COVERAGE_NOT_PROOF"
+        || code.starts_with("W_")
+        || code.starts_with("W-")
+        || code.starts_with("W_ARCH")
+    {
         CatalogSeverity::Warning
     } else {
         CatalogSeverity::Error
@@ -1882,6 +2612,10 @@ mod tests {
             CatalogStage::Parse
         );
         assert_eq!(infer_stage("ETEST_COMPILE", None), CatalogStage::Run);
+        assert_eq!(
+            infer_stage("X07PROOF_ECHECK_FAILED", None),
+            CatalogStage::Run
+        );
         assert_eq!(infer_stage("X07-ARITY-0000", None), CatalogStage::Lint);
     }
 
@@ -1894,6 +2628,10 @@ mod tests {
         assert_eq!(
             infer_severity("E_ARCH_LOCK_INVALID"),
             CatalogSeverity::Error
+        );
+        assert_eq!(
+            infer_severity("X07V_COVERAGE_NOT_PROOF"),
+            CatalogSeverity::Warning
         );
     }
 
@@ -1945,13 +2683,34 @@ mod tests {
             fn f() {
                 let d = Diagnostic { code: "X07PKG_SPEC_INVALID".to_string(), message: "m".to_string() };
                 let _x = diag_parse_error("E_ARCH_LOCK_READ", "m", None);
+                let _y = trust_diag("X07TC_EARCH_STRICT", "m");
+                let _missing = if true { "X07TC_EPROVE_REPORT_MISSING" } else { "X07TC_EASYNC_PROVE_REPORT_MISSING" };
+                let _release = "X07REL_ESURROGATE_ENTRY";
+                let _verify = "X07V_IMPORTED_STUB_FORBIDDEN";
+                let _proof = "X07PROOF_ECHECK_FAILED";
             }
             "#,
         )?;
         let extracted = scan_source_codes(&[tmp.join("crates")])?;
         let codes: BTreeSet<String> = extracted.codes.iter().map(|r| r.code.clone()).collect();
         assert!(codes.contains("X07PKG_SPEC_INVALID"));
+        assert!(codes.contains("X07TC_EARCH_STRICT"));
+        assert!(codes.contains("X07TC_EPROVE_REPORT_MISSING"));
+        assert!(codes.contains("X07TC_EASYNC_PROVE_REPORT_MISSING"));
+        assert!(codes.contains("X07REL_ESURROGATE_ENTRY"));
+        assert!(codes.contains("X07V_IMPORTED_STUB_FORBIDDEN"));
+        assert!(codes.contains("X07PROOF_ECHECK_FAILED"));
         std::fs::remove_dir_all(tmp)?;
         Ok(())
+    }
+
+    #[test]
+    fn classify_catalog_entry_includes_certification_guidance() {
+        let entry = exact_catalog_classification("X07TC_EBOUNDARY_MISSING").expect("trust entry");
+        assert_eq!(entry.quickfix_support, QuickfixSupport::Sometimes);
+        assert_eq!(entry.quickfix_kind, vec![QuickfixKind::JsonPatch]);
+        assert!(entry
+            .agent_strategy_md
+            .contains("x07 schema derive --emit-boundary-stub"));
     }
 }

@@ -65,7 +65,7 @@ import base64, json, sys
 run_report_path, prog_path = sys.argv[1], sys.argv[2]
 
 run_report = json.load(open(run_report_path, "r", encoding="utf-8"))
-assert run_report.get("schema_version") == "x07.run.report@0.1.0", run_report.get("schema_version")
+assert run_report.get("schema_version") == "x07.run.report@0.3.0", run_report.get("schema_version")
 assert run_report.get("runner") == "host", run_report.get("runner")
 assert run_report.get("world") == "solve-pure", run_report.get("world")
 

@@ -1,0 +1,348 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  X07_PYTHON: python
+
+jobs:
+  compute_nightly:
+    name: compute-nightly-tag
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute nightly version/tag
+        id: meta
+        shell: bash
+        run: |
+          BASE_VERSION="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('crates/x07/Cargo.toml').read_text(encoding='utf-8')
+          m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+          print(m.group(1))
+          PY
+          )"
+          DATE="$(date -u +%Y%m%d)"
+          VERSION="${BASE_VERSION}-nightly.${DATE}"
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: test
+    needs: compute_nightly
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python deps
+        shell: bash
+        run: ./scripts/ci/install_python_deps.sh
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Linux deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            xz-utils
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
+      - name: Run release-readiness CI
+        shell: bash
+        env:
+          X07_REQUIRE_SOLVERS: "1"
+        run: |
+          ./scripts/ci/check_release_ready.sh
+
+  build_matrix:
+    name: build-${{ matrix.target }}
+    needs:
+      - compute_nightly
+      - test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-14
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    env:
+      X07_CARGO: cargo
+      X07_CARGO_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            xz-utils
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install openssl@3 pkg-config
+      - name: Build nightly binaries
+        shell: bash
+        run: |
+          cargo build --locked --release --target "${{ matrix.target }}" \
+            -p x07 \
+            -p x07c \
+            -p x07-host-runner \
+            -p x07-os-runner \
+            -p x07-vm-launcher \
+            -p x07-vm-reaper \
+            -p x07import-cli \
+            -p x07up
+      - name: Build x07-vz-helper (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          ./scripts/build_vz_helper.sh "./target/${{ matrix.target }}/release/x07-vz-helper"
+      - name: Build and stage native backends
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          ./scripts/build_ext_regex.sh
+          ./scripts/build_ext_fs.sh
+          ./scripts/build_ext_stdio.sh
+          ./scripts/build_ext_rand.sh
+          ./scripts/build_ext_jsonschema.sh
+          ./scripts/build_ext_obj_s3.sh
+          ./scripts/build_ext_math.sh
+          ./scripts/build_ext_stream_xf.sh
+          ./scripts/build_ext_time.sh
+          ./scripts/build_ext_db_sqlite.sh
+          ./scripts/build_ext_db_pg.sh
+          ./scripts/build_ext_db_mysql.sh
+          ./scripts/build_ext_db_redis.sh
+      - name: Build nightly archives
+        id: pack
+        shell: bash
+        run: |
+          VERSION="${{ needs.compute_nightly.outputs.version }}"
+          TOOLCHAIN_PATH="$(bash scripts/release/build-core-archive.sh \
+            --component x07 \
+            --version "${VERSION}" \
+            --target "${{ matrix.target }}" \
+            --out-dir dist/release)"
+          X07UP_PATH="$(bash scripts/release/build-x07up-archive.sh \
+            --version "${VERSION}" \
+            --target "${{ matrix.target }}" \
+            --out-dir dist/release)"
+          echo "toolchain_path=${TOOLCHAIN_PATH}" >> "$GITHUB_OUTPUT"
+          echo "x07up_path=${X07UP_PATH}" >> "$GITHUB_OUTPUT"
+      - name: Attest nightly archives
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            ${{ steps.pack.outputs.toolchain_path }}
+            ${{ steps.pack.outputs.x07up_path }}
+      - name: Upload nightly artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: archives-${{ matrix.target }}
+          path: |
+            ${{ steps.pack.outputs.toolchain_path }}
+            ${{ steps.pack.outputs.x07up_path }}
+          if-no-files-found: error
+          retention-days: 7
+
+  finalize_nightly:
+    name: finalize-nightly
+    needs:
+      - compute_nightly
+      - build_matrix
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prepare nightly asset workspace
+        shell: bash
+        run: |
+          rm -rf dist/release
+          mkdir -p dist/release
+      - name: Download nightly artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: archives-*
+          path: dist/release
+          merge-multiple: true
+      - name: Generate nightly metadata
+        id: meta
+        shell: bash
+        run: |
+          VERSION="${{ needs.compute_nightly.outputs.version }}"
+          TAG="${{ needs.compute_nightly.outputs.tag }}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "checksums=dist/release/x07-${VERSION}-checksums.txt" >> "$GITHUB_OUTPUT"
+          echo "component_manifest=dist/release/x07-${VERSION}-release.json" >> "$GITHUB_OUTPUT"
+          echo "bundle_manifest=dist/release/x07-${VERSION}-bundle.json" >> "$GITHUB_OUTPUT"
+          echo "attestations_jsonl=dist/release/x07-${VERSION}-attestations.jsonl" >> "$GITHUB_OUTPUT"
+      - name: Export nightly attestations bundle
+        shell: bash
+        run: |
+          bash scripts/release/export-attestations-jsonl.sh \
+            --in-dir dist/release \
+            --out "${{ steps.meta.outputs.attestations_jsonl }}"
+      - name: Generate checksums
+        shell: bash
+        run: |
+          python3 scripts/release/gen-checksums.py \
+            --in-dir dist/release \
+            --out "${{ steps.meta.outputs.checksums }}"
+      - name: Generate nightly component release manifest
+        shell: bash
+        run: |
+          python3 scripts/release/gen-component-release.py \
+            --schema x07.component.release@0.1.0 \
+            --component x07_core \
+            --version "${{ steps.meta.outputs.version }}" \
+            --tag "${{ steps.meta.outputs.tag }}" \
+            --repo "https://github.com/${GITHUB_REPOSITORY}" \
+            --assets-dir dist/release \
+            --compat-file "releases/compat/nightly.json" \
+            --out "${{ steps.meta.outputs.component_manifest }}"
+      - name: Validate nightly component release manifest
+        shell: bash
+        run: |
+          python3 scripts/release/validate-json.py \
+            --schema x07.component.release@0.1.0 \
+            --in "${{ steps.meta.outputs.component_manifest }}" \
+            --require component \
+            --require version \
+            --require assets \
+            --require compatibility
+      - name: Generate nightly bundle manifest
+        shell: bash
+        run: |
+          python3 scripts/release/gen-bundle.py \
+            --schema x07.release.bundle@0.1.0 \
+            --channel nightly \
+            --input "releases/bundles/nightly.input.json" \
+            --core-manifest "${{ steps.meta.outputs.component_manifest }}" \
+            --out "${{ steps.meta.outputs.bundle_manifest }}"
+      - name: Validate nightly bundle manifest
+        shell: bash
+        run: |
+          python3 scripts/release/validate-json.py \
+            --schema x07.release.bundle@0.1.0 \
+            --in "${{ steps.meta.outputs.bundle_manifest }}" \
+            --require channel \
+            --require x07_core \
+            --require x07_wasm \
+            --require x07_web_ui_host \
+            --require x07_device_host \
+            --require packages
+      - name: Attest nightly manifest assets
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            ${{ steps.meta.outputs.attestations_jsonl }}
+            ${{ steps.meta.outputs.checksums }}
+            ${{ steps.meta.outputs.component_manifest }}
+            ${{ steps.meta.outputs.bundle_manifest }}
+      - name: Publish nightly channel manifest
+        shell: bash
+        run: |
+          bash scripts/release/publish-channel-manifest.sh \
+            --channel nightly \
+            --bundle "${{ steps.meta.outputs.bundle_manifest }}" \
+            --publish-dir dist/channels
+      - name: Create nightly prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if ! gh release view "${{ steps.meta.outputs.tag }}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "${{ steps.meta.outputs.tag }}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --prerelease \
+              --target "${GITHUB_SHA}" \
+              --title "${{ steps.meta.outputs.tag }}"
+          fi
+      - name: Upload nightly assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release upload "${{ steps.meta.outputs.tag }}" \
+            dist/release/* \
+            dist/channels/nightly.json \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
+      - name: Publish nightly prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release edit "${{ steps.meta.outputs.tag }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false

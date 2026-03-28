@@ -1,0 +1,47 @@
+{
+  "schema_version": "x07.verify.primitives@0.2.0",
+  "primitives": [
+    {
+      "symbol": "bytes.empty",
+      "kind": "builtin",
+      "assumption_class": "semantics_model",
+      "certification_policy": "allowed",
+      "note": "Deterministic empty-bytes constructor used by generated drivers."
+    },
+    {
+      "symbol": "bytes.lit",
+      "kind": "builtin",
+      "assumption_class": "semantics_model",
+      "certification_policy": "allowed",
+      "note": "Deterministic literal-bytes constructor."
+    },
+    {
+      "symbol": "std.codec.read_u32_le",
+      "kind": "imported_stub",
+      "assumption_class": "dev_stub",
+      "certification_policy": "dev_only",
+      "note": "Developer-only decoding stub used by verifier overlays."
+    },
+    {
+      "symbol": "std.mcp.auth.bearer_v1.parse_authorization_bearer_v1",
+      "kind": "imported_stub",
+      "assumption_class": "dev_stub",
+      "certification_policy": "dev_only",
+      "note": "Developer-only bearer parser stub used by the MCP authentication examples."
+    },
+    {
+      "symbol": "view.slice",
+      "kind": "builtin",
+      "assumption_class": "semantics_model",
+      "certification_policy": "allowed",
+      "note": "Pure slice view constructor."
+    },
+    {
+      "symbol": "view.to_bytes",
+      "kind": "builtin",
+      "assumption_class": "semantics_model",
+      "certification_policy": "allowed",
+      "note": "Deterministic bytes materialization for bounded views."
+    }
+  ]
+}

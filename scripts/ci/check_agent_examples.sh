@@ -150,8 +150,8 @@ require_deps = sys.argv[6].strip().lower() == "true"
 
 doc = json.loads(wrapped_path.read_text(encoding="utf-8"))
 sv = doc.get("schema_version")
-if sv != "x07.run.report@0.1.0":
-    raise SystemExit(f"{name}: expected schema_version x07.run.report@0.1.0, got {sv!r}")
+if sv != "x07.run.report@0.3.0":
+    raise SystemExit(f"{name}: expected schema_version x07.run.report@0.3.0, got {sv!r}")
 
 if want_runner and doc.get("runner") != want_runner:
     raise SystemExit(f"{name}: expected runner {want_runner!r}, got {doc.get('runner')!r}")
@@ -196,7 +196,23 @@ pkg_lock_check() {
   local work="$1"
 
   # Keep agent examples deterministic: no network access during pkg lock checks.
-  (cd "$work" && "$x07_bin" pkg lock --check --offline >/dev/null)
+  mkdir -p "$work/tmp"
+  local stdout_log="$work/tmp/pkg.lock.check.stdout"
+  local stderr_log="$work/tmp/pkg.lock.check.stderr"
+  if (cd "$work" && "$x07_bin" pkg lock --check --offline >"$stdout_log" 2>"$stderr_log"); then
+    return 0
+  fi
+
+  echo "ERROR: pkg lock --check failed for $work" >&2
+  if [[ -s "$stderr_log" ]]; then
+    echo "--- stderr ($stderr_log) ---" >&2
+    cat "$stderr_log" >&2 || true
+  fi
+  if [[ -s "$stdout_log" ]]; then
+    echo "--- stdout ($stdout_log) ---" >&2
+    cat "$stdout_log" >&2 || true
+  fi
+  return 1
 }
 
 run_x07_run() {
@@ -553,11 +569,11 @@ pkg_lock_check "$proto_work"
 fmt_check_all "$proto_work"
 lint_check_one "$proto_work" "run-os-sandboxed" "src/main.x07.json"
 
-wrapped_13="$(run_x07_run "protos-framing-loopback" "$proto_work" \
-  --profile sandbox \
-  --allow-host "127.0.0.1:18081" \
-  --cpu-time-limit-seconds 60 \
-)"
+	wrapped_13="$(run_x07_run "protos-framing-loopback" "$proto_work" \
+	  --profile sandbox \
+	  --allow-host "127.0.0.1:18082" \
+	  --cpu-time-limit-seconds 60 \
+	)"
 unwrap_and_check_wrapped_report "protos-framing-loopback" "$wrapped_13" "$proto_work/tmp/runner.json" "os" "run-os-sandboxed" "true"
 
 expected_13='{"grpc":"ping","ok":true,"ws":"hello"}'$'\n'

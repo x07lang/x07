@@ -1,0 +1,46 @@
+{
+  "schema_version": "x07.x07ast@0.8.0",
+  "kind": "module",
+  "module_id": "fixture",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "fixture.main"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "fixture.main",
+      "params": [
+        {
+          "name": "x",
+          "ty": "i32"
+        }
+      ],
+      "result": "i32",
+      "requires": [
+        {
+          "id": "r0",
+          "expr": [
+            "=",
+            "x",
+            "x"
+          ]
+        }
+      ],
+      "ensures": [
+        {
+          "id": "e0",
+          "expr": [
+            "=",
+            "__result",
+            "x"
+          ]
+        }
+      ],
+      "body": "x"
+    }
+  ]
+}

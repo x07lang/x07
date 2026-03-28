@@ -35,7 +35,10 @@ Authoritative machine list of what exists in the public registry right now:
 
 Machine entrypoint used by `x07up`:
 
-- Channels: https://x07lang.org/install/channels.json
+- Bootstrap manifest: https://x07lang.org/install/channels.json
+- Stable bundle: https://x07lang.org/install/channels/stable.json
+- Beta bundle: https://x07lang.org/install/channels/beta.json
+- Nightly bundle: https://x07lang.org/install/channels/nightly.json
 
 ## Local (offline) contracts
 

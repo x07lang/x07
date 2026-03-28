@@ -42,10 +42,15 @@ tmp/
 dist/*.tar.gz
 dist/channels.json
 dist/.tmp_toolchain_*
+dist/manual-*/
 dist/release-manifest.json
 
 # Package artifacts (generated locally)
 packages/**/dist/
+
+# Generated example verification artifacts
+docs/examples/**/.x07/
+docs/examples/**/target/cert/
 
 # OS helper binaries (built by scripts/build_os_helpers.sh)
 /deps/x07/x07-proc-echo
@@ -87,6 +92,11 @@ packages/**/dist/
 /deps/x07/libx07_ext_jsonschema.a
 /deps/x07/x07_ext_jsonschema.lib
 /deps/x07/include/x07_ext_jsonschema_abi_v1.h
+
+# Native ext-obj-s3 backend artifacts (built by scripts/build_ext_obj_s3.sh)
+/deps/x07/libx07_ext_obj_s3.a
+/deps/x07/x07_ext_obj_s3.lib
+/deps/x07/include/x07_ext_obj_s3_abi_v1.h
 
 # Native ext-db-sqlite backend artifacts (built by scripts/build_ext_db_sqlite.sh)
 /deps/x07/libx07_ext_db_sqlite.a

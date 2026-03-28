@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-arch.manifest.schema.json",
-  "title": "x07.arch.manifest@0.1.0",
+  "title": "x07.arch.manifest@0.3.0",
   "description": "Pinned architecture manifest consumed by `x07 arch check`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "repo", "externals", "nodes", "rules", "checks", "tool_budgets"],
   "properties": {
-    "schema_version": { "const": "x07.arch.manifest@0.1.0" },
+    "schema_version": { "const": "x07.arch.manifest@0.3.0" },
     "repo": {
       "type": "object",
       "additionalProperties": false,
@@ -79,6 +79,10 @@
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
+    "trust_zone": {
+      "type": "string",
+      "enum": ["verified_core", "certified_capsule", "test_only", "untrusted"]
+    },
     "node_match": {
       "type": "object",
       "additionalProperties": false,
@@ -136,11 +140,12 @@
     "node": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "match", "world", "visibility", "imports"],
+      "required": ["id", "match", "world", "trust_zone", "visibility", "imports"],
       "properties": {
         "id": { "$ref": "#/$defs/node_id" },
         "match": { "$ref": "#/$defs/node_match" },
         "world": { "$ref": "#/$defs/world_id" },
+        "trust_zone": { "$ref": "#/$defs/trust_zone" },
         "visibility": { "$ref": "#/$defs/node_visibility" },
         "imports": { "$ref": "#/$defs/node_imports" },
         "contracts": { "$ref": "#/$defs/node_contracts" }
@@ -261,6 +266,7 @@
       "additionalProperties": false,
       "required": ["canonical_json"],
       "properties": {
+        "boundaries": { "$ref": "#/$defs/contracts_index_v1" },
         "web": { "$ref": "#/$defs/contracts_index_v1" },
         "crawl": { "$ref": "#/$defs/contracts_index_v1" },
         "msg": { "$ref": "#/$defs/contracts_index_v1" },

@@ -14,7 +14,9 @@ use crate::program::Program;
 use crate::stream_pipe;
 use crate::types::Ty;
 use crate::x07ast;
-use x07_contracts::{NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0};
+use x07_contracts::{
+    NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ContractMode {
@@ -32,6 +34,7 @@ pub struct CompileOptions {
     pub enable_rr: bool,
     pub enable_kv: bool,
     pub module_roots: Vec<std::path::PathBuf>,
+    pub prefer_module_roots_first: bool,
     pub arch_root: Option<std::path::PathBuf>,
     pub emit_main: bool,
     pub freestanding: bool,
@@ -39,6 +42,7 @@ pub struct CompileOptions {
     pub contract_mode: ContractMode,
     pub allow_unsafe: Option<bool>,
     pub allow_ffi: Option<bool>,
+    pub allow_internal_only_heads_in_entry: bool,
 }
 
 impl Default for CompileOptions {
@@ -49,6 +53,7 @@ impl Default for CompileOptions {
             enable_rr: false,
             enable_kv: false,
             module_roots: Vec::new(),
+            prefer_module_roots_first: false,
             arch_root: None,
             emit_main: true,
             freestanding: false,
@@ -56,6 +61,7 @@ impl Default for CompileOptions {
             contract_mode: ContractMode::default(),
             allow_unsafe: None,
             allow_ffi: None,
+            allow_internal_only_heads_in_entry: false,
         }
     }
 }
@@ -105,12 +111,29 @@ pub enum CompileErrorKind {
 #[derive(Debug, Clone)]
 pub struct CompilerError {
     pub kind: CompileErrorKind,
-    pub message: String,
+    pub message: Box<str>,
+    pub diagnostic: Option<Box<crate::diagnostics::Diagnostic>>,
 }
 
 impl CompilerError {
     pub fn new(kind: CompileErrorKind, message: String) -> Self {
-        Self { kind, message }
+        Self {
+            kind,
+            message: message.into_boxed_str(),
+            diagnostic: None,
+        }
+    }
+
+    pub fn with_diagnostic(
+        kind: CompileErrorKind,
+        message: String,
+        diagnostic: crate::diagnostics::Diagnostic,
+    ) -> Self {
+        Self {
+            kind,
+            message: message.into_boxed_str(),
+            diagnostic: Some(Box::new(diagnostic)),
+        }
     }
 }
 
@@ -134,17 +157,16 @@ pub fn compile_program_to_c_with_stats(
 }
 
 #[derive(Debug, Clone)]
-pub struct CompileToCOutput {
-    pub c_src: String,
+pub struct CompileToProgramOutput {
+    pub program: Program,
     pub stats: CompileStats,
-    pub native_requires: NativeRequires,
-    pub mono_map: Option<crate::generics::MonoMapV1>,
+    pub mono_map: crate::generics::MonoMapV1,
 }
 
-pub fn compile_program_to_c_with_meta(
+pub fn compile_program_to_program_with_meta(
     program: &[u8],
     options: &CompileOptions,
-) -> Result<CompileToCOutput, CompilerError> {
+) -> Result<CompileToProgramOutput, CompilerError> {
     let FrontendOutput {
         mut parsed_program,
         mono_map,
@@ -178,7 +200,7 @@ pub fn compile_program_to_c_with_meta(
     }
 
     validate_program_visibility(&parsed_program, &module_infos)?;
-    forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos)?;
+    forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos, options)?;
 
     let contract_nodes = |clauses: &[crate::x07ast::ContractClauseAst]| -> usize {
         clauses
@@ -219,6 +241,31 @@ pub fn compile_program_to_c_with_meta(
         ));
     }
 
+    Ok(CompileToProgramOutput {
+        program: parsed_program,
+        stats: CompileStats { fuel_used },
+        mono_map,
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct CompileToCOutput {
+    pub c_src: String,
+    pub stats: CompileStats,
+    pub native_requires: NativeRequires,
+    pub mono_map: Option<crate::generics::MonoMapV1>,
+}
+
+pub fn compile_program_to_c_with_meta(
+    program: &[u8],
+    options: &CompileOptions,
+) -> Result<CompileToCOutput, CompilerError> {
+    let CompileToProgramOutput {
+        program: parsed_program,
+        stats,
+        mono_map,
+    } = compile_program_to_program_with_meta(program, options)?;
+
     let (c_src, native_requires) =
         c_emit::emit_c_program_with_native_requires(&parsed_program, options)?;
 
@@ -236,7 +283,7 @@ pub fn compile_program_to_c_with_meta(
 
     Ok(CompileToCOutput {
         c_src,
-        stats: CompileStats { fuel_used },
+        stats,
         native_requires: NativeRequires {
             schema_version: NATIVE_REQUIRES_SCHEMA_VERSION.to_string(),
             world: Some(options.world.as_str().to_string()),
@@ -244,6 +291,14 @@ pub fn compile_program_to_c_with_meta(
         },
         mono_map: Some(mono_map),
     })
+}
+
+pub fn compile_program_to_wasm_v1(
+    program: &Program,
+    options: &CompileOptions,
+    wasm_opts: &crate::wasm_emit::WasmEmitOptions,
+) -> Result<Vec<u8>, CompilerError> {
+    crate::wasm_emit::emit_solve_pure_wasm_v1(program, options, wasm_opts)
 }
 
 pub fn check_program(program: &[u8], options: &CompileOptions) -> Result<(), CompilerError> {
@@ -314,7 +369,9 @@ fn compile_frontend(
     enforce_contract_typecheck("main", &file)?;
     fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     let main = parse_main_file_x07ast(file)?;
-    forbid_internal_only_heads_in_entry("main", &main)?;
+    if !options.allow_internal_only_heads_in_entry {
+        forbid_internal_only_heads_in_entry("main", &main)?;
+    }
     let mut modules = BTreeMap::new();
     let mut module_infos = BTreeMap::new();
     module_infos.insert(
@@ -780,12 +837,15 @@ fn forbid_internal_only_heads_in_module(
 fn forbid_internal_only_heads_in_non_builtin_code(
     program: &Program,
     module_infos: &BTreeMap<String, ModuleInfo>,
+    options: &CompileOptions,
 ) -> Result<(), CompilerError> {
-    if let Some(head) = find_internal_only_head(&program.solve) {
-        return Err(CompilerError::new(
-            CompileErrorKind::Unsupported,
-            format!("main: internal-only builtin is not allowed here: {head}"),
-        ));
+    if !options.allow_internal_only_heads_in_entry {
+        if let Some(head) = find_internal_only_head(&program.solve) {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("main: internal-only builtin is not allowed here: {head}"),
+            ));
+        }
     }
 
     for f in &program.functions {
@@ -808,6 +868,9 @@ fn forbid_internal_only_heads_in_non_builtin_code(
             )
         })?;
         if info.is_builtin {
+            continue;
+        }
+        if options.allow_internal_only_heads_in_entry && module_id == "main" {
             continue;
         }
         if f.name.contains(".__std_stream_pipe_v1_") {
@@ -871,6 +934,9 @@ fn forbid_internal_only_heads_in_non_builtin_code(
             )
         })?;
         if info.is_builtin {
+            continue;
+        }
+        if options.allow_internal_only_heads_in_entry && module_id == "main" {
             continue;
         }
         if f.name.contains(".__std_stream_pipe_v1_") {
@@ -1036,8 +1102,12 @@ fn load_module_recursive(
         ));
     }
 
-    let source =
-        module_source::load_module_source(module_id, options.world, &options.module_roots)?;
+    let source = module_source::load_module_source_with_preference(
+        module_id,
+        options.world,
+        &options.module_roots,
+        options.prefer_module_roots_first,
+    )?;
     let src = source.src;
     let is_builtin = source.is_builtin;
 
@@ -1118,7 +1188,9 @@ fn file_has_contracts(file: &x07ast::X07AstFile) -> bool {
 }
 
 fn enforce_contract_typecheck(label: &str, file: &x07ast::X07AstFile) -> Result<(), CompilerError> {
-    if file.schema_version != X07AST_SCHEMA_VERSION_V0_5_0 {
+    if file.schema_version != X07AST_SCHEMA_VERSION_V0_5_0
+        && file.schema_version != X07AST_SCHEMA_VERSION_V0_6_0
+    {
         return Ok(());
     }
     if !file_has_contracts(file) {

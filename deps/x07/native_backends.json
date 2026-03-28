@@ -200,6 +200,35 @@
       }
     },
     {
+      "backend_id": "x07.ext.obj.s3",
+      "abi_major": 1,
+      "link": {
+        "linux": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_obj_s3.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        },
+        "macos": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_obj_s3.a"],
+          "args": [
+            "-framework",
+            "CoreFoundation",
+            "-framework",
+            "SystemConfiguration",
+            "-framework",
+            "Security"
+          ],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        }
+      }
+    },
+    {
       "backend_id": "x07.math",
       "abi_major": 1,
       "link": {

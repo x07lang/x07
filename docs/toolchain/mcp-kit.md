@@ -1,6 +1,6 @@
 # MCP Kit
 
-`x07-mcp` is the MCP server kit for X07. It ships templates, package modules, and a dedicated CLI for scaffold/check/bundle/conformance workflows.
+`x07-mcp` is the MCP server kit for X07. It ships templates, package modules, and a dedicated CLI for scaffold/check/inspect/catalog/bundle/conformance/publish/trust workflows.
 
 Phase 4 adds:
 
@@ -49,6 +49,57 @@ Phase 10 adds:
 - DPoP nonce hardening (RFC9449 `use_dpop_nonce`)
 - RFC9728 signed PRM metadata (`signed_metadata`)
 
+Phase 12 adds:
+
+- trust framework bundles (`x07.mcp.trust.bundle@0.1.0`) + framework policy (`x07.mcp.trust.framework@0.1.0`)
+- resource policy resolution with precedence: `exact` > `prefix` > `hostSuffix` > defaults
+- publish-time signed-PRM enforcement (`publish.require_signed_prm=true`)
+- publisher `_meta` trust summary injection (`requireSigned`, `signerIss`, `trustFrameworkSha256`)
+- tag-release guardrails rejecting placeholder trust metadata
+
+Phase 13 adds:
+
+- trust framework v2 (`x07.mcp.trust.framework@0.2.0`) with bundle publisher key pins and AS selection policy
+- signed trust bundle statements (`*.trust_bundle.sig.jwt`) validated against pinned publisher keys
+- trust lockfile pins (`x07.mcp.trust.lock@0.1.0`) for deterministic bundle/signature digest validation
+- governed multi-AS PRM issuer selection (`prefer_order_v1`) with fail-closed behavior
+- publisher `_meta` trust summary fields under `.../publisher-provided.x07`:
+  - `trustFrameworkSha256`
+  - `trustLockSha256`
+  - `requireSignedPrm`
+  - `asSelectionStrategy`
+
+Phase 14 adds:
+
+- trust framework v3 (`x07.mcp.trust.framework@0.3.0`) remote bundle sources (`source.kind=url`, `sig_source.kind=url`) with no-TOFU enforcement
+- trust lock v2 (`x07.mcp.trust.lock@0.2.0`) pins for remote URL + digest pairs (`bundle_url`, `sig_url`, `bundle_sha256`, `sig_sha256`)
+- trust pack registry/semver surfaces (`registry index`, `pack index`, `pack manifest`, deterministic highest-version selection)
+- publisher `_meta` trust pack summary fields under `.../publisher-provided.x07.x07.trustPack`:
+  - `registry`
+  - `packId`
+  - `packVersion`
+  - `lockSha256`
+
+Phase 15 adds:
+
+- TUF-lite trust registry metadata verification (`root.json`, `timestamp.jwt`, `snapshot.jwt`) plus anti-rollback monotonic checks
+- optional witness checkpoint verification (`transparency/checkpoint.jwt`) for transparency-style attestations
+- trust-pack publish summary anti-rollback fields:
+  - `minSnapshotVersion`
+  - `snapshotSha256`
+  - `checkpointSha256`
+- template replay fixtures for metadata refresh success + rollback rejection (`trust.tuf_ok`, `trust.tuf_rollback_timestamp`)
+
+Phase 16 adds:
+
+- trust transparency log verification primitives (CT-style Merkle root, inclusion proof, consistency proof)
+- checkpoint JWS verification and trust bundle inclusion verification helpers
+- run-os monitor runner surfaces that verify append-only growth and evaluate newly appended entries against monitor policy
+- deterministic transparency monitor assets:
+  - `templates/trust-registry-tlog/`
+  - `rr/http/trust_tlog_monitor_{ok,unexpected,inconsistent}.http.jsonl`
+  - `conformance/trust-tlog/` scenario baselines
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
@@ -57,6 +108,22 @@ The core toolchain delegates MCP kit commands to `x07-mcp`:
 - `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http|mcp-server-http-tasks` delegates scaffold generation to `x07-mcp scaffold init`.
 
 If `x07-mcp` is not installed on PATH, delegated commands exit with code `2`.
+
+## Official `x07lang-mcp` lifecycle path
+
+The official `io.x07/x07lang-mcp` server is the supported MCP entry point for X07 lifecycle actions. Use query surfaces such as `lp.query_v1` for read-only inspection and capability-gated control surfaces such as `lp.control_v1` for safe structured lifecycle mutations when the platform pack is enabled.
+
+`x07` does not re-implement those lifecycle actions. Its responsibility is the local delegation layer (`x07 mcp ...` and `x07 init --template ...`) plus the surrounding project bootstrap; the lifecycle mutation surface itself stays in the official MCP server.
+
+For release-control clients such as Forge, the public lifecycle read/write split is:
+
+- mutate through `lp.control_v1`, which returns `lp.control.action.result@0.1.0`
+- read deploy state through `lp.query_v1` into `lp.deploy.query.result@0.1.0`
+- read environment inventory through `lp.query_v1` into `lp.environment.list.result@0.1.0`
+- read incident inbox/detail through `lp.query_v1` into `lp.incident.query.result@0.2.0`
+- read regression generation status through `lp.query_v1` into `lp.regression.run.result@0.2.0`
+
+This is the M5 boundary on the `x07` side: release-candidate composition remains client-owned, while deploy, environment, incident, and regression truth comes from the official structured `lp.*` contracts. Consumers should cache against stable ids and artifact refs from those contracts instead of scraping CLI text or private platform internals. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
 
 ## HTTP template quickstart
 
@@ -69,10 +136,18 @@ x07 test --manifest tests/tests.json
 
 The HTTP template includes:
 
-- `config/mcp.server.json` (`x07.mcp.server_config@0.2.0`)
+- `config/mcp.server.json` (`x07.mcp.server_config@0.3.0`)
 - `config/mcp.server.dev.json` (no-auth dev config)
 - `config/mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`)
 - `config/mcp.oauth.json` (`x07.mcp.oauth@0.2.0`, with deterministic `test_static` dev tokens)
+- `trust/bundles/dev_trust_bundle_v1.trust_bundle.json`
+- `trust/bundles/dev_trust_bundle_v1.trust_bundle.sig.jwt`
+- `trust/frameworks/dev_local_trust_framework_v1.trust_framework.json`
+- `trust/trust.lock.json`
+- `trust/frameworks/dev_remote_pack.trust_framework.json`
+- `trust/packs/dev_remote_pack/trust.lock.json`
+- `trust/registry/v1/...` trust-pack fixture registry tree
+- `publish/prm.json` + `publish/server.json` trust summary fixtures
 - deterministic HTTP replay fixtures under `tests/.x07_rr/sessions/`
 
 ## HTTP Tasks template quickstart
@@ -84,6 +159,8 @@ x07 pkg lock
 x07 test --manifest tests/tests.json
 ```
 
+Use this template when the server should expose HTTP+SSE task flows, progress, or resumable task polling to MCP clients such as Forge.
+
 The HTTP Tasks template includes:
 
 - `mcp.server.json` (`x07.mcp.server_config@0.3.0`)
@@ -92,6 +169,14 @@ The HTTP Tasks template includes:
 - `mcp.oauth.json` (`x07.mcp.oauth@0.2.0`, with deterministic `test_static` dev tokens)
 - `mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`, including `execution.taskSupport`)
 - RR transcript fixtures under `tests/fixtures/rr/`
+
+## Production hardening notes
+
+- Template runtime auth secrets/keys are generated at scaffold time and are ignored by git (do not commit `config/auth/*`).
+- `mcp.server.json` is production-shaped by default (`origin_allow_missing=false`, `strict_protocol_header=true`).
+- Streamable HTTP enforces basic request caps via `transports.http.streamable.{max_header_bytes,max_body_bytes,max_concurrent_requests}`.
+- Per-tool isolation can be bounded via `sandbox.router_exec.{max_concurrent_per_tool,warm_pool_size_per_tool}`.
+- Server config loading is strict (unknown keys and type mismatches fail closed).
 
 ## Conformance workflow
 
@@ -152,10 +237,21 @@ x07 mcp publish --dry-run \
   --mcpb servers/postgres-mcp/dist/postgres-mcp.mcpb
 ```
 
+When `publish.require_signed_prm=true`, dry-run also verifies:
+
+- `signed_metadata` is present in PRM
+- signer issuer is allowed by trust framework resource policy
+- signer key is pinned in trust bundles
+- trust bundle signatures verify against pinned bundle publisher keys
+- trust lockfile digests match canonical bundle/signature bytes
+- remote trust bundle URLs are rejected unless pinned by trust lock (no TOFU)
+- generated trust summary matches publisher `_meta`
+
 ## Reference server set
 
 The kit includes these reference servers:
 
+- `x07lang-mcp` (official X07 ecosystem server; core editing tools plus capability-gated pkg/wasm/web-ui/device/app/platform packs)
 - `github-mcp`
 - `slack-mcp`
 - `jira-mcp`

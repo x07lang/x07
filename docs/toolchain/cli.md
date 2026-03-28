@@ -11,6 +11,30 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 init --package`
   - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
   - Not compatible with `--template` (templates are for app scaffolds).
+- `x07 init --template verified-core-pure`
+  - Creates a certifiable `solve-pure` project with `arch/manifest.x07arch.json`, `arch/boundaries/index.x07boundary.json`, `arch/trust/profiles/verified_core_pure_v1.json`, `.github/workflows/certify.yml`, and a smoke + PBT harness wired for `x07 trust certify`.
+- `x07 init --template trusted-sandbox-program`
+  - Creates a certifiable `run-os-sandboxed` async project with a certified capsule boundary, capsule attestations, sandbox smoke tests, and a self-hosted VM certification workflow wired for `x07 trust certify`.
+- `x07 init --template trusted-network-service`
+  - Creates a certifiable `run-os-sandboxed` network service project under `trusted_program_sandboxed_net_v1`, with pinned peer-policy files, attested network capsule metadata, a loopback TCP smoke harness, and a self-hosted VM certification workflow.
+- `x07 init --template certified-capsule`
+  - Creates a minimal certified-capsule project with capsule contract/effect-log/attestation surfaces plus a self-hosted VM certification workflow.
+- `x07 init --template certified-network-capsule`
+  - Creates a standalone network capsule project under `trusted_program_sandboxed_net_v1`, with peer-policy evidence, effect-log attestations, a loopback TCP smoke harness, and a self-hosted VM certification workflow.
+- `x07 init --template api-cell|event-consumer|scheduled-job|policy-service|workflow-service`
+  - Copies the matching service scaffold from `docs/examples/service_*_v1/`, including `arch/service/index.x07service.json`, sandbox policy defaults, and a starter test harness.
+  - `workflow-service` is scaffold-only for now; use it to define the authoring shape and bindings before workload packaging is finalized.
+
+### Service tooling
+
+- `x07 service archetypes`
+  - Emits the built-in service archetype catalog, including default capabilities and package defaults pinned to the current published package lines.
+- `x07 service genpack schema --archetype <id>`
+  - Emits an archetype-specific JSON Schema for constrained service generation.
+- `x07 service genpack grammar --archetype <id>`
+  - Emits an archetype-specific CFG-style grammar for constrained service generation.
+- `x07 service validate --manifest <path>`
+  - Validates `arch/service/index.x07service.json` and checks it against a built-in archetype when one matches the service shape.
 
 ### MCP kit tooling
 
@@ -18,15 +42,22 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Delegates to `x07-mcp` on PATH.
   - Delegated commands exit with code `2` if `x07-mcp` is not installed/discoverable.
 - Common subcommands (provided by `x07-mcp`):
+  - `x07 mcp inspect initialize|tools|tool-call|prompts|prompt-get|resources|resource-read|tasks|task-poll ...`
+  - `x07 mcp catalog templates|reference-servers|conformance-suites|publish-capabilities`
   - `x07 mcp registry gen --in <x07.mcp.json> --out <server.json> [--mcpb <file>] [--schema <schema.json>]`
   - `x07 mcp publish --dry-run --server-json <server.json> --mcpb <file>`
   - `x07 mcp conformance --url <url> [--baseline <path>] [--spawn <server-id> --mode <noauth|oauth>]`
   - `x07 mcp bundle --mcpb --server-dir <servers/<id>> [--out <dist/...mcpb>]`
+  - `x07 mcp trust summary --server-dir <servers/<id>> [--x07-root <repo>]`
+  - `x07 mcp trust tlog-monitor --server-dir <servers/<id>> [--x07-root <repo>]`
 - `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http|mcp-server-http-tasks`
   - Delegates template generation to `x07-mcp scaffold init ... --machine json`.
   - Creates the agent kit and a worker base policy at `.x07/policies/base/worker.sandbox.base.policy.json`.
+  - Prefer `mcp-server-http-tasks` for task-aware HTTP/SSE servers that expose long-running tool calls, progress, or `tasks/*` APIs.
+  - Official lifecycle control still flows through the official `io.x07/x07lang-mcp` server via capability-gated tools such as `lp.query_v1` and `lp.control_v1`; `x07` does not duplicate platform runtime actions here.
+  - Forge-style clients should treat the public `lp.control.action.result@0.1.0`, `lp.deploy.query.result@0.1.0`, `lp.environment.list.result@0.1.0`, `lp.incident.query.result@0.2.0`, and `lp.regression.run.result@0.2.0` outputs as the stable lifecycle read surface.
 
-### WASM tooling (Phases 0–3)
+### WASM tooling
 
 - `x07 wasm [ARGS...]`
   - Delegates to `x07-wasm` on PATH.
@@ -50,14 +81,32 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - `x07 wasm web-ui serve`
   - `x07 wasm web-ui test`
   - `x07 wasm web-ui regress-from-incident`
+  - `x07 wasm device index validate`
+  - `x07 wasm device profile validate`
+  - `x07 wasm device build`
+  - `x07 wasm device verify`
+  - `x07 wasm device run`
+  - `x07 wasm device package`
   - `x07 wasm app contracts validate`
   - `x07 wasm app profile validate`
   - `x07 wasm app build`
   - `x07 wasm app serve`
   - `x07 wasm app test`
+  - `x07 wasm app pack`
+  - `x07 wasm app verify`
   - `x07 wasm app regress from-incident`
+  - `x07 wasm deploy plan`
+  - `x07 wasm slo eval`
 
-See: [WASM (Phases 0–3)](wasm.md).
+For platform-facing remote deploy workflows, the supported wasm contract surface is:
+
+- `x07 wasm app pack`
+- `x07 wasm app verify`
+- `x07 wasm deploy plan`
+- `x07 wasm slo eval`
+- `x07 wasm app regress from-incident`
+
+See: [WASM](wasm.md).
 
 ### Doctor (platform prerequisites)
 
@@ -76,6 +125,8 @@ See: [WASM (Phases 0–3)](wasm.md).
 - `x07 fmt --write <path>...`
 - `x07 fmt --input <path> --check`
 - `x07 fmt --input <path> --write`
+
+Add `--pretty` to produce deterministic multi-line formatting intended for human editing/review (default: canonical one-line JSON).
 
 `--input` may be repeated. Positional `<path>` inputs may also be repeated. Each `<path>` may be a file or a directory; directory inputs are scanned recursively for `*.x07.json`.
 
@@ -144,8 +195,8 @@ See: [Architecture check](arch-check.md).
 - `x07 review diff --from <path> --to <path> --html-out <path>`
 - `x07 review diff --from <path> --to <path> --html-out <path> --json-out <path>`
   - Produces an intent-level semantic diff for x07AST/project/arch/policy changes.
-  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi`.
-  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.1.0"`).
+  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|recursion-proof-coverage-decrease|async-proof-coverage-decrease|summary-downgrade|assumption-surface-widen|dev-only-assumption-introduced|bounded-proof-introduced|coverage-summary-imported|operational-entry-diverges|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled|network-allowlist-widen|peer-policy-relaxation|capsule-network-surface-widen|package-set-change|lockfile-hash-change|advisory-allowance-enabled`.
+  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.5.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -159,6 +210,21 @@ See: [Review & trust artifacts](review-trust.md).
   - Dependency capability policy: `--deps-cap-policy <path>` (safe relative path) + CI gate `--fail-on deps-capability`.
   - Supports CI gates via `--strict` and `--fail-on ...`.
   - JSON schema: `spec/x07-trust.report.schema.json` (`schema_version: "x07.trust.report@0.1.0"`).
+- `x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry <sym>`
+  - Validates a certification profile against the current project posture.
+  - Built-in profile line: `verified_core_pure_v1`, `trusted_program_sandboxed_local_v1`, `trusted_program_sandboxed_net_v1`, and `certified_capsule_v1` (`x07.trust.profile@0.4.0`).
+  - Strong profiles validate `project.operational_entry_symbol`, optional `project.certification_entry_symbol`, per-symbol prove requirements, and coverage-import policy before certification starts.
+- `x07 trust capsule check --index arch/capsules/index.x07capsule.json --project x07.json`
+  - Validates a capsule index plus referenced contracts/attestations.
+- `x07 trust capsule attest --contract <path> --module <path>... --lockfile x07.lock.json --conformance-report <path> --out <path>`
+  - Emits a deterministic `x07.capsule.attest@0.2.0` artifact for a certified capsule.
+- `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry <sym> --out-dir target/cert`
+  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, proof inventory, proof assumptions, proof-check acceptance metadata, formal-verification scope fields, compile attestation evidence, dependency-closure evidence, and any observed capsule/runtime/peer-policy evidence references (`x07.trust.certificate@0.7.0`).
+  - Strong profiles reject surrogate certification entries, coverage-only imports, developer-only imported stubs, and bounded recursive proof usage.
+
+- `x07 prove check --proof <path>`
+  - Independently checks a proof object emitted by `x07 verify --prove --emit-proof`.
+  - JSON schema: `spec/x07-verify.proof-check.report.schema.json` (`schema_version: "x07.verify.proof_check.report@0.2.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -230,18 +296,36 @@ See: [Property-based testing](pbt.md).
 
 - `x07 verify --bmc --entry <sym>`
 - `x07 verify --smt --entry <sym>`
+- `x07 verify --prove --entry <sym>`
+- `x07 verify --coverage --entry <sym>`
   - `--project <path>` (or one/more `--module-root <dir>`)
   - `--unwind <n>` (CBMC loop unwinding bound)
   - `--max-bytes-len <n>` (bound for `bytes` / `bytes_view` params)
+  - `--proof-summary <path>` (import reviewed proof-summary artifacts from `x07 verify --prove`)
+  - `--summary <path>` (deprecated alias for `--proof-summary`)
+  - `--allow-imported-stubs` (developer-only proof mode)
+  - `--emit-proof <path>` (emit proof object and proof-check artifacts for independent checking)
 
 Notes:
 
-- v0.1 verifies only a selected subset: `defn` targets only (no `defasync`), no recursion, and `for` loops must have literal bounds.
-- v0.1 supports params: `i32`, `u32`, `bytes`, `bytes_view` (use a wrapper if you need other types).
+- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, and `for` loops with non-literal bounds remain unsupported.
+- Direct `--prove` inputs currently support `i32`, `u32`, raw `bytes`, raw `bytes_view`, raw `vec_u8`, `option_i32`, `option_bytes`, `option_bytes_view`, `result_i32`, `result_bytes`, and `result_bytes_view`.
+- Direct prove inputs accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
+- That means schema-derived record and tagged-union documents can be proved directly as `bytes_view@brand` inputs, with the generated verify driver running the validator before it constructs the branded view seen by the proof target.
+- Owned branded `bytes` and nested result carriers are still rejected explicitly.
 - `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
+- `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
+- `--prove` reports include `proof_summary` for the solver engine, recursion kind, `decreases` usage, unwind-bounded recursion, and the reachable dependency symbol set.
+- `--coverage` emits a reachable-closure support artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including `supported*` counters plus per-function `support_summary`, alongside `trusted_scheduler_model` and `capsule_boundary` statuses when they apply.
+- `--coverage` and `--prove` emit reusable coverage/support summaries (`x07.verify.summary@0.2.0`, `summary_kind = "coverage_support"`). These are posture artifacts only and do not satisfy proof requirements.
+- Successful `--prove` runs emit reusable proof summaries (`x07.verify.proof_summary@0.2.0`, `summary_kind = "proof"`). Pass them back with `--proof-summary <path>` when a reviewed reachable dependency sits outside the currently loaded module roots.
+- Coverage/support summaries are rejected anywhere proof imports are required.
+- When `--emit-proof <path>` is set, `x07 verify --prove` also emits a proof object plus a proof-check report that `x07 prove check` can semantically replay independently.
+- Async `--prove` failures emit `x07.verify.cex@0.2.0`, including `await_invariant`, `scope_invariant`, and `cancellation_ensures` counterexamples when those checks fail.
 - Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
+- Async proof coverage is lowered through the trusted scheduler model catalog at `catalog/verify_scheduler_model.json`.
 
-Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.1.0"`).
+Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.8.0"`).
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 
@@ -277,6 +361,7 @@ Doc report schema: `docs/spec/schemas/x07-doc.report.schema.json`.
 
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --write`
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --check`
+- `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --emit-boundary-stub --write`
 - `x07 schema derive --json ...`
 
 See: [Schema derive](schema-derive.md).
@@ -298,7 +383,9 @@ See: [State machines](state-machines.md).
 - `x07 pkg remove <name>`
 - `x07 pkg remove <name> --sync`
 - `x07 pkg versions <name>`
+- `x07 pkg versions <name> --refresh`
 - `x07 pkg lock --project x07.json`
+- `x07 pkg attest-closure --project x07.json --out <path>`
 - `x07 pkg provides <module-id>`
 - `x07 pkg pack --package <dir> --out <path>`
 - `x07 pkg login --index <registry_url>`
@@ -309,9 +396,11 @@ Notes:
 - `x07 pkg add <name>@<version>` edits `x07.json` only (no network) unless you pass `--sync`.
 - `x07 pkg add <name>` consults the index to resolve a version (network unless you use a file-based index).
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
+- `x07 pkg attest-closure` emits `x07.dep.closure.attest@0.1.0` and exits with code `20` when the closure is materialized but yanked/advisory policy fails.
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
-- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.3.0`; `x07.project@0.2.0` is accepted for legacy manifests but does not support `project.patch`).
+- Sparse index reads (including `x07 pkg versions`) may be cached; use `x07 pkg versions --refresh <name>` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
+- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.4.0`; `x07.project@0.2.0` and `x07.project@0.3.0` are accepted for legacy manifests, but the current certification surfaces use `project.operational_entry_symbol` and related `0.4.0` fields).
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
 ### Project check (no emit)
@@ -340,11 +429,13 @@ See: [Embedding in C](embedding-in-c.md).
 - `x07 bundle --project x07.json --profile os --out dist/mytool`
   - Produces a native CLI executable (standard `argc/argv`, raw stdout).
   - Runs without the X07 toolchain installed at runtime.
+- `x07 bundle --project x07.json --profile os --solve-fuel <u64> --out dist/mytool`
+  - Overrides the initial solve fuel cap (otherwise `profile.solve_fuel`, then the built-in default).
 - `x07 bundle --project x07.json --profile sandbox --out dist/mytool`
   - Bundles a VM-backed sandbox bundle by default (requires a base policy via profile or `--policy`).
   - To emit a legacy policy-only bundle (weaker isolation), add: `--sandbox-backend os --i-accept-weaker-isolation`.
 
-Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.2.0"`).
+Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.4.0"`).
 
 ### Running programs (canonical)
 
@@ -359,6 +450,8 @@ Use `x07 run` as the canonical entry point for execution. Prefer intent-driven p
 - `x07 run --repair=off`
 - `x07 run --repair=memory`
 - `x07 run --repair=write` (default)
+
+For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes `x07.runtime.attest@0.2.0` and records the reference in the runner and wrapped reports.
 
 For the complete guide (targets, worlds, input, policies, reports), see [Running programs](running-programs.md).
 

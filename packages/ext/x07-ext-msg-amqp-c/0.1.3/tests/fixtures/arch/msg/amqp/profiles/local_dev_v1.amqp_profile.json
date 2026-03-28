@@ -1,0 +1,10 @@
+{
+  "schema_version": "x07.arch.msg.amqp.profile@0.1.0",
+  "id": "local_dev_v1",
+  "v": 1,
+  "host": "127.0.0.1",
+  "port": 5672,
+  "vhost": "/",
+  "auth": { "username_secret_id": "", "password_secret_id": "" },
+  "limits": { "max_body_bytes": 1048576, "prefetch_count": 100, "max_poll_items": 100 }
+}

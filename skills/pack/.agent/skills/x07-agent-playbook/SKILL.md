@@ -66,7 +66,16 @@ Canonical docs:
    - `x07 bundle --profile os --out dist/app`
    - `x07 bundle --profile sandbox --out dist/app` (policy enforced)
 
-6. If you need explicit diagnostics or tighter control than the default auto-repair loop:
+6. For formal verification or certificate-oriented review flows, use the public trust surface directly:
+   - `x07 verify --prove --entry <sym>`
+   - `x07 trust profile check --project x07.json --profile <profile.json> --entry <sym>`
+   - `x07 trust capsule check --project x07.json --index arch/capsules/index.x07capsule.json` when capsules are in scope
+   - `x07 pkg attest-closure --project x07.json --out arch/trust/dependency_closure.attest.json` for networked certification profiles
+   - `x07 trust certify --project x07.json --profile <profile.json> --entry <sym> --out-dir target/cert`
+
+   Read the certificate artifacts (`summary.html`, `certificate.json`, prove/coverage reports) instead of treating trust as a hidden internal process.
+
+7. If you need explicit diagnostics or tighter control than the default auto-repair loop:
    - `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
 
 Keep each iteration small and checkable; if a repair loop does not converge quickly, stop and re-evaluate the approach.
@@ -87,15 +96,18 @@ module files under `modules/` and run tests via `x07 test --manifest tests/tests
   - SBOM artifact (default CycloneDX): `target/trust/trust.sbom.cdx.json`
   - Dependency capability gate: add `--fail-on deps-capability` and provide `x07.deps.capability-policy.json`
 
-- Function contracts + bounded verification artifacts:
+- Function contracts + certification artifacts:
   - add `requires` / `ensures` / `invariant` clauses on a `defn`
-  - run `x07 verify --bmc|--smt --entry <sym>` (subset supported in v0.1)
+  - add `decreases[]` when certifying pure self-recursive `defn`
+  - run `x07 verify --prove --entry <sym>` for proof and coverage artifacts
+  - run `x07 trust profile check` before `x07 trust certify`
+  - for networked profiles, bind the reviewed dependency set with `x07 pkg attest-closure`
 
 ## Recommended project layout (single canonical shape)
 
 For app projects (`x07 init`):
 
-- `x07.json`: project manifest (`x07.project@0.3.0`; `x07.project@0.2.0` is legacy compatibility)
+- `x07.json`: project manifest (`x07.project@0.3.0`; do not author new manifests on `x07.project@0.2.0`)
 - `x07.lock.json`: project lockfile (or `lockfile` configured in `x07.json`)
 - `src/main.x07.json`: entry
 - `src/`: module roots
@@ -108,6 +120,14 @@ For publishable package repos (`x07 init --package`):
 - `x07.json`: minimal project manifest for local tests
 - `modules/`: module roots (publishable modules layout)
 - `tests/tests.json`: test manifest
+
+For certification-oriented projects, start from the matching scaffold:
+
+- `x07 init --template verified-core-pure`
+- `x07 init --template trusted-sandbox-program`
+- `x07 init --template trusted-network-service`
+- `x07 init --template certified-capsule`
+- `x07 init --template certified-network-capsule`
 
 ## Choosing packages (canonical)
 

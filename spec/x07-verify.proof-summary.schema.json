@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.proof-summary.schema.json",
+  "title": "x07.verify.proof_summary@0.2.0",
+  "description": "Reusable proof evidence emitted only by successful `x07 verify --prove` runs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "summary_kind",
+    "symbol",
+    "kind",
+    "decl_sha256_hex",
+    "result_kind",
+    "engine",
+    "recursion_kind",
+    "recursion_bound_kind",
+    "dependency_symbols",
+    "assumptions"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.verify.proof_summary@0.2.0" },
+    "summary_kind": { "const": "proof" },
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "kind": { "type": "string", "enum": ["defn", "defasync"] },
+    "decl_sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "result_kind": { "type": "string", "enum": ["proven", "proven_async"] },
+    "engine": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "recursion_kind": { "type": "string", "enum": ["none", "self_recursive", "mutual"] },
+    "recursion_bound_kind": {
+      "type": "string",
+      "enum": ["none", "bounded_by_unwind", "unbounded"]
+    },
+    "dependency_symbols": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 2048 },
+      "default": []
+    },
+    "proof_object_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/assumption" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "subject", "certifiable"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "trusted_builtin",
+            "imported_proof_summary",
+            "imported_stub",
+            "trusted_scheduler_model",
+            "capsule_boundary",
+            "runtime_evidence"
+          ]
+        },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "digest": {
+          "anyOf": [
+            { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "certifiable": { "type": "boolean" }
+      }
+    }
+  }
+}

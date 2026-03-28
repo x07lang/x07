@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.arch.boundaries.index@0.1.0",
+  "boundaries": [
+    {
+      "id": "example.main_v1",
+      "symbol": "example.main",
+      "node_id": "example_core",
+      "kind": "public_function",
+      "from_zone": "verified_core",
+      "to_zone": "verified_core",
+      "worlds_allowed": ["solve-pure"],
+      "input": {
+        "params": [{ "name": "x", "ty": "i32" }]
+      },
+      "output": { "ty": "i32" },
+      "smoke": {
+        "entry": "tests.core.smoke_identity",
+        "tests": ["smoke/identity"]
+      },
+      "pbt": {
+        "required": true,
+        "tests": ["pbt/main_deterministic"]
+      },
+      "verify": {
+        "required": true,
+        "mode": "prove"
+      }
+    }
+  ]
+}

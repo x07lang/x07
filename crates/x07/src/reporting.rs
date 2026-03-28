@@ -362,8 +362,10 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "fix"
             | "build"
             | "check"
+            | "service"
             | "cli"
             | "pkg"
+            | "prove"
             | "review"
             | "trust"
             | "doc"
@@ -406,12 +408,25 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "sarif",
         ],
         "pkg" => &[
-            "add", "remove", "versions", "pack", "lock", "provides", "login", "publish",
+            "add",
+            "remove",
+            "versions",
+            "pack",
+            "lock",
+            "attest-closure",
+            "provides",
+            "login",
+            "publish",
         ],
         "policy" => &["init"],
+        "prove" => &["check"],
         "review" => &["diff"],
-        "trust" => &["report"],
+        "trust" => &["report", "profile", "capsule", "certify"],
+        "trust.profile" => &["check"],
+        "trust.capsule" => &["check", "attest"],
         "schema" => &["derive"],
+        "service" => &["archetypes", "genpack", "validate"],
+        "service.genpack" => &["schema", "grammar"],
         "sm" => &["check", "gen"],
         "rr" => &["record"],
         "patch" => &["apply"],
@@ -544,7 +559,7 @@ pub struct MetaDelta {
 #[allow(clippy::too_many_arguments)]
 pub fn build_report<T: Serialize>(
     scope: Option<&str>,
-    report_semver: &str,
+    schema_version: &str,
     started: Instant,
     raw_argv: &[OsString],
     exit_code: u8,
@@ -571,7 +586,7 @@ pub fn build_report<T: Serialize>(
     }
 
     ToolReport {
-        schema_version: schema_id_for_scope(scope, report_semver),
+        schema_version: schema_version.to_string(),
         command: command_id_for_scope(scope),
         ok,
         exit_code,

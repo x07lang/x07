@@ -54,7 +54,7 @@ For `run-os-sandboxed` with `sandbox_backend=vm`, execution is split into two VM
 1. **Build phase**: compile inside a VM and write a compiled artifact to `/x07/out/compiled-out` (network is always disabled).
 2. **Run phase**: run the compiled artifact in a fresh VM, mounting only the policy-declared filesystem roots and applying VM-boundary restrictions (network remains disabled unless explicitly allowed by policy).
 
-The final runner report schema stays the same: `compile` is from the build phase and `solve` is from the run phase.
+The final runner report schema stays the same: `compile` is from the build step and `solve` is from the run step.
 
 ## Networking at the VM boundary
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +23,7 @@ def iso_utc_now() -> str:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", required=True, help="Release tag (for example: v0.1.40)")
+    ap.add_argument("--tag", required=True, help="Release tag (for example: v0.1.102)")
     ap.add_argument("--dist", type=Path, default=Path("dist"), help="Artifacts directory (default: dist)")
     ap.add_argument(
         "--base-url",
@@ -30,6 +31,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Base URL used for asset downloads (default: GitHub releases/download/<tag>)",
     )
     ap.add_argument("--out", type=Path, default=Path("dist/channels.json"), help="Output path (default: dist/channels.json)")
+    ap.add_argument(
+        "--channel-out-dir",
+        type=Path,
+        default=Path("dist/channels"),
+        help="Directory for per-channel bundle manifests (default: dist/channels)",
+    )
+    ap.add_argument(
+        "--bundle",
+        type=Path,
+        default=None,
+        help="Optional x07.release.bundle@0.1.0 file to publish as channels/stable.json",
+    )
     return ap.parse_args(argv)
 
 
@@ -64,14 +77,28 @@ def main(argv: list[str]) -> int:
         ("aarch64-unknown-linux-gnu", "tar.gz"),
         ("x86_64-apple-darwin", "tar.gz"),
         ("aarch64-apple-darwin", "tar.gz"),
+        ("x86_64-pc-windows-msvc", "zip"),
     ]
 
     toolchain_assets: dict[str, dict] = {}
     x07up_assets: dict[str, dict] = {}
 
     for target, fmt in targets:
-        toolchain_name = f"x07-{tag}-{target}.{fmt}"
-        toolchain_path = dist / toolchain_name
+        toolchain_candidates = [
+            f"x07-{tag}-{target}.{fmt}",
+            f"x07-{tag.removeprefix('v')}-{target}.{fmt}",
+        ]
+        toolchain_path = None
+        toolchain_name = None
+        for candidate in toolchain_candidates:
+            candidate_path = dist / candidate
+            if candidate_path.is_file():
+                toolchain_path = candidate_path
+                toolchain_name = candidate
+                break
+        if toolchain_path is None or toolchain_name is None:
+            toolchain_path = dist / toolchain_candidates[0]
+            toolchain_name = toolchain_candidates[0]
         if toolchain_path.is_file():
             toolchain_assets[target] = artifact_entry(
                 path=toolchain_path,
@@ -125,6 +152,29 @@ def main(argv: list[str]) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"ok: wrote {out}")
+
+    bundle_path = args.bundle
+    if bundle_path is None:
+        bundle_path = dist / "release" / f"x07-{tag.removeprefix('v')}-bundle.json"
+    bundle_path = bundle_path.resolve()
+    if bundle_path.is_file():
+        channel_dir = args.channel_out_dir.resolve()
+        channel_dir.mkdir(parents=True, exist_ok=True)
+        stable_path = channel_dir / "stable.json"
+        try:
+            bundle_doc = json.loads(bundle_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise SystemExit(f"ERROR: failed to parse bundle manifest {bundle_path}: {e}")
+        if not isinstance(bundle_doc, dict):
+            raise SystemExit(f"ERROR: bundle manifest must be a JSON object: {bundle_path}")
+        if bundle_doc.get("schema_version") != "x07.release.bundle@0.1.0":
+            raise SystemExit(
+                f"ERROR: unexpected bundle schema_version: {bundle_doc.get('schema_version')!r}"
+            )
+        if bundle_doc.get("channel") != "stable":
+            raise SystemExit(f"ERROR: bundle manifest is not stable: {bundle_path}")
+        shutil.copy2(bundle_path, stable_path)
+        print(f"ok: wrote {stable_path}")
     return 0
 
 

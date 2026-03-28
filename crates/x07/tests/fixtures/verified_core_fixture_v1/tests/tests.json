@@ -1,0 +1,37 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "id": "smoke/fixture_identity",
+      "entry": "tests.core.smoke_fixture_identity",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "pbt/fixture_main_deterministic",
+      "entry": "tests.core.pbt_fixture_main_deterministic",
+      "expect": "pass",
+      "world": "solve-pure",
+      "returns": "bytes_status_v1",
+      "pbt": {
+        "cases": 8,
+        "max_shrinks": 32,
+        "params": [
+          {
+            "name": "payload",
+            "gen": {
+              "kind": "bytes",
+              "max_len": 4
+            }
+          }
+        ],
+        "case_budget": {
+          "fuel": 100000,
+          "timeout_ms": 250,
+          "max_mem_bytes": 16777216,
+          "max_output_bytes": 65536
+        }
+      }
+    }
+  ]
+}

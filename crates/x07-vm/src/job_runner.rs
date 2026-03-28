@@ -5,10 +5,12 @@ use anyhow::{Context, Result};
 use crate::{
     apple_container_cleanup, apple_container_hard_kill, container_id_from_run_id, docker_cleanup,
     docker_hard_kill, firecracker_ctr_cleanup, firecracker_ctr_config_from_env,
-    firecracker_ctr_hard_kill, podman_cleanup, podman_hard_kill, run_apple_container, run_docker,
-    run_firecracker_ctr, run_podman, spawn_reaper, spawn_vz_helper, sweep_orphans_best_effort,
-    touch_done_marker, vz_cleanup_scratch, wait_child_output_capped, write_job_file, x07_label_set,
-    CtrJob, FirecrackerCtrConfig, RunOutput, RunSpec, VmBackend, VmCaps, VmJob,
+    firecracker_ctr_hard_kill, podman_cleanup, podman_hard_kill, run_apple_container,
+    run_apple_container_passthrough, run_docker, run_docker_passthrough, run_firecracker_ctr,
+    run_firecracker_ctr_passthrough, run_podman, run_podman_passthrough, spawn_reaper,
+    spawn_vz_helper, spawn_vz_helper_passthrough, sweep_orphans_best_effort, touch_done_marker,
+    vz_cleanup_scratch, wait_child_output_capped, wait_child_passthrough, write_job_file,
+    x07_label_set, CtrJob, FirecrackerCtrConfig, RunOutput, RunSpec, VmBackend, VmCaps, VmJob,
 };
 
 pub struct VmJobRunParams<'a> {
@@ -72,6 +74,24 @@ impl VmDriver for DefaultVmDriver {
 }
 
 pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutput> {
+    run_vm_job_mode(spec, params, VmIoMode::Capture)
+}
+
+pub fn run_vm_job_passthrough(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutput> {
+    run_vm_job_mode(spec, params, VmIoMode::Passthrough)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VmIoMode {
+    Capture,
+    Passthrough,
+}
+
+fn run_vm_job_mode(
+    spec: &RunSpec,
+    params: VmJobRunParams<'_>,
+    io_mode: VmIoMode,
+) -> Result<RunOutput> {
     let container_id = container_id_from_run_id(&spec.run_id)?;
 
     let job_file = params.state_dir.join("job.json");
@@ -104,7 +124,10 @@ pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutpu
 
     let out = match spec.backend {
         VmBackend::Vz => {
-            let spawned = spawn_vz_helper(spec, params.state_dir)?;
+            let spawned = match io_mode {
+                VmIoMode::Capture => spawn_vz_helper(spec, params.state_dir)?,
+                VmIoMode::Passthrough => spawn_vz_helper_passthrough(spec, params.state_dir)?,
+            };
 
             let job = VmJob {
                 schema_version: crate::VM_JOB_SCHEMA_VERSION.to_string(),
@@ -121,12 +144,17 @@ pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutpu
             write_job_file(&job_file, &job)?;
             spawn_reaper(params.reaper_bin, &job_file)?;
 
-            let out = wait_child_output_capped(
-                spawned.child,
-                spec.limits.wall_ms,
-                spec.limits.max_stdout_bytes,
-                spec.limits.max_stderr_bytes,
-            )?;
+            let out = match io_mode {
+                VmIoMode::Capture => wait_child_output_capped(
+                    spawned.child,
+                    spec.limits.wall_ms,
+                    spec.limits.max_stdout_bytes,
+                    spec.limits.max_stderr_bytes,
+                )?,
+                VmIoMode::Passthrough => {
+                    wait_child_passthrough(spawned.child, spec.limits.wall_ms)?
+                }
+            };
             let _ = vz_cleanup_scratch(params.state_dir);
             out
         }
@@ -146,7 +174,12 @@ pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutpu
             };
             write_job_file(&job_file, &job)?;
             spawn_reaper(params.reaper_bin, &job_file)?;
-            run_apple_container(spec, &container_id, &labels)?
+            match io_mode {
+                VmIoMode::Capture => run_apple_container(spec, &container_id, &labels)?,
+                VmIoMode::Passthrough => {
+                    run_apple_container_passthrough(spec, &container_id, &labels)?
+                }
+            }
         }
 
         VmBackend::Docker => {
@@ -164,7 +197,10 @@ pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutpu
             };
             write_job_file(&job_file, &job)?;
             spawn_reaper(params.reaper_bin, &job_file)?;
-            run_docker(spec, &container_id, &labels)?
+            match io_mode {
+                VmIoMode::Capture => run_docker(spec, &container_id, &labels)?,
+                VmIoMode::Passthrough => run_docker_passthrough(spec, &container_id, &labels)?,
+            }
         }
 
         VmBackend::Podman => {
@@ -182,7 +218,10 @@ pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutpu
             };
             write_job_file(&job_file, &job)?;
             spawn_reaper(params.reaper_bin, &job_file)?;
-            run_podman(spec, &container_id, &labels)?
+            match io_mode {
+                VmIoMode::Capture => run_podman(spec, &container_id, &labels)?,
+                VmIoMode::Passthrough => run_podman_passthrough(spec, &container_id, &labels)?,
+            }
         }
 
         VmBackend::FirecrackerCtr => {
@@ -209,7 +248,12 @@ pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutpu
             write_job_file(&job_file, &job)?;
             spawn_reaper(params.reaper_bin, &job_file)?;
 
-            run_firecracker_ctr(spec, cfg, &container_id, &labels)?
+            match io_mode {
+                VmIoMode::Capture => run_firecracker_ctr(spec, cfg, &container_id, &labels)?,
+                VmIoMode::Passthrough => {
+                    run_firecracker_ctr_passthrough(spec, cfg, &container_id, &labels)?
+                }
+            }
         }
     };
 

@@ -13,8 +13,8 @@
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.8",
-      "version": "0.1.8"
+      "path": ".x07/deps/ext-data-model/0.1.10",
+      "version": "0.1.10"
     },
     {
       "name": "ext-decimal-rs",
@@ -33,13 +33,13 @@
     },
     {
       "name": "ext-json-rs",
-      "path": ".x07/deps/ext-json-rs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-json-rs/0.1.6",
+      "version": "0.1.6"
     },
     {
       "name": "ext-msgpack-rs",
-      "path": ".x07/deps/ext-msgpack-rs/0.1.6",
-      "version": "0.1.6"
+      "path": ".x07/deps/ext-msgpack-rs/0.1.8",
+      "version": "0.1.8"
     },
     {
       "name": "ext-toml-rs",
@@ -72,6 +72,6 @@
       "world": "run-os"
     }
   },
-  "schema_version": "x07.project@0.2.0",
+  "schema_version": "x07.project@0.4.0",
   "world": "run-os"
 }

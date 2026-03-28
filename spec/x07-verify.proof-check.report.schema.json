@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.proof-check.report.schema.json",
+  "title": "x07.verify.proof_check.report@0.2.0",
+  "description": "Independent semantic proof-check report emitted by `x07 prove check`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ok",
+    "proof_object_digest",
+    "checker",
+    "result",
+    "symbol",
+    "entry_symbol",
+    "verify_engine",
+    "expected_obligation_digest",
+    "replayed_obligation_digest",
+    "expected_solver_result",
+    "replayed_solver_result"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.verify.proof_check.report@0.2.0" },
+    "ok": { "type": "boolean" },
+    "proof_object_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "checker": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "result": { "type": "string", "enum": ["accepted", "rejected"] },
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "entry_symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "verify_engine": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "expected_obligation_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "replayed_obligation_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "expected_solver_result": {
+      "type": "string",
+      "enum": ["unsat", "sat", "unknown"]
+    },
+    "replayed_solver_result": {
+      "type": "string",
+      "enum": ["unsat", "sat", "unknown"]
+    },
+    "validated_imported_proof_summary_digests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "default": []
+    },
+    "validated_scheduler_model_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic"
+      },
+      "default": []
+    }
+  }
+}

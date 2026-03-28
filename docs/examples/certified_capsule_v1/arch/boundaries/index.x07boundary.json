@@ -1,0 +1,39 @@
+{
+  "schema_version": "x07.arch.boundaries.index@0.1.0",
+  "boundaries": [
+    {
+      "id": "capsule.main",
+      "symbol": "capsule.main",
+      "node_id": "capsule_code",
+      "kind": "public_function",
+      "from_zone": "certified_capsule",
+      "to_zone": "certified_capsule",
+      "worlds_allowed": ["run-os-sandboxed"],
+      "input": {
+        "params": [
+          {
+            "name": "payload",
+            "ty": "bytes_view",
+            "brand": "certified_capsule.request_v1"
+          }
+        ]
+      },
+      "output": {
+        "ty": "bytes",
+        "brand": "certified_capsule.response_v1"
+      },
+      "smoke": {
+        "entry": "tests.core.smoke_capsule",
+        "tests": ["smoke/capsule_echo"]
+      },
+      "pbt": {
+        "required": false,
+        "tests": []
+      },
+      "verify": {
+        "required": true,
+        "mode": "prove"
+      }
+    }
+  ]
+}

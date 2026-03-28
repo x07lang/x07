@@ -2,7 +2,7 @@
 
 X07’s canonical installer is `x07up` (toolchain manager).
 
-The bootstrap script (`install.sh`) installs `x07up`, then `x07up` installs the selected toolchain and sets up `~/.x07/bin/` shims. On Windows, run the bootstrap inside WSL2.
+The bootstrap script (`install.sh`) installs `x07up`, then `x07up` installs the selected toolchain and sets up `~/.x07/bin/` shims. After bootstrap, `x07up` reads the per-channel bundle manifest (`/install/channels/<channel>.json`) to resolve compatible component versions. On Windows, run the bootstrap inside WSL2.
 
 Quickstart: see [Install](install.md).
 
@@ -51,25 +51,38 @@ curl -fsSL https://x07lang.org/install.sh | sh -s -- \
 3. global default from `~/.x07/config.json`
 4. fallback: `stable` (but `x07up` never auto-installs; you must run `x07up install`)
 
+## Component management
+
+Use `x07up` to install/update runtime components that must track the active core release bundle:
+
+```bash
+x07up component add wasm
+x07up component add device-host
+x07up component update
+x07up component list
+```
+
+`x07up component update` reads the bundle published for the active installed toolchain tag, so component upgrades stay on the compatibility line blessed by that core release.
+
 ## Pinning per project
 
 Write `x07-toolchain.toml`:
 
 ```bash
-x07up override set v0.1.40
+x07up override set v0.1.102
 ```
 
 This writes a file like:
 
 ```toml
 [toolchain]
-channel = "v0.1.40"
+channel = "v0.1.102"
 components = ["docs", "skills"]
 ```
 
 Notes:
 
-- `channel` can be `stable` or a specific tag like `v0.1.40`.
+- `channel` can be `stable` or a specific tag like `v0.1.102`.
 - `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:

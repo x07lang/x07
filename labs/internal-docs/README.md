@@ -18,6 +18,7 @@ Quick entry points:
 - Rename note: `rename.md`
 - Stream pipe internals: `spec/stream-pipe.md`
 - MCP kit release policy: `mcp/ecosystem-release.md`
+- x07 Platform (x07lp): see `x07lang/x07-platform` for the shared Rust driver, Command Center surface, and canonical `lp.*` schemas mirrored into `x07-registry-web`
 
 End-user package contracts live under:
 

@@ -122,7 +122,9 @@ fi
 
 echo "==> extract kernel from $kernel_image"
 kernel_path="$stage/kernel"
-docker run --rm --entrypoint cat "$kernel_image" /kernel >"$kernel_path"
+kernel_cid="$(docker create "$kernel_image" true)"
+docker cp "$kernel_cid:/kernel" "$kernel_path"
+docker rm -f "$kernel_cid" >/dev/null 2>&1 || true
 chmod 0644 "$kernel_path" || true
 
 cmdline_path="$stage/cmdline.txt"

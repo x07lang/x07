@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["kernel.quote_total_cents_v1"]},{"body":["*","items_count","unit_price_cents"],"kind":"defn","name":"kernel.quote_total_cents_v1","params":[{"name":"items_count","ty":"i32"},{"name":"unit_price_cents","ty":"i32"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"kernel","schema_version":"x07.x07ast@0.8.0"}

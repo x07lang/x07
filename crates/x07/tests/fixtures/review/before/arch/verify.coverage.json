@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.verify.coverage@0.1.0",
+  "entry": "app.main",
+  "worlds": ["solve-pure"],
+  "summary": {
+    "reachable_defn": 2,
+    "proven_defn": 2,
+    "trusted_primitives": 1,
+    "uncovered_defn": 0,
+    "unsupported_defn": 0
+  },
+  "functions": [
+    { "symbol": "app.main", "kind": "defn", "status": "proven" }
+  ]
+}

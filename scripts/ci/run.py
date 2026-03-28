@@ -133,7 +133,13 @@ def jobs_for_profile(profile: str, root: Path) -> list[Job]:
         return jobs
 
     if profile == "release":
-        return pr_jobs + [Job("asan.c-backend", ["bash", "scripts/ci/check_asan_c_backend.sh"])]
+        jobs = pr_jobs + [Job("asan.c-backend", ["bash", "scripts/ci/check_asan_c_backend.sh"])]
+
+        perf = root / "labs" / "scripts" / "ci" / "check_perf_baseline.sh"
+        if perf.is_file():
+            jobs.append(Job("labs.perf-baseline", ["bash", str(perf)]))
+
+        return jobs
 
     raise ValueError(f"unknown profile: {profile!r}")
 

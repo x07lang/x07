@@ -1,0 +1,42 @@
+{
+  "schema_version": "x07.effect.log@0.2.0",
+  "capsule_id": "capsule.main_v1",
+  "events": [
+    {
+      "kind": "connect_attempt",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "peer_policy_id": "loopback_tcp_v1",
+      "transport": "tcp",
+      "host": "127.0.0.1",
+      "port": 30030,
+      "tls_mode": "none",
+      "meta": {
+        "direction": "outbound"
+      }
+    },
+    {
+      "kind": "request_start",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "peer_policy_id": "loopback_tcp_v1",
+      "transport": "tcp",
+      "host": "127.0.0.1",
+      "port": 30030,
+      "tls_mode": "none",
+      "meta": {
+        "shape": "bytes_echo_v1"
+      }
+    },
+    {
+      "kind": "request_finish",
+      "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "peer_policy_id": "loopback_tcp_v1",
+      "transport": "tcp",
+      "host": "127.0.0.1",
+      "port": 30030,
+      "tls_mode": "none",
+      "meta": {
+        "result": "echo"
+      }
+    }
+  ]
+}

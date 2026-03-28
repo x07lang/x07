@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.report.schema.json",
-  "title": "X07 x07 verify report v0.1.0",
+  "title": "X07 x07 verify report v0.8.0",
   "description": "Machine-readable report emitted by `x07 verify`.",
   "type": "object",
   "additionalProperties": false,
@@ -16,12 +16,14 @@
     "exit_code"
   ],
   "properties": {
-    "schema_version": { "const": "x07.verify.report@0.1.0" },
-    "mode": { "type": "string", "enum": ["bmc", "smt"] },
+    "schema_version": { "const": "x07.verify.report@0.8.0" },
+    "mode": { "type": "string", "enum": ["bmc", "smt", "prove", "coverage"] },
     "ok": { "type": "boolean" },
     "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
     "bounds": { "$ref": "#/$defs/bounds" },
     "result": { "$ref": "#/$defs/result" },
+    "proof_summary": { "$ref": "#/$defs/proof_summary" },
+    "coverage": { "$ref": "https://x07.io/spec/x07-verify.coverage.schema.json" },
     "artifacts": { "$ref": "#/$defs/artifacts" },
     "diagnostics_count": { "type": "integer", "minimum": 0 },
     "diagnostics": {
@@ -52,6 +54,9 @@
           "enum": [
             "verified_within_bounds",
             "counterexample_found",
+            "proven",
+            "coverage_report",
+            "unsupported",
             "inconclusive",
             "tool_missing",
             "error"
@@ -70,7 +75,43 @@
         "cbmc_json_path": { "type": "string" },
         "cex_path": { "type": "string" },
         "smt2_path": { "type": "string" },
-        "z3_out_path": { "type": "string" }
+        "z3_out_path": { "type": "string" },
+        "verify_coverage_summary_path": { "type": "string" },
+        "verify_proof_summary_path": { "type": "string" },
+        "proof_object_path": { "type": "string" },
+        "proof_check_report_path": { "type": "string" }
+      }
+    },
+    "proof_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine",
+        "recursion_kind",
+        "has_decreases",
+        "decreases_count",
+        "bounded_by_unwind",
+        "recursion_bound_kind",
+        "dependency_symbols"
+      ],
+      "properties": {
+        "engine": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "recursion_kind": {
+          "type": "string",
+          "enum": ["none", "self_recursive", "mutual"]
+        },
+        "has_decreases": { "type": "boolean" },
+        "decreases_count": { "type": "integer", "minimum": 0 },
+        "bounded_by_unwind": { "type": "boolean" },
+        "recursion_bound_kind": {
+          "type": "string",
+          "enum": ["none", "bounded_by_unwind", "unbounded"]
+        },
+        "dependency_symbols": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "default": []
+        }
       }
     },
     "contract_witness": {
@@ -93,7 +134,15 @@
       "properties": {
         "contract_kind": {
           "type": "string",
-          "enum": ["requires", "ensures", "invariant_entry", "invariant_exit"]
+          "enum": [
+            "requires",
+            "ensures",
+            "invariant_entry",
+            "invariant_exit",
+            "await_invariant",
+            "scope_invariant",
+            "cancellation_ensures"
+          ]
         },
         "fn": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "clause_id": { "type": "string", "minLength": 1, "maxLength": 2048 },
@@ -106,5 +155,26 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "coverage" },
+          "ok": { "const": true }
+        },
+        "required": ["mode", "ok"]
+      },
+      "then": {
+        "required": ["coverage"],
+        "properties": {
+          "result": {
+            "properties": {
+              "kind": { "const": "coverage_report" }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

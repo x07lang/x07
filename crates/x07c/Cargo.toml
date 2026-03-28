@@ -1,6 +1,68 @@
 [package]
 name = "x07c"
-version = "0.1.40"
+version = "0.1.102"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -124,5 +186,9 @@ clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+wasm-encoder = "0.245.1"
 x07-contracts = { path = "../x07-contracts" }
 x07-worlds = { path = "../x07-worlds", features = ["clap"] }
+
+[dev-dependencies]
+wasmparser = "0.245.1"

@@ -231,6 +231,7 @@ impl Elaborator<'_> {
                         requires: Vec::new(),
                         ensures: Vec::new(),
                         invariant: Vec::new(),
+                        protocol: None,
                         params: parsed
                             .params
                             .iter()
@@ -1102,7 +1103,7 @@ fn load_brand_registry_optional_v1(
     load_brand_registry_v1_from_meta_v1(meta)
 }
 
-fn load_brand_registry_v1_from_meta_v1(
+pub fn brand_registry_from_meta_v1(
     meta: &BTreeMap<String, Value>,
 ) -> Result<BTreeMap<String, String>, CompilerError> {
     let Some(v) = meta.get("brands_v1") else {
@@ -1151,6 +1152,12 @@ fn load_brand_registry_v1_from_meta_v1(
     }
 
     Ok(out)
+}
+
+fn load_brand_registry_v1_from_meta_v1(
+    meta: &BTreeMap<String, Value>,
+) -> Result<BTreeMap<String, String>, CompilerError> {
+    brand_registry_from_meta_v1(meta)
 }
 
 fn ensure_brand_validator_sig_v1(

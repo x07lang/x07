@@ -1,0 +1,78 @@
+name: Certified Capsule Certify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  X07_TOOLCHAIN_TAG: "v0.1.79"
+
+jobs:
+  certify:
+    runs-on: [self-hosted, x07-vm-linux-firecracker]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            clang \
+            build-essential \
+            curl \
+            pkg-config \
+            libcurl4-openssl-dev \
+            unzip
+
+      - name: Install formal verification tools
+        shell: bash
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/x07lang/x07/${X07_TOOLCHAIN_TAG}/scripts/ci/install_formal_verification_tools_linux.sh" | bash
+
+      - name: Install x07
+        shell: bash
+        run: cargo install --locked --git https://github.com/x07lang/x07 --tag "$X07_TOOLCHAIN_TAG" x07
+
+      - name: Trust posture checks
+        shell: bash
+        run: |
+          x07 trust profile check \
+            --project x07.json \
+            --profile arch/trust/profiles/certified_capsule_v1.json \
+            --entry capsule.main
+          x07 trust capsule check \
+            --project x07.json \
+            --index arch/capsules/index.x07capsule.json
+
+      - name: Sandboxed tests
+        shell: bash
+        run: x07 test --all --manifest tests/tests.json
+
+      - name: Emit certificate bundle
+        shell: bash
+        run: |
+          x07 trust certify \
+            --project x07.json \
+            --profile arch/trust/profiles/certified_capsule_v1.json \
+            --entry capsule.main \
+            --out-dir target/cert
+
+      - name: Upload certificate bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: certified-capsule-certificate
+          path: target/cert/
+          if-no-files-found: error

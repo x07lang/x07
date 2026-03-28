@@ -46,6 +46,11 @@ impl<'a> Emitter<'a> {
         const JSON_JCS_START: &str = "\n// --- X07_JSON_JCS_START";
         const JSON_JCS_END: &str = "\n// --- X07_JSON_JCS_END";
 
+        const EXT_OBJ_S3_START: &str = "\n// --- X07_EXT_OBJ_S3_START";
+        const EXT_OBJ_S3_END: &str = "\n// --- X07_EXT_OBJ_S3_END";
+        const REGEX_SECTION_START: &str =
+            "\n// Native ext-regex backend entrypoints (linked from deps/x07/libx07_ext_regex.*).";
+
         const STREAM_XF_PLUGIN_START: &str = "\n// --- X07_STREAM_XF_PLUGIN_START";
         const STREAM_XF_PLUGIN_END: &str = "\n// --- X07_STREAM_XF_PLUGIN_END";
 
@@ -54,6 +59,8 @@ impl<'a> Emitter<'a> {
                 || program_uses_head(self.program, "__internal.stream_xf.plugin_init_v1")
                 || program_uses_head(self.program, "__internal.stream_xf.plugin_step_v1")
                 || program_uses_head(self.program, "__internal.stream_xf.plugin_flush_v1");
+
+        let uses_ext_obj_s3 = program_uses_head(self.program, "os.obj.s3.dispatch_v1");
 
         let uses_json_jcs = program_uses_head(self.program, "json.jcs.canon_doc_v1")
             || program_uses_stream_xf_plugin_json_jcs(self.program);
@@ -64,6 +71,17 @@ impl<'a> Emitter<'a> {
             if !uses_json_jcs {
                 preamble =
                     trim_preamble_section(&preamble, JSON_JCS_START, JSON_JCS_END, "json.jcs")?;
+            }
+            if !uses_ext_obj_s3 {
+                preamble = trim_preamble_section(
+                    &preamble,
+                    EXT_OBJ_S3_START,
+                    EXT_OBJ_S3_END,
+                    "ext_obj_s3",
+                )?;
+                preamble = preamble.replace(EXT_OBJ_S3_END, "");
+                preamble =
+                    preamble.replace(&format!("\n{REGEX_SECTION_START}"), REGEX_SECTION_START);
             }
             if !uses_stream_xf_plugin {
                 preamble = trim_preamble_section(
@@ -94,6 +112,12 @@ impl<'a> Emitter<'a> {
         let mut preamble = RUNTIME_C_PREAMBLE.to_string();
         if !uses_json_jcs {
             preamble = trim_preamble_section(&preamble, JSON_JCS_START, JSON_JCS_END, "json.jcs")?;
+        }
+        if !uses_ext_obj_s3 {
+            preamble =
+                trim_preamble_section(&preamble, EXT_OBJ_S3_START, EXT_OBJ_S3_END, "ext_obj_s3")?;
+            preamble = preamble.replace(EXT_OBJ_S3_END, "");
+            preamble = preamble.replace(&format!("\n{REGEX_SECTION_START}"), REGEX_SECTION_START);
         }
         if !uses_stream_xf_plugin {
             preamble = trim_preamble_section(
@@ -2000,6 +2024,7 @@ typedef struct {
 } iface_t;
 
 static __attribute__((noreturn)) void rt_trap(const char* msg);
+static __attribute__((noreturn)) void rt_trap_path(const char* msg, const char* path);
 
 #define RT_IFACE_VTABLE_IO_READER UINT32_C(1)
 #define RT_IFACE_VTABLE_EXT_IO_READER_MIN UINT32_C(2)
@@ -2435,6 +2460,11 @@ bytes_t x07_ext_db_redis_open_v1(bytes_t req, bytes_t caps);
 bytes_t x07_ext_db_redis_cmd_v1(bytes_t req, bytes_t caps);
 bytes_t x07_ext_db_redis_close_v1(bytes_t req, bytes_t caps);
 
+// --- X07_EXT_OBJ_S3_START
+// Native ext-obj-s3 backend entrypoint (linked from deps/x07/libx07_ext_obj_s3.*).
+bytes_t x07_obj_s3_dispatch_v1(bytes_t req, bytes_t caps);
+// --- X07_EXT_OBJ_S3_END
+
 // Native ext-regex backend entrypoints (linked from deps/x07/libx07_ext_regex.*).
 bytes_t x07_ext_regex_compile_opts_v1(bytes_t pat, int32_t opts_u32);
 bytes_t x07_ext_regex_exec_from_v1(bytes_t compiled, bytes_t text, int32_t start_i32);
@@ -2473,6 +2503,27 @@ static __attribute__((noreturn)) void rt_trap(const char* msg) {
   if (msg || (rt_ext_ctx && rt_ext_ctx->trap_ptr)) (void)write(STDERR_FILENO, "\n", 1);
 #else
   (void)msg;
+#endif
+  __builtin_trap();
+}
+
+static __attribute__((noreturn)) void rt_trap_path(const char* msg, const char* path) {
+
+#ifndef X07_FREESTANDING
+  if (msg) (void)write(STDERR_FILENO, msg, strlen(msg));
+  if (path) {
+    (void)write(STDERR_FILENO, " path=", 6);
+    (void)write(STDERR_FILENO, path, strlen(path));
+  }
+  if (rt_ext_ctx && rt_ext_ctx->trap_ptr) {
+    const char* p = rt_ext_ctx->trap_ptr;
+    (void)write(STDERR_FILENO, " ptr=", 5);
+    (void)write(STDERR_FILENO, p, strlen(p));
+  }
+  if (msg || path || (rt_ext_ctx && rt_ext_ctx->trap_ptr)) (void)write(STDERR_FILENO, "\n", 1);
+#else
+  (void)msg;
+  (void)path;
 #endif
   __builtin_trap();
 }
@@ -5752,10 +5803,7 @@ static bytes_t rt_fs_read(ctx_t* ctx, bytes_view_t path) {
   p[path.len] = 0;
 
   FILE* f = fopen(p, "rb");
-  if (!f) {
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.read open failed");
-  }
+  if (!f) rt_trap_path("fs.read open failed", p);
   rt_free(ctx, p, path.len + 1, 1);
 
   if (fseek(f, 0, SEEK_END) != 0) rt_trap("fs.read seek failed");
@@ -5790,10 +5838,7 @@ static bytes_t rt_fs_list_dir(ctx_t* ctx, bytes_view_t path) {
   p[path.len] = 0;
 
   DIR* dir = opendir(p);
-  if (!dir) {
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.list_dir open failed");
-  }
+  if (!dir) rt_trap_path("fs.list_dir open failed", p);
 
   uint32_t count = 0;
   for (;;) {
@@ -5820,11 +5865,7 @@ static bytes_t rt_fs_list_dir(ctx_t* ctx, bytes_view_t path) {
   char** names = (char**)rt_alloc(ctx, count * (uint32_t)sizeof(char*), 8);
 
   dir = opendir(p);
-  if (!dir) {
-    rt_free(ctx, names, names_cap * (uint32_t)sizeof(char*), 8);
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.list_dir open failed");
-  }
+  if (!dir) rt_trap_path("fs.list_dir open failed", p);
 
   uint32_t idx = 0;
   for (;;) {
@@ -5963,10 +6004,7 @@ static uint32_t rt_fs_open_read(ctx_t* ctx, bytes_view_t path) {
   p[path.len] = 0;
 
   FILE* f = fopen(p, "rb");
-  if (!f) {
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.open_read open failed");
-  }
+  if (!f) rt_trap_path("fs.open_read open failed", p);
   rt_free(ctx, p, path.len + 1, 1);
 
   uint32_t ticks = rt_fs_latency_ticks(ctx, path);

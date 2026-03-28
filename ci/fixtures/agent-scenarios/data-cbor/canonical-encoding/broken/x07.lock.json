@@ -13,19 +13,21 @@
         "std.math.bigint.fmt": "98675052af019d828e6e3cdb6aaab763e89acfb53f40d664feb6c1dbfc53f74d",
         "std.math.bigint.parse": "542ab8498c612f921fb2c98e4bf94d8c22be87f2f255799daa0516079bc30a74",
         "std.math.bigint.tests": "1c6d0ec34c448e7bb64a0e43a1d09dcbb1525c0637090f33d1933a24fbe8d1d7"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-cbor-rs",
-      "version": "0.1.6",
-      "path": ".x07/deps/ext-cbor-rs/0.1.6",
-      "package_manifest_sha256": "9cd59ce3603f3baa4fb4df67d3bd62d59d4bf9ea391ee8b1fe9138ae1f94e12a",
+      "version": "0.1.8",
+      "path": ".x07/deps/ext-cbor-rs/0.1.8",
+      "package_manifest_sha256": "dfdb0a45a2dbe591e3d9038aebce547cdf633178564623fe0ca968b2a6693d3a",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.cbor": "5a1c02de55c197cadc96a8eefcfa7a1706ade507c3045de50b5750fe0cd596b7",
-        "ext.cbor.data_model": "383637897d41f07610d38430ec2264e0cabfd369eb931e2b6338d32555ada4eb",
-        "ext.cbor.tests": "bdfbd9141dafdc3181859a85ae7de930ff4c6b6190175abe9c3ab27c707431f8"
-      }
+        "ext.cbor": "fff76e377acfaff61e41e8c39c94a02c2355eb094aa7000d46e0ae18a8a505eb",
+        "ext.cbor.data_model": "184ebf6556cb86de86fe1c44b0c10a197933fd05dfdcd9e8e7b22149caa99233",
+        "ext.cbor.tests": "7900ec3e9f8601ec7d0166a5159dd2e7c0ac41909a8b3d40bd4ae0538e85a748"
+      },
+      "yanked": false
     },
     {
       "name": "ext-csv-rs",
@@ -37,30 +39,32 @@
         "ext.csv": "09f75965c511bc084e99e7e0b82e9e19bde36e67b92b5e1eec22c77a2717d793",
         "ext.csv.data_model": "a4de66fec599d5ef92ca30c056ef4e235a9aff85b74caec7d027c6f3aca9b911",
         "ext.csv.tests": "2f9a4ea717e4d1eec3ae65c561877a574f0813f5c43badf501c5b4c283475582"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-data-model",
-      "version": "0.1.8",
-      "path": ".x07/deps/ext-data-model/0.1.8",
-      "package_manifest_sha256": "256665f4519598ef50953e7cd8fc2b18aefcdeaa4689e82f4fb832892cc3f1e8",
+      "version": "0.1.10",
+      "path": ".x07/deps/ext-data-model/0.1.10",
+      "package_manifest_sha256": "baa4eae2e19ca7a8f0b99dd712658db64802e137dad443dcb451d09508a6a09a",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.data_model": "f725211ff55a6ad1db31f174dfbdcf55beccd7a24e44f8da929ecf7d5d0c0ccb",
-        "ext.data_model.csv": "3535863cd84a4dc45d5068347ca7e6005aae64d596a638e8497810f3f9b562ad",
-        "ext.data_model.csv.tests": "81d708e2f0df89050c2cbabf1ff739a88c0166b03ce95e2a0158f73d24159511",
-        "ext.data_model.ini": "754a6ed3ecda50959762f9629e99537935dd793dc26e2a3394449f653ad3dff3",
-        "ext.data_model.ini.tests": "f13271299d4131a702e33b4d058c98fc9d15f886f29ce93c2c64779f81a00a19",
-        "ext.data_model.json": "6c634e7007fbb19db79262869e9348dc525339c59a5ff013837527bacd5a7294",
-        "ext.data_model.json.tests": "0af030b9b17d03c554364c518841410f9263470d25e1f75ae70c582ad1182f01",
-        "ext.data_model.tests": "620b200c7570a4c6841cba26f5cda5f8451a7996f78bb73aec0ea3f6aafb825a",
-        "ext.data_model.toml": "675037e7d4bee4a8f5ae791eb94e246760296e122977015a010686f6191d2118",
-        "ext.data_model.toml.tests": "bb8bb19c44d0e5a2b296eef2d0e70b005d84317347d48958fbe28a7ee9d2e94b",
-        "ext.data_model.xml": "a58d1ba50f669ab944dfe2621d26cd6cc85df5086470eb23d3d39b77478de140",
-        "ext.data_model.xml.tests": "05017353879a1db1c4578cde7ccac8672b1e0c3f022a7471d79ca21e660934e5",
-        "ext.data_model.yaml": "b6f260ed1c258711422ec36f0b7721b5b590e6e32472c4b23d837b3155865c7c",
-        "ext.data_model.yaml.tests": "9fbb2323670b07f81daf0e339d73aff75cf4e340695ec5f1ae7410339f91609c"
-      }
+        "ext.data_model": "def06160be3f2843479f579c41901b023537e0101ff87099af278b5d0fc31758",
+        "ext.data_model.csv": "bd6f36f25bc0e01480859c59e2302f2865c960f100a95cadefed7fe59f4e0c99",
+        "ext.data_model.csv.tests": "5df3b4a86cf222ca8962cb0ceab2c5fc861437713c36f262bca0fb891cc8614c",
+        "ext.data_model.ini": "e6cc44509901f4b350da17deffcd653b985dc9ec277a72efe523f122bf06a4a4",
+        "ext.data_model.ini.tests": "006b64f4404ba4da08eecaf9af201676fc49797a5a253b80d88236f78aa26e94",
+        "ext.data_model.json": "18353e6e5d43a4e83870c735c6f41115fa521ab6190d2a59d04cb36fbe8e3580",
+        "ext.data_model.json.tests": "1986759fde953f7760104f83ee4ac4c46e17457071c71ba0e3a43dc509d4d65d",
+        "ext.data_model.tests": "77771892bb782ce1fdc7dc0bf45d0404fa35063f4429b2071229e42d00130b2f",
+        "ext.data_model.toml": "4b624becaf1313a382b29ba80b6bde5292bdb002d3e4f9e55a3ddd23809fa9a0",
+        "ext.data_model.toml.tests": "280744f2d36c5b3ec0a2908e1d3ad0469f07387c81f245426b1a9b81e92a1f36",
+        "ext.data_model.xml": "6a93997653ad26b6922fa494a9b2bd15ab104626d0277f2fd267afd540974750",
+        "ext.data_model.xml.tests": "8346ec79e12f8dde83721bab5727da4f1db94d89bed824caea29c8792794eb47",
+        "ext.data_model.yaml": "95e49ea80ebbd4c9b4d25a8dee22c6eba6d604ceec936434f47deecbc46758ef",
+        "ext.data_model.yaml.tests": "03fc345b1dcaf330f813b6d3c2b11f0bb1ea509f3f72c93b6d2e3146a1ed7f50"
+      },
+      "yanked": false
     },
     {
       "name": "ext-decimal-rs",
@@ -74,7 +78,8 @@
         "std.math.decimal.fmt": "6c9542abaef069370cfeed271a001f85f643b777c3b11128a126a9e90c1c3971",
         "std.math.decimal.parse": "5be50da05a7822aa37afbd26c063296a2a5c4f74e72327d442d9b48942d9ea3f",
         "std.math.decimal.tests": "cebadf071098d7725ab2bd2041a868d407b063ec408c916dbbcd12b52b268328"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-error",
@@ -87,7 +92,8 @@
         "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
         "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
         "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-ini-rs",
@@ -99,20 +105,22 @@
         "ext.ini": "9fc4d8075b2b23a3479d2e60b6a42142aac2e27013984d2a1e5b83fae2f80820",
         "ext.ini.data_model": "4748bc43a9eb46ed4a053fa4f07bf9ec7f9eb1ed814cf29bdb0d47e3e33edc03",
         "ext.ini.tests": "f311d5006c1db62968f7094a1bdf3dcd1c7ccf0af8aa820e2b67619ba85fd4a1"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-json-rs",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-json-rs/0.1.4",
-      "package_manifest_sha256": "7801ecd8a774f290c864a42e5bc3280e6ed7268bc2e79d8d66c5e1472eebe208",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-json-rs/0.1.6",
+      "package_manifest_sha256": "35e79345685c32f31b39615a1fc984f96f741f755d4805f4d3b7a7b68a373f50",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.json.canon": "0748c0cc8c3ad90ea0d0352ff9c444cc2b2116fce05782866d263c2d138dea7a",
-        "ext.json.data_model": "d4762aee02eadf4b35fc425b496a6829c0c0f3f389eee667cae90023a4a2a7ff",
+        "ext.json.canon": "257bd91ff3961fc200c109bd67859f428cf78153fa2aaedaed5bd23a47c59ca8",
+        "ext.json.data_model": "65ab0ed5ada4d6668e2c394d836960b41447835b401ddd9d900a0e6b97013887",
         "ext.json.pointer": "658decbd56790023d28bd72ef5f6fe810ed69b0d1ab6275b0c6c54b1f414192a",
-        "ext.json.tests": "5ad25069a57e40b87d9ace8f4821d3f2e509df3e56348bd5f4ed914a1bfcdfcd"
-      }
+        "ext.json.tests": "743f7ed1160311de23d31af307a74af494382dbb275f4dbc42322b61e09e1dac"
+      },
+      "yanked": false
     },
     {
       "name": "ext-toml-rs",
@@ -124,7 +132,8 @@
         "ext.toml": "3bd80fbe0c44b57092432b628d3ce0068abe190d8c27395ebf9bf711bdeeea35",
         "ext.toml.data_model": "a156658af92d9a9e960d86e58de62c957b02440c7dbd6dca6e56fb28c6a1b642",
         "ext.toml.tests": "f3a1e8df9afd6da0927c097080344af08a3cf12ae5769686721bf462e122a046"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-unicode-rs",
@@ -138,7 +147,8 @@
         "ext.unicode.normalize": "4f86ecc58f838788004617c9978476a1821cb780ed8e640f965d1aa44b826fc5",
         "ext.unicode.segment": "341c8ace2b44f8fca0c5339bdbc8d102a6d06d36ef4a6a705601539a9fbf03c4",
         "ext.unicode.tests": "1d5209fc2aab58dca59930459fd054d8065eb7a7dd9e042c179149ba7252064f"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-xml-rs",
@@ -150,7 +160,8 @@
         "ext.xml": "758a99622b077650c9ec0fdc7fe8d60261c27720bf944361f09dc2fd66d91b3d",
         "ext.xml.data_model": "c152bb642453e15060f7e6d602db0b1b65a3aa1ddb793037db2024f3d4cccb61",
         "ext.xml.tests": "3ff5feb0110c2fa362b452b849fbeb6ade61389badb734bff7ba81277adb391c"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-yaml-rs",
@@ -162,7 +173,8 @@
         "ext.yaml": "065c86d25102c285092c7b9402ca773f38929f58c3acdebbfb4c6c567c1bf853",
         "ext.yaml.data_model": "2e1bf8111f4a41a45fd70f142fd17b5637b4a11d067c0ef2d073788b1f492bb3",
         "ext.yaml.tests": "3b25f2eb094d815c0669f35395d5ff9b1af9c6be5a7089cb50f66639784a0d1e"
-      }
+      },
+      "yanked": false
     }
   ]
 }

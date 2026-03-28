@@ -12,7 +12,8 @@
         "ext.diff.lines": "79235400ed467c076bea1f96323a772ed1d7a641e23a6cd40c597669c8019d49",
         "ext.diff.patch_v1": "4cff3f8b84048a8f0efc86aaa0d92e872b0f1bb9831594e8cbaee2ed1bfbc776",
         "ext.diff.tests": "bbf279d8b1856b97d1afe04024746b122cac6525ec03c01f8156ae44cf0943c6"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-error",
@@ -25,7 +26,8 @@
         "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
         "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
         "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
-      }
+      },
+      "yanked": false
     }
   ]
 }

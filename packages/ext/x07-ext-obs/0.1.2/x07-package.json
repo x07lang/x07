@@ -24,7 +24,6 @@
       "ext-pb-rs@0.1.5",
       "ext-u64-rs@0.1.0"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

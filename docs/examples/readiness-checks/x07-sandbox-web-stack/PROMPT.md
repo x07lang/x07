@@ -51,7 +51,7 @@ SANDBOX POLICY REQUIREMENTS
 - Run everything under run-os-sandboxed.
 - Use fixed loopback ports:
   - HTTP server: 127.0.0.1:18080
-  - TCP proto service: 127.0.0.1:18081
+  - TCP proto service: 127.0.0.1:18082
 - Allow network ONLY to those loopback ports (explicit ports only), for example:
   - `x07 run --profile sandbox --allow-host 127.0.0.1:18080,18081 -- ...`
 - Deny all external hosts.
@@ -87,4 +87,3 @@ D) Observability + output:
 TESTS
 - A test entrypoint that uses the fixed ports above, runs the crawler against the local server, exercises the loopback WS/gRPC framing path, and asserts output stability.
 ```
-

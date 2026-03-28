@@ -1,0 +1,111 @@
+{
+  "schema_version": "x07.arch.manifest@0.3.0",
+  "repo": { "id": "trusted_network_service_v1", "root": "." },
+  "externals": {
+    "allowed_import_prefixes": ["std."],
+    "allowed_exact": ["std.test"]
+  },
+  "nodes": [
+    {
+      "id": "program_core",
+      "match": {
+        "module_prefixes": ["example", "main"],
+        "path_globs": ["src/example.x07.json", "src/main.x07.json"]
+      },
+      "world": "run-os-sandboxed",
+      "trust_zone": "untrusted",
+      "visibility": { "mode": "public", "visible_to": [] },
+      "imports": {
+        "deny_prefixes": ["tests."],
+        "allow_prefixes": ["capsule", "example", "main", "std."]
+      }
+    },
+    {
+      "id": "capsule_code",
+      "match": {
+        "module_prefixes": ["capsule"],
+        "path_globs": ["src/capsule.x07.json"]
+      },
+      "world": "run-os-sandboxed",
+      "trust_zone": "certified_capsule",
+      "visibility": {
+        "mode": "restricted",
+        "visible_to": ["program_core", "tests"]
+      },
+      "imports": {
+        "deny_prefixes": ["example.", "tests."],
+        "allow_prefixes": ["capsule", "std."]
+      }
+    },
+    {
+      "id": "tests",
+      "match": {
+        "module_prefixes": ["tests."],
+        "path_globs": ["tests/**/*.x07.json"]
+      },
+      "world": "run-os-sandboxed",
+      "trust_zone": "test_only",
+      "visibility": { "mode": "restricted", "visible_to": [] },
+      "imports": {
+        "deny_prefixes": [],
+        "allow_prefixes": ["capsule", "example", "std.", "tests."]
+      }
+    }
+  ],
+  "rules": [
+    { "kind": "deny_cycles_v1", "id": "deny_cycles.nodes_v1", "scope": "nodes" },
+    {
+      "kind": "deps_v1",
+      "id": "allow:program_core->program_core",
+      "from": "program_core",
+      "to": ["program_core"],
+      "mode": "allow"
+    },
+    {
+      "kind": "deps_v1",
+      "id": "allow:program_core->capsule_code",
+      "from": "program_core",
+      "to": ["capsule_code"],
+      "mode": "allow"
+    },
+    {
+      "kind": "deps_v1",
+      "id": "allow:tests->program_core",
+      "from": "tests",
+      "to": ["program_core"],
+      "mode": "allow"
+    },
+    {
+      "kind": "deps_v1",
+      "id": "allow:tests->capsule_code",
+      "from": "tests",
+      "to": ["capsule_code"],
+      "mode": "allow"
+    }
+  ],
+  "checks": {
+    "deny_cycles": true,
+    "deny_orphans": true,
+    "enforce_visibility": true,
+    "enforce_world_caps": true,
+    "allowlist_mode": {
+      "enabled": true,
+      "default_allow_external": false,
+      "default_allow_internal": false
+    },
+    "brand_boundary_v1": { "enabled": true },
+    "world_of_imported_v1": { "enabled": true }
+  },
+  "contracts_v1": {
+    "boundaries": {
+      "index_path": "arch/boundaries/index.x07boundary.json",
+      "enforce": "error"
+    },
+    "canonical_json": { "mode": "jcs_rfc8785_v1" }
+  },
+  "tool_budgets": {
+    "max_modules": 1000,
+    "max_edges": 1000,
+    "max_diags": 1000
+  }
+}

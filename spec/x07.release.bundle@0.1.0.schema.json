@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "x07.release.bundle@0.1.0",
+  "title": "x07 release bundle manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "channel",
+    "published_at_utc",
+    "min_x07up_version",
+    "x07_core",
+    "x07_wasm",
+    "x07_web_ui_host",
+    "x07_device_host",
+    "packages"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.release.bundle@0.1.0"
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "stable",
+        "beta",
+        "nightly"
+      ]
+    },
+    "published_at_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "min_x07up_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "x07_core": {
+      "$ref": "#/$defs/component_ref"
+    },
+    "x07_wasm": {
+      "$ref": "#/$defs/component_ref"
+    },
+    "x07_web_ui_host": {
+      "$ref": "#/$defs/component_ref"
+    },
+    "x07_device_host": {
+      "$ref": "#/$defs/component_ref"
+    },
+    "packages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "std_web_ui"
+      ],
+      "properties": {
+        "std_web_ui": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "component_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "tag",
+        "release_manifest_url",
+        "release_manifest_sha256"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "release_manifest_url": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "release_manifest_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

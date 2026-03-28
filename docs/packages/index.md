@@ -10,15 +10,17 @@ X07 packages are source-only (x07AST JSON), and projects pin dependencies with a
 
 ## Manifest schema (canonical)
 
-- New and actively maintained projects should use `x07.project@0.3.0`.
-- The toolchain still accepts `x07.project@0.2.0` for legacy manifests.
-- `project.patch` (transitive dependency overrides) requires `x07.project@0.3.0`.
+- New and actively maintained projects should use `x07.project@0.4.0`.
+- The toolchain still accepts `x07.project@0.2.0` and `x07.project@0.3.0` for legacy manifests.
+- `project.patch` (transitive dependency overrides) works on the current manifest line, and certification-facing projects use the additional `x07.project@0.4.0` fields such as `project.operational_entry_symbol`.
 
 ## Module roots (important)
 
 `x07.json` contains a `module_roots` list. This should list **your source directories** (usually `src` for projects, and `modules` for publishable package repos).
 
 When you run `x07 pkg lock`, dependencies are fetched into `.x07/deps/...` and pinned in `x07.lock.json`. Tooling that accepts `--project` (for example `x07 build --project x07.json` and `x07 run --project x07.json`) automatically adds the locked dependency module roots from the lockfile.
+
+If a dependency path points at a registry-vendored location under `.x07/deps/...` (including `$workspace/.../.x07/deps/...`) and the package is missing locally, project commands auto-sync it by running the equivalent of `x07 pkg lock --project x07.json` before build/run/test. Use `x07 pkg lock --project x07.json --check` in CI when you want missing deps or lock drift to fail instead of mutating the workspace.
 
 Do not add `.x07/deps/*/modules` paths to `module_roots` manually.
 
@@ -101,7 +103,7 @@ If you need to override a transitive dependency (for example to move off a yanke
 
 ```jsonc
 {
-  "schema_version": "x07.project@0.3.0",
+  "schema_version": "x07.project@0.4.0",
   "patch": {
     "some-dep": { "version": "1.2.3" }
   }

@@ -1,0 +1,88 @@
+{
+  "schema_version": "x07.service.manifest@0.1.0",
+  "service_id": "svc_event_consumer_v1",
+  "display_name": "Svc Event Consumer V1",
+  "domain_pack": {
+    "id": "svc_event_consumer_v1",
+    "display_name": "Svc Event Consumer V1"
+  },
+  "cells": [
+    {
+      "cell_key": "primary",
+      "cell_kind": "event-consumer",
+      "entry_symbol": "example.main",
+      "ingress_kind": "event",
+      "runtime_class": "native-worker",
+      "scale_class": "partitioned-consumer",
+      "binding_refs": [
+        "db.primary",
+        "msg.orders"
+      ],
+      "topology_group": "primary",
+      "runtime": {
+        "event": {
+          "binding_ref": "msg.orders",
+          "topic": "orders.created",
+          "consumer_group": "svc-event-consumer-v1",
+          "ack_mode": "manual",
+          "max_in_flight": 32,
+          "drain_timeout_seconds": 30
+        },
+        "probes": {
+          "readiness": {
+            "probe_kind": "exec",
+            "command": [
+              "/bin/check-consumer",
+              "--ready"
+            ],
+            "period_seconds": 10
+          },
+          "liveness": {
+            "probe_kind": "exec",
+            "command": [
+              "/bin/check-consumer",
+              "--alive"
+            ],
+            "period_seconds": 15
+          }
+        },
+        "rollout": {
+          "strategy": "rolling",
+          "max_unavailable": "1"
+        },
+        "autoscaling": {
+          "min_replicas": 1,
+          "max_replicas": 8,
+          "target_inflight": 64
+        }
+      }
+    }
+  ],
+  "topology_profiles": [
+    {
+      "id": "dev",
+      "target_kind": "hosted",
+      "placement": "co-located",
+      "notes": "single deployable for local and hosted dev"
+    },
+    {
+      "id": "prod",
+      "target_kind": "k8s",
+      "placement": "split-by-cell",
+      "notes": "allow independent scale later"
+    }
+  ],
+  "resource_bindings": [
+    {
+      "name": "db.primary",
+      "kind": "postgres",
+      "required": true
+    },
+    {
+      "name": "msg.orders",
+      "kind": "amqp",
+      "required": true
+    }
+  ],
+  "default_trust_profile": "sandboxed_service_v1"
+}

@@ -1,0 +1,90 @@
+name: Publish Channels
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel to publish
+        required: true
+        type: choice
+        options:
+          - stable
+          - beta
+          - nightly
+      tag:
+        description: Release tag (for example v0.1.56)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  resolve_bundle:
+    name: resolve-bundle
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch bundle manifest
+        id: bundle
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag }}"
+          VERSION="${TAG#v}"
+          mkdir -p dist/release
+          curl -fsSL \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/x07-${VERSION}-bundle.json" \
+            -o "dist/release/x07-${VERSION}-bundle.json"
+          echo "bundle_path=${GITHUB_WORKSPACE}/dist/release/x07-${VERSION}-bundle.json" >> "$GITHUB_OUTPUT"
+      - name: Validate bundle manifest
+        shell: bash
+        run: |
+          python3 scripts/release/validate-json.py \
+            --schema x07.release.bundle@0.1.0 \
+            --in "${{ steps.bundle.outputs.bundle_path }}" \
+            --require channel \
+            --require x07_core \
+            --require x07_wasm \
+            --require x07_web_ui_host \
+            --require x07_device_host \
+            --require packages
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle
+          path: ${{ steps.bundle.outputs.bundle_path }}
+          if-no-files-found: error
+
+  publish_channel_manifest:
+    name: publish-channel-manifest
+    needs: resolve_bundle
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle
+          path: dist/release
+      - name: Publish channel manifest
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag }}"
+          VERSION="${TAG#v}"
+          bash scripts/release/publish-channel-manifest.sh \
+            --channel "${{ inputs.channel }}" \
+            --bundle "dist/release/x07-${VERSION}-bundle.json" \
+            --publish-dir dist/channels
+      - name: Upload channel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: channel-${{ inputs.channel }}
+          path: dist/channels/${{ inputs.channel }}.json
+          if-no-files-found: error

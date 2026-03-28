@@ -134,6 +134,10 @@ pub struct RunArgs {
     #[arg(long)]
     pub i_accept_weaker_isolation: bool,
 
+    /// Write a runtime attestation artifact for run-os-sandboxed executions.
+    #[arg(long, value_name = "PATH")]
+    pub attest_runtime: Option<PathBuf>,
+
     /// Append network destinations to the sandbox policy allowlist (repeatable).
     #[arg(long, value_name = "HOST:PORT[,PORT...]")]
     pub allow_host: Vec<String>,
@@ -261,6 +265,19 @@ pub fn cmd_run(
 
     let (target_kind, target_path, project_manifest) = resolve_target(&cwd, &args)?;
 
+    if target_kind == TargetKind::Project {
+        if let Some(project_path) = project_manifest.as_ref() {
+            let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.clone())
+                .context("hydrate project deps")?;
+            if hydrated {
+                eprintln!(
+                    "x07 run: hydrated project dependencies via `x07 pkg lock --project {}`",
+                    project_path.display()
+                );
+            }
+        }
+    }
+
     let project_root = project_manifest.as_deref().map(|manifest| {
         let abs = if manifest.is_absolute() {
             manifest.to_path_buf()
@@ -303,6 +320,9 @@ pub fn cmd_run(
         anyhow::bail!(
             "--sandbox-backend/--i-accept-weaker-isolation are only supported for OS worlds"
         );
+    }
+    if args.attest_runtime.is_some() && world != WorldId::RunOsSandboxed {
+        anyhow::bail!("--attest-runtime is only supported for --world run-os-sandboxed");
     }
 
     let cc_profile = resolve_cc_profile(&args, selected_profile.as_ref());
@@ -548,6 +568,10 @@ pub fn cmd_run(
             }
             if args.i_accept_weaker_isolation {
                 argv.push("--i-accept-weaker-isolation".to_string());
+            }
+            if let Some(path) = args.attest_runtime.as_ref() {
+                argv.push("--attest-runtime".to_string());
+                argv.push(path.display().to_string());
             }
 
             if resolve_auto_ffi(&args, selected_profile.as_ref()) {
@@ -1369,6 +1393,15 @@ fn project_lockfile_path(project_path: &Path) -> Result<PathBuf> {
 fn try_collect_project_module_roots(
     project_path: &Path,
 ) -> Result<Option<(PathBuf, Vec<PathBuf>)>> {
+    let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf())
+        .context("hydrate project deps")?;
+    if hydrated {
+        eprintln!(
+            "x07 run: hydrated project dependencies via `x07 pkg lock --project {}`",
+            project_path.display()
+        );
+    }
+
     let manifest = project::load_project_manifest(project_path)?;
     let lock_path = project::default_lockfile_path(project_path, &manifest);
     let lock_bytes = match std::fs::read(&lock_path) {

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-effect.log.schema.json",
+  "title": "x07.effect.log@0.2.0",
+  "description": "Structured effect-log envelope referenced by capsule contracts and runtime attestations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "capsule_id", "events"],
+  "properties": {
+    "schema_version": { "const": "x07.effect.log@0.2.0" },
+    "capsule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "digest"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "dns_resolution",
+            "connect_attempt",
+            "tls_handshake",
+            "request_start",
+            "request_finish",
+            "listener_bind",
+            "listener_accept",
+            "custom"
+          ]
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "peer_policy_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["tcp", "udp"]
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "tls_mode": {
+          "type": "string",
+          "enum": ["none", "tls", "mtls"]
+        },
+        "meta": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    }
+  }
+}

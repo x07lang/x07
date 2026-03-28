@@ -1,0 +1,8 @@
+{
+  "headers": ["name", "count"],
+  "rows": [
+    ["alpha", 1],
+    ["beta", 12]
+  ]
+}
+

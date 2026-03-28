@@ -122,7 +122,7 @@ path = sys.argv[1]
 profile = sys.argv[2]
 
 r = json.load(open(path, "r", encoding="utf-8"))
-assert r.get("schema_version") == "x07.run.report@0.1.0", r.get("schema_version")
+assert r.get("schema_version") == "x07.run.report@0.3.0", r.get("schema_version")
 assert r.get("runner") == "os", r.get("runner")
 rep = r.get("report") or {}
 assert rep.get("exit_code") == 0, rep.get("exit_code")

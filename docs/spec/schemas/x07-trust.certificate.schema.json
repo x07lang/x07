@@ -1,0 +1,474 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-trust.certificate.schema.json",
+  "title": "x07.trust.certificate@0.7.0",
+  "description": "Source-free trust certificate emitted by `x07 trust certify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "verdict",
+    "profile",
+    "entry",
+    "operational_entry_symbol",
+    "out_dir",
+    "claims",
+    "formal_verification_scope",
+    "proved_symbol_count",
+    "proved_defn_count",
+    "proved_defasync_count",
+    "entry_body_formally_proved",
+    "operational_entry_proof_inventory_refs",
+    "capsule_boundary_only_symbol_count",
+    "runtime_evidence_only_symbol_count",
+    "async_proof",
+    "proof_inventory",
+    "proof_assumptions",
+    "capsules",
+    "network_capsules",
+    "runtime",
+    "recursive_proof_summary",
+    "imported_summary_inventory",
+    "accepted_depends_on_bounded_proof",
+    "accepted_depends_on_dev_only_assumption",
+    "package_set_digest",
+    "dependency_closure",
+    "tcb",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.trust.certificate@0.7.0" },
+    "verdict": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    },
+    "profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "entry": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "operational_entry_symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "out_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "claims": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "default": []
+    },
+    "formal_verification_scope": {
+      "type": "string",
+      "enum": ["none", "partial", "entry_body", "whole_certifiable_graph"]
+    },
+    "proved_symbol_count": { "type": "integer", "minimum": 0 },
+    "proved_defn_count": { "type": "integer", "minimum": 0 },
+    "proved_defasync_count": { "type": "integer", "minimum": 0 },
+    "entry_body_formally_proved": { "type": "boolean" },
+    "operational_entry_proof_inventory_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_ref" },
+      "default": []
+    },
+    "capsule_boundary_only_symbol_count": { "type": "integer", "minimum": 0 },
+    "runtime_evidence_only_symbol_count": { "type": "integer", "minimum": 0 },
+    "async_proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reachable", "proved", "model"],
+      "properties": {
+        "reachable": { "type": "integer", "minimum": 0 },
+        "proved": { "type": "integer", "minimum": 0 },
+        "model": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 256 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "proof_inventory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/proof_inventory_item" },
+      "default": []
+    },
+    "proof_assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/proof_assumption" },
+      "default": []
+    },
+    "recursive_proof_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reachable_recursive_defn",
+        "accepted_recursive_defn",
+        "bounded_recursive_defn",
+        "unbounded_recursive_defn",
+        "imported_proof_summary_defn",
+        "rejected_recursive_defn",
+        "accepted_depends_on_bounded_proof"
+      ],
+      "properties": {
+        "reachable_recursive_defn": { "type": "integer", "minimum": 0 },
+        "accepted_recursive_defn": { "type": "integer", "minimum": 0 },
+        "bounded_recursive_defn": { "type": "integer", "minimum": 0 },
+        "unbounded_recursive_defn": { "type": "integer", "minimum": 0 },
+        "imported_proof_summary_defn": { "type": "integer", "minimum": 0 },
+        "rejected_recursive_defn": { "type": "integer", "minimum": 0 },
+        "accepted_depends_on_bounded_proof": { "type": "boolean" }
+      }
+    },
+    "imported_summary_inventory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/imported_summary_ref" },
+      "default": []
+    },
+    "accepted_depends_on_bounded_proof": { "type": "boolean" },
+    "accepted_depends_on_dev_only_assumption": { "type": "boolean" },
+    "capsules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "ids", "attestations"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "default": []
+        },
+        "attestations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        }
+      }
+    },
+    "network_capsules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "ids"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "default": []
+        }
+      }
+    },
+    "runtime": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "backend",
+            "network_mode",
+            "network_enforcement",
+            "weaker_isolation",
+            "effective_allow_hosts",
+            "policy_digest_bound",
+            "guest_image_digest_bound",
+            "attestation"
+          ],
+          "properties": {
+            "backend": {
+              "type": "string",
+              "enum": ["vm", "os", "none"]
+            },
+            "network_mode": {
+              "type": "string",
+              "enum": ["none", "allowlist", "disabled"]
+            },
+            "network_enforcement": {
+              "type": "string",
+              "enum": ["none", "vm_boundary_allowlist", "guest_allowlist", "unsupported"]
+            },
+            "weaker_isolation": { "type": "boolean" },
+            "effective_allow_hosts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/net_host" },
+              "default": []
+            },
+            "policy_digest_bound": { "type": "boolean" },
+            "guest_image_digest_bound": { "type": "boolean" },
+            "attestation": {
+              "anyOf": [
+                { "$ref": "#/$defs/evidence_ref" },
+                { "type": "null" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "package_set_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "dependency_closure": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest_digest",
+            "lockfile_digest",
+            "packages",
+            "advisory_check_ok",
+            "attestation"
+          ],
+          "properties": {
+            "manifest_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "lockfile_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "packages": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "default": []
+            },
+            "advisory_check_ok": { "type": "boolean" },
+            "attestation": {
+              "anyOf": [
+                { "$ref": "#/$defs/evidence_ref" },
+                { "type": "null" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "effect_logs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_ref" },
+      "default": []
+    },
+    "tcb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x07_version",
+        "host_compiler",
+        "trusted_primitive_manifest_digest"
+      ],
+      "properties": {
+        "x07_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "host_compiler": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "trusted_primitive_manifest_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundaries_report",
+        "coverage_report",
+        "verify_summary_report",
+        "prove_reports",
+        "tests_report",
+        "trust_report",
+        "compile_attestation"
+      ],
+      "properties": {
+        "boundaries_report": { "$ref": "#/$defs/evidence_ref" },
+        "coverage_report": { "$ref": "#/$defs/evidence_ref" },
+        "verify_summary_report": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "schema_derive_reports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
+        "prove_reports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
+        "tests_report": { "$ref": "#/$defs/evidence_ref" },
+        "trust_report": { "$ref": "#/$defs/evidence_ref" },
+        "compile_attestation": { "$ref": "#/$defs/evidence_ref" },
+        "runtime_attestation": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "peer_policy_files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
+        "capsule_attestations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
+        "effect_logs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
+        "review_diff": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "dependency_closure_attestation": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "bundle_path": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 4096 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "net_host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "ports"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "ports": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256_hex"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "imported_summary_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256_hex"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "symbols": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "default": []
+        }
+      }
+    },
+    "proof_inventory_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "kind",
+        "result_kind",
+        "verify_report",
+        "proof_summary"
+      ],
+      "properties": {
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "kind": { "type": "string", "enum": ["defn", "defasync"] },
+        "result_kind": { "type": "string", "enum": ["proven", "proven_async"] },
+        "verify_report": { "$ref": "#/$defs/evidence_ref" },
+        "proof_summary": { "$ref": "#/$defs/evidence_ref" },
+        "proof_object": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "proof_check_report": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "proof_check_result": {
+          "anyOf": [
+            { "type": "string", "enum": ["accepted", "rejected"] },
+            { "type": "null" }
+          ]
+        },
+        "proof_check_checker": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 128 },
+            { "type": "null" }
+          ]
+        },
+        "proof_object_digest": {
+          "anyOf": [
+            { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "proof_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "subject", "certifiable"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "trusted_builtin",
+            "imported_proof_summary",
+            "imported_stub",
+            "trusted_scheduler_model",
+            "capsule_boundary",
+            "runtime_evidence"
+          ]
+        },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "digest": {
+          "anyOf": [
+            { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "certifiable": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -346,24 +346,24 @@
       "name": "std.json",
       "path": "stdlib/std/0.1.0/modules/std/json.x07.json",
       "relpath": "std/0.1.0/modules/std/json.x07.json",
-      "sha256": "21e4a708c5c73b1b0b330a7eea8e82e62c1a93a4038d049a2840aa524fb06940",
-      "size_bytes": 14635,
+      "sha256": "75994759da144979aa1497117713b548e4a0639f2d71fb4356ad8815b6c281fc",
+      "size_bytes": 15943,
       "version": "0.1.0"
     },
     {
       "name": "std.json",
       "path": "stdlib/std/0.1.1/modules/std/json.x07.json",
       "relpath": "std/0.1.1/modules/std/json.x07.json",
-      "sha256": "2d567ecdc59b80c8cba2417956ee8729d2ba320d3771bc07b72f002c60cabe98",
-      "size_bytes": 30302,
+      "sha256": "c7faeb12ef4333f5f579e83a857758fc5b90cf18dd567213ce91ac54b9135e87",
+      "size_bytes": 31615,
       "version": "0.1.1"
     },
     {
       "name": "std.json",
       "path": "stdlib/std/0.1.2/modules/std/json.x07.json",
       "relpath": "std/0.1.2/modules/std/json.x07.json",
-      "sha256": "2d567ecdc59b80c8cba2417956ee8729d2ba320d3771bc07b72f002c60cabe98",
-      "size_bytes": 30302,
+      "sha256": "c7faeb12ef4333f5f579e83a857758fc5b90cf18dd567213ce91ac54b9135e87",
+      "size_bytes": 31615,
       "version": "0.1.2"
     },
     {
@@ -913,6 +913,6 @@
       "version": "0.1.2"
     }
   ],
-  "stdlib_hash": "67a32b1742675bd16339cdd6203c0fd3f68165dc63d634beb317a48712b0a0b7",
+  "stdlib_hash": "e0cfa07751db2fd4fd87010ce6d20c211adaa09fc8e23b43655ed3ea69dc35b6",
   "stdlib_root": "stdlib/std"
 }

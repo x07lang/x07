@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-compile.attest.schema.json",
+  "title": "x07.compile.attest@0.1.0",
+  "description": "Source-to-binary attestation emitted by `x07 bundle --emit-attestation`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "world",
+    "bundle_kind",
+    "output_path",
+    "inputs",
+    "artifacts",
+    "compiler",
+    "rebuild"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.compile.attest@0.1.0" },
+    "world": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "bundle_kind": {
+      "type": "string",
+      "enum": ["native", "vm"]
+    },
+    "output_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_kind", "target_path", "program_sha256", "module_roots"],
+      "properties": {
+        "target_kind": {
+          "type": "string",
+          "enum": ["project", "program", "artifact"]
+        },
+        "target_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "project_path": { "type": ["string", "null"], "maxLength": 4096 },
+        "lockfile_path": { "type": ["string", "null"], "maxLength": 4096 },
+        "program_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "lockfile_sha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "module_roots": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "default": []
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binary_sha256"],
+      "properties": {
+        "freestanding_c_sha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "wrapper_c_sha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "combined_c_sha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "binary_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "compiler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lang_id", "ok"],
+      "properties": {
+        "lang_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "ok": { "type": "boolean" },
+        "exit_status": { "type": ["integer", "null"] },
+        "stdout_sha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "stderr_sha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "rebuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deterministic_match"],
+      "properties": {
+        "deterministic_match": { "type": "boolean" },
+        "binary_sha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

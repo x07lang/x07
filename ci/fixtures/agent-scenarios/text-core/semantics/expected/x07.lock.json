@@ -15,7 +15,8 @@
         "std.text.split": "dfd60f66759f0a0876c9d3cb1feaeeebb6b5282a139c3aa071ef231548664dbf",
         "std.text.tests": "9ab717edbb0fdecb852901822dc8cc746b61e05a7155420f08e1d02abff4bdc1",
         "std.text.ws": "7895ace61733e993fd025fe96d98432b734342a679f8cf925f024ba9d1f978f3"
-      }
+      },
+      "yanked": false
     }
   ]
 }

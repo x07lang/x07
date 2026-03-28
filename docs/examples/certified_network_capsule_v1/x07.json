@@ -1,0 +1,40 @@
+{
+  "default_profile": "sandbox",
+  "dependencies": [
+    {
+      "name": "ext-curl-c",
+      "path": ".x07/deps/ext-curl-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
+      "name": "ext-net",
+      "path": ".x07/deps/ext-net/0.1.10",
+      "version": "0.1.10"
+    },
+    {
+      "name": "ext-sockets-c",
+      "path": ".x07/deps/ext-sockets-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
+      "name": "ext-url-rs",
+      "path": ".x07/deps/ext-url-rs/0.1.4",
+      "version": "0.1.4"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src",
+    "tests"
+  ],
+  "profiles": {
+    "sandbox": {
+      "policy": "policy/run-os.json",
+      "world": "run-os-sandboxed"
+    }
+  },
+  "schema_version": "x07.project@0.4.0",
+  "operational_entry_symbol": "capsule.main",
+  "world": "run-os-sandboxed"
+}

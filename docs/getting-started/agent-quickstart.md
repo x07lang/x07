@@ -23,8 +23,8 @@ High-level primitives to learn early (the “one whole system”):
 - Budget scopes: [`budget.scope_v1`](../language/budget-scopes.md) (localize cost contracts; arch-driven budgets)
 - Contracts tooling: `x07 arch check`, `x07 schema derive`, `x07 sm gen` (pinned contracts → deterministic checks/generation)
 - Property-based testing: `x07 test --pbt` + `x07 fix --from-pbt` (counterexample → deterministic regression)
-- Function contracts + verification: `requires` / `ensures` / `invariant` + `x07 verify --bmc|--smt` (bounded proof artifacts)
-- Review + trust artifacts: `x07 review diff` + `x07 trust report` (human reviewable “intent-level” diff + trust report)
+- Function contracts + verification: `requires` / `ensures` / `invariant` + `x07 verify --prove|--coverage` (proof artifacts plus explicit support posture)
+- Certificate-first review: `x07 prove check`, `x07 trust certify`, `x07 review diff`, `x07 trust report`
 
 ## 1) Install and verify the toolchain
 
@@ -67,6 +67,48 @@ x07 doctor
 
 See also: [Install](install.md).
 
+## MCP: install the official X07 MCP server (optional)
+
+If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient core tools plus capability-gated ecosystem tools (`x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.wasm.core_v1`, `x07.web_ui.exec_v1`, `x07.device.exec_v1`, `x07.app.exec_v1`, `lp.query_v1`, `lp.control_v1`, safe patching, etc).
+
+Download the published bundle from GitHub releases:
+- Repo: https://github.com/x07lang/x07-mcp
+- Release tag pattern: `x07lang-mcp-v<MAJOR.MINOR.PATCH>` (download the latest published release on the releases page)
+- Files: `x07lang-mcp.mcpb` and `x07lang-mcp.mcpb.sha256.txt`
+
+Verify (macOS / Linux):
+
+```bash
+expected="$(cat x07lang-mcp.mcpb.sha256.txt)"
+got="$(shasum -a 256 x07lang-mcp.mcpb | awk '{print $1}')"
+test "$got" = "$expected"
+```
+
+Configure your MCP client:
+- If your client supports `.mcpb`, install the bundle.
+- If your client requires a `command`/`args` server definition, extract the bundle and run the router from the bundle root:
+
+  ```bash
+  unzip -q x07lang-mcp.mcpb -d x07lang-mcp.bundle
+  ```
+
+  Use:
+  - `command`: `.../x07lang-mcp.bundle/server/x07lang-mcp`
+  - `cwd`: `.../x07lang-mcp.bundle` (so `config/mcp.server.json` + `out/mcp-worker` resolve)
+  - env (recommended): `X07_MCP_X07_EXE=/absolute/path/to/x07` (`command -v x07`)
+
+Before optional wasm or platform actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine. When a workflow needs safe structured lifecycle actions, use the official MCP server path (`lp.control_v1` when the platform pack is enabled) instead of private shell glue to `x07-platform`.
+
+For control-room style clients, keep release-candidate or workspace state in the client and join it to the public lifecycle result contracts (`lp.control.action.result`, `lp.deploy.query.result`, `lp.environment.list.result`, `lp.incident.query.result`, `lp.regression.run.result`) rather than parsing shell output. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
+
+If you are creating a new HTTP/SSE MCP server project that needs long-running tool calls or task polling, start from:
+
+```bash
+x07 init --template mcp-server-http-tasks --dir ./my-mcp-http-tasks
+```
+
+That scaffold still comes from `x07-mcp`; `x07` only owns the delegation path and the surrounding project bootstrap.
+
 ## 2) Create a project (canonical starting point)
 
 ```bash
@@ -90,6 +132,7 @@ x07 init
 
 - The root `world` field is required (it’s used as a fallback when no run profile is selected).
 - For multi-profile projects, set the root `world` to the solve-* world you want for deterministic lint/repair (for example `solve-pure`), and run OS worlds via profiles (`run-os*`).
+- If the project will be certified, set `project.operational_entry_symbol` on the `x07.project@0.4.0` manifest line. Strong trust profiles certify that operational entry and reject proof-only surrogate entries.
 
 ### Contracts-by-example (copy/paste)
 
@@ -98,6 +141,26 @@ If your project uses pinned rr policies, archive policies, DB migrations, or arc
 - `docs/examples/contracts_project/` (copy its `arch/` into your project root)
 
 If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
+
+If you want the smallest certificate-first pure project instead of the default app skeleton, start from:
+
+```bash
+x07 init --template verified-core-pure
+```
+
+That template wires `arch/`, smoke/PBT tests, and `verified_core_pure_v1` so you can go straight to `x07 trust profile check` and `x07 trust certify`.
+
+If you want the sandboxed certificate-backed line instead, use:
+
+```bash
+x07 init --template trusted-sandbox-program
+```
+
+For a capsule-only starting point, use:
+
+```bash
+x07 init --template certified-capsule
+```
 
 See also: [Available skills](available-skills.md).
 
@@ -176,6 +239,7 @@ If you need a human-reviewable artifact for an agent patchset, use:
 
 - `x07 review diff` (semantic diff; HTML)
 - `x07 trust report` (budgets/worlds/nondeterminism summary)
+- `x07 trust certify` (certificate bundle with proof inventory, assumptions, and runtime/boundary evidence)
 
 See: [Review & trust artifacts](../toolchain/review-trust.md).
 
@@ -213,7 +277,7 @@ x07 pkg remove NAME --sync
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
-- Canonical project manifests use `x07.project@0.3.0`. `x07.project@0.2.0` is accepted for legacy manifests, but `project.patch` requires `@0.3.0`.
+- Canonical project manifests use `x07.project@0.4.0`. `x07.project@0.2.0` and `x07.project@0.3.0` are accepted for legacy manifests, but current certification surfaces use the `0.4.0` fields such as `project.operational_entry_symbol`.
 - `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
@@ -225,7 +289,7 @@ Notes:
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
 - In CI, run `x07 pkg lock --project x07.json --check`.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
-- If you must force a transitive dependency version, use `project.patch` in `x07.json` (requires `x07.project@0.3.0`).
+- If you must force a transitive dependency version, use `project.patch` in `x07.json` on the current `x07.project@0.4.0` manifest line.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
 

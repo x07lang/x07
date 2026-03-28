@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.proof-object.schema.json",
+  "title": "x07.verify.proof_object@0.2.0",
+  "description": "Independently replayable proof object emitted by `x07 verify --prove --emit-proof`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project_manifest_digest",
+    "entry_symbol",
+    "symbol",
+    "kind",
+    "decl_sha256_hex",
+    "verify_engine",
+    "primitive_manifest_digest",
+    "imported_proof_summary_digests",
+    "proof_summary_digest",
+    "obligation_digest",
+    "expected_solver_result",
+    "recursion_kind",
+    "recursion_bound_kind",
+    "unwind",
+    "max_bytes_len"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.verify.proof_object@0.2.0" },
+    "project_manifest_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "entry_symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "kind": { "type": "string", "enum": ["defn", "defasync"] },
+    "decl_sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "verify_engine": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "primitive_manifest_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "imported_proof_summary_digests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "default": []
+    },
+    "proof_summary_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "obligation_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "expected_solver_result": {
+      "type": "string",
+      "enum": ["unsat", "sat", "unknown"]
+    },
+    "recursion_kind": {
+      "type": "string",
+      "enum": ["none", "self_recursive", "mutual"]
+    },
+    "recursion_bound_kind": {
+      "type": "string",
+      "enum": ["none", "bounded_by_unwind", "unbounded"]
+    },
+    "scheduler_model_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "unwind": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "max_bytes_len": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+  }
+}

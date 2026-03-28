@@ -1,0 +1,72 @@
+{
+  "schema_version": "x07.arch.manifest@0.3.0",
+  "repo": { "id": "verified_core_pure_v1", "root": "." },
+  "externals": {
+    "allowed_import_prefixes": ["std."],
+    "allowed_exact": ["std.codec", "std.test"]
+  },
+  "nodes": [
+    {
+      "id": "example_core",
+      "match": {
+        "module_prefixes": [],
+        "path_globs": ["src/**/*.x07.json"]
+      },
+      "world": "solve-pure",
+      "trust_zone": "verified_core",
+      "visibility": { "mode": "public", "visible_to": [] },
+      "imports": {
+        "deny_prefixes": ["std.os.", "ext."],
+        "allow_prefixes": ["example", "main", "std."]
+      }
+    },
+    {
+      "id": "tests",
+      "match": {
+        "module_prefixes": [],
+        "path_globs": ["tests/**/*.x07.json"]
+      },
+      "world": "solve-pure",
+      "trust_zone": "test_only",
+      "visibility": { "mode": "restricted", "visible_to": [] },
+      "imports": {
+        "deny_prefixes": ["std.os.", "ext."],
+        "allow_prefixes": ["example", "tests", "std."]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "kind": "layers_v1",
+      "id": "layers.main_v1",
+      "layers": ["example_core", "tests"],
+      "direction": "down"
+    },
+    { "kind": "deny_cycles_v1", "id": "deny_cycles.nodes_v1", "scope": "nodes" }
+  ],
+  "checks": {
+    "deny_cycles": true,
+    "deny_orphans": true,
+    "enforce_visibility": true,
+    "enforce_world_caps": true,
+    "allowlist_mode": {
+      "enabled": true,
+      "default_allow_external": false,
+      "default_allow_internal": false
+    },
+    "brand_boundary_v1": { "enabled": true },
+    "world_of_imported_v1": { "enabled": true }
+  },
+  "contracts_v1": {
+    "boundaries": {
+      "index_path": "arch/boundaries/index.x07boundary.json",
+      "enforce": "error"
+    },
+    "canonical_json": { "mode": "jcs_rfc8785_v1" }
+  },
+  "tool_budgets": {
+    "max_modules": 1000,
+    "max_edges": 1000,
+    "max_diags": 1000
+  }
+}

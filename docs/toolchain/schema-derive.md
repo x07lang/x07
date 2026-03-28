@@ -8,6 +8,8 @@
   - Writes generated outputs under `<dir>/modules/**` and `<dir>/tests/tests.json`.
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --check`
   - Fails if any generated output would change (drift check).
+- `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --emit-boundary-stub --write`
+  - Also writes `arch/boundaries/*.stub.x07boundary.json` with boundary-index starter entries derived from the schema brands.
 
 The command always prints a machine-readable derive report to stdout (`schema_version: "x07.schema.derive.report@0.1.0"`).
 To wrap it in the universal tool report envelope, run with `--json` (and optionally `--report-out` / `--quiet-json`).
@@ -49,6 +51,17 @@ For each schema type, the tool emits:
 And a test manifest:
 
 - `tests/tests.json` (run with `x07 test --manifest tests/tests.json`)
+
+When `--emit-boundary-stub` is set, the tool also emits:
+
+- `arch/boundaries/*.stub.x07boundary.json`
+
+These stub files are valid `x07.arch.boundaries.index@0.1.0` documents intended to be copied into
+the real boundary index and edited for the actual exported symbol, node id, and smoke/PBT entry IDs.
+
+For `verified_core_pure_v1` certification, boundary-referenced schemas are rechecked by
+`x07 trust certify` with `x07 schema derive --check --out-dir .`, so the certified convention is
+to derive boundary schemas into the project root.
 
 ## Canonicalization tightening (`x07schema.specrows@0.2.0`)
 

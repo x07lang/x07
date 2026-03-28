@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.arch.boundaries.index@0.1.0",
+  "boundaries": [
+    {
+      "id": "app.main_v1",
+      "symbol": "app.main",
+      "node_id": "app",
+      "kind": "public_function",
+      "from_zone": "verified_core",
+      "to_zone": "verified_core",
+      "worlds_allowed": ["solve-pure", "run-os-sandboxed"],
+      "input": { "params": [] },
+      "output": {
+        "ty": "bytes"
+      },
+      "smoke": {
+        "entry": "",
+        "tests": []
+      },
+      "pbt": {
+        "required": false,
+        "tests": []
+      },
+      "verify": {
+        "required": false,
+        "mode": "off"
+      }
+    }
+  ]
+}

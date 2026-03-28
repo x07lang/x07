@@ -1,0 +1,34 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.cli/profile_from_arch_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.cli.tests.test_profile_from_arch_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.cli/progress_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.cli.tests.test_progress_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.cli/table_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.cli.tests.test_table_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.cli/jsonl_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.cli.tests.test_jsonl_v1",
+      "expect": "pass"
+    }
+  ]
+}
+

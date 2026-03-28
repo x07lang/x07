@@ -1,0 +1,20 @@
+{
+  "schema_version": "x07.arch.device.index@0.1.0",
+  "profiles": [
+    {
+      "id": "device_desktop_dev",
+      "path": "arch/device/profiles/device_desktop_dev.json"
+    },
+    {
+      "id": "device_ios_dev",
+      "path": "arch/device/profiles/device_ios_dev.json"
+    },
+    {
+      "id": "device_android_dev",
+      "path": "arch/device/profiles/device_android_dev.json"
+    }
+  ],
+  "defaults": {
+    "default_profile_id": "device_ios_dev"
+  }
+}

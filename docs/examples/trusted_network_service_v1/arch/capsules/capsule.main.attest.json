@@ -1,0 +1,21 @@
+{
+  "capsule_id": "capsule.main_v1",
+  "conformance_report_digest": "sha256:5e9505a815903127e834b307771d2ba0e6e377809495de0405890cd736f1026c",
+  "contract_digest": "sha256:a1bb6cf2f46077762588e45724bad158e8facdb111b0527c9be4ab0e4701add8",
+  "lockfile_digest": "sha256:c2e289a38b10eccea29a722f065fe179fee1efdcf408344dca2a7df243ac85ab",
+  "module_digests": [
+    {
+      "digest": "sha256:c7bc562e89ae36d14c5927ca2aa5dccd3992eec23ffddb48c20fdec4681764d6",
+      "path": "src/capsule.x07.json"
+    }
+  ],
+  "peer_policy_digests": [
+    {
+      "digest": "sha256:06bb6e52153d2ebf42952b9de3e628b519e84f2a8114dc061cb329d82f8c466c",
+      "path": "peers/loopback_tcp_v1.peer.json"
+    }
+  ],
+  "request_contract_digest": null,
+  "response_contract_digest": null,
+  "schema_version": "x07.capsule.attest@0.2.0"
+}

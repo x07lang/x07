@@ -1,0 +1,94 @@
+{
+  "assets": [
+    {
+      "bytes_len": 109531802,
+      "kind": "archive",
+      "name": "x07-0.1.79-aarch64-apple-darwin.tar.gz",
+      "sha256": "sha256:ea60459ccc03ab891832feb122526ef1a671debd457275ccae525055fa207fb2",
+      "target": "aarch64-apple-darwin",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07-0.1.79-aarch64-apple-darwin.tar.gz"
+    },
+    {
+      "bytes_len": 116092739,
+      "kind": "archive",
+      "name": "x07-0.1.79-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "sha256:73733e447a02c546da29dc551a5527d9bc3ef47464fa8a6d4b4d115eafebc0f3",
+      "target": "aarch64-unknown-linux-gnu",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07-0.1.79-aarch64-unknown-linux-gnu.tar.gz"
+    },
+    {
+      "bytes_len": 112281353,
+      "kind": "archive",
+      "name": "x07-0.1.79-x86_64-apple-darwin.tar.gz",
+      "sha256": "sha256:d658d662f2c52787dccb0f5aa2bf6b914baba4ce84fd7a99d629234954d50295",
+      "target": "x86_64-apple-darwin",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07-0.1.79-x86_64-apple-darwin.tar.gz"
+    },
+    {
+      "bytes_len": 118231505,
+      "kind": "archive",
+      "name": "x07-0.1.79-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "sha256:6389bf991dda5bee478b79ebd7887b7ed02372d5bd2a24e49d2e7be226716e58",
+      "target": "x86_64-unknown-linux-gnu",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07-0.1.79-x86_64-unknown-linux-gnu.tar.gz"
+    },
+    {
+      "bytes_len": 2308,
+      "kind": "attestations",
+      "name": "x07-0.1.79-attestations.jsonl",
+      "sha256": "sha256:2f977b76b3a9e21f58b9d4d88e3135356c997e299715d816ed683888161207c1",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07-0.1.79-attestations.jsonl"
+    },
+    {
+      "bytes_len": 964,
+      "kind": "checksums",
+      "name": "x07-0.1.79-checksums.txt",
+      "sha256": "sha256:bcb91f8368a863d1eb2f2967f1a25b68f96b70e81f5dac436cf879fc3afec5a3",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07-0.1.79-checksums.txt"
+    },
+    {
+      "bytes_len": 1896917,
+      "kind": "installer_archive",
+      "name": "x07up-v0.1.79-aarch64-apple-darwin.tar.gz",
+      "sha256": "sha256:40f615dda7a30c4753337badc1a059193e5b2f9db5e9882b2b9d9492cce1af7a",
+      "target": "aarch64-apple-darwin",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07up-v0.1.79-aarch64-apple-darwin.tar.gz"
+    },
+    {
+      "bytes_len": 2071924,
+      "kind": "installer_archive",
+      "name": "x07up-v0.1.79-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "sha256:771c18892c8d5e8eb404374a3d6b140a8979a3c165878f7bb0b7dc6b8e68af90",
+      "target": "aarch64-unknown-linux-gnu",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07up-v0.1.79-aarch64-unknown-linux-gnu.tar.gz"
+    },
+    {
+      "bytes_len": 2034905,
+      "kind": "installer_archive",
+      "name": "x07up-v0.1.79-x86_64-apple-darwin.tar.gz",
+      "sha256": "sha256:2178d4e38450540f601d43f09e7bb5959dd66debac1c62ebc8c8e8195036e9a6",
+      "target": "x86_64-apple-darwin",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07up-v0.1.79-x86_64-apple-darwin.tar.gz"
+    },
+    {
+      "bytes_len": 2140202,
+      "kind": "installer_archive",
+      "name": "x07up-v0.1.79-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "sha256:873de89aabb2aca2becde31112fdda4a73f15f739aad32fed31f71646be2068d",
+      "target": "x86_64-unknown-linux-gnu",
+      "url": "https://github.com/x07lang/x07/releases/download/v0.1.79/x07up-v0.1.79-x86_64-unknown-linux-gnu.tar.gz"
+    }
+  ],
+  "compatibility": {
+    "device_host": "0.2.5",
+    "std_web_ui": "0.2.6",
+    "x07_core": ">=0.1.79,<0.2.0",
+    "x07_wasm": "0.2.8"
+  },
+  "component": "x07_core",
+  "published_at_utc": "2026-03-16T03:30:46Z",
+  "repo": "https://github.com/x07lang/x07",
+  "schema_version": "x07.component.release@0.1.0",
+  "tag": "v0.1.79",
+  "version": "0.1.79"
+}

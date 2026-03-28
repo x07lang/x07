@@ -45,7 +45,7 @@ python3 - "$tmp/run_report.json" <<'PY'
 import base64, json, sys
 
 r = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-assert r.get("schema_version") == "x07.run.report@0.1.0", r.get("schema_version")
+assert r.get("schema_version") == "x07.run.report@0.3.0", r.get("schema_version")
 assert r.get("runner") == "host", r.get("runner")
 rep = r.get("report") or {}
 assert rep.get("schema_version") == "x07-host-runner.report@0.3.0", rep.get("schema_version")

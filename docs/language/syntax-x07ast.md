@@ -44,10 +44,13 @@ The root JSON object must include `schema_version`.
 
 Current schema version:
 
-- `x07.x07ast@0.5.0`
+- `x07.x07ast@0.8.0`
 
 The toolchain also accepts legacy schema versions:
 
+- `x07.x07ast@0.7.0` (programs with async protocol contracts but without function `decreases`)
+- `x07.x07ast@0.6.0` (programs with loop contracts but without async protocol contracts)
+- `x07.x07ast@0.5.0` (programs with function contracts but without loop contracts)
 - `x07.x07ast@0.4.0` (programs without contracts)
 - `x07.x07ast@0.3.0` (concrete-only programs)
 
@@ -91,6 +94,67 @@ Contract expressions and witnesses may only call contract-pure builtins/operator
 - Also allowed: any builtin head with prefix `option_*` or `result_*`.
 
 Module calls (like `foo.bar`) are not allowed in contracts.
+
+## Loop contracts (v0.6)
+
+x07AST v0.6 adds `loop_contracts` on `defn` declarations so proof mode can reason about `for` loops without widening the certifiable subset to recursion.
+
+Each item points at a loop body by JSON Pointer and declares:
+
+- `invariant[]`: clauses that must hold at loop entry and every iteration
+- `decreases[]`: lexicographic rank terms used to prove termination
+
+Minimal shape:
+
+```json
+"loop_contracts": [
+  {
+    "ptr": "/decls/0/body/4",
+    "invariant": [
+      { "id": "i_nonneg", "expr": [">=", "i", 0] }
+    ],
+    "decreases": [
+      { "expr": ["-", "n", "i"] }
+    ]
+  }
+]
+```
+
+Use `x07 verify --prove` with `loop_contracts` when the certified surface needs loops; combine them with `decreases` on `defn` when the same pure core also uses self-recursion.
+
+## Function termination clauses (v0.8)
+
+x07AST v0.8 adds `decreases` on `defn` declarations so pure self-recursive functions can stay inside the certifiable proof subset.
+
+`decreases` uses the same contract-clause object shape as `requires` / `ensures` / `invariant` and declares the lexicographic rank that must descend on recursive self-calls.
+
+Minimal shape:
+
+```json
+{
+  "kind": "defn",
+  "name": "main.count_down",
+  "params": [{"name":"n","ty":"i32"}],
+  "result": "i32",
+  "requires": [{"id":"r0","expr":[">=","n",0]}],
+  "decreases": [{"id":"d0","expr":"n"}],
+  "body": ["if",["=","n",0],0,["main.count_down",["-","n",1]]]
+}
+```
+
+Mutual recursion and recursive `defasync` targets remain outside the current certifiable subset.
+
+## Async protocol contracts (v0.7)
+
+x07AST v0.7 adds `protocol` on `defasync` declarations so async code can declare proof obligations across suspension points and task scopes.
+
+`protocol` may include:
+
+- `await_invariant[]`
+- `scope_invariant[]`
+- `cancellation_ensures[]`
+
+These clauses use the same contract-clause object shape as `requires` / `ensures` / `invariant`, and they must remain contract-pure.
 
 ## Branded bytes annotations
 

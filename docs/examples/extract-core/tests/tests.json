@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "id": "kernel/quote_total_smoke",
+      "entry": "tests.core.kernel_quote_total_smoke_v1",
+      "expect": "pass",
+      "world": "solve-pure"
+    }
+  ]
+}

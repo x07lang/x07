@@ -1,5 +1,12 @@
+diff --git a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/src/main.x07.json b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/src/main.x07.json
+index 2f1696e..dda909c 100644
+--- a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/src/main.x07.json
++++ b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/src/main.x07.json
+@@ -1,2 +1 @@
+ {"decls":[],"imports":["app"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.3.0","solve":["app.solve","input"]}
+-
 diff --git a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.json b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.json
-index f4ea51e..1b00bed 100644
+index f4ea51e..5fcc3b6 100644
 --- a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.json
 +++ b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.json
 @@ -1,13 +1,22 @@
@@ -10,8 +17,8 @@ index f4ea51e..1b00bed 100644
 +  "dependencies": [
 +    {
 +      "name": "ext-unicode-rs",
-+      "path": ".x07/deps/ext-unicode-rs/0.1.4",
-+      "version": "0.1.4"
++      "path": ".x07/deps/ext-unicode-rs/0.1.5",
++      "version": "0.1.5"
 +    }
 +  ],
    "entry": "src/main.x07.json",
@@ -34,27 +41,28 @@ index f4ea51e..1b00bed 100644
  }
 -
 diff --git a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.lock.json b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.lock.json
-index d7f8feb..a493220 100644
+index 2925fc0..2a6b6eb 100644
 --- a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.lock.json
 +++ b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.lock.json
-@@ -1,4 +1,19 @@
+@@ -1,4 +1,20 @@
  {
    "schema_version": "x07.lock@0.3.0",
 -  "dependencies": []
 +  "dependencies": [
 +    {
 +      "name": "ext-unicode-rs",
-+      "version": "0.1.4",
-+      "path": ".x07/deps/ext-unicode-rs/0.1.4",
-+      "package_manifest_sha256": "1a33b3f8bb839b46e198ceae5e837d07f2668540e4661b767ded398b88076895",
++      "version": "0.1.5",
++      "path": ".x07/deps/ext-unicode-rs/0.1.5",
++      "package_manifest_sha256": "a25f1c73b8f456c2a8719e105ca95d40c50c1489cd88169d51301b845b6411c0",
 +      "module_root": "modules",
 +      "modules_sha256": {
-+        "ext.unicode": "fed557ebb8d3c8df0ba496cefe493a330c33321562d1b5015673204e47e0cf17",
-+        "ext.unicode.casefold": "af8e51983408f1e01dd5c96bceeb00c2e079657d88effff7134bb39cf4209162",
-+        "ext.unicode.normalize": "7730910a774be59ddd9acc1d017d361ac39cf07343498f092047b1f3b674da6d",
-+        "ext.unicode.segment": "3ad319edf09ecb3db1998bd01579fdd5d1b68318f7f3d3b7d1495d6ee5218e19",
-+        "ext.unicode.tests": "52016c3da47fddb02ff89ad79e2965a1a9ab9c59b338a6393fffd3512f39b502"
-+      }
++        "ext.unicode": "df35037b24fff1346db444d0281f002cc49f992799647d89d1ca80516714bbdb",
++        "ext.unicode.casefold": "2a2be7ca592acef482c3e0015ad9748cd98b9a831bebce0791d11488a70d38c4",
++        "ext.unicode.normalize": "4f86ecc58f838788004617c9978476a1821cb780ed8e640f965d1aa44b826fc5",
++        "ext.unicode.segment": "341c8ace2b44f8fca0c5339bdbc8d102a6d06d36ef4a6a705601539a9fbf03c4",
++        "ext.unicode.tests": "1d5209fc2aab58dca59930459fd054d8065eb7a7dd9e042c179149ba7252064f"
++      },
++      "yanked": false
 +    }
 +  ]
  }

@@ -14,7 +14,8 @@
         "ext.zip.tests": "bd96f3212022e41840a43dfddbcd3560b76f5a87ec3be6098a69ca5b38952c8b",
         "ext.zstd": "1e289c31b5a407d6c5fea3c4d5e5cff7d6f59ff185392ba327bc38a08dedb519",
         "ext.zstd.tests": "160c77242dc967387c3251cb2467df0fa2d876e5c3577c1922805b1d109965c1"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-error",
@@ -27,7 +28,8 @@
         "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
         "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
         "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
-      }
+      },
+      "yanked": false
     }
   ]
 }

@@ -707,6 +707,7 @@ fn lower_defasync(f: AstAsyncFunctionDef) -> Result<AsyncFunctionDef, CompilerEr
         requires: f.requires,
         ensures: f.ensures,
         invariant: f.invariant,
+        protocol: f.protocol,
         params: f
             .params
             .into_iter()
@@ -2778,6 +2779,7 @@ mod tests {
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: vec![AstFunctionParam {
                 name: "x".to_string(),
                 ty: TypeRef::Var("A".to_string()),

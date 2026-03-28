@@ -10,7 +10,8 @@
       "modules_sha256": {
         "ext.curl._ffi": "ef7ab5e230cc7bb054cf9b777ae803fe80907a43ab8254d99d231dc9b69d529f",
         "ext.curl.http": "b7d884c62d109a666917dc2de20d9d30a7835103394afe61522632a02747e119"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-net",
@@ -30,7 +31,8 @@
         "std.net.tcp": "9df98d2f69b07f30c62d041db9f2d6d3a2b94496dde89c1f6371bd8788840965",
         "std.net.tls": "525a4e5181b94d59f30b2ae055b642421788a00bd776f7cef16376f2f921ea27",
         "std.net.udp": "d632703b7e750934891a60b155ce10f9a9cc21d674f23933b0023b5ea53dad18"
-      }
+      },
+      "yanked": false
     }
   ]
 }

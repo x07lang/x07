@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -124,6 +125,26 @@ impl SparseIndexClient {
         parse_ndjson(&bytes).with_context(|| format!("parse index file: {}", url.as_str()))
     }
 
+    pub fn fetch_entries_refresh(&self, package_name: &str) -> Result<Vec<IndexEntry>> {
+        let rel = index_relative_path(package_name)?;
+        let mut url = self
+            .index_root
+            .join(&rel)
+            .with_context(|| format!("index url join: {rel:?}"))?;
+
+        if matches!(url.scheme(), "http" | "https") {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_else(|e| e.duration())
+                .as_millis();
+            url.query_pairs_mut()
+                .append_pair("x07_refresh", &now.to_string());
+        }
+
+        let bytes = fetch_bytes(&url, self.token_for_fetch())?;
+        parse_ndjson(&bytes).with_context(|| format!("parse index file: {}", url.as_str()))
+    }
+
     pub fn download_url(&self, package_name: &str, version: &str) -> Result<Url> {
         let url = self
             .dl_root
@@ -240,11 +261,23 @@ pub fn http_post_bytes(url: &Url, token: Option<&str>, body: &[u8]) -> Result<Ve
                 req = req.header("Authorization", &format!("Bearer {token}"));
             }
             let resp = req
+                .config()
+                .http_status_as_error(false)
+                .build()
                 .send(body)
-                .map_err(|e| anyhow::anyhow!("http POST {}: {e}", url))?;
+                .map_err(|e| anyhow::anyhow!("http POST {}: {e}", url.as_str()))?;
+            let status = resp.status().as_u16();
             let mut reader = resp.into_body().into_reader();
             let mut buf = Vec::new();
             reader.read_to_end(&mut buf).context("read http response")?;
+            if status >= 400 {
+                let body = String::from_utf8_lossy(&buf);
+                let body = body.trim();
+                if body.is_empty() {
+                    anyhow::bail!("http POST {}: HTTP {}", url.as_str(), status);
+                }
+                anyhow::bail!("http POST {}: HTTP {}: {}", url.as_str(), status, body);
+            }
             Ok(buf)
         }
         other => anyhow::bail!("unsupported url scheme {other:?} for {}", url.as_str()),
@@ -259,11 +292,23 @@ pub fn http_get_bytes(url: &Url, token: Option<&str>) -> Result<Vec<u8>> {
                 req = req.header("Authorization", &format!("Bearer {token}"));
             }
             let resp = req
+                .config()
+                .http_status_as_error(false)
+                .build()
                 .call()
-                .map_err(|e| anyhow::anyhow!("http GET {}: {e}", url))?;
+                .map_err(|e| anyhow::anyhow!("http GET {}: {e}", url.as_str()))?;
+            let status = resp.status().as_u16();
             let mut reader = resp.into_body().into_reader();
             let mut buf = Vec::new();
             reader.read_to_end(&mut buf).context("read http response")?;
+            if status >= 400 {
+                let body = String::from_utf8_lossy(&buf);
+                let body = body.trim();
+                if body.is_empty() {
+                    anyhow::bail!("http GET {}: HTTP {}", url.as_str(), status);
+                }
+                anyhow::bail!("http GET {}: HTTP {}: {}", url.as_str(), status, body);
+            }
             Ok(buf)
         }
         other => anyhow::bail!("unsupported url scheme {other:?} for {}", url.as_str()),

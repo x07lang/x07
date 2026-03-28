@@ -1,0 +1,214 @@
+{
+  "schema_version": "x07.service.archetypes@0.1.0",
+  "archetypes": [
+    {
+      "id": "api-cell",
+      "summary": "HTTP/API service scaffold with Postgres and optional S3-compatible object storage.",
+      "cell_kind": "api-cell",
+      "ingress_kind": "http",
+      "runtime_class": "native-http",
+      "scale_class": "replicated-http",
+      "example_path": "docs/examples/service_api_cell_v1",
+      "default_capabilities": [
+        "net.http",
+        "data.model",
+        "db.core",
+        "db.postgres",
+        "obj.core",
+        "obj.s3"
+      ],
+      "default_packages": [
+        {
+          "name": "ext-net",
+          "version": "0.1.10"
+        },
+        {
+          "name": "ext-data-model",
+          "version": "0.1.10"
+        },
+        {
+          "name": "ext-db-core",
+          "version": "0.1.11"
+        },
+        {
+          "name": "ext-db-postgres",
+          "version": "0.1.5"
+        },
+        {
+          "name": "ext-obj-core",
+          "version": "0.1.0"
+        },
+        {
+          "name": "ext-obj-s3",
+          "version": "0.1.0"
+        }
+      ],
+      "supported_bindings": [
+        "postgres",
+        "s3",
+        "secret",
+        "otlp"
+      ]
+    },
+    {
+      "id": "event-consumer",
+      "summary": "AMQP-first background consumer with Postgres-backed state.",
+      "cell_kind": "event-consumer",
+      "ingress_kind": "event",
+      "runtime_class": "native-worker",
+      "scale_class": "partitioned-consumer",
+      "example_path": "docs/examples/service_event_consumer_v1",
+      "default_capabilities": [
+        "msg.core",
+        "msg.amqp",
+        "data.model",
+        "db.core",
+        "db.postgres"
+      ],
+      "default_packages": [
+        {
+          "name": "ext-msg-core",
+          "version": "0.1.3"
+        },
+        {
+          "name": "ext-msg-amqp-c",
+          "version": "0.1.3"
+        },
+        {
+          "name": "ext-data-model",
+          "version": "0.1.10"
+        },
+        {
+          "name": "ext-db-core",
+          "version": "0.1.11"
+        },
+        {
+          "name": "ext-db-postgres",
+          "version": "0.1.5"
+        }
+      ],
+      "supported_bindings": [
+        "amqp",
+        "postgres",
+        "secret",
+        "otlp"
+      ]
+    },
+    {
+      "id": "scheduled-job",
+      "summary": "Scheduled batch worker with Postgres-backed state and deterministic retry boundaries.",
+      "cell_kind": "scheduled-job",
+      "ingress_kind": "schedule",
+      "runtime_class": "native-worker",
+      "scale_class": "burst-batch",
+      "example_path": "docs/examples/service_scheduled_job_v1",
+      "default_capabilities": [
+        "data.model",
+        "db.core",
+        "db.postgres"
+      ],
+      "default_packages": [
+        {
+          "name": "ext-data-model",
+          "version": "0.1.10"
+        },
+        {
+          "name": "ext-db-core",
+          "version": "0.1.11"
+        },
+        {
+          "name": "ext-db-postgres",
+          "version": "0.1.5"
+        }
+      ],
+      "supported_bindings": [
+        "postgres",
+        "secret",
+        "otlp"
+      ]
+    },
+    {
+      "id": "policy-service",
+      "summary": "HTTP policy/decision surface with Postgres-backed policy data.",
+      "cell_kind": "policy-service",
+      "ingress_kind": "http",
+      "runtime_class": "native-http",
+      "scale_class": "replicated-http",
+      "example_path": "docs/examples/service_policy_service_v1",
+      "default_capabilities": [
+        "net.http",
+        "data.model",
+        "db.core",
+        "db.postgres"
+      ],
+      "default_packages": [
+        {
+          "name": "ext-net",
+          "version": "0.1.10"
+        },
+        {
+          "name": "ext-data-model",
+          "version": "0.1.10"
+        },
+        {
+          "name": "ext-db-core",
+          "version": "0.1.11"
+        },
+        {
+          "name": "ext-db-postgres",
+          "version": "0.1.5"
+        }
+      ],
+      "supported_bindings": [
+        "postgres",
+        "secret",
+        "otlp"
+      ]
+    },
+    {
+      "id": "workflow-service",
+      "summary": "Scaffold-only orchestrator service with AMQP ingress/egress and Postgres state.",
+      "cell_kind": "workflow-service",
+      "ingress_kind": "workflow",
+      "runtime_class": "native-worker",
+      "scale_class": "singleton-orchestrator",
+      "example_path": "docs/examples/service_workflow_service_v1",
+      "default_capabilities": [
+        "msg.core",
+        "msg.amqp",
+        "data.model",
+        "db.core",
+        "db.postgres"
+      ],
+      "default_packages": [
+        {
+          "name": "ext-msg-core",
+          "version": "0.1.3"
+        },
+        {
+          "name": "ext-msg-amqp-c",
+          "version": "0.1.3"
+        },
+        {
+          "name": "ext-data-model",
+          "version": "0.1.10"
+        },
+        {
+          "name": "ext-db-core",
+          "version": "0.1.11"
+        },
+        {
+          "name": "ext-db-postgres",
+          "version": "0.1.5"
+        }
+      ],
+      "supported_bindings": [
+        "amqp",
+        "postgres",
+        "secret",
+        "otlp"
+      ],
+      "scaffold_only": true
+    }
+  ]
+}

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07ast.schema.json",
-  "title": "X07 x07AST v0.5.0",
+  "title": "X07 x07AST v0.8.0",
   "description": "Canonical, JSON-based AST carrier for LLM-first X07 program generation and repair. Expressions are encoded as JSON S-expressions (json-sexpr).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "kind", "module_id", "imports", "decls"],
   "properties": {
-    "schema_version": { "const": "x07.x07ast@0.5.0" },
+    "schema_version": { "const": "x07.x07ast@0.8.0" },
     "kind": {
       "type": "string",
       "enum": ["entry", "module"],
@@ -179,6 +179,50 @@
         "witness": { "type": "array", "items": { "$ref": "#/$defs/sexpr" } }
       }
     },
+    "loop_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ptr"],
+      "properties": {
+        "ptr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^/decls/\\d+/body(?:/.*)?$"
+        },
+        "invariant": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contract_clause" },
+          "default": []
+        },
+        "decreases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contract_clause" },
+          "default": []
+        }
+      }
+    },
+    "async_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "await_invariant": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contract_clause" },
+          "default": []
+        },
+        "scope_invariant": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contract_clause" },
+          "default": []
+        },
+        "cancellation_ensures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contract_clause" },
+          "default": []
+        }
+      }
+    },
     "decl_defn": {
       "type": "object",
       "additionalProperties": false,
@@ -190,6 +234,8 @@
         "requires": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "ensures": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "invariant": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
+        "decreases": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
+        "loop_contracts": { "type": "array", "items": { "$ref": "#/$defs/loop_contract" } },
         "params": {
           "type": "array",
           "items": { "$ref": "#/$defs/param" },
@@ -211,6 +257,8 @@
         "requires": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "ensures": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "invariant": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
+        "protocol": { "$ref": "#/$defs/async_protocol" },
+        "loop_contracts": { "type": "array", "items": { "$ref": "#/$defs/loop_contract" } },
         "params": {
           "type": "array",
           "items": { "$ref": "#/$defs/param" },
