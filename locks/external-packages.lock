@@ -3808,6 +3808,46 @@
       "modules": [
         {
           "module_id": "std.db.dm",
+          "path": "packages/ext/x07-ext-db-core/0.1.12/modules/std/db/dm.x07.json",
+          "sha256": "5e324da1af86ac41a6c17f1da17a65256919a521c1776fb9aeaa0afc56e6e875",
+          "size_bytes": 2643
+        },
+        {
+          "module_id": "std.db.params",
+          "path": "packages/ext/x07-ext-db-core/0.1.12/modules/std/db/params.x07.json",
+          "sha256": "7cfd2e5038d23a08a502fd15fb7b5927a1f1499266c17e8f5b7f7fdac3146215",
+          "size_bytes": 1952
+        },
+        {
+          "module_id": "std.db.pool",
+          "path": "packages/ext/x07-ext-db-core/0.1.12/modules/std/db/pool.x07.json",
+          "sha256": "d072995ccf88503bfb6dfd368e70a6bdd3725fd2ca8acc9c2ab356748a6714fb",
+          "size_bytes": 2660
+        },
+        {
+          "module_id": "std.db.spec",
+          "path": "packages/ext/x07-ext-db-core/0.1.12/modules/std/db/spec.x07.json",
+          "sha256": "eda1a91783a0dc523d7887f3b87166bcfa76a1d4ac87ce76d45ef2f97b08853c",
+          "size_bytes": 9470
+        },
+        {
+          "module_id": "std.db",
+          "path": "packages/ext/x07-ext-db-core/0.1.12/modules/std/db.x07.json",
+          "sha256": "49122422f3057827e81669955c3b03fa6c33912126d4085e71d7d6059e10c7b9",
+          "size_bytes": 4990
+        }
+      ],
+      "name": "ext-db-core",
+      "package_manifest_sha256": "29fc2a0a527ec720ad95192db6704cae5d0e37a719acc5b42165c6bfe3cffc9a",
+      "path": "packages/ext/x07-ext-db-core/0.1.12",
+      "version": "0.1.12"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.dm",
           "path": "packages/ext/x07-ext-db-core/0.1.2/modules/std/db/dm.x07.json",
           "sha256": "5e324da1af86ac41a6c17f1da17a65256919a521c1776fb9aeaa0afc56e6e875",
           "size_bytes": 2643
@@ -6928,6 +6968,43 @@
       "version": "0.1.3"
     },
     {
+      "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "rabbitmq"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "std.msg.amqp.rr",
+          "path": "packages/ext/x07-ext-msg-amqp-c/0.1.4/modules/std/msg/amqp/rr.x07.json",
+          "sha256": "822b29459f5142a399cad75a7e3925c4383e4d132686d12f9fe787d339d9aeaa",
+          "size_bytes": 10554
+        },
+        {
+          "module_id": "std.msg.amqp.tests",
+          "path": "packages/ext/x07-ext-msg-amqp-c/0.1.4/modules/std/msg/amqp/tests.x07.json",
+          "sha256": "17af6750e26fc4105fe35dad322266bac16832900ec95348393347a3a753b818",
+          "size_bytes": 4020
+        },
+        {
+          "module_id": "std.msg.amqp.topology",
+          "path": "packages/ext/x07-ext-msg-amqp-c/0.1.4/modules/std/msg/amqp/topology.x07.json",
+          "sha256": "60c9525cb52239f8bc11a8732ac8b16ea9dbd707142e77ba115b9d1ae9675bcd",
+          "size_bytes": 6197
+        },
+        {
+          "module_id": "std.msg.amqp",
+          "path": "packages/ext/x07-ext-msg-amqp-c/0.1.4/modules/std/msg/amqp.x07.json",
+          "sha256": "cae9d12e442d3becba3173a1dbb1e6efcb0733f00d6315e48873d161f3129777",
+          "size_bytes": 6209
+        }
+      ],
+      "name": "ext-msg-amqp-c",
+      "package_manifest_sha256": "74193767ef704ae4661d27a250c5aabceae80dfc0db9c96585497cb39e397104",
+      "path": "packages/ext/x07-ext-msg-amqp-c/0.1.4",
+      "version": "0.1.4"
+    },
+    {
       "determinism_tier": "mixed",
       "import_mode": "handwritten",
       "modules": [
@@ -7086,6 +7163,46 @@
       "package_manifest_sha256": "68d628721fa5418cbca766ad112f011eca9cdd5045fc4bcc08163b3a0b426bb5",
       "path": "packages/ext/x07-ext-msg-core/0.1.3",
       "version": "0.1.3"
+    },
+    {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.msg.driver",
+          "path": "packages/ext/x07-ext-msg-core/0.1.4/modules/std/msg/driver.x07.json",
+          "sha256": "94b9290594f1f26f4ca9518dd2c0adc2234f716e8a58f96e3c98f3f06530979c",
+          "size_bytes": 10022
+        },
+        {
+          "module_id": "std.msg.envelope",
+          "path": "packages/ext/x07-ext-msg-core/0.1.4/modules/std/msg/envelope.x07.json",
+          "sha256": "18d05d97ae089b42a66332516d5c8fbc439f72ed54ac22be363c0cca168c6c37",
+          "size_bytes": 12354
+        },
+        {
+          "module_id": "std.msg.rr",
+          "path": "packages/ext/x07-ext-msg-core/0.1.4/modules/std/msg/rr.x07.json",
+          "sha256": "e2c160317d0edeb4f739eed6f7da13058804c7e9e1efa5e54bc111dd2e5c320e",
+          "size_bytes": 9249
+        },
+        {
+          "module_id": "std.msg.spec",
+          "path": "packages/ext/x07-ext-msg-core/0.1.4/modules/std/msg/spec.x07.json",
+          "sha256": "7ef0299bee87fbf82b04c8bfa5c06e2a97d9de43cdd3603b40977183c5551e2f",
+          "size_bytes": 3429
+        },
+        {
+          "module_id": "std.msg.tests",
+          "path": "packages/ext/x07-ext-msg-core/0.1.4/modules/std/msg/tests.x07.json",
+          "sha256": "bb8cc836383805278c289460f815597375baaf9d4e56d49a45e7b519c794b24f",
+          "size_bytes": 10215
+        }
+      ],
+      "name": "ext-msg-core",
+      "package_manifest_sha256": "bc1185d1d02b5aafd5f499c8ea49a3d428985899e85dcf4e5a7d00222221bc0b",
+      "path": "packages/ext/x07-ext-msg-core/0.1.4",
+      "version": "0.1.4"
     },
     {
       "determinism_tier": "os-world-only",
@@ -8546,6 +8663,28 @@
       "package_manifest_sha256": "9f302369aae61da9b25414c004b3c851f840afd538f7e16b4f3ce37126636f75",
       "path": "packages/ext/x07-ext-obj-s3/0.1.1",
       "version": "0.1.1"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.obj.s3.spec",
+          "path": "packages/ext/x07-ext-obj-s3/0.1.2/modules/std/obj/s3/spec.x07.json",
+          "sha256": "3a887fcd4cc55d337c61399ec20feb5e8700ec691db5c130e7140512dba8c959",
+          "size_bytes": 1276
+        },
+        {
+          "module_id": "std.obj.s3",
+          "path": "packages/ext/x07-ext-obj-s3/0.1.2/modules/std/obj/s3.x07.json",
+          "sha256": "f1a28b3e3d70c6e2ca7354bfd1f341ed33b19da4a6e911fcc58cf7924fa2f989",
+          "size_bytes": 973
+        }
+      ],
+      "name": "ext-obj-s3",
+      "package_manifest_sha256": "3d2267e855784bb147eaf8e96cf1a1595371b3115beeb9edb866ca1d14275f24",
+      "path": "packages/ext/x07-ext-obj-s3/0.1.2",
+      "version": "0.1.2"
     },
     {
       "determinism_tier": "mixed",
@@ -13217,6 +13356,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "7e92ee96336c80b7f4de449b8b801565762a5714bfa8a569401af43b59f158b0",
+  "packages_hash": "bf53f0f12413a5dd6a1c9d835d6dd788c3a47800583a4f5cc6af93fc3c0e0ee5",
   "packages_root": "packages/ext"
 }
