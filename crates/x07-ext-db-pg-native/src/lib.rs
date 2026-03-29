@@ -515,8 +515,12 @@ pub extern "C" fn x07_ext_db_pg_open_v1(
             cfg.connect_timeout(Duration::from_millis(timeout_ms as u64));
         }
 
-        if pol.sandboxed && pol.require_tls {
-            cfg.ssl_mode(tokio_postgres::config::SslMode::Require);
+        if pol.require_tls {
+            cfg.ssl_mode(if pol.sandboxed {
+                tokio_postgres::config::SslMode::Require
+            } else {
+                tokio_postgres::config::SslMode::Prefer
+            });
             let tls_cfg = if pol.require_verify {
                 tls_config_webpki_roots()
             } else {
