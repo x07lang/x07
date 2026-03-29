@@ -1,0 +1,89 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.data_model/string_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.tests.test_string_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.json/emit_canon_map_sorts_keys",
+      "world": "solve-pure",
+      "entry": "ext.data_model.json.tests.test_emit_canon_map_sorts_keys",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.json/emit_canon_invalid_utf8",
+      "world": "solve-pure",
+      "entry": "ext.data_model.json.tests.test_emit_canon_invalid_utf8",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.json/emit_canon_string_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.json.tests.test_emit_canon_string_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model/map_sort_and_find",
+      "world": "solve-pure",
+      "entry": "ext.data_model.tests.test_map_sort_and_find",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model/seq_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.tests.test_seq_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.yaml/emit_canon_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.yaml.tests.test_emit_canon_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.xml/emit_canon_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.xml.tests.test_emit_canon_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.ini/emit_canon_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.ini.tests.test_emit_canon_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.csv/emit_canon_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.csv.tests.test_emit_canon_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.toml/emit_canon_sections_exact_and_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.data_model.toml.tests.test_emit_canon_sections_exact_and_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.toml/emit_canon_string_escapes",
+      "world": "solve-pure",
+      "entry": "ext.data_model.toml.tests.test_emit_canon_string_escapes",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.toml/emit_canon_invalid_key",
+      "world": "solve-pure",
+      "entry": "ext.data_model.toml.tests.test_emit_canon_invalid_key",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.data_model.toml/emit_canon_unsupported_kind",
+      "world": "solve-pure",
+      "entry": "ext.data_model.toml.tests.test_emit_canon_unsupported_kind",
+      "expect": "pass"
+    }
+  ]
+}
