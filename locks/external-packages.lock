@@ -7000,7 +7000,7 @@
         }
       ],
       "name": "ext-msg-amqp-c",
-      "package_manifest_sha256": "74193767ef704ae4661d27a250c5aabceae80dfc0db9c96585497cb39e397104",
+      "package_manifest_sha256": "ac53018e7161a81f54319b55e6f44d1697f1155b48cb0986bfd20ae907641613",
       "path": "packages/ext/x07-ext-msg-amqp-c/0.1.4",
       "version": "0.1.4"
     },
@@ -7200,7 +7200,7 @@
         }
       ],
       "name": "ext-msg-core",
-      "package_manifest_sha256": "bc1185d1d02b5aafd5f499c8ea49a3d428985899e85dcf4e5a7d00222221bc0b",
+      "package_manifest_sha256": "82866e038e500a0dd39ab9b174d35f94df1090d778f49d02823d9c85d0a67c08",
       "path": "packages/ext/x07-ext-msg-core/0.1.4",
       "version": "0.1.4"
     },
@@ -13356,6 +13356,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "bf53f0f12413a5dd6a1c9d835d6dd788c3a47800583a4f5cc6af93fc3c0e0ee5",
+  "packages_hash": "d351615e08682580a4ef43a0da3777565380341e27912dc787fa18543abc59d9",
   "packages_root": "packages/ext"
 }

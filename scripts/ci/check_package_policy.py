@@ -82,6 +82,8 @@ def main() -> int:
         return 2
 
     caps_canonical, caps_any = _collect_capability_refs(caps_doc)
+    caps_canonical_names = {name for name, _version in caps_canonical}
+    caps_any_names = {name for name, _version in caps_any}
 
     packages_root = root / "packages" / "ext"
     if not packages_root.is_dir():
@@ -92,6 +94,8 @@ def main() -> int:
 
     # Hard no-duplicates rule: the same module_id must not be exported by multiple package names.
     module_to_pkg_names: dict[str, set[str]] = {}
+    visible_pkgs: dict[str, list[Path]] = {}
+    canonical_visible_pkgs: dict[str, list[Path]] = {}
 
     for ver_dir in _iter_pkg_versions(packages_root):
         manifest_path = ver_dir / "x07-package.json"
@@ -132,22 +136,31 @@ def main() -> int:
             )
             continue
 
-        version = manifest.get("version")
-        if isinstance(version, str) and visibility == "canonical":
-            if (pkg_name, version) not in caps_canonical:
-                errs.append(
-                    f"{manifest_path.relative_to(root)}: meta.visibility is canonical, but {pkg_name}@{version} is not a canonical entry in catalog/capabilities.json"
-                )
-        if isinstance(version, str) and (pkg_name, version) not in caps_any:
-            errs.append(
-                f"{manifest_path.relative_to(root)}: meta.visibility is set, but {pkg_name}@{version} is not referenced from catalog/capabilities.json"
-            )
+        visible_pkgs.setdefault(pkg_name, []).append(manifest_path)
+        if visibility == "canonical":
+            canonical_visible_pkgs.setdefault(pkg_name, []).append(manifest_path)
 
     for mid, names in sorted(module_to_pkg_names.items(), key=lambda kv: kv[0]):
         if len(names) <= 1:
             continue
         errs.append(
             f"module_id collision: {mid!r} is exported by multiple packages: {', '.join(sorted(names))}"
+        )
+
+    for pkg_name in sorted(visible_pkgs):
+        if pkg_name in caps_any_names:
+            continue
+        manifest_path = visible_pkgs[pkg_name][0]
+        errs.append(
+            f"{manifest_path.relative_to(root)}: meta.visibility is set, but {pkg_name} is not referenced from catalog/capabilities.json"
+        )
+
+    for pkg_name in sorted(canonical_visible_pkgs):
+        if pkg_name in caps_canonical_names:
+            continue
+        manifest_path = canonical_visible_pkgs[pkg_name][0]
+        errs.append(
+            f"{manifest_path.relative_to(root)}: meta.visibility is canonical, but {pkg_name} is not a canonical entry in catalog/capabilities.json"
         )
 
     if errs:
@@ -162,4 +175,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
