@@ -357,11 +357,9 @@ jobs:
     name: finalize-release
     needs:
       - build_matrix
-      - guest_runner_image
     if: |
       always() &&
-      needs.build_matrix.result == 'success' &&
-      needs.guest_runner_image.result == 'success'
+      needs.build_matrix.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
