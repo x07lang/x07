@@ -18,7 +18,7 @@ const REQ_VERSION: u32 = 1;
 const MAX_REQ_BYTES_DEFAULT: u32 = 1024 * 1024;
 const MAX_PUT_BYTES_DEFAULT: u32 = 16 * 1024 * 1024;
 const MAX_RESP_BYTES_DEFAULT: u32 = 32 * 1024 * 1024;
-const AWS_REGION: &str = "us-east-1";
+const AWS_REGION_DEFAULT: &str = "us-east-1";
 const AWS_SERVICE: &str = "s3";
 const DATE_ONLY_FORMAT: &[FormatItem<'static>] = format_description!("[year][month][day]");
 const AMZ_DATE_FORMAT: &[FormatItem<'static>] =
@@ -29,6 +29,7 @@ struct Policy {
     enabled: bool,
     s3_enabled: bool,
     endpoint: Url,
+    aws_region: String,
     default_bucket: String,
     access_key: String,
     secret_key: String,
@@ -71,11 +72,19 @@ fn policy() -> Result<Policy, (u32, Vec<u8>)> {
     let default_bucket = env_required("X07_OS_OBJ_S3_BUCKET")?;
     let access_key = env_required("X07_OS_OBJ_S3_ACCESS_KEY")?;
     let secret_key = env_required("X07_OS_OBJ_S3_SECRET_KEY")?;
+    let endpoint = Url::parse(&endpoint)
+        .map_err(|err| (objcore::OBJ_ERR_BAD_REQ, err.to_string().into_bytes()))?;
+    let aws_region = std::env::var("X07_OS_OBJ_S3_REGION")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| endpoint.host_str().and_then(infer_aws_region))
+        .unwrap_or_else(|| AWS_REGION_DEFAULT.to_string());
     Ok(Policy {
         enabled,
         s3_enabled,
-        endpoint: Url::parse(&endpoint)
-            .map_err(|err| (objcore::OBJ_ERR_BAD_REQ, err.to_string().into_bytes()))?,
+        endpoint,
+        aws_region,
         default_bucket,
         access_key,
         secret_key,
@@ -104,6 +113,27 @@ fn env_required(name: &str) -> Result<String, (u32, Vec<u8>)> {
             )
         })?;
     Ok(value)
+}
+
+fn infer_aws_region(host: &str) -> Option<String> {
+    let host = host.split(':').next().unwrap_or(host);
+    let parts: Vec<&str> = host.split('.').collect();
+    for (idx, part) in parts.iter().enumerate() {
+        if *part == "s3" {
+            match parts.get(idx + 1) {
+                Some(region) if *region != "amazonaws" && !region.is_empty() => {
+                    return Some((*region).to_string());
+                }
+                _ => return None,
+            }
+        }
+        if let Some(region) = part.strip_prefix("s3-") {
+            if !region.is_empty() {
+                return Some(region.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn read_u32_le(b: &[u8], off: usize) -> Option<u32> {
@@ -271,7 +301,10 @@ fn signed_request(
         "{method}\n{}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}",
         url.path()
     );
-    let credential_scope = format!("{date_only}/{AWS_REGION}/{AWS_SERVICE}/aws4_request");
+    let credential_scope = format!(
+        "{date_only}/{}/{AWS_SERVICE}/aws4_request",
+        policy.aws_region
+    );
     let string_to_sign = format!(
         "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
         hex::encode(Sha256::digest(canonical_request.as_bytes()))
@@ -279,7 +312,7 @@ fn signed_request(
     let signature = hex::encode(sign_aws_v4(
         &policy.secret_key,
         &date_only,
-        AWS_REGION,
+        &policy.aws_region,
         AWS_SERVICE,
         string_to_sign.as_bytes(),
     )?);
@@ -451,6 +484,36 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
 }
 
 #[cfg(test)]
+mod region_tests {
+    use super::infer_aws_region;
+
+    #[test]
+    fn infer_region_service_endpoint() {
+        assert_eq!(
+            infer_aws_region("s3.us-west-1.amazonaws.com").as_deref(),
+            Some("us-west-1")
+        );
+    }
+
+    #[test]
+    fn infer_region_bucket_endpoint() {
+        assert_eq!(
+            infer_aws_region("my-bucket.s3.us-west-2.amazonaws.com").as_deref(),
+            Some("us-west-2")
+        );
+        assert_eq!(infer_aws_region("my-bucket.s3.amazonaws.com"), None);
+    }
+
+    #[test]
+    fn infer_region_dash_style() {
+        assert_eq!(
+            infer_aws_region("s3-eu-central-1.amazonaws.com").as_deref(),
+            Some("eu-central-1")
+        );
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
@@ -473,6 +536,7 @@ mod tests {
             enabled: true,
             s3_enabled: true,
             endpoint,
+            aws_region: AWS_REGION_DEFAULT.to_string(),
             default_bucket: "demo-bucket".to_string(),
             access_key: "minio".to_string(),
             secret_key: "minio123".to_string(),
