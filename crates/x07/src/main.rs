@@ -2485,7 +2485,11 @@ fn build_test_driver_x07ast_json(test: &TestDecl) -> Result<Vec<u8>> {
             "begin",
             ["let", "task", call_entry],
             ["task.spawn", "task"],
-            ["let", "out", ["await", "task"]],
+            if test.entry_result_ty == "result_bytes" {
+                serde_json::json!(["let", "out", ["task.join.result_bytes", "task"]])
+            } else {
+                serde_json::json!(["let", "out", ["await", "task"]])
+            },
             if test.entry_result_ty == "result_bytes" {
                 serde_json::json!([
                     "if",
@@ -2494,7 +2498,7 @@ fn build_test_driver_x07ast_json(test: &TestDecl) -> Result<Vec<u8>> {
                     ["std.test.status_fail", ["result_bytes.err_code", "out"]]
                 ])
             } else {
-                serde_json::json!(["std.test.status_ok"])
+                serde_json::json!("out")
             }
         ]),
     };
