@@ -14,6 +14,10 @@ X07 is a programming language built from the ground up for **100% agentic coding
 
 ---
 
+## Agent Entrypoint
+
+Start here: https://x07lang.org/docs/getting-started/agent-quickstart
+
 ## Why X07?
 
 X07 is the core repo and entrypoint for the whole ecosystem. It is the place to start if you want to understand the language, install the toolchain, or build agent-friendly software that can move from local development to browser, device, MCP, package registry, and lifecycle platform workflows without switching languages.
