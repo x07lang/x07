@@ -15,5 +15,6 @@ The `x07lang` GitHub org is split into focused repos so each part of the languag
 - `x07lang/x07-website`: the `x07lang.org` site built from released docs bundles.
 - `x07lang/x07-perf-compare`: performance comparison harnesses and reproducible benchmark snapshots.
 - `x07lang/x07-crewops`: a multi-role showcase app that demonstrates how the ecosystem fits together for a real product.
+- `x07lang/x07-sentinel-reference-stack`: the canonical public backend reference system for x07 Sentinel (orders domain: API + consumer + scheduled job) with AWS/GCP tutorials and a local smoke path.
 
 The `x07lang/x07-platform-cloud` repo is the private implementation repo for x07 Sentinel, the managed control layer built on the public platform split. `x07lang/x07-infra-private` holds operational infrastructure.
