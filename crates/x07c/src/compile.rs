@@ -1547,6 +1547,18 @@ fn collect_call_heads(expr: &crate::ast::Expr, out: &mut Vec<String>) {
         crate::ast::Expr::List { items, .. } => {
             if let Some(head) = items.first().and_then(crate::ast::Expr::as_ident) {
                 out.push(head.to_string());
+                if matches!(
+                    head,
+                    "std.brand.cast_bytes_v1"
+                        | "std.brand.cast_view_copy_v1"
+                        | "std.brand.cast_view_v1"
+                ) {
+                    if let Some(validator_symbol) =
+                        items.get(2).and_then(crate::ast::Expr::as_ident)
+                    {
+                        out.push(validator_symbol.to_string());
+                    }
+                }
             }
             for e in items {
                 collect_call_heads(e, out);
