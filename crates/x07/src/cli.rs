@@ -664,14 +664,21 @@ fn write_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 fn infer_cli_module_roots_for_spec(spec_path: &Path) -> Result<Vec<PathBuf>> {
-    let toolchain_roots = toolchain_cli_spec_module_roots().ok();
+    let (toolchain_roots, toolchain_roots_err) = match toolchain_cli_spec_module_roots() {
+        Ok(roots) => (Some(roots), None),
+        Err(err) => (None, Some(err)),
+    };
     let start_dir = spec_path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let Some(project_path) = crate::run::discover_project_manifest(start_dir)? else {
-        return toolchain_roots
-            .ok_or_else(|| anyhow::anyhow!("could not find toolchain packages/ext directory"));
+        return match toolchain_roots {
+            Some(roots) => Ok(roots),
+            None => Err(toolchain_roots_err.unwrap_or_else(|| {
+                anyhow::anyhow!("could not find toolchain packages/ext directory")
+            })),
+        };
     };
 
     let manifest =
@@ -728,9 +735,7 @@ fn merge_roots(toolchain: Option<Vec<PathBuf>>, project: Vec<PathBuf>) -> Vec<Pa
 }
 
 fn toolchain_cli_spec_module_roots() -> Result<Vec<PathBuf>> {
-    let Some(ext_dir) = crate::pkg::official_ext_packages_dir() else {
-        anyhow::bail!("could not find toolchain packages/ext directory");
-    };
+    let ext_dir = crate::pkg::official_ext_packages_dir_required()?;
 
     let mut roots: Vec<PathBuf> = Vec::new();
     for name in ["ext-cli", "ext-data-model", "ext-json-rs", "ext-unicode-rs"] {
@@ -762,6 +767,9 @@ fn best_semver_version_dir(dir: &Path) -> Result<String> {
             .file_type()
             .with_context(|| format!("read file type: {}", entry.path().display()))?;
         if !file_type.is_dir() {
+            continue;
+        }
+        if !entry.path().join("x07-package.json").is_file() {
             continue;
         }
         let name = entry.file_name().to_string_lossy().to_string();

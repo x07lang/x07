@@ -123,7 +123,7 @@ For release-control clients such as Forge, the public lifecycle read/write split
 - read incident inbox/detail through `lp.query_v1` into `lp.incident.query.result@0.2.0`
 - read regression generation status through `lp.query_v1` into `lp.regression.run.result@0.2.0`
 
-This is the M5 boundary on the `x07` side: release-candidate composition remains client-owned, while deploy, environment, incident, and regression truth comes from the official structured `lp.*` contracts. Consumers should cache against stable ids and artifact refs from those contracts instead of scraping CLI text or private platform internals. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
+This is the boundary on the `x07` side: release-candidate composition remains client-owned, while deploy, environment, incident, and regression truth comes from the official structured `lp.*` contracts. Consumers should cache against stable ids and artifact refs from those contracts instead of scraping CLI text or private platform internals. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
 
 ## HTTP template quickstart
 

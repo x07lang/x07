@@ -2957,21 +2957,91 @@ pub(crate) fn official_ext_packages_dir() -> Option<PathBuf> {
     if let Ok(v) = std::env::var("X07_REPO_ROOT") {
         let root = PathBuf::from(v);
         let cand = root.join("packages").join("ext");
-        if cand.is_dir() {
+        if std::fs::read_dir(&cand).is_ok() {
             return Some(cand);
+        }
+    }
+
+    for anc in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() {
+        let cand = anc.join("packages").join("ext");
+        if std::fs::read_dir(&cand).is_ok() {
+            return Some(cand);
+        }
+    }
+
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Some(toolchain_root) = util::detect_toolchain_root_best_effort(&cwd) {
+            let cand = toolchain_root.join("packages").join("ext");
+            if std::fs::read_dir(&cand).is_ok() {
+                return Some(cand);
+            }
         }
     }
 
     if let Ok(exe) = std::env::current_exe() {
         for anc in exe.ancestors() {
             let cand = anc.join("packages").join("ext");
-            if cand.is_dir() {
+            if std::fs::read_dir(&cand).is_ok() {
                 return Some(cand);
             }
         }
     }
 
     None
+}
+
+pub(crate) fn official_ext_packages_dir_required() -> Result<PathBuf> {
+    let mut tried: Vec<(PathBuf, std::io::Error)> = Vec::new();
+
+    if let Ok(v) = std::env::var("X07_REPO_ROOT") {
+        let root = PathBuf::from(v);
+        let cand = root.join("packages").join("ext");
+        match std::fs::read_dir(&cand) {
+            Ok(_) => return Ok(cand),
+            Err(err) => tried.push((cand, err)),
+        }
+    }
+
+    for anc in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() {
+        let cand = anc.join("packages").join("ext");
+        match std::fs::read_dir(&cand) {
+            Ok(_) => return Ok(cand),
+            Err(err) => tried.push((cand, err)),
+        }
+    }
+
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Some(toolchain_root) = util::detect_toolchain_root_best_effort(&cwd) {
+            let cand = toolchain_root.join("packages").join("ext");
+            match std::fs::read_dir(&cand) {
+                Ok(_) => return Ok(cand),
+                Err(err) => tried.push((cand, err)),
+            }
+        }
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        for anc in exe.ancestors() {
+            let cand = anc.join("packages").join("ext");
+            match std::fs::read_dir(&cand) {
+                Ok(_) => return Ok(cand),
+                Err(err) => tried.push((cand, err)),
+            }
+        }
+    }
+
+    tried.sort_by(|(a, _), (b, _)| a.cmp(b));
+    tried.dedup_by(|(a, _), (b, _)| a == b);
+
+    let mut msg = String::from("could not find toolchain packages/ext directory");
+    if !tried.is_empty() {
+        msg.push_str("\ntried:");
+        for (path, err) in tried {
+            msg.push_str(&format!("\n- {}: {}", path.display(), err));
+        }
+        msg.push('\n');
+    }
+    anyhow::bail!(msg);
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {

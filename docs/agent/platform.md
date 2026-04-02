@@ -120,7 +120,7 @@ Forge-style clients should keep candidate/workspace state in the client, then re
 - regression generation result: `lp.regression.run.result@0.2.0`
   - stable linkage fields: `incident_id`, `regression_id`, `incident_status_after`, `replay_mode`, `replay_synthesis_status`, `generated_trace_artifact_refs`, `generated_report_artifact_refs`
 
-This is the intended M5 boundary in `x07`: the core toolchain and docs point clients at the official machine-readable lifecycle outputs, but they do not invent a second release-candidate or incident domain on top of `x07-platform`.
+This is the intended boundary in `x07`: the core toolchain and docs point clients at the official machine-readable lifecycle outputs, but they do not invent a second release-candidate or incident domain on top of `x07-platform`.
 
 ## Runtime surface
 
