@@ -19,7 +19,7 @@ hardproof doctor
 
 ## Codespaces install helper
 
-If you are evaluating via `x07lang/x07-mcp` Codespaces, the repo includes a helper that downloads a pinned alpha verifier binary:
+If you are evaluating via `x07lang/x07-mcp` Codespaces, the repo includes a helper that installs the verifier binary (defaults to the latest beta, or you can pass a specific tag):
 
 ```sh
 ./scripts/dev/install_hardproof.sh

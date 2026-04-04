@@ -11,7 +11,7 @@ At a minimum, a CI run usually does:
 
 ## Minimal workflow sketch
 
-This is intentionally a sketch (private alpha). Wire the install and server start steps to match your repo.
+This is intentionally a sketch (public beta). Wire the install and server start steps to match your repo.
 
 ```yaml
 name: mcp-quality
@@ -25,9 +25,11 @@ jobs:
         run: |
           echo "Start your MCP server here"
       - name: Hardproof Scan (beta)
-        uses: x07lang/hardproof/hardproof-scan@v0.1.0-alpha.6
+        uses: x07lang/hardproof/hardproof-scan@v0.2.0-beta.1
         with:
           url: http://127.0.0.1:3000/mcp
+          version: v0.2.0-beta.1
+          threshold: "80"
           full-suite: "false"
           sarif: "true"
       - name: Upload artifacts
