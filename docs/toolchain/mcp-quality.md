@@ -4,10 +4,11 @@ Official MCP conformance is the baseline. Hardproof (`hardproof`) layers additio
 
 What Hardproof does:
 
-- **Conformance**: run the official MCP conformance suite and emit JSON/JUnit/HTML artifacts.
-- **Replay**: record a small HTTP session cassette and replay it to detect behavior drift with deterministic diffs.
-- **Trust**: validate required trust metadata in an MCP registry `server.json`.
-- **Bundle**: validate that a `server.json` and `.mcpb` bundle are consistent (hash/metadata mismatch detection).
+- **Scan**: run deterministic verification across five dimensions (conformance, reliability, performance, security, trust) and emit a stable scan report (`scan.json`) plus an event stream (`scan.events.jsonl`).
+- **CI gating**: run `hardproof ci` to enforce policies (minimum score, zero critical findings, per-dimension minimums, usage limits).
+- **Replay**: record a small session cassette and replay it to detect behavior drift with deterministic diffs.
+- **Trust + bundle**: verify registry metadata (`server.json`) and bundle integrity (`.mcpb`) as part of a scan (when inputs are provided) or via explicit subcommands.
+- **Report export**: render a scan summary or export SARIF/HTML from an existing scan report.
 
 What it does *not* do (yet):
 
@@ -28,8 +29,13 @@ hardproof doctor --machine json
 3) Conformance:
 
 ```sh
-hardproof scan --url "http://127.0.0.1:3000/mcp" --out out/conformance --machine json
+hardproof scan --url "http://127.0.0.1:3000/mcp" --out out/scan --format json
 ```
+
+Artifacts are written under `out/scan/`:
+
+- `scan.json`
+- `scan.events.jsonl`
 
 4) Replay:
 
@@ -45,8 +51,31 @@ hardproof trust verify --server-json ./server.json --machine json
 hardproof bundle verify --server-json ./server.json --mcpb ./bundle.mcpb --machine json
 ```
 
+If you have both `server.json` and `.mcpb`, you can also include trust checks in the scan:
+
+```sh
+hardproof scan \
+  --url "http://127.0.0.1:3000/mcp" \
+  --server-json ./server.json \
+  --mcpb ./bundle.mcpb \
+  --out out/scan \
+  --format json
+```
+
 ## x07-native path (optional)
 
 If you want to **build** an MCP server in X07 (not just verify one), use `x07lang/x07-mcp`.
 
 The shortest zero-install path is Codespaces: see [MCP quality: Codespaces](mcp-codespaces.md).
+
+## Hardproof as a reference x07 application
+
+Hardproof is intentionally built as a pure x07 application (CLI + contracts + deterministic evidence).
+If you want a concrete example of the “one whole system” primitives working together, Hardproof exercises:
+
+- Streaming composition: `std.stream.pipe_v1`
+- Structured concurrency: `task.scope_v1`
+- Record/replay as first-class evidence (`std.rr` + replay cassettes)
+- Deterministic contracts/tooling: `x07 arch check`, `x07 schema derive`, `x07 sm gen`
+- Property-based tests: `x07 test --pbt` and deterministic regressions
+- Verification + review artifacts: `x07 verify`, `x07 prove check`, `x07 trust certify`, `x07 trust report`

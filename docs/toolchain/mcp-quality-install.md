@@ -2,7 +2,7 @@
 
 Hardproof (`hardproof`) is a standalone verifier CLI. The public beta is distributed as prebuilt binaries from GitHub Releases.
 
-Conformance runs in the `hardproof` binary (no Node.js toolchain required). Use `hardproof doctor` to check your environment before you run conformance in CI.
+Scan runs in the `hardproof` binary (no Node.js toolchain required). Use `hardproof doctor` to check your environment before you run verification in CI.
 
 ## Install from release artifacts
 

@@ -29,7 +29,7 @@ x07 bundle --project x07.json --profile sandbox --program src/worker_main.x07.js
 4) Verify in another terminal:
 
 ```sh
-hardproof scan --url "http://127.0.0.1:8314/mcp" --out out/conformance --machine json
+hardproof scan --url "http://127.0.0.1:8314/mcp" --out out/scan --format json
 hardproof replay record --url "http://127.0.0.1:8314/mcp" --out out/replay.session.json --machine json
 hardproof replay verify --session out/replay.session.json --url "http://127.0.0.1:8314/mcp" --out out/replay-verify --machine json
 ```
