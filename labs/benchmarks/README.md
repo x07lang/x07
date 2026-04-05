@@ -4,7 +4,7 @@ Benchmark suites live here and are executed by `labs/scripts/bench/run_bench_sui
 
 ## Suites
 
-- solve-pure sanity: `labs/benchmarks/solve-pure/phase3-suite.json`
+- solve-pure sanity: `labs/benchmarks/solve-pure/sanity-suite.json`
 - ABI/types baseline (solve-pure):
   - fast gate: `labs/benchmarks/solve-pure/abi-types-smoke.json`
   - main suite: `labs/benchmarks/solve-pure/abi-types-suite.json`
@@ -17,8 +17,8 @@ Benchmark suites live here and are executed by `labs/scripts/bench/run_bench_sui
   - `labs/benchmarks/solve-kv/stdlib-parity-suite.json`
   - fast gate (solve-full): `labs/benchmarks/solve-full/stdlib-parity-smoke.json`
   - `labs/benchmarks/solve-full/stdlib-parity-suite.json`
-- curriculum tiers (solve-pure): `labs/benchmarks/solve-pure/phase4-tier{1,2,3}-*.json`
-- holdout (solve-pure): `labs/benchmarks/solve-pure/phase4-holdout.json`
+- curriculum tiers (solve-pure): `labs/benchmarks/solve-pure/curriculum-tier{1,2,3}-*.json`
+- holdout (solve-pure): `labs/benchmarks/solve-pure/curriculum-holdout.json`
 
 Suite bundles (multi-suite runs):
 
@@ -34,10 +34,10 @@ Suite smoke (native backend):
 
 - `./labs/scripts/ci/check_suites_h1h2.sh`
 
-## Phase 4 curriculum generation
+## Curriculum generation
 
-- Generate: `python3 labs/scripts/bench/generate_phase4_curriculum.py`
-- Check up to date: `python3 labs/scripts/bench/generate_phase4_curriculum.py --check`
+- Generate: `python3 labs/scripts/bench/generate_curriculum.py`
+- Check up to date: `python3 labs/scripts/bench/generate_curriculum.py --check`
 
 ## Fixtures
 

@@ -44,7 +44,7 @@
 - [MCP quality: install](toolchain/mcp-quality-install.md)
 - [MCP quality: GitHub Actions](toolchain/mcp-quality-action.md)
 - [MCP quality: Codespaces](toolchain/mcp-codespaces.md)
-- [WASM (Phases 0–10)](toolchain/wasm.md)
+- [WASM toolchain](toolchain/wasm.md)
 - [Benchmarks](toolchain/benchmarks.md)
 - [Compiler limits](toolchain/compiler-limits.md)
 - [Optimizer](toolchain/optimizer.md)

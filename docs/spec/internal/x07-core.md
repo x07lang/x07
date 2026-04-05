@@ -28,7 +28,7 @@ In Track B:
 Seed language references:
 - Guide snapshot: `docs/spec/language-guide.md`
 - Default benchmark bundle: `labs/benchmarks/bundles/regression.json`
-- Optional suite: `labs/benchmarks/solve-pure/phase4-holdout.json`
+- Optional suite: `labs/benchmarks/solve-pure/curriculum-holdout.json`
 
 ## Determinism and safety
 

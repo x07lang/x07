@@ -2,99 +2,44 @@
 
 `x07-mcp` is the MCP server kit for X07. It ships templates, package modules, and a dedicated CLI for scaffold/check/inspect/catalog/bundle/conformance/publish/trust workflows.
 
-Phase 4 adds:
+`x07-mcp` includes:
 
 - Streamable HTTP SSE (`POST /mcp` streaming and `GET /mcp` listen streams)
 - progress tokens (`_meta.progressToken`) + `notifications/progress`
 - explicit cancellation (`notifications/cancelled`)
 - `resources/subscribe` / `resources/unsubscribe` + `notifications/resources/updated`
 - deterministic HTTP+SSE RR fixtures (`*.http_sse.session.jsonl`)
-
-Phase 5 adds:
-
 - Tasks API (`tools/call` task mode + `tasks/get|list|result|cancel`)
 - task-aware negotiation (`tools/list.execution.taskSupport`)
 - task stores: in-memory + durable sqlite (restart marks `working → failed`)
-- deterministic RR transcript fixtures (JSONL)
-- a new template: `mcp-server-http-tasks`
-
-Phase 6 adds:
-
+- deterministic RR transcript fixture formats: JSONL transcripts + golden assets (for example `hello_tasks_progress`)
 - progress token lifecycle enforcement for tasks
-- `notifications/progress` tied to task lifetime (stops after terminal)
 - resumable SSE outbox behavior (bounded buffering + `Last-Event-ID`)
-- golden RR transcript fixture for tasks progress (`hello_tasks_progress`)
-
-Phase 7 adds:
-
 - `notifications/message` logging + `logging/setLevel`
 - audit sink wiring (JSONL) and metrics export plumbing
 - RR fixtures that capture and replay router/worker OOB signals deterministically
-
-Phase 8 adds:
-
 - OAuth2 Resource Server enforcement on HTTP `POST /mcp` (401/403 + correct `WWW-Authenticate`)
 - RFC9728 Protected Resource Metadata (PRM) at the insertion URL (and optional root alias)
 - strict Streamable HTTP headers (Origin / Accept / MCP-Protocol-Version) with empty-body HTTP failures
 - HTTP record/replay sanitization hardened at the cassette boundary (auth/cookie redaction + fail-closed)
-
-Phase 9 adds:
-
 - JWT/JWKS access token validation (`jwt_jwks_v1`)
-- DPoP validation + replay window enforcement (RFC9449)
+- DPoP validation + replay window enforcement (RFC9449), plus nonce hardening (`use_dpop_nonce`)
 - client-mode conformance harness (auth suite)
-
-Phase 10 adds:
-
-- DPoP nonce hardening (RFC9449 `use_dpop_nonce`)
-- RFC9728 signed PRM metadata (`signed_metadata`)
-
-Phase 12 adds:
-
 - trust framework bundles (`x07.mcp.trust.bundle@0.1.0`) + framework policy (`x07.mcp.trust.framework@0.1.0`)
 - resource policy resolution with precedence: `exact` > `prefix` > `hostSuffix` > defaults
 - publish-time signed-PRM enforcement (`publish.require_signed_prm=true`)
 - publisher `_meta` trust summary injection (`requireSigned`, `signerIss`, `trustFrameworkSha256`)
 - tag-release guardrails rejecting placeholder trust metadata
-
-Phase 13 adds:
-
-- trust framework v2 (`x07.mcp.trust.framework@0.2.0`) with bundle publisher key pins and AS selection policy
 - signed trust bundle statements (`*.trust_bundle.sig.jwt`) validated against pinned publisher keys
-- trust lockfile pins (`x07.mcp.trust.lock@0.1.0`) for deterministic bundle/signature digest validation
+- trust lockfile pins for deterministic bundle/signature digest validation (`x07.mcp.trust.lock@0.1.0` and `x07.mcp.trust.lock@0.2.0`)
 - governed multi-AS PRM issuer selection (`prefer_order_v1`) with fail-closed behavior
-- publisher `_meta` trust summary fields under `.../publisher-provided.x07`:
-  - `trustFrameworkSha256`
-  - `trustLockSha256`
-  - `requireSignedPrm`
-  - `asSelectionStrategy`
-
-Phase 14 adds:
-
-- trust framework v3 (`x07.mcp.trust.framework@0.3.0`) remote bundle sources (`source.kind=url`, `sig_source.kind=url`) with no-TOFU enforcement
-- trust lock v2 (`x07.mcp.trust.lock@0.2.0`) pins for remote URL + digest pairs (`bundle_url`, `sig_url`, `bundle_sha256`, `sig_sha256`)
+- remote trust bundle sources (`source.kind=url`, `sig_source.kind=url`) with no-TOFU enforcement
 - trust pack registry/semver surfaces (`registry index`, `pack index`, `pack manifest`, deterministic highest-version selection)
-- publisher `_meta` trust pack summary fields under `.../publisher-provided.x07.x07.trustPack`:
-  - `registry`
-  - `packId`
-  - `packVersion`
-  - `lockSha256`
-
-Phase 15 adds:
-
 - TUF-lite trust registry metadata verification (`root.json`, `timestamp.jwt`, `snapshot.jwt`) plus anti-rollback monotonic checks
-- optional witness checkpoint verification (`transparency/checkpoint.jwt`) for transparency-style attestations
-- trust-pack publish summary anti-rollback fields:
-  - `minSnapshotVersion`
-  - `snapshotSha256`
-  - `checkpointSha256`
-- template replay fixtures for metadata refresh success + rollback rejection (`trust.tuf_ok`, `trust.tuf_rollback_timestamp`)
-
-Phase 16 adds:
-
+- witness checkpoint verification (`transparency/checkpoint.jwt`) for transparency-style attestations
 - trust transparency log verification primitives (CT-style Merkle root, inclusion proof, consistency proof)
 - checkpoint JWS verification and trust bundle inclusion verification helpers
-- run-os monitor runner surfaces that verify append-only growth and evaluate newly appended entries against monitor policy
+- monitor runner surfaces that verify append-only growth and evaluate newly appended entries against monitor policy
 - deterministic transparency monitor assets:
   - `templates/trust-registry-tlog/`
   - `rr/http/trust_tlog_monitor_{ok,unexpected,inconsistent}.http.jsonl`
@@ -197,7 +142,7 @@ x07 mcp conformance \
 
 When `--url` is omitted with `--spawn`, the harness derives host/port/path from the selected server config.
 
-Default run mode executes the Phase-4 regression scenarios:
+Default run mode executes the baseline regression scenarios:
 
 - `server-initialize`
 - `ping`

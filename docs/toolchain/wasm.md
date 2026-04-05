@@ -1,18 +1,16 @@
-# WASM (Phases 0–10)
+# WASM toolchain
 
-Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
-Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
-Phase 2 adds a **Web UI** loop (`web-ui build|serve|test`) on top of Phase 0/1.
-Phase 3 adds a **full-stack app bundle** loop (`app build|serve|test`) that combines Phase 2 (frontend) and Phase 1 (backend).
-Phase 4 adds **native backend targets** so `x07 wasm component build --emit http|cli` can produce runnable standard-world components without guest adapters and without a compose step.
-Phase 5 adds **Track-1 hardening**: toolchain pin validation, host runtime budgets, deployable app packs, and a core-wasm HTTP reducer loop.
-Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **SLO-as-code**, **deploy plan generation**, and **signed provenance** (DSSE + Ed25519).
-Phase 7 adds a **native x07→wasm backend** so `solve-pure` wasm builds no longer require `clang` / `wasm-ld` by default.
-Phase 8 adds **device bundles** for running `std.web_ui` reducers in a system WebView host (desktop + mobile), pinned to a host ABI hash.
-Phase 9 adds a **system WebView host runner** and wires `device run` + `device package` for desktop.
-Phase 10 adds **iOS/Android project generation** via `device package --target ios|android`.
+`x07 wasm` covers:
 
-Phases 0–10 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+- build+run loops for **solve-pure** X07 programs as WASM modules
+- **WASI 0.2 components** (HTTP + CLI runnable targets)
+- a **Web UI** loop (`web-ui build|serve|test`) for `std.web_ui` reducers
+- a **full-stack app bundle** loop (`app build|serve|test`) combining a reducer frontend and `wasi:http/proxy` backend component
+- hardening surfaces (toolchain pin validation, runtime budgets, app packs, and core-wasm HTTP reducers)
+- operational contracts (ops profiles, capabilities, policy), SLO-as-code, deploy plan generation, and signed provenance
+- device bundles, device runners, and iOS/Android project generation via `device package --target ios|android`
+
+This surface is implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -50,21 +48,21 @@ The released docs bundle mirrors the official `x07-wasm` showcase sources under 
 
 The canonical runnable projects and CI scripts live in `x07-wasm-backend/examples/`.
 
-Phase 1 also requires additional tools on `PATH` (checked by `x07 wasm doctor`):
+Component builds also require additional tools on `PATH` (checked by `x07 wasm doctor`):
 
 - `wasm-tools`
 - `wit-bindgen`
 - `wac`
 - `wasmtime`
 
-Phase 2 (component+ESM builds) also uses:
+Browser component builds (transpiled ESM outputs) also use:
 
 - `node`
 - `jco` (component transpile)
 
 Note: Node is used for browser-targeted tooling (for example `jco transpile`), not as a secure WASI runtime. Node’s WASI APIs are not intended to be a security sandbox for untrusted code; use Wasmtime (the `x07-wasm` baseline) for untrusted execution.
 
-Phase 9 (desktop host runner + packaging) also uses:
+Desktop host runner and packaging also use:
 
 - `x07-device-host-desktop`
 
@@ -120,9 +118,9 @@ Agents should use:
 - `x07 wasm --cli-specrows`
 - `x07 wasm cli specrows check`
 
-## Phase 1: components (WASI 0.2)
+## Components (WASI 0.2)
 
-Phase 1 introduces a component pipeline:
+This section introduces a component pipeline:
 
 - WIT registry: `arch/wit/index.x07wit.json` (vendored, pinned)
 - Component profile registry: `arch/wasm/component/index.x07wasm.component.json`
@@ -134,7 +132,7 @@ x07 wasm wit validate --json
 x07 wasm component profile validate --json
 ```
 
-Phase 4 native targets (adapterless, no compose):
+Native targets (adapterless, no compose):
 
 ```sh
 x07 wasm component build --project examples/http_echo/x07.json --emit http-native --json
@@ -148,7 +146,7 @@ x07 wasm component targets --component target/x07-wasm/component/cli.component.w
 x07 wasm component run --component target/x07-wasm/component/cli.component.wasm --stdin examples/solve_pure_echo/tests/fixtures/in_hello.bin --stdout-out dist/stdout.bin --json
 ```
 
-Composed path (Phase 1 adapters + `wac plug`):
+Composed path (adapters + `wac plug`):
 
 ```sh
 x07 wasm component build --project examples/http_echo/x07.json --emit solve --json
@@ -169,9 +167,9 @@ x07 wasm serve --mode canary --component dist/app.http.component.wasm --request-
 x07 wasm component run --component dist/app.cli.component.wasm --stdin examples/solve_pure_echo/tests/fixtures/in_hello.bin --stdout-out dist/stdout.bin --json
 ```
 
-## Phase 2: web-ui (browser host)
+## Web UI (browser host)
 
-Phase 2 adds a browser host loop for X07 reducers that consume `x07.web_ui.dispatch@0.1.0` and emit `x07.web_ui.frame@0.2.0` as UTF-8 JSON bytes.
+This section covers a browser host loop for X07 reducers that consume `x07.web_ui.dispatch@0.1.0` and emit `x07.web_ui.frame@0.2.0` as UTF-8 JSON bytes.
 
 The canonical `std-web-ui` package, browser host assets, and WIT contracts live in the `x07-web-ui` repo. Install/update the package with the X07 package manager:
 
@@ -214,11 +212,11 @@ Component build (transpiled for the browser via `jco transpile`):
 x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_ui_debug --out-dir dist --format component --json
 ```
 
-Note: `web-ui build` emits `dist/wasm.profile.json` (the resolved wasm profile used for the build). `web-ui test` and replay tooling use it to apply Phase-5 runtime limits deterministically.
+Note: `web-ui build` emits `dist/wasm.profile.json` (the resolved wasm profile used for the build). `web-ui test` and replay tooling use it to apply runtime limits deterministically.
 
-## Phase 8: device bundles (system WebView host)
+## Device bundles (system WebView host)
 
-Phase 8 introduces a device contract layer for running `std.web_ui` reducers in a system WebView host (desktop + mobile).
+This section covers a device contract layer for running `std.web_ui` reducers in a system WebView host (desktop + mobile).
 
 The device bundle format pins a host ABI hash (from the `x07-device-host` repo) so that device apps can reject incompatible hosts deterministically.
 
@@ -252,7 +250,7 @@ x07 wasm device provenance attest --dir dist/device --signing-key <signing_key.b
 x07 wasm device provenance verify --attestation dist/device.provenance.dsse.json --bundle-dir dist/device --trusted-public-key <public_key.b64> --json
 ```
 
-## Phase 9: device run + package (desktop host)
+## Device run + package (desktop host)
 
 Run a device bundle via the desktop host:
 
@@ -280,7 +278,7 @@ Package a device bundle into a desktop payload (writes `package.manifest.json`):
 x07 wasm device package --bundle dist/device --target desktop --out-dir dist/device_package --json
 ```
 
-## Phase 10: device package (iOS/Android project generation)
+## Device package (iOS/Android project generation)
 
 Generate an iOS project directory (no Xcode required for generation):
 
@@ -294,9 +292,9 @@ Generate an Android project directory (no Gradle required for generation):
 x07 wasm device package --bundle dist/device --target android --out-dir dist/device_package_android --json
 ```
 
-## Phase 3: app bundle (full stack)
+## App bundle (full stack)
 
-Phase 3 introduces an app-bundle registry (`arch/app/*`) and a single closed loop:
+This section introduces an app-bundle registry (`arch/app/*`) and a single closed loop:
 
 - app profile → app build → app serve → app test → incident → regression
 
@@ -320,7 +318,7 @@ x07 wasm app test --dir dist/app --trace examples/app_fullstack_hello/tests/trac
 
 For backends that need server-held JSON state across one `app serve` or `app test` session, set `backend.adapter` to `wasi_http_proxy_state_doc_v1`. The adapter passes a typed `{request, state}` document into the backend and persists the returned `state` for the next request in that replay session.
 
-## Phase 5: hardening
+## Hardening
 
 Toolchain pins as data (CI gate):
 
@@ -367,9 +365,9 @@ Core-wasm HTTP reducer contracts + loop:
 x07 wasm http contracts validate --strict --json
 ```
 
-## Phase 6: ops + capabilities + policy + SLO + deploy plans + provenance
+## Ops + capabilities + policy + SLO + deploy plans + provenance
 
-Phase 6 introduces machine-readable operational governance and deployment artifacts:
+This section introduces machine-readable operational governance and deployment artifacts:
 
 ```sh
 x07 wasm ops validate --profile arch/app/ops/ops_release.json --json

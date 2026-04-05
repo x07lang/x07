@@ -24,7 +24,7 @@ For an autonomous agent workflow, treat `x07c` as the contract-enforcer:
 
 ## Projects (modules/packages)
 
-For multi-module programs and pinned dependencies, use the Phase E project workflow:
+For multi-module programs and pinned dependencies, use the project workflow:
 
 - `cargo run -p x07c -- lock --project <project/x07.json>`
 - `cargo run -p x07c -- build --project <project/x07.json> --out <out.c>`
@@ -32,24 +32,18 @@ For multi-module programs and pinned dependencies, use the Phase E project workf
 
 Details: `labs/internal-docs/spec/modules-packages.md`.
 
-## Standalone OS worlds (Phase H3)
+## Standalone OS worlds
 
 Standalone OS worlds are not used in deterministic suites:
 
 - `run-os`
 - `run-os-sandboxed` (policy restricted; see `schemas/run-os-policy.schema.json`)
 
-Phase H4 extends standalone-only worlds with systems features:
+Standalone OS worlds also include systems features:
 
 - `unsafe` blocks, raw pointers, and `extern` C declarations/calls (world-gated; not available in `solve-*` worlds).
 
-Use `x07-os-runner` to compile+run programs in these worlds:
-
-```bash
-cargo run -p x07-os-runner -- \
-  --program examples/h3/read_file_by_stdin.x07.json \
-  --world run-os
-```
+Use `x07-os-runner` to compile+run programs in these worlds.
 
 ## Freeze criteria (practical)
 

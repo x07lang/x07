@@ -37,7 +37,7 @@ Modules whose semantics are basically:
 * deterministic parsing/printing
 * deterministic data-structure logic with stable iteration order
 
-These map well onto X07’s current strengths and your Phase E/F direction.
+These map well onto X07’s current strengths and your current direction.
 
 ### Avoid “automatic translation” early
 
@@ -236,7 +236,7 @@ Since your runtime already emits `mem_stats`, your importer should also enforce:
 * bounded memcpy
 * peak_live_bytes near output + slack (especially once views exist)
 
-This aligns with your Phase F mem and Phase G1 goals.
+This aligns with your memory and borrow-tracking goals.
 
 ---
 
@@ -432,7 +432,7 @@ implementation is `x07import-cli` / `x07import-core`, and the current pinned std
 
 Below is a concrete, “PR-ready” spec for an **`x07import`** tool that deterministically imports a *restricted* subset of Rust into X07 stdlib modules, plus an opinionated answer on whether X07 should add more core types.
 
-I’m assuming your current Phase‑E module form is:
+I’m assuming your current module form is:
 
 * modules are `.x07.json` files containing `decls` (`export` + `defn`/`defasync`) and `imports`
 * function names are fully-qualified (e.g. `std.text.ascii.normalize_lines`)
@@ -728,7 +728,7 @@ pub enum x07Stmt {
     Return(x07Expr),
 }
 
-/// Expression forms that map cleanly to your Phase-E S-expr surface.
+/// Expression forms that map cleanly to the current json-sexpr surface.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum x07Expr {
     Int(i32),
@@ -1208,9 +1208,9 @@ Then lower x07IR → existing X07 constructs.
 This gives you:
 
 * faster stdlib porting *now* (you can read Rust code “as typed”)
-* no explosion of core semantics while Phase E–F are still stabilizing
+* no explosion of core semantics while the core module system is still stabilizing
 
-### Option 2 (the right move for Phase G1): add **ViewBytes** as a distinct core type
+### Option 2 (the right move next): add **ViewBytes** as a distinct core type
 
 This one is *worth doing in core* because it unlocks the “big win” you want:
 
@@ -1218,9 +1218,9 @@ This one is *worth doing in core* because it unlocks the “big win” you want:
 * `memcpy_bytes` collapsing to near output size
 * `realloc_calls` improvements through better builders and views
 
-This aligns with your Phase G1 goals.
+This aligns with the borrow-aware `bytes_view` goals.
 
-### Option 3 (later, Phase H): structs/enums + generic-ish containers
+### Option 3 (later): structs/enums + generic-ish containers
 
 For “C/Rust-class” capability, you’ll eventually want:
 
@@ -1237,9 +1237,9 @@ But: adding these too early increases:
 
 So I’d stage it:
 
-* **Now (Phase E/F)**: keep core types lean; do typed import in x07IR only
-* **Phase G1**: make `bytes_view` real
-* **Phase H**: introduce structured types once you have a big cross-stdlib benchmark suite + canary gating
+* **Now**: keep core types lean; do typed import in x07IR only
+* **Next**: make `bytes_view` real
+* **Later**: introduce structured types once you have a big cross-stdlib benchmark suite + canary gating
 
 ### A practical heuristic
 
@@ -1333,7 +1333,7 @@ pub enum x07Ty {
 
     // Bytes
     Bytes,      // owning buffer
-    BytesView,  // borrowed view (ptr+len concept; may still lower to Bytes until Phase G1)
+    BytesView,  // borrowed view (ptr+len concept; may still lower to Bytes until bytes_view lowering is implemented)
 
     // Builders / handles
     VecU8,      // vec_u8 value (lowers to `vec_u8` surface type)
@@ -1889,7 +1889,7 @@ Yes — but the key is **where** you add them.
 
 2. **Add runtime-level representations only when needed for performance/safety:**
 
-   * Phase G1: real `bytes_view` (fat pointer) and debug borrow checks.
+   * Next: real `bytes_view` (fat pointer) and debug borrow checks.
    * Later: typed slices `slice<T>` etc.
 
 So: **Yes, more types make sense**, but treat them as **compile-time “phantom types” first** so you don’t bloat the runtime or expand the search surface prematurely.
@@ -2180,7 +2180,7 @@ impl<'src> Validator<'src> {
             ok = false;
             self.push("X7I_FN_ASYNC", span(sig),
                 "async functions are not supported in v1 subset",
-                Some("use a synchronous function; async is a Phase G feature in X07".into()));
+                Some("use a synchronous function; async is not supported in this surface".into()));
         }
         if sig.unsafety.is_some() {
             ok = false;

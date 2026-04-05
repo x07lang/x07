@@ -37,7 +37,7 @@ Notes:
 - `solve-pure`: pure compute only.
 - `solve-fs`: deterministic read-only fixture filesystem mounted as current directory (`.`).
   - `["fs.read", path_bytes]` reads a fixture file with a safe relative-path policy.
-  - Phase G2 streaming adapters:
+  - Streaming adapters:
     - `["fs.open_read", path_bytes]` → `iface` reader
     - `["io.read", reader_iface, max_i32]` → next chunk (bytes)
 - `solve-rr`: deterministic replay/record backed by cassette files under `./.x07_rr/`.
@@ -58,7 +58,7 @@ Notes:
   - `["kv.get_stream", key_bytes]` returns an `iface` reader for streaming reads.
   - `["kv.set", key_bytes, val_bytes]` sets a value and returns 1 if inserted, 0 if updated.
   - The seed is loaded from `./.x07_kv/seed.evkv` at process start.
-  - Phase G2 latency index: runner may also materialize `./.x07_kv/latency.evkvlat` (used to advance virtual time for `kv.get`).
+  - Runner may also materialize `./.x07_kv/latency.evkvlat` (used to advance virtual time for `kv.get`).
 - `solve-full`: includes fs + rr + kv.
 
 Standalone-only (not used in deterministic suites; run via `x07-os-runner`):
@@ -66,7 +66,7 @@ Standalone-only (not used in deterministic suites; run via `x07-os-runner`):
 - `run-os`: real OS access (non-deterministic by design).
 - `run-os-sandboxed`: same surface, but restricted by a policy file (see `schemas/run-os-policy.schema.json`).
 
-Phase H3 adds standalone-only OS builtins (compile-time gated to `run-os*`):
+Standalone-only OS builtins (compile-time gated to `run-os*`):
 
 - `os.fs.read_file(path: bytes) -> bytes`
 - `os.fs.write_file(path: bytes, data: bytes) -> i32` (0 on success; errno-like code on failure)
@@ -85,7 +85,7 @@ Pinned tzdb builtins (deterministic; used by `ext.time.tzdb`, see `docs/time/tzd
 - `os.time.tzdb_offset_duration_v1(tzid: bytes_view, unix_s_lo: i32, unix_s_hi: i32) -> bytes`
 - `os.time.tzdb_snapshot_id_v1() -> bytes`
 
-Phase H4 adds standalone-only unsafe + FFI (compile-time gated to `run-os*`):
+Standalone-only unsafe + FFI (compile-time gated to `run-os*`):
 
 - `unsafe` blocks (`["unsafe", ...]`) and raw pointer types (`ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`).
 - Pointer + memory intrinsics (`ptr.*`, `addr_of*`, `memcpy`/`memmove`/`memset`) and `extern` C function declarations/calls (unsafe + `ffi` capability).
@@ -126,6 +126,6 @@ To keep the generated C source for inspection, set `X07_KEEP_C=1` and the runner
 
 ## Debug borrow checks
 
-To enable debug-only borrow/lifetime instrumentation in the C backend (Phase G1), run the host runner with:
+To enable debug-only borrow/lifetime instrumentation in the C backend, run the host runner with:
 
 - `--debug-borrow-checks`

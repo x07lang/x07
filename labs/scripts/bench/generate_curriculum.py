@@ -534,10 +534,10 @@ def main() -> None:
     ]
 
     suites = [
-        ("phase4-tier1-toy@0.1.0", out_dir / "phase4-tier1-toy.json", tier1_tasks),
-        ("phase4-tier2-leetcode@0.1.0", out_dir / "phase4-tier2-leetcode.json", tier2_tasks),
-        ("phase4-tier3-algorithms@0.1.0", out_dir / "phase4-tier3-algorithms.json", tier3_tasks),
-        ("phase4-holdout@0.1.0", out_dir / "phase4-holdout.json", holdout_tasks),
+        ("curriculum-tier1-toy@0.1.0", out_dir / "curriculum-tier1-toy.json", tier1_tasks),
+        ("curriculum-tier2-leetcode@0.1.0", out_dir / "curriculum-tier2-leetcode.json", tier2_tasks),
+        ("curriculum-tier3-algorithms@0.1.0", out_dir / "curriculum-tier3-algorithms.json", tier3_tasks),
+        ("curriculum-holdout@0.1.0", out_dir / "curriculum-holdout.json", holdout_tasks),
     ]
 
     for suite_id, path, tasks in suites:

@@ -198,7 +198,7 @@
       "path": "docs/spec/internal/modules-packages.md",
       "spec_id": "x07.spec.internal.modules-packages@0.1.0",
       "status": "draft",
-      "title": "Phase E: Modules, packages, and composable stdlib"
+      "title": "Modules, packages, and composable stdlib"
     },
     {
       "kind": "markdown",
@@ -219,7 +219,7 @@
       "path": "docs/spec/internal/types/type-system-v1.md",
       "spec_id": "x07.spec.internal.types.type-system-v1@0.1.0",
       "status": "draft",
-      "title": "Type System v1 (Phase H1)"
+      "title": "Type System v1"
     },
     {
       "kind": "markdown",

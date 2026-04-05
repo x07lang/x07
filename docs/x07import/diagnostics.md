@@ -2,7 +2,7 @@
 
 This document is generated from `crates/x07import-core/src/diagnostics.rs`.
 
-| Code | Phase | Severity | Message | Help |
+| Code | Stage | Severity | Message | Help |
 | ---- | ----- | -------- | ------- | ---- |
 | X7I0001 | Parse | Error | failed to parse source file | Ensure the file parses as Rust/C and contains only supported items for x07import v1. |
 | X7I0100 | Validate | Error | unsupported top-level item |  |

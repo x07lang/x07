@@ -8,7 +8,7 @@ Related schemas: []
 ## ABI v1
 
 - `docs/spec/abi/abi-v1.md` is the normative reference for ABI v1 value layouts.
-- ABI v1 is considered frozen once Phase H1 is complete.
+- ABI v1 is considered frozen; new layout work should land as ABI v2.
 
 ## ABI v2
 

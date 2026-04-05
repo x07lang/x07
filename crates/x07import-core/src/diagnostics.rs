@@ -173,7 +173,7 @@ pub fn render_diagnostics_md() -> String {
     let mut out = String::new();
     out.push_str("# x07import diagnostics catalog\n\n");
     out.push_str("This document is generated from `crates/x07import-core/src/diagnostics.rs`.\n\n");
-    out.push_str("| Code | Phase | Severity | Message | Help |\n");
+    out.push_str("| Code | Stage | Severity | Message | Help |\n");
     out.push_str("| ---- | ----- | -------- | ------- | ---- |\n");
     for (code, phase, sev, msg, help) in rows {
         out.push_str(&format!(

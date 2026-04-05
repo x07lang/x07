@@ -3,9 +3,9 @@ Status: draft
 Applies-to: toolchain >= v0.0.95
 Related schemas: []
 
-# Phase E: Modules, packages, and composable stdlib
+# Modules, packages, and composable stdlib
 
-Phase E adds a deterministic, file-backed module system and a minimal package+lockfile workflow for reproducible builds.
+This document describes the deterministic, file-backed module system and the package+lockfile workflow for reproducible builds.
 
 ## Modules (language-level)
 
@@ -14,7 +14,7 @@ x07AST modules are JSON objects (`spec/x07ast.schema.json`):
 - `imports`: array of module IDs (strings)
 - `decls`: array of decl objects:
   - `{"kind":"defn", ...}`
-  - `{"kind":"defasync", ...}` (Phase G2)
+  - `{"kind":"defasync", ...}` (async functions)
   - `{"kind":"export", ...}` (module files only)
 - Entry programs additionally contain `solve` (an expression).
 
@@ -35,7 +35,7 @@ Modules are resolved by explicit roots (no directory scanning):
 ### Standalone binding override (`std.world.*`)
 
 In standalone-only worlds (`run-os`, `run-os-sandboxed`), `std.world.*` modules are resolved from `--module-root` only (no built-in fallback).
-This enables the Phase H3 binding pattern: `std.fs` stays source-stable while the world selects the underlying adapter.
+This enables a binding override pattern: `std.fs` stays source-stable while the world selects the underlying adapter.
 
 CLI example (standalone, without a project manifest):
 
@@ -82,8 +82,6 @@ Commands:
 - Compile+run native: `cargo run -p x07-host-runner -- --project <path/to/x07.json> --world solve-pure --input <case.bin>`
 
 Note: `link.*` is only used by `x07-os-runner` when building standalone (run-os*) executables; deterministic runners ignore it.
-
-Example project: `examples/phaseE/`.
 
 ## Packages (path deps)
 
@@ -158,15 +156,15 @@ The compiler ships a small, versioned stdlib package under `stdlib/std/0.1.1/`:
 - `std.lru_cache`: fixed-capacity LRU cache for u32 keys/values (`peek_u32_opt`, `touch_u32`, `put_u32`)
 - `std.result`: `ok_i32_le`, `err0`, `chain_sum_csv_i32`
 - `std.option`: `some_i32_le`, `none`
-- `std.io`: `read` (Phase G2 streaming)
-- `std.io.bufread`: `new`, `fill`, `consume` (Phase G2 buffering)
+- `std.io`: `read` (streaming)
+- `std.io.bufread`: `new`, `fill`, `consume` (buffering)
 - `std.fs`: `read`, `read_async`, `read_task` (bind via `std.world.fs`), plus fixture-only ops `open_read`, `list_dir`, `list_dir_sorted`
 - `std.world.fs`: fixture-backed adapter used by `std.fs.read` in deterministic worlds
 - `std.rr`: `send_request`, `fetch`, `send` (solve-rr only)
 - `std.kv`: `get`, `get_async`, `set`, `get_stream` (solve-kv only)
 - `std.path`: `join`, `basename`, `extname`
 
-## Standalone stdlib packages (Phase H3)
+## Standalone stdlib packages
 
 `stdlib/os/0.2.0/` provides OS-backed adapters and convenience aliases (resolved via `--module-root`):
 

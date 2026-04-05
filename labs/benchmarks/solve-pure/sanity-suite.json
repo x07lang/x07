@@ -1,5 +1,5 @@
 {
-  "suite_id": "phase3-solve-pure@0.1.0",
+  "suite_id": "sanity-solve-pure@0.1.0",
   "world": "solve-pure",
   "tasks": [
     {
@@ -31,4 +31,3 @@
     }
   ]
 }
-

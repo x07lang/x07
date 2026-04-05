@@ -19,8 +19,8 @@ Notes:
 - `vtable=1` is the built-in streaming reader vtable used by world adapters and in-memory adapters (e.g. `fs.open_read`, `kv.get_stream`, `io.open_read_bytes`).
 - OS-world runtimes may register additional `vtable` IDs for external package adapters (still dispatching through `io.read` deterministically).
 
-## Phase H1 scope
+## Scope
 
-Phase H1 introduces interface records for Phase G2 streaming I/O:
+This spec introduces interface records for streaming I/O:
 - `iface(io.reader)` values are returned by `fs.open_read`, `kv.get_stream`, and `io.open_read_bytes`.
 - `io.read` consumes the interface record and dispatches deterministically.

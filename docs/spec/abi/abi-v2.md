@@ -81,7 +81,7 @@ Interface records are ABI-stable “fat handles”:
 - `data`: opaque handle (u32)
 - `vtable`: opaque handle (u32)
 
-The initial use is `iface(io.reader)` for Phase G2 streaming readers.
+The initial use is `iface(io.reader)` for streaming readers.
 
 ## Option / Result
 

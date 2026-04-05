@@ -21,7 +21,7 @@ Non-goals:
 - `i32` is represented as an **unsigned** 32-bit integer in C (`uint32_t`) with two’s-complement interpretation where needed.
 - `bool` is represented as `uint32_t` (`0` = false, non-zero = true).
 
-## Raw pointers (Phase H4, standalone-only)
+## Raw pointers (standalone-only)
 
 Raw pointer types map directly to C pointer types:
 
@@ -83,7 +83,7 @@ Interface records are ABI-stable “fat handles”:
 - `data`: opaque handle (u32)
 - `vtable`: opaque handle (u32)
 
-The initial use is `iface(io.reader)` for Phase G2 streaming readers.
+The initial use is `iface(io.reader)` for streaming readers.
 
 ## Option / Result
 
