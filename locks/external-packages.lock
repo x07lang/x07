@@ -2074,6 +2074,94 @@
       "version": "0.1.3"
     },
     {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.cli.bar",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/bar.x07.json",
+          "sha256": "b96de06c9eb65aeccffc4d69cf4f5475aed5bf2f92c13a0609d6999277232c05",
+          "size_bytes": 1316
+        },
+        {
+          "module_id": "std.cli.events",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/events.x07.json",
+          "sha256": "3a2d939d9091b16c9223554d51c22986793c8bf36f4b8720146ff27fec012913",
+          "size_bytes": 4778
+        },
+        {
+          "module_id": "std.cli.jsonl",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/jsonl.x07.json",
+          "sha256": "51f6653a4a523e3e4a2b747caf98f779a892d12fd5205fab91186142d27c30f4",
+          "size_bytes": 966
+        },
+        {
+          "module_id": "std.cli.kv",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/kv.x07.json",
+          "sha256": "593ed123097350245d0a81a7016bad6d66bc06425ee0b4b70d83fa4681ff87a7",
+          "size_bytes": 2704
+        },
+        {
+          "module_id": "std.cli.layout",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/layout.x07.json",
+          "sha256": "c061436d9634b15d2e6dc6a452be29e5db25f277f822209fec9e4e81884d5750",
+          "size_bytes": 2497
+        },
+        {
+          "module_id": "std.cli.panel",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/panel.x07.json",
+          "sha256": "9a7fc6dfbab609307dc4ea89ebf5a3d9e047ebbe2c4f264f13ac7021e20d6108",
+          "size_bytes": 3393
+        },
+        {
+          "module_id": "std.cli.profile",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/profile.x07.json",
+          "sha256": "78c421662ab42929eda91843475c3a475ddb3b2c36fe5e89a9bdceaf74b8a87f",
+          "size_bytes": 4100
+        },
+        {
+          "module_id": "std.cli.progress",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/progress.x07.json",
+          "sha256": "1c19a01507c59facd1cf7db73da66ad4e6f0a651b972ce12f1a3503378d3890f",
+          "size_bytes": 1204
+        },
+        {
+          "module_id": "std.cli.section",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/section.x07.json",
+          "sha256": "ecbac52d335b90dc2bf0bc0c10903b45594ab15cf4169b062e609706695df28a",
+          "size_bytes": 894
+        },
+        {
+          "module_id": "std.cli.status",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/status.x07.json",
+          "sha256": "7adb1292bd69e47028d38bf1c2343b09292abd28963582a131f2deea790e355e",
+          "size_bytes": 632
+        },
+        {
+          "module_id": "std.cli.table",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/table.x07.json",
+          "sha256": "9c49241060448a0f83a46b8f1760f7767cf22e6fb7385ee15df8e52acd5af988",
+          "size_bytes": 3934
+        },
+        {
+          "module_id": "std.cli.term",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/term.x07.json",
+          "sha256": "9ab5983f816c1369c203c701d85e4159b427e0fcf540f45ee1f7a79637858693",
+          "size_bytes": 2721
+        },
+        {
+          "module_id": "std.cli.tests",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.4/modules/std/cli/tests.x07.json",
+          "sha256": "968b20da67edcb169633823f9bfe3c142b79f3c63a16fe7e12f2ba39d372c72b",
+          "size_bytes": 10762
+        }
+      ],
+      "name": "ext-cli-ux",
+      "package_manifest_sha256": "408b09ab2fbdcd11f29ad333e2e29037aa5e75da056274ca4a5c4645eaabe018",
+      "path": "packages/ext/x07-ext-cli-ux/0.1.4",
+      "version": "0.1.4"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "x07import",
       "modules": [
@@ -13396,6 +13484,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "a120926be62b2545769364a2dfb09ea934b24bef922acf8734b945089767092c",
+  "packages_hash": "ee912d48e2ba286afb320d72ba914bc90db833ccb1dba8fb4d12a57d20ccb145",
   "packages_root": "packages/ext"
 }
