@@ -6,7 +6,7 @@
       "summary": "Parse CLI argv (argv_v1) and define CLI interfaces.",
       "canonical": {
         "name": "ext-cli",
-        "version": "0.1.14"
+        "version": "0.1.15"
       },
       "status": "stable"
     },
@@ -15,7 +15,7 @@
       "summary": "CLI UX primitives: deterministic progress, tables, and JSONL output.",
       "canonical": {
         "name": "ext-cli-ux",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "experimental"
     },
@@ -63,7 +63,7 @@
       "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
       "canonical": {
         "name": "ext-net",
-        "version": "0.1.10"
+        "version": "0.1.11"
       },
       "alternatives": [
         {
@@ -83,7 +83,7 @@
       "summary": "HTTP/2 protocol helpers for OS worlds (run-os*).",
       "canonical": {
         "name": "ext-net-protos-c",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -96,7 +96,7 @@
       "summary": "WebSocket framing helpers for OS worlds (run-os*).",
       "canonical": {
         "name": "ext-net-protos-c",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -109,7 +109,7 @@
       "summary": "gRPC framing/unary helpers over HTTP/2 for OS worlds (run-os*).",
       "canonical": {
         "name": "ext-net-protos-c",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -122,7 +122,7 @@
       "summary": "JWT (Ed25519) encode/verify + JOSE JWS compact sign/verify + JWK thumbprints pinned by arch/crypto profiles (run-os*).",
       "canonical": {
         "name": "ext-auth-jwt",
-        "version": "0.1.6"
+        "version": "0.1.7"
       },
       "worlds": [
         "run-os",
@@ -162,7 +162,7 @@
       "summary": "Parse and normalize URLs; stable URL primitives.",
       "canonical": {
         "name": "ext-url-rs",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "status": "stable"
     },
@@ -180,7 +180,7 @@
       "summary": "Parse robots.txt allow/disallow rules.",
       "canonical": {
         "name": "ext-robots-txt-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "experimental"
     },
@@ -198,7 +198,7 @@
       "summary": "Web service kit: router + canonical errors + OpenAPI 3.1 generation.",
       "canonical": {
         "name": "ext-web-kit",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "experimental"
     },
@@ -207,7 +207,7 @@
       "summary": "Crawling helpers: robots/sitemaps/url normalization/scheduling + RR fetch helpers.",
       "canonical": {
         "name": "ext-web-crawl",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "status": "experimental"
     },
@@ -216,7 +216,7 @@
       "summary": "Messaging core: envelope encoding + RR entry format + driver interface.",
       "canonical": {
         "name": "ext-msg-core",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "experimental"
     },
@@ -225,7 +225,7 @@
       "summary": "Kafka driver with RR replay interface (librdkafka).",
       "canonical": {
         "name": "ext-msg-kafka-c",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -239,7 +239,7 @@
       "summary": "AMQP 0-9-1 driver with RR replay interface (rabbitmq-c).",
       "canonical": {
         "name": "ext-msg-amqp-c",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -262,7 +262,7 @@
       "summary": "S3-compatible object storage driver for X07 services.",
       "canonical": {
         "name": "ext-obj-s3",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "worlds": [
         "run-os",
@@ -275,7 +275,7 @@
       "summary": "Typed DataModel values and deterministic codecs (JSON/TOML/YAML).",
       "canonical": {
         "name": "ext-data-model",
-        "version": "0.1.10"
+        "version": "0.1.11"
       },
       "status": "stable"
     },
@@ -284,7 +284,7 @@
       "summary": "JSON parse/encode.",
       "canonical": {
         "name": "ext-json-rs",
-        "version": "0.1.6"
+        "version": "0.1.7"
       },
       "status": "stable"
     },
@@ -320,12 +320,12 @@
       "summary": "CBOR encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-cbor-rs",
-        "version": "0.1.8"
+        "version": "0.1.9"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.10"
+          "version": "0.1.11"
         }
       ],
       "status": "experimental"
@@ -335,12 +335,12 @@
       "summary": "MessagePack encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-msgpack-rs",
-        "version": "0.1.8"
+        "version": "0.1.9"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.10"
+          "version": "0.1.11"
         }
       ],
       "status": "experimental"
@@ -419,7 +419,7 @@
       "summary": "Tar/tgz parsing and safe extraction helpers pinned by arch/archive contracts.",
       "canonical": {
         "name": "ext-archive-c",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "experimental"
     },
@@ -464,7 +464,7 @@
       "summary": "Metrics snapshot + OpenMetrics rendering + OTLP encoding/export.",
       "canonical": {
         "name": "ext-obs",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "worlds": [
         "run-os",
@@ -487,7 +487,7 @@
       "summary": "Database core interfaces and pooling for OS worlds.",
       "canonical": {
         "name": "ext-db-core",
-        "version": "0.1.11"
+        "version": "0.1.12"
       },
       "worlds": [
         "run-os",
@@ -500,7 +500,7 @@
       "summary": "Deterministic DB migration plans and apply helpers (run-os*).",
       "canonical": {
         "name": "ext-db-migrate",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "worlds": [
         "run-os",
@@ -514,7 +514,7 @@
       "summary": "SQLite client for OS worlds.",
       "canonical": {
         "name": "ext-db-sqlite",
-        "version": "0.1.11"
+        "version": "0.1.12"
       },
       "worlds": [
         "run-os",

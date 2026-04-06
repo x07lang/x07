@@ -3,8 +3,8 @@
   "dependencies": [
     {
       "name": "ext-cli",
-      "path": ".x07/deps/ext-cli/0.1.14",
-      "version": "0.1.14"
+      "path": ".x07/deps/ext-cli/0.1.15",
+      "version": "0.1.15"
     },
     {
       "name": "ext-csv-rs",
@@ -13,8 +13,8 @@
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.10",
-      "version": "0.1.10"
+      "path": ".x07/deps/ext-data-model/0.1.11",
+      "version": "0.1.11"
     },
     {
       "name": "ext-ini-rs",
@@ -23,8 +23,8 @@
     },
     {
       "name": "ext-json-rs",
-      "path": ".x07/deps/ext-json-rs/0.1.6",
-      "version": "0.1.6"
+      "path": ".x07/deps/ext-json-rs/0.1.7",
+      "version": "0.1.7"
     },
     {
       "name": "ext-toml-rs",

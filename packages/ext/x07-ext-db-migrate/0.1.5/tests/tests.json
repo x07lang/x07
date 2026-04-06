@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.db.migrate/plan_parse_v1",
+      "world": "solve-pure",
+      "entry": "std.db.migrate.tests.test_plan_parse_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.db.migrate/sqlite_apply_v1",
+      "world": "run-os-sandboxed",
+      "entry": "std.db.migrate.tests.test_sqlite_apply_v1",
+      "expect": "pass",
+      "policy_json": "policies/sqlite_apply_v1.policy.json"
+    },
+    {
+      "id": "std.db.rr/key_stability_v1",
+      "world": "solve-pure",
+      "entry": "std.db.migrate.tests.test_rr_key_stability_v1",
+      "expect": "pass"
+    }
+  ]
+}
+
