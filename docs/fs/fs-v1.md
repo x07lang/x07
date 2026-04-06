@@ -29,6 +29,8 @@ All paths are passed as **bytes** that must decode as **UTF‑8**.
 Canonical conventions:
 
 - Use `/` as the separator on **all platforms** (Windows included).
+- `run-os` accepts both safe relative paths and safe absolute paths.
+- `run-os-sandboxed` accepts safe relative paths plus safe absolute paths that resolve beneath an allowed root.
 - No NUL byte (`0x00`) allowed.
 - No empty segments.
 - `.` segments are ignored.

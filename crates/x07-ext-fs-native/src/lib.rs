@@ -332,21 +332,24 @@ fn bytes_to_utf8(b: &[u8]) -> Result<&str, i32> {
     std::str::from_utf8(b).map_err(|_| FS_ERR_BAD_PATH)
 }
 
-fn parse_rel_path_v1(input: &[u8]) -> Result<(PathBuf, bool), i32> {
+fn parse_safe_path_v1(input: &[u8]) -> Result<(PathBuf, bool), i32> {
     let s = bytes_to_utf8(input)?;
     if s.is_empty() {
-        return Err(FS_ERR_BAD_PATH);
-    }
-    if s.as_bytes()[0] == b'/' {
         return Err(FS_ERR_BAD_PATH);
     }
     if s.as_bytes().iter().any(|&b| b == 0 || b == b'\\') {
         return Err(FS_ERR_BAD_PATH);
     }
 
+    let abs = s.as_bytes()[0] == b'/';
+    let body = if abs { &s[1..] } else { s };
+    if body.is_empty() {
+        return Err(FS_ERR_BAD_PATH);
+    }
+
     let mut segs: Vec<&str> = Vec::new();
     let mut hidden = false;
-    for raw in s.split('/') {
+    for raw in body.split('/') {
         if raw.is_empty() {
             return Err(FS_ERR_BAD_PATH);
         }
@@ -364,7 +367,11 @@ fn parse_rel_path_v1(input: &[u8]) -> Result<(PathBuf, bool), i32> {
     if segs.is_empty() {
         return Err(FS_ERR_BAD_PATH);
     }
-    let mut pb = PathBuf::new();
+    let mut pb = if abs {
+        PathBuf::from("/")
+    } else {
+        PathBuf::new()
+    };
     for seg in segs {
         pb.push(seg);
     }
@@ -402,19 +409,19 @@ fn enforce_read_path(caps: CapsV1, path_bytes: &[u8]) -> Result<PathBuf, i32> {
         return Err(FS_ERR_DISABLED);
     }
 
-    let (rel, hidden) = parse_rel_path_v1(path_bytes)?;
+    let (path, hidden) = parse_safe_path_v1(path_bytes)?;
     if pol.deny_hidden && hidden && !cap_allow_hidden(caps) {
         return Err(FS_ERR_POLICY_DENY);
     }
 
     if !pol.sandboxed {
-        return Ok(rel);
+        return Ok(path);
     }
     if pol.read_roots.is_empty() {
         return Err(FS_ERR_POLICY_DENY);
     }
 
-    let abs = canonicalize_existing_prefix(&canonicalize_best_effort(&rel));
+    let abs = canonicalize_existing_prefix(&canonicalize_best_effort(&path));
     if !is_allowed_by_roots(&abs, &pol.read_roots) {
         return Err(FS_ERR_POLICY_DENY);
     }
@@ -427,19 +434,19 @@ fn enforce_write_path(caps: CapsV1, path_bytes: &[u8]) -> Result<PathBuf, i32> {
         return Err(FS_ERR_DISABLED);
     }
 
-    let (rel, hidden) = parse_rel_path_v1(path_bytes)?;
+    let (path, hidden) = parse_safe_path_v1(path_bytes)?;
     if pol.deny_hidden && hidden && !cap_allow_hidden(caps) {
         return Err(FS_ERR_POLICY_DENY);
     }
 
     if !pol.sandboxed {
-        return Ok(rel);
+        return Ok(path);
     }
     if pol.write_roots.is_empty() {
         return Err(FS_ERR_POLICY_DENY);
     }
 
-    let abs = canonicalize_existing_prefix(&canonicalize_best_effort(&rel));
+    let abs = canonicalize_existing_prefix(&canonicalize_best_effort(&path));
     if !is_allowed_by_roots(&abs, &pol.write_roots) {
         return Err(FS_ERR_POLICY_DENY);
     }
@@ -1396,6 +1403,14 @@ mod tests {
         unsafe { res.payload.err as i32 }
     }
 
+    fn ok_bytes(res: ev_result_bytes) -> Vec<u8> {
+        assert_eq!(res.tag, 1, "expected ok, got err={}", unsafe {
+            res.payload.err
+        });
+        let out = unsafe { res.payload.ok };
+        unsafe { std::slice::from_raw_parts(out.ptr, out.len as usize).to_vec() }
+    }
+
     #[test]
     fn fs_stream_writer_handle_v1_smoke() {
         std::env::set_var("X07_OS_SANDBOXED", "0");
@@ -1551,6 +1566,39 @@ mod tests {
             )),
             FS_ERR_IS_DIR
         );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_read_write_v1_accept_absolute_paths_in_run_os() {
+        std::env::set_var("X07_OS_SANDBOXED", "0");
+        std::env::set_var("X07_OS_FS", "1");
+        std::env::set_var("X07_OS_FS_ALLOW_MKDIR", "1");
+        std::env::set_var("X07_OS_FS_MAX_WRITE_BYTES", "1000000");
+
+        let root = std::env::temp_dir().join(format!("x07_ext_fs_abs_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+
+        let out_path = root.join("nested").join("out.txt");
+        let out_path_s = out_path.to_str().expect("utf8 temp path");
+        let caps = caps_v1(1024, CAP_CREATE_PARENTS | CAP_OVERWRITE);
+
+        assert_eq!(
+            ok_i32(x07_ext_fs_write_all_v1(
+                to_ev_bytes(out_path_s.as_bytes()),
+                to_ev_bytes(b"ok"),
+                to_ev_bytes(&caps),
+            )),
+            2
+        );
+        assert_eq!(std::fs::read(&out_path).expect("read out.txt"), b"ok");
+
+        let read_back = ok_bytes(x07_ext_fs_read_all_v1(
+            to_ev_bytes(out_path_s.as_bytes()),
+            to_ev_bytes(&caps),
+        ));
+        assert_eq!(read_back, b"ok");
 
         let _ = std::fs::remove_dir_all(&root);
     }
