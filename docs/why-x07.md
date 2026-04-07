@@ -43,9 +43,10 @@ The toolchain exposes stable, machine-readable surfaces for agents:
 - Offline docs + agent portal endpoints: [Agent contracts](agent/contract.md)
 - Machine doc API: `x07 doc --json ...`
 
-## How to evaluate locally (one path)
+## How to evaluate locally
 
-1. Start from [Agent quickstart](getting-started/agent-quickstart.md).
-2. Run an end-to-end workflow on one of the reference projects under `docs/examples/`.
-3. Run `x07 bench validate` / `x07 bench eval` on `labs/x07bench/suites/core_v1/`.
-4. Run `x07-perf-compare` for cross-language perf + build size comparisons.
+1. Start with [Install](getting-started/install.md) and [Your first project](getting-started/first-project.md).
+2. If you are operating through a coding agent, add [Agent quickstart](getting-started/agent-quickstart.md) and [The agent workflow](getting-started/agent-workflow.md).
+3. Run an end-to-end workflow on one of the reference projects under `docs/examples/`.
+4. Run `x07 bench validate` / `x07 bench eval` on `labs/x07bench/suites/core_v1/`.
+5. Run `x07-perf-compare` for cross-language perf + build size comparisons.

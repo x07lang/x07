@@ -4,13 +4,13 @@
 - [Why X07](why-x07.md)
 
 ## Getting started
-- [Agent initial prompt](getting-started/agent-initial-prompt.md)
-- [Agent quickstart](getting-started/agent-quickstart.md)
-- [Available skills](getting-started/available-skills.md)
 - [Install](getting-started/install.md)
 - [Installer / x07up](getting-started/installer.md)
 - [First project](getting-started/first-project.md)
+- [Agent initial prompt](getting-started/agent-initial-prompt.md)
+- [Agent quickstart](getting-started/agent-quickstart.md)
 - [Agent workflow](getting-started/agent-workflow.md)
+- [Available skills](getting-started/available-skills.md)
 
 ## Agent
 - [Agent contracts](agent/contract.md)

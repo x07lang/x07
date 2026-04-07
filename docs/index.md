@@ -20,14 +20,23 @@ Programs are stored and exchanged in a **structured AST format** (x07AST JSON). 
 
 ## Start here
 
+### If you are a human evaluating X07
+
 - [Why X07 (trust story + evidence pack)](why-x07.md)
-- [Formal verification & certification](toolchain/formal-verification.md)
-- [Agent initial prompt (copy/paste)](getting-started/agent-initial-prompt.md)
-- [Agent quickstart (learn X07 from scratch)](getting-started/agent-quickstart.md)
 - [Install X07](getting-started/install.md)
 - [Your first project](getting-started/first-project.md)
+- [Language overview](language/overview.md)
 - [How “worlds” work](worlds/index.md)
+- [MCP kit](toolchain/mcp-kit.md)
+- [WASM tooling](toolchain/wasm.md)
+
+### If you are driving through an agent
+
+- [Agent initial prompt (copy/paste)](getting-started/agent-initial-prompt.md)
+- [Agent quickstart (learn X07 from scratch)](getting-started/agent-quickstart.md)
 - [The agent workflow](getting-started/agent-workflow.md)
+- [Agent contracts](agent/contract.md)
+- [Formal verification & certification](toolchain/formal-verification.md)
 
 ## Ecosystem at a glance
 
@@ -70,10 +79,10 @@ When you need real OS resources (real network, real disk, real time), you switch
 ## Documentation map (human)
 
 - Getting started:
-  - [Agent initial prompt](getting-started/agent-initial-prompt.md)
-  - [Agent quickstart](getting-started/agent-quickstart.md)
   - [Install](getting-started/install.md)
   - [First project](getting-started/first-project.md)
+  - [Agent initial prompt](getting-started/agent-initial-prompt.md)
+  - [Agent quickstart](getting-started/agent-quickstart.md)
   - [Agent workflow](getting-started/agent-workflow.md)
 - Language:
   - [Overview](language/overview.md)
