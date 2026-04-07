@@ -1874,7 +1874,10 @@ impl<'a> Emitter<'a> {
                 if call_ty != Ty::Never && !tyinfo_compat_assign(&call_ty, &dest_ty) {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
-                        format!("call must evaluate to {:?}, got {:?}", dest.ty, call_ty),
+                        format!(
+                            "call must evaluate to {:?}, got {:?} (ptr={} head={})",
+                            dest.ty, call_ty, expr_ptr, head
+                        ),
                     ));
                 }
 

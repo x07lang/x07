@@ -1,0 +1,39 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-cli-ux",
+  "version": "0.1.5",
+  "description": "CLI UX primitives: deterministic progress, tables, JSONL, and small rich-layout helpers (pinned via arch/cli).",
+  "docs": "CLI UX primitives: deterministic progress, tables, JSONL, and small rich-layout helpers (pinned via arch/cli).\n\nModules:\n- std.cli.profile\n- std.cli.progress\n- std.cli.table\n- std.cli.jsonl\n- std.cli.panel\n- std.cli.bar\n- std.cli.status\n- std.cli.section\n- std.cli.kv\n- std.cli.layout\n- std.cli.term\n- std.cli.events\n- std.cli.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-cli-ux@0.1.5\n- Load profile from arch: std.cli.profile.from_arch_v1\n- Render progress: std.cli.progress.render_v1\n- Render tables: std.cli.table.render_v1\n- Emit JSONL: std.cli.jsonl.encode_v1\n- Render panels: std.cli.panel.render_v1\n- Render titled panels: std.cli.panel.render_titled_v2\n- Render score bars: std.cli.bar.render_v1\n- Render threshold bars: std.cli.bar.render_threshold_v2\n- Render status labels: std.cli.status.render_v1\n- Render status pills: std.cli.status.render_pill_v2\n- Render sections: std.cli.section.render_v1\n- Render key/value rows: std.cli.kv.render_v1\n- Render columns: std.cli.layout.columns_v1\n- Render stacked blocks: std.cli.layout.stack_v1\n- Render auto columns: std.cli.layout.columns_auto_v2\n- Render JSONL event stream: std.cli.events.render_jsonl_v1\n- Render progress events: std.cli.events.render_progress_v2\n",
+  "module_root": "modules",
+  "modules": [
+    "std.cli.profile",
+    "std.cli.progress",
+    "std.cli.table",
+    "std.cli.jsonl",
+    "std.cli.panel",
+    "std.cli.bar",
+    "std.cli.status",
+    "std.cli.section",
+    "std.cli.kv",
+    "std.cli.layout",
+    "std.cli.term",
+    "std.cli.events",
+    "std.cli.tests"
+  ],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-data-model@0.1.11",
+      "ext-json-rs@0.1.7"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.cli.status.render_pill_v2",
+        "std.cli.status.render_v1"
+      ]
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "if",
+          [
+            "=",
+            [
+              "std.bytes.eq",
+              "status",
+              [
+                "bytes.view_lit",
+                "pass"
+              ]
+            ],
+            1
+          ],
+          [
+            "return",
+            [
+              "bytes.lit",
+              "PASS"
+            ]
+          ],
+          0
+        ],
+        [
+          "if",
+          [
+            "=",
+            [
+              "std.bytes.eq",
+              "status",
+              [
+                "bytes.view_lit",
+                "warn"
+              ]
+            ],
+            1
+          ],
+          [
+            "return",
+            [
+              "bytes.lit",
+              "WARN"
+            ]
+          ],
+          0
+        ],
+        [
+          "if",
+          [
+            "=",
+            [
+              "std.bytes.eq",
+              "status",
+              [
+                "bytes.view_lit",
+                "fail"
+              ]
+            ],
+            1
+          ],
+          [
+            "return",
+            [
+              "bytes.lit",
+              "FAIL"
+            ]
+          ],
+          0
+        ],
+        [
+          "if",
+          [
+            "=",
+            [
+              "std.bytes.eq",
+              "status",
+              [
+                "bytes.view_lit",
+                "partial"
+              ]
+            ],
+            1
+          ],
+          [
+            "return",
+            [
+              "bytes.lit",
+              "PARTIAL"
+            ]
+          ],
+          0
+        ],
+        [
+          "if",
+          [
+            "=",
+            [
+              "std.bytes.eq",
+              "status",
+              [
+                "bytes.view_lit",
+                "publishable"
+              ]
+            ],
+            1
+          ],
+          [
+            "return",
+            [
+              "bytes.lit",
+              "PUBLISHABLE"
+            ]
+          ],
+          0
+        ],
+        [
+          "bytes.lit",
+          "UNKNOWN"
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.cli.status._label_v2",
+      "params": [
+        {
+          "name": "status",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "label",
+          [
+            "std.cli.status._label_v2",
+            "status"
+          ]
+        ],
+        [
+          "bytes.concat",
+          [
+            "bytes.lit",
+            "["
+          ],
+          [
+            "bytes.concat",
+            "label",
+            [
+              "bytes.lit",
+              "]"
+            ]
+          ]
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.cli.status.render_pill_v2",
+      "params": [
+        {
+          "name": "profile_doc",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "status",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "std.cli.status._label_v2",
+        "status"
+      ],
+      "kind": "defn",
+      "name": "std.cli.status.render_v1",
+      "params": [
+        {
+          "name": "profile_doc",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "status",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    }
+  ],
+  "imports": [
+    "std.bytes"
+  ],
+  "kind": "module",
+  "module_id": "std.cli.status",
+  "schema_version": "x07.x07ast@0.3.0"
+}
