@@ -1,54 +1,32 @@
 # Teams
 
-This document defines the project teams and their responsibilities.
+## Current structure
 
-## Core team
+X07 currently operates with one core maintainer and repo-level delegation that will
+expand over time.
 
-Responsibilities:
-
-- Owns the overall technical direction of X07.
-- Approves RFCs and decides on stabilization and breaking changes.
-- Owns release policy and the definition of "official" builds.
-- Delegates responsibilities to other teams.
-
-Membership: TBD.
-
-## Toolchain team
+## Core maintainer
 
 Responsibilities:
 
-- Compiler (`x07c`) and CLI (`x07`).
-- Deterministic runners (`x07-host-runner`, `x07-os-runner`).
-- Diagnostics, JSON contracts, schemas, and compatibility gates.
+- overall technical direction
+- compatibility policy
+- release policy
+- maintainer appointments
+- governance changes
 
-Membership: TBD.
+Current membership:
 
-## Stdlib team
+- Bohdan Vitomskyi (@webodik)
 
-Responsibilities:
+## Planned teams
 
-- Stdlib modules (`stdlib/**`) and `stdlib.lock`.
-- Determinism guarantees and performance baselines for builtins and stdlib.
-- Compatibility across capability worlds.
+As the project grows, X07 expects to formalize the following teams:
 
-Membership: TBD.
+- Toolchain
+- MCP / agent integrations
+- Packages / registry
+- Runtime / platform
+- Security response
 
-## Packages/registry team
-
-Responsibilities:
-
-- Package formats, lockfiles, registry protocol, and index format.
-- `x07 pkg` client implementation and registry tooling.
-- Operational policies for publishing (yank/un-yank, moderation primitives).
-
-Membership: TBD.
-
-## Security response team
-
-Responsibilities:
-
-- Security triage and coordinated disclosure handling.
-- Advisories, patch releases, and supported-version policy.
-
-Membership: TBD.
-
+These teams are planned but not yet independently staffed.

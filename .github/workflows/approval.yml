@@ -10,12 +10,12 @@ permissions:
   pull-requests: read
 
 jobs:
-  webodik-approval:
-    name: policy / require-webodik-approval
+  core-maintainer-approval:
+    name: policy / require-core-maintainer-approval
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.base.ref == 'main' }}
     steps:
-      - name: Require approval by webodik
+      - name: Require approval by a repo maintainer
         uses: actions/github-script@v7
         with:
           script: |
@@ -29,18 +29,45 @@ jobs:
             );
 
             const relevantStates = new Set(["APPROVED", "CHANGES_REQUESTED", "DISMISSED"]);
-            let latestState = null;
+            const maintainerStates = new Map();
+            const permissionCache = new Map();
+
             for (const review of reviews) {
-              if (review.user?.login !== "webodik") continue;
               if (!relevantStates.has(review.state)) continue;
-              latestState = review.state;
+
+              const login = review.user?.login;
+              if (!login) continue;
+
+              if (!permissionCache.has(login)) {
+                const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username: login,
+                });
+                permissionCache.set(login, permission.data.permission);
+              }
+
+              const permission = permissionCache.get(login);
+              if (!["admin", "maintain", "write"].includes(permission)) continue;
+              maintainerStates.set(login, review.state);
             }
 
-            if (latestState !== "APPROVED") {
+            const blocking = [...maintainerStates.entries()]
+              .filter(([, state]) => state === "CHANGES_REQUESTED")
+              .map(([login]) => login);
+            if (blocking.length > 0) {
               core.setFailed(
-                `missing required approval by webodik (latest relevant state: ${latestState ?? "none"})`,
+                `blocking review from repo maintainer(s): ${blocking.join(", ")}`,
               );
               return;
             }
 
-            core.notice("ok: approved by webodik");
+            const approvers = [...maintainerStates.entries()]
+              .filter(([, state]) => state === "APPROVED")
+              .map(([login]) => login);
+            if (approvers.length === 0) {
+              core.setFailed("missing required approval by a repo maintainer");
+              return;
+            }
+
+            core.notice(`ok: approved by repo maintainer(s): ${approvers.join(", ")}`);

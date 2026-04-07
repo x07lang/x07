@@ -7,6 +7,8 @@ import sys
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     required = [
+        root / "GOVERNANCE.md",
+        root / "OWNERS.md",
         root / "governance" / "TEAMS.md",
         root / "governance" / "MAINTAINERS.md",
         root / "governance" / "DECISION-MAKING.md",
@@ -25,4 +27,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

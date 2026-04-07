@@ -3,6 +3,7 @@
 The `x07lang` GitHub org is split into focused repos so each part of the language story stays understandable. Together they form one public ecosystem around X07 as an agent-first programming language.
 
 - `x07lang/x07`: the canonical toolchain repo. Compiler, runners, stdlib and package sources, schemas, specs, and the docs source for x07lang.org.
+- `x07lang/x07-rfcs`: the public RFC process and design-record repo for language, release, and governance changes that need formal review.
 - `x07lang/x07-mcp`: the MCP kit plus the official `io.x07/x07lang-mcp` server for coding, package, WASM, web UI, device, and platform workflows from agent runtimes.
 - `x07lang/x07-wasm-backend`: the WASM toolchain, host runners, app bundling, browser UI support, device packaging, and incident-to-regression workflows.
 - `x07lang/x07-web-ui`: the official reducer-style web UI contracts, browser host, and `std.web_ui.*` packages.
@@ -18,3 +19,7 @@ The `x07lang` GitHub org is split into focused repos so each part of the languag
 - `x07lang/x07-sentinel-reference-stack`: the canonical public backend reference system for x07 Sentinel (orders domain: API + consumer + scheduled job) with AWS/GCP tutorials and a local smoke path.
 
 The `x07lang/x07-platform-cloud` repo is the private implementation repo for x07 Sentinel, the managed control layer built on the public platform split. `x07lang/x07-infra-private` holds operational infrastructure.
+
+For governance purposes, the official companion repositories currently cited alongside
+`x07` are `x07-rfcs`, `x07-mcp`, `x07-wasm-backend`, `x07-web-ui`,
+`x07-device-host`, `x07-platform`, `x07-registry`, and `x07-website`.

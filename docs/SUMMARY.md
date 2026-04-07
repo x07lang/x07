@@ -154,6 +154,7 @@
 
 ## Project
 - [About](about.md)
+- [Roadmap](roadmap.md)
 - [Repositories](project/repositories.md)
 - [Website docs sync](project/website-docs-sync.md)
 - [Package policy](project/package-policy.md)

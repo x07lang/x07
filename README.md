@@ -12,7 +12,7 @@ X07 is a language and toolchain for teams that want software generation, repair,
 
 > X07 is under active development. Tooling and APIs still move.
 
-**Start here:** [Agent Quickstart](https://x07lang.org/docs/getting-started/agent-quickstart) · [Installer](https://x07lang.org/docs/getting-started/installer) · [Docs](https://x07lang.org) · [FAQ](https://x07lang.org/docs/faq) · [Package Registry](https://x07.io) · [Releases](https://github.com/x07lang/x07/releases) · [Support](SUPPORT.md) · [Discord](https://discord.gg/59xuEuPN47)
+**Start here:** [Agent Quickstart](https://x07lang.org/docs/getting-started/agent-quickstart) · [Installer](https://x07lang.org/docs/getting-started/installer) · [Docs](https://x07lang.org) · [Roadmap](https://x07lang.org/docs/roadmap) · [Governance](https://x07lang.org/docs/governance) · [FAQ](https://x07lang.org/docs/faq) · [Package Registry](https://x07.io) · [Releases](https://github.com/x07lang/x07/releases) · [Support](SUPPORT.md) · [Discord](https://discord.gg/59xuEuPN47)
 
 ## What This Repo Is
 
@@ -102,6 +102,7 @@ If you want a first project in this area, use one of the built-in templates:
 The public X07 ecosystem is split into focused repos with clear boundaries:
 
 - [`x07lang/x07`](https://github.com/x07lang/x07): language, CLI, compiler, stdlib, schemas, and canonical docs source
+- [`x07lang/x07-rfcs`](https://github.com/x07lang/x07-rfcs): RFC process and design records for language, compatibility, release, and governance changes
 - [`x07lang/x07-mcp`](https://github.com/x07lang/x07-mcp): MCP kit, templates, reference servers, and the official `io.x07/x07lang-mcp` server
 - [`x07lang/x07-wasm-backend`](https://github.com/x07lang/x07-wasm-backend): WASM toolchain and app packaging
 - [`x07lang/x07-web-ui`](https://github.com/x07lang/x07-web-ui): browser UI contracts and host surfaces
@@ -110,6 +111,10 @@ The public X07 ecosystem is split into focused repos with clear boundaries:
 - [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry): package registry backend
 - [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web): package registry UI at [x07.io](https://x07.io)
 - [`x07lang/x07-website`](https://github.com/x07lang/x07-website): public docs site at [x07lang.org](https://x07lang.org)
+
+Project governance is documented in [`GOVERNANCE.md`](GOVERNANCE.md) and
+[`OWNERS.md`](OWNERS.md). The public 12-month plan lives in
+[`docs/roadmap.md`](docs/roadmap.md).
 
 ## Repository Layout
 
