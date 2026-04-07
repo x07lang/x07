@@ -12,7 +12,7 @@ X07 is a language and toolchain for teams that want software generation, repair,
 
 > X07 is under active development. Tooling and APIs still move.
 
-**Start here:** [Agent Quickstart](https://x07lang.org/docs/getting-started/agent-quickstart) · [Installer](https://x07lang.org/docs/getting-started/installer) · [Docs](https://x07lang.org) · [FAQ](https://x07lang.org/docs/faq) · [Releases](https://github.com/x07lang/x07/releases) · [Support](SUPPORT.md) · [Discord](https://discord.gg/59xuEuPN47)
+**Start here:** [Agent Quickstart](https://x07lang.org/docs/getting-started/agent-quickstart) · [Installer](https://x07lang.org/docs/getting-started/installer) · [Docs](https://x07lang.org) · [FAQ](https://x07lang.org/docs/faq) · [Package Registry](https://x07.io) · [Releases](https://github.com/x07lang/x07/releases) · [Support](SUPPORT.md) · [Discord](https://discord.gg/59xuEuPN47)
 
 ## What This Repo Is
 
