@@ -62,6 +62,13 @@ hardproof scan \
   --format json
 ```
 
+Score semantics are explicit in the report:
+
+- `score_mode=full`: `overall_score` is populated and the scan is eligible for a full score.
+- `score_mode=partial`: `overall_score` stays `null`, `partial_score` remains machine-readable, and rich output withholds the primary score.
+
+`hardproof ci` now fails on `score_mode=partial` by default. Use `--allow-partial-score` only when a partial gate is intentional.
+
 ## x07-native path (optional)
 
 If you want to **build** an MCP server in X07 (not just verify one), use `x07lang/x07-mcp`.
