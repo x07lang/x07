@@ -59,14 +59,18 @@ JSON
 
 extract_readme_commands() {
   local readme_path="${root}/README.md"
-  awk '
+  local command_sections='Run a Program|Run your first program|Agent Tooling|Use X07 with a coding agent'
+  awk -v command_sections="$command_sections" '
+    function section_matches(name) {
+      return name ~ ("^(" command_sections ")$");
+    }
     BEGIN { section=""; in_block=0; capture_section=0; capture_block=0; }
     /^## / { capture_section=0; next; }
     /^# / { capture_section=0; next; }
     /^### / {
       section=$0;
       sub(/^### /,"",section);
-      capture_section=(section=="Run a Program" || section=="Agent Tooling");
+      capture_section=section_matches(section);
       next;
     }
     /^```/ {
@@ -89,7 +93,7 @@ extract_readme_commands() {
 commands_file="$tmp_dir/commands.txt"
 extract_readme_commands >"$commands_file"
 if [[ ! -s "$commands_file" ]]; then
-  echo "ERROR: no README commands extracted (expected sections: Run a Program, Agent Tooling)" >&2
+  echo "ERROR: no README commands extracted from the expected command subsections" >&2
   exit 1
 fi
 
