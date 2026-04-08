@@ -83,6 +83,6 @@ If you want a concrete example of x07 primitives working together, Hardproof use
 - Streaming composition: `std.stream.pipe_v1`
 - Structured concurrency: `task.scope_v1`
 - Record/replay as first-class evidence (`std.rr` + replay cassettes)
-- Deterministic CLI UX composition via `ext-cli-ux`, including `std.cli.panel.render_titled_v2`, `std.cli.bar.render_threshold_v2`, `std.cli.status.render_pill_v2`, `std.cli.layout.stack_v1`, `std.cli.layout.columns_auto_v2`, and `std.cli.events.render_progress_v2`
+- Deterministic CLI UX composition via `ext-cli-ux`, including `std.cli.panel.render_titled_v2`, `std.cli.section.render_v1`, `std.cli.bar.render_threshold_v2`, `std.cli.status.render_pill_v2`, `std.cli.layout.stack_v1`, and `std.cli.layout.columns_auto_v2`
 - Deterministic project/tooling checks: `x07 fmt`, `x07 pkg lock --check`, `x07 arch check`, `x07 test`, `x07 verify`
 - Verification + review artifacts: `x07 prove check`, `x07 trust certify`, `x07 trust report`
