@@ -77,13 +77,12 @@ The shortest zero-install path is Codespaces: see [MCP quality: Codespaces](mcp-
 
 ## Hardproof as a reference x07 application
 
-Hardproof is intentionally built as a pure x07 application (CLI + contracts + deterministic evidence).
-If you want a concrete example of the “one whole system” primitives working together, Hardproof exercises:
+Hardproof is built as an x07-native application (CLI + contracts + deterministic evidence).
+If you want a concrete example of x07 primitives working together, Hardproof uses:
 
 - Streaming composition: `std.stream.pipe_v1`
 - Structured concurrency: `task.scope_v1`
 - Record/replay as first-class evidence (`std.rr` + replay cassettes)
 - Deterministic CLI UX composition via `ext-cli-ux`, including `std.cli.panel.render_titled_v2`, `std.cli.bar.render_threshold_v2`, `std.cli.status.render_pill_v2`, `std.cli.layout.stack_v1`, `std.cli.layout.columns_auto_v2`, and `std.cli.events.render_progress_v2`
-- Deterministic contracts/tooling: `x07 arch check`, `x07 schema derive`, `x07 sm gen`
-- Property-based tests: `x07 test --pbt` and deterministic regressions
-- Verification + review artifacts: `x07 verify`, `x07 prove check`, `x07 trust certify`, `x07 trust report`
+- Deterministic project/tooling checks: `x07 fmt`, `x07 pkg lock --check`, `x07 arch check`, `x07 test`, `x07 verify`
+- Verification + review artifacts: `x07 prove check`, `x07 trust certify`, `x07 trust report`
