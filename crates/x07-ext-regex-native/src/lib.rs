@@ -191,9 +191,10 @@ fn opts_bit(opts: u32, bit: u32) -> bool {
 }
 
 fn syntax_config(opts: u32) -> syntax::Config {
+    let utf8_unicode = opts_bit(opts, 8);
     syntax::Config::new()
-        .unicode(false)
-        .utf8(false)
+        .unicode(utf8_unicode)
+        .utf8(utf8_unicode)
         .case_insensitive(opts_bit(opts, 1))
         .multi_line(opts_bit(opts, 2))
         .dot_matches_new_line(opts_bit(opts, 4))

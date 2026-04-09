@@ -32,10 +32,24 @@ hardproof doctor --machine json
 hardproof scan --url "http://127.0.0.1:3000/mcp" --out out/scan --format json
 ```
 
+For the default live terminal UI:
+
+```sh
+hardproof scan --url "http://127.0.0.1:3000/mcp" --out out/scan --ui rich
+hardproof scan --url "http://127.0.0.1:3000/mcp" --out out/scan --ui tui
+```
+
 Artifacts are written under `out/scan/`:
 
 - `scan.json`
 - `scan.events.jsonl`
+
+Token/context truth classes are explicit in `scan.json.usage_metrics` and in rich/TUI output:
+
+- `usage_mode=estimate`: deterministic estimates
+- `usage_mode=tokenizer_exact`: exact counts under a chosen tokenizer profile (`--tokenizer openai:o200k_base`)
+- `usage_mode=trace_observed`: observed counts from a real client trace (`--token-trace trace.json`)
+- `usage_mode=mixed`: per-metric mix of exact + observed
 
 4) Replay:
 

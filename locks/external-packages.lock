@@ -2364,6 +2364,130 @@
       "version": "0.1.5"
     },
     {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.cli.bar",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/bar.x07.json",
+          "sha256": "26aa3dedb543ebdb381c6262500eebbe7478348d9055f06b7262ee4b4c694000",
+          "size_bytes": 2802
+        },
+        {
+          "module_id": "std.cli.events",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/events.x07.json",
+          "sha256": "6441d2368d22611cc0f2068dc5d537cfd43b3f493643e50cae3f1bcaef6800be",
+          "size_bytes": 6591
+        },
+        {
+          "module_id": "std.cli.findings_list",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/findings_list.x07.json",
+          "sha256": "c5aa5ea51741b5a3060d655ff64a9bd1cb0a9e325241d316715df211854e448c",
+          "size_bytes": 1814
+        },
+        {
+          "module_id": "std.cli.frame_diff",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/frame_diff.x07.json",
+          "sha256": "7392efa120ca0b4d324267c55906d56b2dee3cc03b3d4a194987604ea17ebe9e",
+          "size_bytes": 421
+        },
+        {
+          "module_id": "std.cli.jsonl",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/jsonl.x07.json",
+          "sha256": "51f6653a4a523e3e4a2b747caf98f779a892d12fd5205fab91186142d27c30f4",
+          "size_bytes": 966
+        },
+        {
+          "module_id": "std.cli.kv",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/kv.x07.json",
+          "sha256": "593ed123097350245d0a81a7016bad6d66bc06425ee0b4b70d83fa4681ff87a7",
+          "size_bytes": 2704
+        },
+        {
+          "module_id": "std.cli.layout",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/layout.x07.json",
+          "sha256": "0a47c37fac42ddf11506235083471226786de7f62e48644a811cb650686cf25b",
+          "size_bytes": 5092
+        },
+        {
+          "module_id": "std.cli.live_table",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/live_table.x07.json",
+          "sha256": "1562cdc551bf2915c700d713f3834022df2943b6d748e318b3fade4cae0d629e",
+          "size_bytes": 3941
+        },
+        {
+          "module_id": "std.cli.panel",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/panel.x07.json",
+          "sha256": "ce9264c90a3562e61bbe31af89adcc01e2a909c22e3c4ff242b07fe54241c0ac",
+          "size_bytes": 4659
+        },
+        {
+          "module_id": "std.cli.profile",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/profile.x07.json",
+          "sha256": "78c421662ab42929eda91843475c3a475ddb3b2c36fe5e89a9bdceaf74b8a87f",
+          "size_bytes": 4100
+        },
+        {
+          "module_id": "std.cli.progress",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/progress.x07.json",
+          "sha256": "1c19a01507c59facd1cf7db73da66ad4e6f0a651b972ce12f1a3503378d3890f",
+          "size_bytes": 1204
+        },
+        {
+          "module_id": "std.cli.progress_stage",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/progress_stage.x07.json",
+          "sha256": "71727e647edda2301f22cefaa3598b23f1df9090e5360ee2a905ac3b1d0ecacf",
+          "size_bytes": 845
+        },
+        {
+          "module_id": "std.cli.section",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/section.x07.json",
+          "sha256": "ecbac52d335b90dc2bf0bc0c10903b45594ab15cf4169b062e609706695df28a",
+          "size_bytes": 894
+        },
+        {
+          "module_id": "std.cli.spinner",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/spinner.x07.json",
+          "sha256": "26301e4a39cccbaebfbb6723e434fbac0909af559cc50b64de108e7b849d72eb",
+          "size_bytes": 537
+        },
+        {
+          "module_id": "std.cli.status",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/status.x07.json",
+          "sha256": "e45e7e56c823b8938510af87b3e80c409cc5d499e50bca72e2330fc281765d88",
+          "size_bytes": 1393
+        },
+        {
+          "module_id": "std.cli.summary_grid",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/summary_grid.x07.json",
+          "sha256": "b0ad12ad3d41c6754de26bf91d3a89bbb7ddf33c4470be1ab21ca72735724991",
+          "size_bytes": 395
+        },
+        {
+          "module_id": "std.cli.table",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/table.x07.json",
+          "sha256": "9c49241060448a0f83a46b8f1760f7767cf22e6fb7385ee15df8e52acd5af988",
+          "size_bytes": 3934
+        },
+        {
+          "module_id": "std.cli.term",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/term.x07.json",
+          "sha256": "67e375016e4750b98f555c93726b090764519368ddba7e6daaae17b821f974aa",
+          "size_bytes": 3442
+        },
+        {
+          "module_id": "std.cli.tests",
+          "path": "packages/ext/x07-ext-cli-ux/0.1.6/modules/std/cli/tests.x07.json",
+          "sha256": "f1527f4f29e85bfd06b48135626ca927847b4eaed7e6b69404ad7f6d11c15a80",
+          "size_bytes": 21774
+        }
+      ],
+      "name": "ext-cli-ux",
+      "package_manifest_sha256": "c0ba8501168c3365e4bad70bdb0a801e8f03c9f7fee68a2aada21de8e8b2f34a",
+      "path": "packages/ext/x07-ext-cli-ux/0.1.6",
+      "version": "0.1.6"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "x07import",
       "modules": [
@@ -10436,6 +10560,28 @@
       "import_mode": "handwritten",
       "modules": [
         {
+          "module_id": "ext.regex.tests",
+          "path": "packages/ext/x07-ext-regex/0.2.5/modules/ext/regex/tests.x07.json",
+          "sha256": "3626ebe4b5b487e82bc4ded9745cd3acd6a21258ac3a3b8e6f6696ee1fa75f5d",
+          "size_bytes": 36477
+        },
+        {
+          "module_id": "ext.regex",
+          "path": "packages/ext/x07-ext-regex/0.2.5/modules/ext/regex.x07.json",
+          "sha256": "478683d110a814a169f9ddffb69dc7cbdfe8a666a8365b7676778a81a9068ca5",
+          "size_bytes": 9320
+        }
+      ],
+      "name": "ext-regex",
+      "package_manifest_sha256": "2b050b0695dd3dddb28b2aa40c7180ce15bc75f33e067fd6235a73dc746b3c2e",
+      "path": "packages/ext/x07-ext-regex/0.2.5",
+      "version": "0.2.5"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
           "module_id": "ext.robots.tests",
           "path": "packages/ext/x07-ext-robots-txt-rs/0.1.0/modules/ext/robots/tests.x07.json",
           "sha256": "979ca33c9f1bad5d24e6f254a97b72cf7534f179e3c3e5c2e20f47269d1f0c91",
@@ -14083,6 +14229,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "ce55e567819230658836d128d45305ebeea8041c200ef4a01aa0b214ed924ba3",
+  "packages_hash": "90560a2c437bb5212303dda0309989752d94f25b9dbe3a42f2ba5b94af0223da",
   "packages_root": "packages/ext"
 }
