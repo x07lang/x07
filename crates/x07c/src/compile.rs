@@ -1197,7 +1197,12 @@ fn enforce_contract_typecheck(label: &str, file: &x07ast::X07AstFile) -> Result<
         return Ok(());
     }
 
-    let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
+    let tc = crate::typecheck::typecheck_file_local(
+        file,
+        &crate::typecheck::TypecheckOptions {
+            mode: crate::typecheck::TypecheckMode::ContractsOnly,
+        },
+    );
     let errors = tc
         .diagnostics
         .iter()

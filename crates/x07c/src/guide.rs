@@ -250,8 +250,8 @@ pub fn guide_md() -> String {
     out.push_str("## Built-in Modules (stdlib)\n\n");
     out.push_str("Call module functions using fully-qualified names (e.g. `[\"std.bytes.reverse\",\"b\"]`).\n\n");
     out.push_str("- `std.bytes`\n");
-    out.push_str("  - `[\"std.bytes.len\",\"b\"]` -> i32\n");
-    out.push_str("  - `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255)\n");
+    out.push_str("  - `[\"std.bytes.len\",\"b\"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)\n");
+    out.push_str("  - `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)\n");
     out.push_str("  - `[\"std.bytes.set_u8\",\"b\",\"i\",\"v\"]` -> bytes (returns `b`)\n");
     out.push_str("  - `[\"std.bytes.alloc\",\"n\"]` -> bytes (length `n`)\n");
     out.push_str("  - `[\"std.bytes.eq\",\"a\",\"b\"]` -> i32 (1 if equal else 0)\n");
@@ -536,8 +536,8 @@ pub fn guide_md() -> String {
 
     out.push_str("## Bytes Ops\n\n");
     out.push_str("Use `std.bytes.*` functions (import `std.bytes`):\n\n");
-    out.push_str("- `[\"std.bytes.len\",\"b\"]` -> i32\n");
-    out.push_str("- `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255)\n");
+    out.push_str("- `[\"std.bytes.len\",\"b\"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)\n");
+    out.push_str("- `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)\n");
     out.push_str("- `[\"std.bytes.set_u8\",\"b\",\"i\",\"v\"]` -> bytes (returns `b`)\n");
     out.push_str("- `[\"std.bytes.alloc\",\"n\"]` -> bytes (length `n`)\n\n");
 
@@ -580,6 +580,7 @@ pub fn guide_md() -> String {
     out.push_str("- `[\"view.cmp_range\",\"a\",\"a_off\",\"a_len\",\"b\",\"b_off\",\"b_len\"]` -> i32 (-1/0/1)\n\n");
 
     out.push_str("Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).\n\n");
+    out.push_str("Call-argument coercion: some functions typed as `bytes_view` accept `bytes` (and sometimes `vec_u8`) directly at call sites; the compiler implicitly borrows a view for the call.\n\n");
 
     out.push_str("## OS Worlds (run-os / run-os-sandboxed)\n\n");
     out.push_str("OS effects are accessed through `std.os.*` modules, which call `os.*` builtins (listed above).\n");

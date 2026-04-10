@@ -10,8 +10,17 @@ use crate::x07ast::{
     ContractClauseAst, TypeParam, TypeRef, X07AstFile,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TypecheckMode {
+    #[default]
+    Full,
+    ContractsOnly,
+}
+
 #[derive(Debug, Clone, Default)]
-pub struct TypecheckOptions {}
+pub struct TypecheckOptions {
+    pub mode: TypecheckMode,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TappRewrite {
@@ -72,7 +81,10 @@ enum ConstraintOrigin {
     },
     Return,
     IfCond,
-    IfBranch,
+    IfBranch {
+        then_ptr: String,
+        else_ptr: String,
+    },
     SetAssign {
         name: String,
     },
@@ -90,7 +102,7 @@ impl ConstraintOrigin {
             ConstraintOrigin::CallArg { .. } => "call_arg",
             ConstraintOrigin::Return => "return",
             ConstraintOrigin::IfCond => "if_cond",
-            ConstraintOrigin::IfBranch => "if_branch",
+            ConstraintOrigin::IfBranch { .. } => "if_branch",
             ConstraintOrigin::SetAssign { .. } => "set_assign",
             ConstraintOrigin::ContractExpr => "contract_expr",
             ConstraintOrigin::DecreasesExpr => "decreases_expr",
@@ -424,7 +436,10 @@ impl<'a> InferState<'a> {
                     then_ty.ty.clone(),
                     else_ty.ty.clone(),
                     list_ptr.to_string(),
-                    ConstraintOrigin::IfBranch,
+                    ConstraintOrigin::IfBranch {
+                        then_ptr: then_e.ptr().to_string(),
+                        else_ptr: else_e.ptr().to_string(),
+                    },
                 );
                 then_ty
             }
@@ -979,10 +994,64 @@ impl<'a> InferState<'a> {
 
         for c in &self.constraints {
             if let Err(err) = unify(&mut self.subst, &c.lhs, &c.rhs) {
+                if let ConstraintOrigin::CallArg {
+                    callee,
+                    callee_decl_ptr,
+                    ..
+                } = &c.origin
+                {
+                    let got = self.subst.resolve(&c.lhs);
+                    let want = self.subst.resolve(&c.rhs);
+                    if allow_implicit_bytes_view_call_arg_coercion(
+                        callee,
+                        callee_decl_ptr.as_deref(),
+                        &got,
+                        &want,
+                    ) {
+                        continue;
+                    }
+                }
                 self.diagnostics.push(diag_for_unify_error(c, &err));
                 break;
             }
         }
+    }
+}
+
+fn allow_implicit_bytes_view_call_arg_coercion(
+    callee: &str,
+    callee_decl_ptr: Option<&str>,
+    got: &TyTerm,
+    want: &TyTerm,
+) -> bool {
+    let TyTerm::Named(want) = want else {
+        return false;
+    };
+    if want != "bytes_view" {
+        return false;
+    }
+    let TyTerm::Named(got) = got else {
+        return false;
+    };
+
+    // Compiler call-arg compatibility is broader than strict unification, but builtins vary.
+    // - For local functions, the compiler allows `bytes`/`vec_u8` where `bytes_view` is expected.
+    // - For builtins in this typechecker signature set, only the bytes-related helpers accept
+    //   `bytes` (not `vec_u8`) in `bytes_view` positions.
+    match got.as_str() {
+        "bytes" => match callee_decl_ptr {
+            Some(_) => true,
+            None => matches!(
+                callee,
+                "bytes.len"
+                    | "bytes.get_u8"
+                    | "vec_u8.extend_bytes"
+                    | "bytes.eq"
+                    | "bytes.cmp_range"
+            ),
+        },
+        "vec_u8" => callee_decl_ptr.is_some(),
+        _ => false,
     }
 }
 
@@ -1079,19 +1148,123 @@ fn diag_for_unify_error(c: &Constraint, err: &UnifyError) -> Diagnostic {
                 quickfix: None,
             }
         }
-        ConstraintOrigin::IfBranch => {
+        ConstraintOrigin::IfBranch { then_ptr, else_ptr } => {
+            let brief = |tt: &TyTerm| match tt {
+                TyTerm::Named(s) => s.clone(),
+                TyTerm::Never => "never".to_string(),
+                TyTerm::TParam(name) => name.clone(),
+                TyTerm::Meta(id) => format!("?{id}"),
+                TyTerm::App { head, .. } => head.clone(),
+            };
+            let then_named = match &err.lhs {
+                TyTerm::Named(s) => Some(s.as_str()),
+                _ => None,
+            };
+            let else_named = match &err.rhs {
+                TyTerm::Named(s) => Some(s.as_str()),
+                _ => None,
+            };
+
             data.insert("then".to_string(), ty_term_to_value_like(&err.lhs));
             data.insert("else".to_string(), ty_term_to_value_like(&err.rhs));
+            data.insert("then_ptr".to_string(), Value::String(then_ptr.clone()));
+            data.insert("else_ptr".to_string(), Value::String(else_ptr.clone()));
+
+            let mut loc_ptr = c.blame_ptr.clone();
+            let mut related: Vec<Location> = vec![
+                Location::X07Ast {
+                    ptr: then_ptr.clone(),
+                },
+                Location::X07Ast {
+                    ptr: else_ptr.clone(),
+                },
+            ];
+
+            let mut notes = vec![format!(
+                "then branch type: {}; else branch type: {}",
+                brief(&err.lhs),
+                brief(&err.rhs)
+            )];
+
+            // Prefer pointing at the branch that can be rewritten with a single canonical conversion.
+            match (then_named, else_named) {
+                (Some("bytes"), Some("bytes_view")) => {
+                    loc_ptr = then_ptr.clone();
+                    related = vec![Location::X07Ast {
+                        ptr: else_ptr.clone(),
+                    }];
+                    notes.push(
+                        "Suggested fix: wrap the bytes branch with [\"bytes.view\", <expr>] (requires an identifier owner).".to_string(),
+                    );
+                    notes.push(
+                        "If you need bytes instead, wrap the bytes_view branch with [\"view.to_bytes\", <expr>]."
+                            .to_string(),
+                    );
+                }
+                (Some("bytes_view"), Some("bytes")) => {
+                    loc_ptr = else_ptr.clone();
+                    related = vec![Location::X07Ast {
+                        ptr: then_ptr.clone(),
+                    }];
+                    notes.push(
+                        "Suggested fix: wrap the bytes branch with [\"bytes.view\", <expr>] (requires an identifier owner).".to_string(),
+                    );
+                    notes.push(
+                        "If you need bytes instead, wrap the bytes_view branch with [\"view.to_bytes\", <expr>]."
+                            .to_string(),
+                    );
+                }
+                (Some("bytes"), Some("vec_u8")) => {
+                    loc_ptr = else_ptr.clone();
+                    related = vec![Location::X07Ast {
+                        ptr: then_ptr.clone(),
+                    }];
+                    notes.push(
+                        "Suggested fix: convert vec_u8 to bytes with [\"vec_u8.into_bytes\", <expr>]."
+                            .to_string(),
+                    );
+                }
+                (Some("vec_u8"), Some("bytes")) => {
+                    loc_ptr = then_ptr.clone();
+                    related = vec![Location::X07Ast {
+                        ptr: else_ptr.clone(),
+                    }];
+                    notes.push(
+                        "Suggested fix: convert vec_u8 to bytes with [\"vec_u8.into_bytes\", <expr>]."
+                            .to_string(),
+                    );
+                }
+                (Some("bytes_view"), Some("vec_u8")) => {
+                    loc_ptr = else_ptr.clone();
+                    related = vec![Location::X07Ast {
+                        ptr: then_ptr.clone(),
+                    }];
+                    notes.push(
+                        "Suggested fix: convert vec_u8 to bytes_view with [\"vec_u8.as_view\", <expr>] (requires an identifier owner)."
+                            .to_string(),
+                    );
+                }
+                (Some("vec_u8"), Some("bytes_view")) => {
+                    loc_ptr = then_ptr.clone();
+                    related = vec![Location::X07Ast {
+                        ptr: else_ptr.clone(),
+                    }];
+                    notes.push(
+                        "Suggested fix: convert vec_u8 to bytes_view with [\"vec_u8.as_view\", <expr>] (requires an identifier owner)."
+                            .to_string(),
+                    );
+                }
+                _ => {}
+            }
+
             Diagnostic {
                 code: "X07-TYPE-IF-0002".to_string(),
                 severity: Severity::Error,
                 stage: Stage::Type,
                 message: "if branches mismatch".to_string(),
-                loc: Some(Location::X07Ast {
-                    ptr: c.blame_ptr.clone(),
-                }),
-                notes: Vec::new(),
-                related: Vec::new(),
+                loc: Some(Location::X07Ast { ptr: loc_ptr }),
+                notes,
+                related,
                 data,
                 quickfix: None,
             }
@@ -1603,6 +1776,25 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
         mono("bytes.get_u8", &[("b", "bytes_view"), ("i", "i32")], "i32"),
     );
     sigs.insert(
+        "bytes.eq".to_string(),
+        mono("bytes.eq", &[("a", "bytes_view"), ("b", "bytes_view")], "i32"),
+    );
+    sigs.insert(
+        "bytes.cmp_range".to_string(),
+        mono(
+            "bytes.cmp_range",
+            &[
+                ("a", "bytes_view"),
+                ("a_off", "i32"),
+                ("a_len", "i32"),
+                ("b", "bytes_view"),
+                ("b_off", "i32"),
+                ("b_len", "i32"),
+            ],
+            "i32",
+        ),
+    );
+    sigs.insert(
         "bytes.set_u8".to_string(),
         mono(
             "bytes.set_u8",
@@ -1983,17 +2175,21 @@ fn contract_ty_brief(tt: &TyTerm) -> String {
 pub fn typecheck_file_with_sigs(
     file: &X07AstFile,
     sigs: &TypecheckSigs,
-    _opts: &TypecheckOptions,
+    opts: &TypecheckOptions,
 ) -> TypecheckReport {
-    typecheck_file_impl(file, &sigs.sigs)
+    typecheck_file_impl(file, &sigs.sigs, opts)
 }
 
-pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> TypecheckReport {
+pub fn typecheck_file_local(file: &X07AstFile, opts: &TypecheckOptions) -> TypecheckReport {
     let sigs = TypecheckSigs::for_file_with_builtins(file);
-    typecheck_file_impl(file, &sigs.sigs)
+    typecheck_file_impl(file, &sigs.sigs, opts)
 }
 
-fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> TypecheckReport {
+fn typecheck_file_impl(
+    file: &X07AstFile,
+    sigs: &BTreeMap<String, FnSigAst>,
+    opts: &TypecheckOptions,
+) -> TypecheckReport {
     let expr_values = file_expr_values(file);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
     let mut tapp_rewrites: BTreeMap<String, TappRewrite> = BTreeMap::new();
@@ -2005,27 +2201,35 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
     };
     let defn_base = export_slots + file.extern_functions.len();
 
-    if let Some(solve) = &file.solve {
-        let mut infer = InferState::new(sigs, &file.module_id, TyTerm::Named("bytes".to_string()));
-        let _ = infer.infer_expr(solve, Some(&TyTerm::Named("bytes".to_string())));
-        infer.solve_constraints();
-        drain_pending_tapp(
-            std::mem::take(&mut infer.pending_tapp),
-            &infer.subst,
-            &mut diagnostics,
-            &mut tapp_rewrites,
-        );
+    if opts.mode == TypecheckMode::Full {
+        if let Some(solve) = &file.solve {
+            let mut infer =
+                InferState::new(sigs, &file.module_id, TyTerm::Named("bytes".to_string()));
+            let _ = infer.infer_expr(solve, Some(&TyTerm::Named("bytes".to_string())));
+            infer.solve_constraints();
+            drain_pending_tapp(
+                std::mem::take(&mut infer.pending_tapp),
+                &infer.subst,
+                &mut diagnostics,
+                &mut tapp_rewrites,
+            );
 
-        diagnostics.append(&mut infer.diagnostics);
+            diagnostics.append(&mut infer.diagnostics);
+        }
     }
 
     for (idx, f) in file.functions.iter().enumerate() {
         let decl_idx = defn_base + idx;
-        let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
         let decreases = defn_decreases(file, &f.name)
             .expect("internal decreases should decode")
             .unwrap_or_default();
         let has_contracts = contract_has_clauses(&f.requires, &f.ensures, &f.invariant);
+
+        if opts.mode == TypecheckMode::ContractsOnly && !has_contracts && decreases.is_empty() {
+            continue;
+        }
+
+        let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
         let mut direct_recursive_calls = Vec::new();
         collect_direct_call_ptrs(&f.body, &f.name, &mut direct_recursive_calls);
         for p in &f.params {
@@ -2220,8 +2424,10 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
             );
         }
 
-        let want = infer.fn_ret.clone();
-        let _ = infer.infer_expr(&f.body, Some(&want));
+        if opts.mode == TypecheckMode::Full {
+            let want = infer.fn_ret.clone();
+            let _ = infer.infer_expr(&f.body, Some(&want));
+        }
         infer.solve_constraints();
         for (ptr, ty) in std::mem::take(&mut witness_types) {
             let resolved = infer.subst.resolve(&ty);
@@ -2253,6 +2459,12 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
 
     for (idx, f) in file.async_functions.iter().enumerate() {
         let decl_idx = defn_base + file.functions.len() + idx;
+        let has_contracts = contract_has_clauses(&f.requires, &f.ensures, &f.invariant)
+            || async_protocol_has_clauses(f.protocol.as_ref());
+        if opts.mode == TypecheckMode::ContractsOnly && !has_contracts {
+            continue;
+        }
+
         let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
         for p in &f.params {
             infer.bind(
@@ -2266,9 +2478,7 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
         }
         let mut witness_types: Vec<(String, TyTerm)> = Vec::new();
 
-        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant)
-            || async_protocol_has_clauses(f.protocol.as_ref())
-        {
+        if has_contracts {
             for (pidx, p) in f.params.iter().enumerate() {
                 if p.name == "__result" {
                     let ptr = format!("/decls/{decl_idx}/params/{pidx}/name");
@@ -2449,8 +2659,10 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
             }
         }
 
-        let want = infer.fn_ret.clone();
-        let _ = infer.infer_expr(&f.body, Some(&want));
+        if opts.mode == TypecheckMode::Full {
+            let want = infer.fn_ret.clone();
+            let _ = infer.infer_expr(&f.body, Some(&want));
+        }
         infer.solve_constraints();
         for (ptr, ty) in std::mem::take(&mut witness_types) {
             let resolved = infer.subst.resolve(&ty);
@@ -2504,7 +2716,10 @@ mod tests {
     use crate::unify::{Subst, TyTerm};
     use crate::x07ast::{canonicalize_x07ast_file, parse_x07ast_json, TypeRef};
 
-    use super::{drain_pending_tapp, typecheck_file_local, PendingImplicitTapp, TypecheckOptions};
+    use super::{
+        drain_pending_tapp, typecheck_file_local, PendingImplicitTapp, TypecheckMode,
+        TypecheckOptions,
+    };
 
     #[test]
     fn pending_tapp_unresolved_emits_explicit_tapp_required_diag() {
@@ -2672,6 +2887,200 @@ mod tests {
             report.diagnostics.is_empty(),
             "unexpected diags: {:?}",
             report.diagnostics
+        );
+    }
+
+    #[test]
+    fn typecheck_allows_bytes_as_bytes_view_in_call_arg_position() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["begin",
+                ["let", "b", ["bytes.alloc", 0]],
+                ["let", "n", ["bytes.len", "b"]],
+                ["bytes.alloc", "n"]
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        assert!(
+            report.diagnostics.is_empty(),
+            "unexpected diags: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn typecheck_allows_vec_u8_as_bytes_view_when_calling_a_local_fn() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [
+                {
+                    "kind": "defn",
+                    "name": "main.len_view",
+                    "params": [{"name": "v", "ty": "bytes_view"}],
+                    "result": "i32",
+                    "body": ["view.len", "v"],
+                }
+            ],
+            "solve": ["begin",
+                ["let", "v", ["vec_u8.with_capacity", 0]],
+                ["let", "n", ["main.len_view", "v"]],
+                ["bytes.alloc", "n"]
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        assert!(
+            report.diagnostics.is_empty(),
+            "unexpected diags: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn typecheck_contracts_only_mode_skips_body_type_errors() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [
+                {
+                    "kind": "defn",
+                    "name": "main.f",
+                    "params": [],
+                    "result": "i32",
+                    "requires": [{"expr": ["=", 1, 1]}],
+                    "body": ["bytes.alloc", 0]
+                }
+            ],
+            "solve": ["bytes.alloc", 0],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let full = typecheck_file_local(&file, &TypecheckOptions::default());
+        assert!(
+            !full.diagnostics.is_empty(),
+            "expected full typecheck diagnostics"
+        );
+
+        let contracts_only = typecheck_file_local(
+            &file,
+            &TypecheckOptions {
+                mode: TypecheckMode::ContractsOnly,
+            },
+        );
+        assert!(
+            contracts_only.diagnostics.is_empty(),
+            "unexpected diags: {:?}",
+            contracts_only.diagnostics
+        );
+    }
+
+    #[test]
+    fn if_branch_mismatch_points_at_a_branch_and_suggests_bytes_view_conversions() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["begin",
+                ["let", "b", ["bytes.alloc", 0]],
+                ["let", "x", ["if", 1, "b", ["bytes.view", "b"]]],
+                "b"
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        let diag = report
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "X07-TYPE-IF-0002")
+            .expect("expected X07-TYPE-IF-0002");
+
+        let then_ptr = diag
+            .data
+            .get("then_ptr")
+            .and_then(|v| v.as_str())
+            .expect("then_ptr");
+        let else_ptr = diag
+            .data
+            .get("else_ptr")
+            .and_then(|v| v.as_str())
+            .expect("else_ptr");
+
+        let loc_ptr = diag
+            .loc
+            .as_ref()
+            .and_then(|l| match l {
+                crate::diagnostics::Location::X07Ast { ptr } => Some(ptr.as_str()),
+                _ => None,
+            })
+            .expect("expected X07Ast loc");
+        assert_eq!(loc_ptr, then_ptr);
+
+        assert!(
+            diag.related.iter().any(
+                |l| matches!(l, crate::diagnostics::Location::X07Ast { ptr } if ptr == else_ptr)
+            ),
+            "expected else ptr in related: {diag:?}"
+        );
+        assert!(
+            diag.notes.iter().any(|n| n.contains("bytes.view")),
+            "expected bytes.view suggestion: {diag:?}"
+        );
+        assert!(
+            diag.notes.iter().any(|n| n.contains("view.to_bytes")),
+            "expected view.to_bytes suggestion: {diag:?}"
+        );
+    }
+
+    #[test]
+    fn if_branch_mismatch_suggests_vec_u8_into_bytes() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["begin",
+                ["let", "b", ["bytes.alloc", 0]],
+                ["let", "x", ["if", 1, "b", ["vec_u8.with_capacity", 0]]],
+                "b"
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        let diag = report
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "X07-TYPE-IF-0002")
+            .expect("expected X07-TYPE-IF-0002");
+        assert!(
+            diag.notes.iter().any(|n| n.contains("vec_u8.into_bytes")),
+            "expected vec_u8.into_bytes suggestion: {diag:?}"
         );
     }
 }

@@ -24,6 +24,9 @@ The following are treated as “compat-critical” surfaces:
 - Older `x07.lock@…` lockfiles should remain readable, or fail with a deterministic error that tells
   the user what to do next.
 - Older `x07.x07ast@…` programs and modules used by official packages should continue to compile.
+- Call-argument compatibility: in call-argument position, `bytes` (and in some APIs, `vec_u8`) is
+  accepted where a parameter expects `bytes_view` and is treated as an implicit view for that call.
+  This is a call-site-only rule (`bytes` is not a general subtype of `bytes_view`).
 - Diagnostic codes are stable identifiers. New codes are additive; existing code meanings should not
   be silently repurposed.
 - Versioned contracts (`*_v1`, `MAGIC+VERSION` envelopes, `spec/` schemas) do not change in-place.
@@ -66,4 +69,3 @@ When a breaking or near-breaking change is introduced, add an entry here with:
 - the mechanical rewrite (when possible)
 - the compatibility switch (when applicable)
 - links to the relevant diagnostic codes
-

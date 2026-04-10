@@ -26,6 +26,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
     "AGENT.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
+    "CHANGELOG.md",
     "GOVERNANCE.md",
     "OWNERS.md",
     "README.md",
