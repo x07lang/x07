@@ -12,7 +12,7 @@
         ],
         "result": "i32"
       },
-      "source_path": "/Users/webik/projects/x07lang/x07/crates/x07/tests/fixtures/verified_core_fixture_v1/src/fixture.x07.json",
+      "source_path": "src/fixture.x07.json",
       "status": "supported",
       "support_summary": {
         "decreases_count": 0,

@@ -1875,6 +1875,19 @@ fn resolve_artifact_base_dir(
     base.join(".x07").join("artifacts")
 }
 
+fn report_source_path(source_path: &Path, project_root: Option<&Path>) -> String {
+    if let Some(project_root) = project_root {
+        if source_path.is_absolute() {
+            if let Ok(rel) = source_path.strip_prefix(project_root) {
+                return rel.to_string_lossy().replace('\\', "/");
+            }
+        } else {
+            return source_path.to_string_lossy().replace('\\', "/");
+        }
+    }
+    source_path.to_string_lossy().replace('\\', "/")
+}
+
 #[derive(Debug, Clone)]
 struct TargetSig {
     param_names: Vec<String>,
@@ -2268,6 +2281,7 @@ fn summary_mismatch_function_for_decl(
     symbol: &str,
     decl: &CoverageDecl,
     imported: &ImportedSummaryFunction,
+    project_root: Option<&Path>,
 ) -> VerifyCoverageFunction {
     VerifyCoverageFunction {
         symbol: symbol.to_string(),
@@ -2285,7 +2299,7 @@ fn summary_mismatch_function_for_decl(
             prove_supported: true,
         }),
         decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
-        source_path: Some(decl.source_path.display().to_string()),
+        source_path: Some(report_source_path(&decl.source_path, project_root)),
         details: Some(format!(
             "imported proof summary from {} does not match the current declaration",
             imported.source.path
@@ -3246,6 +3260,7 @@ fn coverage_function_for_target(
     target: &TargetSig,
     max_bytes_len: u32,
     recursion: &RecursionSummary,
+    project_root: Option<&Path>,
 ) -> VerifyCoverageFunction {
     let (kind, status, details) = if target.is_async {
         if !target.has_contracts {
@@ -3318,7 +3333,7 @@ fn coverage_function_for_target(
         )),
         support_summary: Some(function_support_summary(target, recursion, prove_supported)),
         decl_sha256_hex: Some(target.decl_sha256_hex.clone()),
-        source_path: Some(target.source_path.display().to_string()),
+        source_path: Some(report_source_path(&target.source_path, project_root)),
         details,
     }
 }
@@ -3335,6 +3350,7 @@ fn coverage_report_for_entry(
     let world = coverage_world(project_path);
     let primitive_catalog = load_verify_primitive_catalog()?;
     let trust_zones = load_coverage_trust_zone_index(project_path)?;
+    let project_root = project_path.and_then(|p| p.parent());
     let mut module_cache: BTreeMap<String, CoverageModule> = BTreeMap::new();
     let mut queue = VecDeque::from([args.entry.clone()]);
     let mut visited = BTreeSet::new();
@@ -3390,7 +3406,12 @@ fn coverage_report_for_entry(
                         ));
                         functions.insert(
                             symbol.clone(),
-                            summary_mismatch_function_for_decl(&symbol, decl, imported),
+                            summary_mismatch_function_for_decl(
+                                &symbol,
+                                decl,
+                                imported,
+                                project_root,
+                            ),
                         );
                         continue;
                     }
@@ -3410,7 +3431,7 @@ fn coverage_report_for_entry(
                                 decl.result_brand.as_deref(),
                             )),
                             Some(decl.decl_sha256_hex.clone()),
-                            Some(decl.source_path.display().to_string()),
+                            Some(report_source_path(&decl.source_path, project_root)),
                         ),
                     );
                     continue;
@@ -3561,7 +3582,7 @@ fn coverage_report_for_entry(
                     )),
                     support_summary: None,
                     decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
-                    source_path: Some(decl.source_path.display().to_string()),
+                    source_path: Some(report_source_path(&decl.source_path, project_root)),
                     details: Some(format!(
                         "reachable closure terminates at certified capsule node {:?}",
                         node.id
@@ -3572,7 +3593,14 @@ fn coverage_report_for_entry(
         }
         functions.insert(
             symbol.clone(),
-            coverage_function_for_decl(&module_roots, world, &symbol, decl, args.max_bytes_len),
+            coverage_function_for_decl(
+                &module_roots,
+                world,
+                &symbol,
+                decl,
+                args.max_bytes_len,
+                project_root,
+            ),
         );
         enqueue_decl_refs(module_id, module, decl, &mut queue);
     }
@@ -3619,6 +3647,7 @@ fn coverage_report_fallback(
     max_bytes_len: u32,
     extra_details: Option<String>,
 ) -> CoverageAnalysis {
+    let project_root = project_path.and_then(|p| p.parent());
     let recursion = RecursionSummary {
         kind: if target.decreases_count > 0 && contains_direct_recursion(&target.body, entry) {
             RecursionKind::SelfRecursive
@@ -3627,8 +3656,14 @@ fn coverage_report_fallback(
         },
         cycle_symbol: None,
     };
-    let mut function =
-        coverage_function_for_target(module_roots, entry, target, max_bytes_len, &recursion);
+    let mut function = coverage_function_for_target(
+        module_roots,
+        entry,
+        target,
+        max_bytes_len,
+        &recursion,
+        project_root,
+    );
     match extra_details {
         Some(details)
             if matches!(
@@ -3664,8 +3699,9 @@ fn coverage_function_for_decl(
     symbol: &str,
     decl: &CoverageDecl,
     max_bytes_len: u32,
+    project_root: Option<&Path>,
 ) -> VerifyCoverageFunction {
-    let source_path = Some(decl.source_path.display().to_string());
+    let source_path = Some(report_source_path(&decl.source_path, project_root));
     match decl.kind.as_str() {
         "extern" => VerifyCoverageFunction {
             symbol: symbol.to_string(),
@@ -3704,7 +3740,14 @@ fn coverage_function_for_decl(
                     cycle_symbol: None,
                 },
             );
-            coverage_function_for_target(module_roots, symbol, &target, max_bytes_len, &recursion)
+            coverage_function_for_target(
+                module_roots,
+                symbol,
+                &target,
+                max_bytes_len,
+                &recursion,
+                project_root,
+            )
         }
     }
 }

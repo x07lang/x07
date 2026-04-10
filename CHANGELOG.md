@@ -15,6 +15,7 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - Contract enforcement now typechecks only contract clauses (requires/ensures/invariant/decreases) instead of full bodies.
 - Typechecker now supports call-argument compatibility `bytes -> bytes_view` (call-site-only) to match compiler behavior.
 - Improved `if` branch mismatch diagnostics to point at a specific branch and suggest canonical conversions.
+- `x07 verify` summaries now emit `source_path` relative to the project root when possible (portable artifacts; no machine-local absolute paths).
 
 ### Breaking changes
 
