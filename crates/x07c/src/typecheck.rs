@@ -1777,7 +1777,11 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
     );
     sigs.insert(
         "bytes.eq".to_string(),
-        mono("bytes.eq", &[("a", "bytes_view"), ("b", "bytes_view")], "i32"),
+        mono(
+            "bytes.eq",
+            &[("a", "bytes_view"), ("b", "bytes_view")],
+            "i32",
+        ),
     );
     sigs.insert(
         "bytes.cmp_range".to_string(),
