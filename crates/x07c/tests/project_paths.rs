@@ -566,6 +566,7 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
 
     let manifest = project::ProjectManifest {
         schema_version: PROJECT_MANIFEST_SCHEMA_VERSION.to_string(),
+        compat: None,
         world: "solve-pure".to_string(),
         entry: "src/main.x07.json".to_string(),
         operational_entry_symbol: None,

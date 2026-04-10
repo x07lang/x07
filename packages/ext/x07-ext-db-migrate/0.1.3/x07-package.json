@@ -7,6 +7,7 @@
   "module_root": "modules",
   "modules": ["std.db.migrate", "std.db.rr", "std.db.migrate.tests"],
   "meta": {
+    "x07c_compat": ">=0.1.111 <0.2.0",
     "determinism_tier": "mixed",
     "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"],
     "requires_packages": [

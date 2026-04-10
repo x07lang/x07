@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
@@ -20,6 +20,7 @@ pub enum TypecheckMode {
 #[derive(Debug, Clone, Default)]
 pub struct TypecheckOptions {
     pub mode: TypecheckMode,
+    pub compat: crate::compat::Compat,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,11 +34,27 @@ pub struct TappRewrite {
 pub struct TypecheckReport {
     pub diagnostics: Vec<Diagnostic>,
     pub tapp_rewrites: Vec<TappRewrite>,
+    pub implicit_call_arg_coercions: Vec<ImplicitCallArgCoercion>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImplicitCallArgCoercion {
+    pub ptr: String,
+    pub callee: String,
+    pub arg_index: usize,
+    pub got: String,
+    pub want: String,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct TypecheckSigs {
     sigs: BTreeMap<String, FnSigAst>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FnSigSummary {
+    pub params: Vec<TypeRef>,
+    pub result: TypeRef,
 }
 
 impl TypecheckSigs {
@@ -58,6 +75,13 @@ impl TypecheckSigs {
         sigs.add_file(file);
         sigs.add_builtins();
         sigs
+    }
+
+    pub fn get(&self, name: &str) -> Option<FnSigSummary> {
+        self.sigs.get(name).map(|sig| FnSigSummary {
+            params: sig.params.iter().map(|(_, ty, _)| ty.clone()).collect(),
+            result: sig.result.clone(),
+        })
     }
 }
 
@@ -133,6 +157,7 @@ struct PendingImplicitTapp {
 struct InferState<'a> {
     sigs: &'a BTreeMap<String, FnSigAst>,
     module_id: String,
+    compat: crate::compat::Compat,
     fn_ret: TyTerm,
     meta_counter: u32,
     env_stack: Vec<BTreeMap<String, TyInfoTerm>>,
@@ -140,13 +165,21 @@ struct InferState<'a> {
     subst: Subst,
     diagnostics: Vec<Diagnostic>,
     pending_tapp: Vec<PendingImplicitTapp>,
+    implicit_call_arg_coercions: Vec<ImplicitCallArgCoercion>,
+    implicit_call_arg_coercions_seen: BTreeSet<String>,
 }
 
 impl<'a> InferState<'a> {
-    fn new(sigs: &'a BTreeMap<String, FnSigAst>, module_id: &str, fn_ret: TyTerm) -> Self {
+    fn new(
+        sigs: &'a BTreeMap<String, FnSigAst>,
+        module_id: &str,
+        compat: crate::compat::Compat,
+        fn_ret: TyTerm,
+    ) -> Self {
         Self {
             sigs,
             module_id: module_id.to_string(),
+            compat,
             fn_ret,
             meta_counter: 0,
             env_stack: vec![BTreeMap::from([(
@@ -157,6 +190,8 @@ impl<'a> InferState<'a> {
             subst: Subst::default(),
             diagnostics: Vec::new(),
             pending_tapp: Vec::new(),
+            implicit_call_arg_coercions: Vec::new(),
+            implicit_call_arg_coercions_seen: BTreeSet::new(),
         }
     }
 
@@ -208,6 +243,66 @@ impl<'a> InferState<'a> {
             rhs,
             blame_ptr,
             origin,
+        });
+    }
+
+    fn record_implicit_call_arg_coercion(
+        &mut self,
+        ptr: &str,
+        callee: &str,
+        arg_index: usize,
+        got: &TyTerm,
+        want: &TyTerm,
+    ) {
+        let (TyTerm::Named(got), TyTerm::Named(want)) = (got, want) else {
+            return;
+        };
+
+        let key = format!("{ptr}\0{callee}\0{arg_index}\0{got}\0{want}");
+        if !self.implicit_call_arg_coercions_seen.insert(key) {
+            return;
+        }
+
+        self.implicit_call_arg_coercions
+            .push(ImplicitCallArgCoercion {
+                ptr: ptr.to_string(),
+                callee: callee.to_string(),
+                arg_index,
+                got: got.to_string(),
+                want: want.to_string(),
+            });
+
+        if !self.compat.strict {
+            return;
+        }
+
+        let mut data: BTreeMap<String, Value> = BTreeMap::new();
+        data.insert("callee".to_string(), Value::String(callee.to_string()));
+        data.insert(
+            "arg_index".to_string(),
+            Value::Number((arg_index as u64).into()),
+        );
+        data.insert("expected".to_string(), Value::String(want.to_string()));
+        data.insert("got".to_string(), Value::String(got.to_string()));
+
+        self.diagnostics.push(Diagnostic {
+            code: "X07-TYPE-COERCE-0001".to_string(),
+            severity: Severity::Warning,
+            stage: Stage::Type,
+            message: format!(
+                "implicit call arg coercion for {callee:?} (arg {arg_index}): {got} -> {want}"
+            ),
+            loc: Some(Location::X07Ast {
+                ptr: ptr.to_string(),
+            }),
+            notes: vec![
+                "This call relies on a compatibility coercion.".to_string(),
+                "Suggested fix: run `x07 migrate --write --to 0.5` to make the coercion explicit."
+                    .to_string(),
+            ],
+            related: Vec::new(),
+            data,
+            quickfix: None,
         });
     }
 
@@ -933,9 +1028,17 @@ impl<'a> InferState<'a> {
         for (idx, arg) in value_args.iter().enumerate().take(n) {
             let (_pname, pty, _pbrand) = &sig.params[idx];
             let want_ty = type_ref_to_term_with_subst(pty, &type_subst);
-            self.check_expr(
-                arg,
-                &want_ty,
+            // Call-argument coercions must be observed at the CallArg constraint. Passing `want`
+            // down into inference can hide the mismatch by forcing the subexpression to adopt the
+            // expected type and producing only an ExprCheck constraint.
+            let got = self.infer_expr(arg, None);
+            if matches!(got.ty, TyTerm::Never) {
+                continue;
+            }
+            self.add_constraint(
+                got.ty,
+                want_ty,
+                arg.ptr().to_string(),
                 ConstraintOrigin::CallArg {
                     callee: sig.name.clone(),
                     arg_index: idx,
@@ -992,26 +1095,47 @@ impl<'a> InferState<'a> {
                 })
         });
 
-        for c in &self.constraints {
-            if let Err(err) = unify(&mut self.subst, &c.lhs, &c.rhs) {
+        for idx in 0..self.constraints.len() {
+            let (lhs, rhs, blame_ptr, origin) = {
+                let c = &self.constraints[idx];
+                (
+                    c.lhs.clone(),
+                    c.rhs.clone(),
+                    c.blame_ptr.clone(),
+                    c.origin.clone(),
+                )
+            };
+
+            if let Err(err) = unify(&mut self.subst, &lhs, &rhs) {
                 if let ConstraintOrigin::CallArg {
                     callee,
+                    arg_index,
                     callee_decl_ptr,
                     ..
-                } = &c.origin
+                } = &origin
                 {
-                    let got = self.subst.resolve(&c.lhs);
-                    let want = self.subst.resolve(&c.rhs);
+                    let got = self.subst.resolve(&lhs);
+                    let want = self.subst.resolve(&rhs);
                     if allow_implicit_bytes_view_call_arg_coercion(
                         callee,
                         callee_decl_ptr.as_deref(),
                         &got,
                         &want,
                     ) {
+                        self.record_implicit_call_arg_coercion(
+                            &blame_ptr, callee, *arg_index, &got, &want,
+                        );
                         continue;
                     }
                 }
-                self.diagnostics.push(diag_for_unify_error(c, &err));
+
+                let c = Constraint {
+                    lhs,
+                    rhs,
+                    blame_ptr,
+                    origin,
+                };
+                self.diagnostics.push(diag_for_unify_error(&c, &err));
                 break;
             }
         }
@@ -2197,6 +2321,7 @@ fn typecheck_file_impl(
     let expr_values = file_expr_values(file);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
     let mut tapp_rewrites: BTreeMap<String, TappRewrite> = BTreeMap::new();
+    let mut implicit_call_arg_coercions: Vec<ImplicitCallArgCoercion> = Vec::new();
     let export_slots = if file.kind == crate::x07ast::X07AstKind::Module && !file.exports.is_empty()
     {
         1usize
@@ -2207,8 +2332,12 @@ fn typecheck_file_impl(
 
     if opts.mode == TypecheckMode::Full {
         if let Some(solve) = &file.solve {
-            let mut infer =
-                InferState::new(sigs, &file.module_id, TyTerm::Named("bytes".to_string()));
+            let mut infer = InferState::new(
+                sigs,
+                &file.module_id,
+                opts.compat,
+                TyTerm::Named("bytes".to_string()),
+            );
             let _ = infer.infer_expr(solve, Some(&TyTerm::Named("bytes".to_string())));
             infer.solve_constraints();
             drain_pending_tapp(
@@ -2218,6 +2347,7 @@ fn typecheck_file_impl(
                 &mut tapp_rewrites,
             );
 
+            implicit_call_arg_coercions.append(&mut infer.implicit_call_arg_coercions);
             diagnostics.append(&mut infer.diagnostics);
         }
     }
@@ -2233,7 +2363,12 @@ fn typecheck_file_impl(
             continue;
         }
 
-        let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
+        let mut infer = InferState::new(
+            sigs,
+            &file.module_id,
+            opts.compat,
+            type_ref_to_term(&f.result),
+        );
         let mut direct_recursive_calls = Vec::new();
         collect_direct_call_ptrs(&f.body, &f.name, &mut direct_recursive_calls);
         for p in &f.params {
@@ -2458,6 +2593,7 @@ fn typecheck_file_impl(
             &mut tapp_rewrites,
         );
 
+        implicit_call_arg_coercions.append(&mut infer.implicit_call_arg_coercions);
         diagnostics.append(&mut infer.diagnostics);
     }
 
@@ -2469,7 +2605,12 @@ fn typecheck_file_impl(
             continue;
         }
 
-        let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
+        let mut infer = InferState::new(
+            sigs,
+            &file.module_id,
+            opts.compat,
+            type_ref_to_term(&f.result),
+        );
         for p in &f.params {
             infer.bind(
                 p.name.clone(),
@@ -2687,6 +2828,7 @@ fn typecheck_file_impl(
             &mut tapp_rewrites,
         );
 
+        implicit_call_arg_coercions.append(&mut infer.implicit_call_arg_coercions);
         diagnostics.append(&mut infer.diagnostics);
     }
 
@@ -2707,6 +2849,7 @@ fn typecheck_file_impl(
     TypecheckReport {
         diagnostics,
         tapp_rewrites: tapp_rewrites.into_values().collect(),
+        implicit_call_arg_coercions,
     }
 }
 
@@ -2987,6 +3130,7 @@ mod tests {
             &file,
             &TypecheckOptions {
                 mode: TypecheckMode::ContractsOnly,
+                ..Default::default()
             },
         );
         assert!(

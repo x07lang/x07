@@ -47,6 +47,79 @@ fn json_ptr_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
+fn collect_quickfix_json_patch_ops(
+    report: &diagnostics::Report,
+) -> (Vec<diagnostics::PatchOp>, usize) {
+    let mut any_applied = false;
+    let mut applied_ops_count: usize = 0;
+
+    let mut tests: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+    let mut replaces: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+    let mut removes: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+    let mut adds: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+    let mut others: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+
+    let mut op_idx: usize = 0;
+    for d in &report.diagnostics {
+        let Some(q) = &d.quickfix else {
+            continue;
+        };
+        if q.kind != diagnostics::QuickfixKind::JsonPatch {
+            continue;
+        }
+        any_applied = true;
+        applied_ops_count = applied_ops_count.saturating_add(q.patch.len());
+        for op in &q.patch {
+            match op {
+                diagnostics::PatchOp::Test { .. } => tests.push((op_idx, op.clone())),
+                diagnostics::PatchOp::Replace { .. } => replaces.push((op_idx, op.clone())),
+                diagnostics::PatchOp::Remove { .. } => removes.push((op_idx, op.clone())),
+                diagnostics::PatchOp::Add { .. } => adds.push((op_idx, op.clone())),
+                diagnostics::PatchOp::Move { .. } | diagnostics::PatchOp::Copy { .. } => {
+                    others.push((op_idx, op.clone()));
+                }
+            }
+            op_idx = op_idx.saturating_add(1);
+        }
+    }
+    if !any_applied {
+        return (Vec::new(), 0);
+    }
+
+    tests.sort_by(|(ia, a), (ib, b)| {
+        ia.cmp(ib)
+            .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+    });
+    replaces.sort_by(|(ia, a), (ib, b)| {
+        json_ptr_cmp(patch_op_path(b), patch_op_path(a))
+            .then_with(|| ia.cmp(ib))
+            .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+    });
+    removes.sort_by(|(ia, a), (ib, b)| {
+        json_ptr_cmp(patch_op_path(b), patch_op_path(a))
+            .then_with(|| ib.cmp(ia))
+            .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+    });
+    adds.sort_by(|(ia, a), (ib, b)| {
+        json_ptr_cmp(patch_op_path(b), patch_op_path(a))
+            .then_with(|| ib.cmp(ia))
+            .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+    });
+    others.sort_by(|(ia, a), (ib, b)| {
+        ia.cmp(ib)
+            .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+    });
+
+    let mut patch: Vec<diagnostics::PatchOp> = Vec::new();
+    patch.extend(tests.into_iter().map(|(_, op)| op));
+    patch.extend(replaces.into_iter().map(|(_, op)| op));
+    patch.extend(others.into_iter().map(|(_, op)| op));
+    patch.extend(removes.into_iter().map(|(_, op)| op));
+    patch.extend(adds.into_iter().map(|(_, op)| op));
+
+    (patch, applied_ops_count)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]
 #[clap(rename_all = "kebab_case")]
 #[serde(rename_all = "kebab-case")]
@@ -82,14 +155,16 @@ pub struct RepairResult {
     pub final_report: diagnostics::Report,
 }
 
-pub fn repair_x07ast_file_doc(
+fn rewrite_x07ast_file_doc_with_quickfixes<F>(
     doc: &mut Value,
-    world: WorldId,
     max_iters: u32,
     mode: RepairMode,
-) -> Result<RepairResult> {
+    mut lint_fn: F,
+) -> Result<RepairResult>
+where
+    F: FnMut(&x07ast::X07AstFile) -> diagnostics::Report,
+{
     let max_iters = max_iters.max(1);
-    let lint_options = world_config::lint_options_for_world(world);
 
     let mut applied_ops_count: usize = 0;
     let mut iterations: u32 = 0;
@@ -106,74 +181,16 @@ pub fn repair_x07ast_file_doc(
         *doc = x07ast::x07ast_file_to_value(&file);
         x07ast::canon_value_jcs(doc);
 
-        let report = lint::lint_file(&file, lint_options);
-
+        let report = lint_fn(&file);
         if report.ok {
             break;
         }
 
-        let mut any_applied = false;
-        let mut tests: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
-        let mut replaces: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
-        let mut removes: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
-        let mut adds: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
-        let mut others: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
-
-        let mut op_idx: usize = 0;
-        for d in &report.diagnostics {
-            let Some(q) = &d.quickfix else { continue };
-            if q.kind != diagnostics::QuickfixKind::JsonPatch {
-                continue;
-            }
-            any_applied = true;
-            applied_ops_count = applied_ops_count.saturating_add(q.patch.len());
-            for op in &q.patch {
-                match op {
-                    diagnostics::PatchOp::Test { .. } => tests.push((op_idx, op.clone())),
-                    diagnostics::PatchOp::Replace { .. } => replaces.push((op_idx, op.clone())),
-                    diagnostics::PatchOp::Remove { .. } => removes.push((op_idx, op.clone())),
-                    diagnostics::PatchOp::Add { .. } => adds.push((op_idx, op.clone())),
-                    diagnostics::PatchOp::Move { .. } | diagnostics::PatchOp::Copy { .. } => {
-                        others.push((op_idx, op.clone()));
-                    }
-                }
-                op_idx = op_idx.saturating_add(1);
-            }
-        }
-        if !any_applied {
+        let (patch, ops_count) = collect_quickfix_json_patch_ops(&report);
+        if patch.is_empty() {
             break;
         }
-
-        tests.sort_by(|(ia, a), (ib, b)| {
-            ia.cmp(ib)
-                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
-        });
-        replaces.sort_by(|(ia, a), (ib, b)| {
-            json_ptr_cmp(patch_op_path(b), patch_op_path(a))
-                .then_with(|| ia.cmp(ib))
-                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
-        });
-        removes.sort_by(|(ia, a), (ib, b)| {
-            json_ptr_cmp(patch_op_path(b), patch_op_path(a))
-                .then_with(|| ib.cmp(ia))
-                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
-        });
-        adds.sort_by(|(ia, a), (ib, b)| {
-            json_ptr_cmp(patch_op_path(b), patch_op_path(a))
-                .then_with(|| ib.cmp(ia))
-                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
-        });
-        others.sort_by(|(ia, a), (ib, b)| {
-            ia.cmp(ib)
-                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
-        });
-
-        let mut patch: Vec<diagnostics::PatchOp> = Vec::new();
-        patch.extend(tests.into_iter().map(|(_, op)| op));
-        patch.extend(replaces.into_iter().map(|(_, op)| op));
-        patch.extend(others.into_iter().map(|(_, op)| op));
-        patch.extend(removes.into_iter().map(|(_, op)| op));
-        patch.extend(adds.into_iter().map(|(_, op)| op));
+        applied_ops_count = applied_ops_count.saturating_add(ops_count);
 
         x07c::json_patch::apply_patch(doc, &patch)
             .map_err(|e| anyhow::anyhow!("apply patch failed: {e}"))?;
@@ -182,7 +199,7 @@ pub fn repair_x07ast_file_doc(
     let doc_bytes = serde_json::to_vec(doc)?;
     let mut file = x07ast::parse_x07ast_json(&doc_bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
     x07ast::canonicalize_x07ast_file(&mut file);
-    let final_report = lint::lint_file(&file, lint_options);
+    let final_report = lint_fn(&file);
 
     let mut v = x07ast::x07ast_file_to_value(&file);
     x07ast::canon_value_jcs(&mut v);
@@ -197,6 +214,32 @@ pub fn repair_x07ast_file_doc(
         },
         formatted,
         final_report,
+    })
+}
+
+pub fn repair_x07ast_file_doc(
+    doc: &mut Value,
+    world: WorldId,
+    max_iters: u32,
+    mode: RepairMode,
+) -> Result<RepairResult> {
+    let lint_options = world_config::lint_options_for_world(world);
+    rewrite_x07ast_file_doc_with_quickfixes(doc, max_iters, mode, |file| {
+        lint::lint_file(file, lint_options)
+    })
+}
+
+pub fn migrate_x07ast_file_doc(
+    doc: &mut Value,
+    world: WorldId,
+    max_iters: u32,
+    mode: RepairMode,
+    compat: x07c::compat::Compat,
+) -> Result<RepairResult> {
+    let mut lint_options = world_config::lint_options_for_world(world);
+    lint_options.compat = compat;
+    rewrite_x07ast_file_doc_with_quickfixes(doc, max_iters, mode, |file| {
+        lint::lint_file_migration(file, lint_options)
     })
 }
 

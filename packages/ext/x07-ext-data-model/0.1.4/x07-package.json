@@ -16,6 +16,7 @@
     "ext.data_model.tests"
   ],
   "meta": {
+    "x07c_compat": ">=0.1.111 <0.2.0",
     "determinism_tier": "pure",
     "requires_packages": [
       "ext-json-rs@0.1.3",

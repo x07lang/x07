@@ -2711,6 +2711,7 @@ fn project_json_bytes(template: Option<InitTemplate>, deps: &[PkgRef]) -> Result
                 "schema_version".to_string(),
                 Value::String(PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
             ),
+            ("compat".to_string(), Value::String("0.5".to_string())),
             ("world".to_string(), Value::String("run-os".to_string())),
             (
                 "entry".to_string(),
@@ -2793,6 +2794,7 @@ fn package_project_json_bytes(entry_rel: &str) -> Result<Vec<u8>> {
                 "schema_version".to_string(),
                 Value::String(PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
             ),
+            ("compat".to_string(), Value::String("0.5".to_string())),
             ("world".to_string(), Value::String("run-os".to_string())),
             ("entry".to_string(), Value::String(entry_rel.to_string())),
             (

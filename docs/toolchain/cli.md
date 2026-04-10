@@ -144,6 +144,10 @@ Add `--pretty` to produce deterministic multi-line formatting intended for human
   - Applies quickfixes (JSON Patch) and rewrites the file deterministically.
 - `x07 fix --from-pbt <repro.json> --write`
   - Converts a PBT repro artifact into a deterministic regression test (wrapper module + manifest entry).
+- `x07 migrate --to 0.5 --check --input <path>`
+  - Runs migration lints and exits non-zero when mechanical rewrites are required.
+- `x07 migrate --to 0.5 --write --input <path>`
+  - Applies mechanical migrations in-place via deterministic quickfix patches.
 
 See: [PBT repro → regression test](pbt-fix-from-repro.md).
 
@@ -400,7 +404,7 @@ Notes:
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `x07 pkg versions --refresh <name>` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
-- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.4.0`; `x07.project@0.2.0` and `x07.project@0.3.0` are accepted for legacy manifests, but the current certification surfaces use `project.operational_entry_symbol` and related `0.4.0` fields).
+- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.5.0`; `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, but the current certification surfaces use `project.operational_entry_symbol` and related `0.4.0` fields which remain present in `0.5.0`).
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
 ### Project check (no emit)
@@ -529,6 +533,7 @@ Notes:
 - `x07 lint` without `--json` prints the raw diagnostics report (`x07diag`, see `spec/x07diag.schema.json`).
 - `x07 fix` without `--json` prints the fixed x07AST JSON to stdout unless `--write` is set.
 - `x07 fix --suggest-generics` emits a suggested `x07.patchset@0.1.0` to stdout (or `--out <PATH>` in `--json` workflows).
+- Compatibility mode overrides are available on build/compile entry points (`x07 run`, `x07 build`, `x07 check`, `x07 test`) via `--compat ...` or `X07_COMPAT=...`. See: [Compatibility modes](../reference/compat.md).
 
 ## Agent bootstrap recipe
 

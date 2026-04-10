@@ -95,6 +95,7 @@ impl Default for LintCtx {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LintOptions {
     pub world: x07_worlds::WorldId,
+    pub compat: crate::compat::Compat,
     pub enable_fs: bool,
     pub enable_rr: bool,
     pub enable_kv: bool,
@@ -120,6 +121,410 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
 
 pub fn lint_file_no_typecheck(file: &X07AstFile, options: LintOptions) -> Report {
     lint_file_impl(file, options, false)
+}
+
+pub fn lint_file_migration(file: &X07AstFile, options: LintOptions) -> Report {
+    fn ptr_parent(ptr: &str) -> Option<&str> {
+        let ptr = ptr.trim_end_matches('/');
+        ptr.rsplit_once('/').map(|(a, _)| a)
+    }
+
+    fn ptr_last_index(ptr: &str) -> Option<usize> {
+        let ptr = ptr.trim_end_matches('/');
+        let (_, last) = ptr.rsplit_once('/')?;
+        last.parse::<usize>().ok()
+    }
+
+    fn bytes_view_compat_expr_for(
+        got: &str,
+        arg: &Expr,
+        owner_ident: Option<&str>,
+    ) -> Option<Expr> {
+        match got {
+            "bytes" => match arg {
+                Expr::Ident { name, .. } if name != "input" => Some(expr_list(vec![
+                    expr_ident("bytes.view"),
+                    expr_ident(name.to_string()),
+                ])),
+                Expr::List { items, .. }
+                    if items.len() == 2 && items[0].as_ident() == Some("bytes.lit") =>
+                {
+                    let text = items[1].as_ident()?;
+                    Some(expr_list(vec![
+                        expr_ident("bytes.view_lit"),
+                        expr_ident(text.to_string()),
+                    ]))
+                }
+                _ => owner_ident.map(|owner| {
+                    expr_list(vec![
+                        expr_ident("bytes.view"),
+                        expr_ident(owner.to_string()),
+                    ])
+                }),
+            },
+            "vec_u8" => match arg {
+                Expr::Ident { name, .. } => Some(expr_list(vec![
+                    expr_ident("vec_u8.as_view"),
+                    expr_ident(name.to_string()),
+                ])),
+                _ => owner_ident.map(|owner| {
+                    expr_list(vec![
+                        expr_ident("vec_u8.as_view"),
+                        expr_ident(owner.to_string()),
+                    ])
+                }),
+            },
+            _ => None,
+        }
+    }
+
+    fn is_view_like_type_ref(ty: &x07ast::TypeRef) -> bool {
+        matches!(
+            ty.as_mono_ty(),
+            Some(
+                crate::types::Ty::BytesView
+                    | crate::types::Ty::OptionBytesView
+                    | crate::types::Ty::ResultBytesView,
+            )
+        )
+    }
+
+    let tc = crate::typecheck::typecheck_file_local(
+        file,
+        &crate::typecheck::TypecheckOptions {
+            compat: options.compat,
+            ..Default::default()
+        },
+    );
+    if tc.implicit_call_arg_coercions.is_empty() {
+        return Report::ok();
+    }
+
+    let sigs = crate::typecheck::TypecheckSigs::for_file_with_builtins(file);
+
+    let mut coercions_by_call_ptr: std::collections::BTreeMap<
+        String,
+        Vec<crate::typecheck::ImplicitCallArgCoercion>,
+    > = std::collections::BTreeMap::new();
+    for c in tc.implicit_call_arg_coercions {
+        let Some(call_ptr) = ptr_parent(&c.ptr) else {
+            continue;
+        };
+        if call_ptr.is_empty() {
+            continue;
+        }
+        coercions_by_call_ptr
+            .entry(call_ptr.to_string())
+            .or_default()
+            .push(c);
+    }
+
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut seen_calls: BTreeSet<String> = BTreeSet::new();
+
+    fn walk_expr(
+        expr: &Expr,
+        coercions_by_call_ptr: &std::collections::BTreeMap<
+            String,
+            Vec<crate::typecheck::ImplicitCallArgCoercion>,
+        >,
+        sigs: &crate::typecheck::TypecheckSigs,
+        seen_calls: &mut BTreeSet<String>,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => {}
+            Expr::List { items, .. } => {
+                let ptr = expr.ptr();
+                if let Some(coercions) = coercions_by_call_ptr.get(ptr) {
+                    let _ = lint_migration_call_arg_coercions(
+                        items,
+                        ptr,
+                        coercions.as_slice(),
+                        sigs,
+                        seen_calls,
+                        diagnostics,
+                    );
+                }
+                for it in items {
+                    walk_expr(it, coercions_by_call_ptr, sigs, seen_calls, diagnostics);
+                }
+            }
+        }
+    }
+
+    fn lint_migration_call_arg_coercions(
+        items: &[Expr],
+        call_ptr: &str,
+        coercions: &[crate::typecheck::ImplicitCallArgCoercion],
+        sigs: &crate::typecheck::TypecheckSigs,
+        seen_calls: &mut BTreeSet<String>,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) -> Result<(), ()> {
+        if !seen_calls.insert(call_ptr.to_string()) {
+            return Ok(());
+        }
+
+        if items.is_empty() {
+            return Ok(());
+        }
+        let Some(head) = items[0].as_ident() else {
+            return Ok(());
+        };
+
+        let mut by_item_idx: std::collections::BTreeMap<
+            usize,
+            crate::typecheck::ImplicitCallArgCoercion,
+        > = std::collections::BTreeMap::new();
+        for c in coercions {
+            if c.callee != head {
+                continue;
+            }
+            let Some(item_idx) = ptr_last_index(&c.ptr) else {
+                continue;
+            };
+            by_item_idx.entry(item_idx).or_insert_with(|| c.clone());
+        }
+
+        if by_item_idx.is_empty() {
+            return Ok(());
+        }
+
+        let mut needs_owner_tmp: Vec<usize> = Vec::new();
+        let mut direct_fix: Vec<usize> = Vec::new();
+        for (&item_idx, c) in &by_item_idx {
+            let Some(arg) = items.get(item_idx) else {
+                continue;
+            };
+            let direct = match c.got.as_str() {
+                "bytes" => {
+                    matches!(arg, Expr::Ident { .. })
+                        || matches!(
+                            arg,
+                            Expr::List { items, .. }
+                                if items.len() == 2 && items[0].as_ident() == Some("bytes.lit")
+                        )
+                }
+                "vec_u8" => matches!(arg, Expr::Ident { .. }),
+                _ => false,
+            };
+            if direct {
+                direct_fix.push(item_idx);
+            } else {
+                needs_owner_tmp.push(item_idx);
+            }
+        }
+
+        direct_fix.sort();
+        needs_owner_tmp.sort();
+
+        let sig = sigs.get(head);
+        let ret_is_view_like = sig
+            .as_ref()
+            .is_some_and(|s| is_view_like_type_ref(&s.result));
+
+        if needs_owner_tmp.is_empty() || ret_is_view_like || sig.is_none() {
+            let mut patch: Vec<PatchOp> = Vec::new();
+            for item_idx in direct_fix {
+                let Some(c) = by_item_idx.get(&item_idx) else {
+                    continue;
+                };
+                let Some(arg) = items.get(item_idx) else {
+                    continue;
+                };
+                let fixed = bytes_view_compat_expr_for(&c.got, arg, None);
+                let Some(fixed) = fixed else { continue };
+                patch.push(PatchOp::Replace {
+                    path: c.ptr.clone(),
+                    value: x07ast::expr_to_value(&fixed),
+                });
+            }
+
+            let quickfix = if patch.is_empty() {
+                None
+            } else {
+                Some(Quickfix {
+                    kind: QuickfixKind::JsonPatch,
+                    patch,
+                    note: Some("Explicitize bytes_view call-arg compat coercions".to_string()),
+                })
+            };
+
+            diagnostics.push(Diagnostic {
+                code: "X07-MIGRATE-COERCE-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Lint,
+                message: format!(
+                    "migration required: explicitize compat coercions in call {head:?}"
+                ),
+                loc: Some(Location::X07Ast {
+                    ptr: call_ptr.to_string(),
+                }),
+                notes: vec![
+                    "This call relies on call-argument compatibility coercions.".to_string(),
+                    "Run `x07 migrate --write --to 0.5` to apply mechanical rewrites.".to_string(),
+                ],
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix,
+            });
+
+            return Ok(());
+        }
+
+        let cutoff = needs_owner_tmp.iter().copied().max().unwrap_or(0usize);
+        if cutoff == 0 || cutoff >= items.len() {
+            return Ok(());
+        }
+
+        let mut begin_items: Vec<Expr> = Vec::new();
+        begin_items.push(expr_ident("begin"));
+
+        let mut arg_tmp_names: std::collections::BTreeMap<usize, String> =
+            std::collections::BTreeMap::new();
+
+        for item_idx in 1..=cutoff {
+            let Some(arg) = items.get(item_idx) else {
+                continue;
+            };
+            let arg_ptr = format!("{call_ptr}/{item_idx}");
+            let tmp_arg = tmp_name("_x07_tmp_migrate_arg", &arg_ptr);
+            arg_tmp_names.insert(item_idx, tmp_arg.clone());
+
+            if let Some(c) = by_item_idx.get(&item_idx) {
+                let direct = match c.got.as_str() {
+                    "bytes" => {
+                        matches!(arg, Expr::Ident { .. })
+                            || matches!(
+                                arg,
+                                Expr::List { items, .. }
+                                    if items.len() == 2 && items[0].as_ident() == Some("bytes.lit")
+                            )
+                    }
+                    "vec_u8" => matches!(arg, Expr::Ident { .. }),
+                    _ => false,
+                };
+
+                if direct {
+                    let Some(fixed) = bytes_view_compat_expr_for(&c.got, arg, None) else {
+                        continue;
+                    };
+                    begin_items.push(expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(tmp_arg),
+                        fixed,
+                    ]));
+                    continue;
+                }
+
+                let tmp_owner = tmp_name("_x07_tmp_migrate_owner", &arg_ptr);
+                begin_items.push(expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(tmp_owner.clone()),
+                    arg.clone(),
+                ]));
+                let Some(view_expr) = bytes_view_compat_expr_for(&c.got, arg, Some(&tmp_owner))
+                else {
+                    continue;
+                };
+                begin_items.push(expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(tmp_arg),
+                    view_expr,
+                ]));
+                continue;
+            }
+
+            begin_items.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(tmp_arg),
+                arg.clone(),
+            ]));
+        }
+
+        let mut call_new_items: Vec<Expr> = Vec::with_capacity(items.len());
+        call_new_items.push(expr_ident(head.to_string()));
+        for item_idx in 1..items.len() {
+            if item_idx <= cutoff {
+                if let Some(tmp) = arg_tmp_names.get(&item_idx) {
+                    call_new_items.push(expr_ident(tmp.to_string()));
+                } else {
+                    call_new_items.push(items[item_idx].clone());
+                }
+                continue;
+            }
+
+            if let Some(c) = by_item_idx.get(&item_idx) {
+                let Some(arg) = items.get(item_idx) else {
+                    continue;
+                };
+                if let Some(fixed) = bytes_view_compat_expr_for(&c.got, arg, None) {
+                    call_new_items.push(fixed);
+                    continue;
+                }
+            }
+
+            call_new_items.push(items[item_idx].clone());
+        }
+
+        begin_items.push(expr_list(call_new_items));
+
+        diagnostics.push(Diagnostic {
+            code: "X07-MIGRATE-COERCE-0001".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Lint,
+            message: format!("migration required: explicitize compat coercions in call {head:?}"),
+            loc: Some(Location::X07Ast {
+                ptr: call_ptr.to_string(),
+            }),
+            notes: vec![
+                "This call relies on call-argument compatibility coercions.".to_string(),
+                "Auto-fix available: run `x07 migrate --write --to 0.5`.".to_string(),
+            ],
+            related: Vec::new(),
+            data: Default::default(),
+            quickfix: Some(Quickfix {
+                kind: QuickfixKind::JsonPatch,
+                patch: vec![PatchOp::Replace {
+                    path: call_ptr.to_string(),
+                    value: x07ast::expr_to_value(&expr_list(begin_items)),
+                }],
+                note: Some("Explicitize bytes_view call-arg compat coercions".to_string()),
+            }),
+        });
+
+        Ok(())
+    }
+
+    if let Some(expr) = &file.solve {
+        walk_expr(
+            expr,
+            &coercions_by_call_ptr,
+            &sigs,
+            &mut seen_calls,
+            &mut diagnostics,
+        );
+    }
+    for f in &file.functions {
+        walk_expr(
+            &f.body,
+            &coercions_by_call_ptr,
+            &sigs,
+            &mut seen_calls,
+            &mut diagnostics,
+        );
+    }
+    for f in &file.async_functions {
+        walk_expr(
+            &f.body,
+            &coercions_by_call_ptr,
+            &sigs,
+            &mut seen_calls,
+            &mut diagnostics,
+        );
+    }
+
+    Report::ok().with_diagnostics(diagnostics)
 }
 
 fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) -> Report {
@@ -263,7 +668,13 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0)
     {
-        let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
+        let tc = crate::typecheck::typecheck_file_local(
+            file,
+            &crate::typecheck::TypecheckOptions {
+                compat: options.compat,
+                ..Default::default()
+            },
+        );
         diagnostics.extend(tc.diagnostics);
     }
 

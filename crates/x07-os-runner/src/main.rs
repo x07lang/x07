@@ -58,6 +58,10 @@ struct Cli {
     #[arg(long, value_enum, default_value_t = WorldId::RunOs)]
     world: WorldId,
 
+    /// Override the language/toolchain compatibility mode.
+    #[arg(long, value_name = "COMPAT")]
+    compat: Option<String>,
+
     /// Sandbox backend selection (run-os-sandboxed defaults to "vm").
     #[arg(long, value_enum)]
     sandbox_backend: Option<SandboxBackend>,
@@ -153,6 +157,7 @@ fn run() -> std::process::ExitCode {
 
 fn try_main() -> Result<std::process::ExitCode> {
     let cli = Cli::parse();
+    let env_compat = std::env::var("X07_COMPAT").ok();
 
     if cli.compile_only && cli.artifact.is_some() {
         anyhow::bail!("--compile-only is not supported with --artifact");
@@ -357,6 +362,8 @@ fn try_main() -> Result<std::process::ExitCode> {
             };
             let mut compile_options =
                 x07c::world_config::compile_options_for_world(world, module_roots);
+            compile_options.compat =
+                x07c::compat::resolve_compat(cli.compat.as_deref(), env_compat.as_deref(), None)?;
             compile_options.arch_root =
                 infer_arch_root_from_path(program_path).or_else(|| std::env::current_dir().ok());
             compile_options.allow_unsafe = allow_unsafe;
@@ -526,6 +533,11 @@ fn try_main() -> Result<std::process::ExitCode> {
 
             let mut compile_options =
                 x07c::world_config::compile_options_for_world(world, module_roots);
+            compile_options.compat = x07c::compat::resolve_compat(
+                cli.compat.as_deref(),
+                env_compat.as_deref(),
+                manifest.compat.as_deref(),
+            )?;
             compile_options.arch_root = infer_arch_root_from_path(project_path)
                 .or_else(|| Some(base.to_path_buf()))
                 .or_else(|| std::env::current_dir().ok());
@@ -2791,6 +2803,7 @@ mod tests {
         }
         let compile_options = compile::CompileOptions {
             world,
+            compat: Default::default(),
             enable_fs: false,
             enable_rr: false,
             enable_kv: false,

@@ -30,6 +30,7 @@ pub enum ContractMode {
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
     pub world: x07_worlds::WorldId,
+    pub compat: crate::compat::Compat,
     pub enable_fs: bool,
     pub enable_rr: bool,
     pub enable_kv: bool,
@@ -49,6 +50,7 @@ impl Default for CompileOptions {
     fn default() -> Self {
         Self {
             world: x07_worlds::WorldId::default(),
+            compat: crate::compat::Compat::default(),
             enable_fs: false,
             enable_rr: false,
             enable_kv: false,
@@ -1201,6 +1203,7 @@ fn enforce_contract_typecheck(label: &str, file: &x07ast::X07AstFile) -> Result<
         file,
         &crate::typecheck::TypecheckOptions {
             mode: crate::typecheck::TypecheckMode::ContractsOnly,
+            ..Default::default()
         },
     );
     let errors = tc

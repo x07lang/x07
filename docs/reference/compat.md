@@ -15,6 +15,33 @@ X07 has multiple versioned surfaces:
 - **Contracts/schemas**: JSON schemas under `spec/` (for example `x07diag`, `x07patch`, `x07test`).
 - **Stable function contracts**: `_v1` suffixes and other explicitly versioned ABIs/encodings.
 
+## Compat Selection (`project.compat`, `--compat`, `X07_COMPAT`)
+
+`x07.project@0.5.0` introduces an optional `project.compat` field that pins language/toolchain
+compatibility semantics for a project.
+
+Example:
+
+```jsonc
+{
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
+  "world": "run-os",
+  "entry": "src/main.x07.json",
+  "module_roots": ["src"]
+}
+```
+
+Resolution order (highest priority first):
+
+- CLI: `--compat ...`
+- Environment: `X07_COMPAT=...`
+- Project: `x07.json` `compat`
+- Default: `current`
+
+When a behavior change is mechanically migratable, prefer `x07 migrate --check/--write` to
+explicitize required rewrites.
+
 ## What Must Stay Compatible
 
 The following are treated as “compat-critical” surfaces:
@@ -58,7 +85,7 @@ Any behavior change that can affect downstream packages/projects must:
 2. Have a regression surface in the compat corpus (a project or a fixability case).
 3. Either:
    - be behind a compatibility switch, or
-   - be mechanically migratable (via `x07 fix` and, once introduced, `x07 migrate`).
+   - be mechanically migratable (via `x07 fix` and `x07 migrate`).
 
 ## Change → Migration Mapping (Appendix)
 

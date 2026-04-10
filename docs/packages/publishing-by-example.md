@@ -167,7 +167,8 @@ It also generates a minimal `x07.json` so `x07 test` can automatically discover 
 
 ```json
 {
-  "schema_version": "x07.project@0.4.0",
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
   "world": "run-os",
   "entry": "modules/ext/acme_hello_demo/tests.x07.json",
   "module_roots": ["modules"],

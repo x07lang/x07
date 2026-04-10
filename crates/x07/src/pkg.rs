@@ -1560,6 +1560,156 @@ fn parse_semver_version(version: &str) -> Option<SemverVersion> {
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SemverReqOp {
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SemverReqClause {
+    op: SemverReqOp,
+    version: SemverVersion,
+}
+
+fn parse_semver_req(raw: &str) -> Result<Vec<SemverReqClause>> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        anyhow::bail!("semver requirement must be non-empty");
+    }
+
+    let mut out: Vec<SemverReqClause> = Vec::new();
+    for tok in raw.split_whitespace() {
+        let tok = tok.trim().trim_end_matches(',');
+        if tok.is_empty() {
+            continue;
+        }
+
+        let (op, version_raw) = if let Some(v) = tok.strip_prefix(">=") {
+            (SemverReqOp::Ge, v)
+        } else if let Some(v) = tok.strip_prefix("<=") {
+            (SemverReqOp::Le, v)
+        } else if let Some(v) = tok.strip_prefix('>') {
+            (SemverReqOp::Gt, v)
+        } else if let Some(v) = tok.strip_prefix('<') {
+            (SemverReqOp::Lt, v)
+        } else if let Some(v) = tok.strip_prefix('=') {
+            (SemverReqOp::Eq, v)
+        } else {
+            (SemverReqOp::Eq, tok)
+        };
+
+        let version_raw = version_raw.trim();
+        if version_raw.is_empty() {
+            anyhow::bail!("semver requirement token is missing a version: {:?}", tok);
+        }
+        let Some(version) = parse_semver_version(version_raw) else {
+            anyhow::bail!(
+                "semver requirement token has invalid version {:?}: {:?}",
+                version_raw,
+                tok
+            );
+        };
+        out.push(SemverReqClause { op, version });
+    }
+
+    if out.is_empty() {
+        anyhow::bail!("semver requirement did not contain any clauses: {:?}", raw);
+    }
+
+    Ok(out)
+}
+
+fn semver_satisfies(version: &SemverVersion, req: &[SemverReqClause]) -> bool {
+    req.iter().all(|c| match version.cmp(&c.version) {
+        std::cmp::Ordering::Less => matches!(c.op, SemverReqOp::Lt | SemverReqOp::Le),
+        std::cmp::Ordering::Equal => {
+            matches!(c.op, SemverReqOp::Le | SemverReqOp::Ge | SemverReqOp::Eq)
+        }
+        std::cmp::Ordering::Greater => matches!(c.op, SemverReqOp::Gt | SemverReqOp::Ge),
+    })
+}
+
+fn current_x07c_semver() -> Result<SemverVersion> {
+    let Some(v) = parse_semver_version(x07c::X07C_VERSION) else {
+        anyhow::bail!(
+            "internal error: x07c version is not semver: {:?}",
+            x07c::X07C_VERSION
+        );
+    };
+    Ok(v)
+}
+
+fn check_pkg_x07c_compat(
+    pkg_name: &str,
+    pkg_version: &str,
+    pkg_manifest_path: &Path,
+    pkg_manifest_bytes: &[u8],
+) -> Result<Option<PkgError>> {
+    let doc: Value = match serde_json::from_slice(pkg_manifest_bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            return Ok(Some(PkgError {
+                code: "X07PKG_MANIFEST_PARSE".to_string(),
+                message: format!(
+                    "parse package manifest for {pkg_name}@{pkg_version}: {err} ({})",
+                    pkg_manifest_path.display()
+                ),
+            }));
+        }
+    };
+
+    let Some(meta) = doc.get("meta").and_then(Value::as_object) else {
+        return Ok(None);
+    };
+    let Some(raw) = meta.get("x07c_compat") else {
+        return Ok(None);
+    };
+    let Some(raw) = raw.as_str() else {
+        return Ok(Some(PkgError {
+            code: "X07PKG_X07C_COMPAT_INVALID".to_string(),
+            message: format!(
+                "package meta.x07c_compat must be a string for {pkg_name}@{pkg_version} ({})",
+                pkg_manifest_path.display()
+            ),
+        }));
+    };
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Ok(None);
+    }
+
+    let req = match parse_semver_req(raw) {
+        Ok(req) => req,
+        Err(err) => {
+            return Ok(Some(PkgError {
+                code: "X07PKG_X07C_COMPAT_INVALID".to_string(),
+                message: format!(
+                    "invalid package meta.x07c_compat for {pkg_name}@{pkg_version}: {:?} ({err})",
+                    raw
+                ),
+            }));
+        }
+    };
+
+    let cur = current_x07c_semver()?;
+    if semver_satisfies(&cur, &req) {
+        return Ok(None);
+    }
+
+    Ok(Some(PkgError {
+        code: "X07PKG_X07C_INCOMPATIBLE".to_string(),
+        message: format!(
+            "package {pkg_name}@{pkg_version} is incompatible with x07c {} (meta.x07c_compat = {:?})",
+            x07c::X07C_VERSION,
+            raw
+        ),
+    }))
+}
+
 fn latest_non_yanked_semver_version(entries: &[x07_pkg::IndexEntry]) -> Option<String> {
     let mut best: Option<(SemverVersion, String)> = None;
     for entry in entries {
@@ -3131,25 +3281,35 @@ fn ensure_deps_present(
     let mut missing: Vec<&project::DependencySpec> = Vec::new();
     for dep in deps {
         let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
-        if !dep_dir.join("x07-package.json").is_file() {
-            let patched_by_path = ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some());
-            if patched_by_path && !project::is_vendored_dep_path(&dep.path) {
-                missing_local_override.push(format!(
-                    "{}@{} ({})",
-                    dep.name,
-                    dep.version,
-                    dep_dir.display()
-                ));
-            } else if !project::is_vendored_dep_path(&dep.path) {
-                missing_local.push(format!(
-                    "{}@{} ({})",
-                    dep.name,
-                    dep.version,
-                    dep_dir.display()
-                ));
-            } else {
-                missing.push(dep);
+        let pkg_manifest_path = dep_dir.join("x07-package.json");
+        if pkg_manifest_path.is_file() {
+            let bytes = std::fs::read(&pkg_manifest_path).with_context(|| {
+                format!("read package manifest: {}", pkg_manifest_path.display())
+            })?;
+            if let Some(err) =
+                check_pkg_x07c_compat(&dep.name, &dep.version, &pkg_manifest_path, &bytes)?
+            {
+                return Ok(Some(err));
             }
+            continue;
+        }
+        let patched_by_path = ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some());
+        if patched_by_path && !project::is_vendored_dep_path(&dep.path) {
+            missing_local_override.push(format!(
+                "{}@{} ({})",
+                dep.name,
+                dep.version,
+                dep_dir.display()
+            ));
+        } else if !project::is_vendored_dep_path(&dep.path) {
+            missing_local.push(format!(
+                "{}@{} ({})",
+                dep.name,
+                dep.version,
+                dep_dir.display()
+            ));
+        } else {
+            missing.push(dep);
         }
     }
 
@@ -3185,6 +3345,16 @@ fn ensure_deps_present(
         let mut still_missing: Vec<&project::DependencySpec> = Vec::new();
         for dep in missing {
             if try_copy_official_dep(&official_ext, dep, ctx.base)? {
+                let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
+                let pkg_manifest_path = dep_dir.join("x07-package.json");
+                let bytes = std::fs::read(&pkg_manifest_path).with_context(|| {
+                    format!("read package manifest: {}", pkg_manifest_path.display())
+                })?;
+                if let Some(err) =
+                    check_pkg_x07c_compat(&dep.name, &dep.version, &pkg_manifest_path, &bytes)?
+                {
+                    return Ok(Some(err));
+                }
                 continue;
             }
             still_missing.push(dep);
@@ -3266,9 +3436,8 @@ fn ensure_deps_present(
         let tmp_dir = temp_unpack_dir(ctx.base)?;
         x07_pkg::unpack_tar_bytes(&archive_bytes, &tmp_dir)?;
 
-        let (pkg, _pkg_manifest_path, _pkg_manifest_bytes) =
-            project::load_package_manifest(&tmp_dir)
-                .with_context(|| format!("validate unpacked package at {}", tmp_dir.display()))?;
+        let (pkg, pkg_manifest_path, pkg_manifest_bytes) = project::load_package_manifest(&tmp_dir)
+            .with_context(|| format!("validate unpacked package at {}", tmp_dir.display()))?;
         if pkg.name != dep.name || pkg.version != dep.version {
             anyhow::bail!(
                 "unpacked package identity mismatch: expected {:?}@{:?} got {:?}@{:?}",
@@ -3277,6 +3446,14 @@ fn ensure_deps_present(
                 pkg.name,
                 pkg.version
             );
+        }
+        if let Some(err) = check_pkg_x07c_compat(
+            &pkg.name,
+            &pkg.version,
+            &pkg_manifest_path,
+            &pkg_manifest_bytes,
+        )? {
+            return Ok(Some(err));
         }
 
         if dep_dir.exists() {

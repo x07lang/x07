@@ -360,6 +360,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "fmt"
             | "lint"
             | "fix"
+            | "migrate"
             | "build"
             | "check"
             | "service"

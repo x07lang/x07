@@ -9,6 +9,7 @@ use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, PROJECT_LOCKFILE_SCHEMA_VERSION_V0_2_0,
     PROJECT_MANIFEST_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED,
     PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0, PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0,
+    PROJECT_MANIFEST_SCHEMA_VERSION_V0_5_0,
 };
 
 fn workspace_path_remainder(raw: &str) -> Option<&str> {
@@ -181,6 +182,8 @@ fn normalize_vec_in_place(vec: &mut [String]) {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProjectManifest {
     pub schema_version: String,
+    #[serde(default)]
+    pub compat: Option<String>,
     pub world: String,
     pub entry: String,
     #[serde(default)]
@@ -323,6 +326,12 @@ pub fn parse_project_manifest_bytes(bytes: &[u8], path: &Path) -> Result<Project
         .with_context(|| format!("[X07PROJECT_PARSE] parse project JSON: {}", path.display()))?;
 
     normalize_string_in_place(&mut m.schema_version);
+    if let Some(compat) = m.compat.as_mut() {
+        normalize_string_in_place(compat);
+    }
+    if m.compat.as_deref().unwrap_or("").is_empty() {
+        m.compat = None;
+    }
     normalize_string_in_place(&mut m.world);
     normalize_string_in_place(&mut m.entry);
     if let Some(symbol) = m.operational_entry_symbol.as_mut() {
@@ -398,7 +407,16 @@ pub fn parse_project_manifest_bytes(bytes: &[u8], path: &Path) -> Result<Project
             PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0
         );
     }
-    if m.schema_version != PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0 {
+    if m.compat.is_some() && m.schema_version != PROJECT_MANIFEST_SCHEMA_VERSION_V0_5_0 {
+        anyhow::bail!(
+            "project.compat requires project schema_version {}",
+            PROJECT_MANIFEST_SCHEMA_VERSION_V0_5_0
+        );
+    }
+
+    let supports_entry_symbols = m.schema_version == PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0
+        || m.schema_version == PROJECT_MANIFEST_SCHEMA_VERSION_V0_5_0;
+    if !supports_entry_symbols {
         if m.operational_entry_symbol.is_some() {
             anyhow::bail!(
                 "project.operational_entry_symbol requires project schema_version {}",

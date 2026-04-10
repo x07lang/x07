@@ -2,6 +2,7 @@ pub mod ast;
 pub mod builtin_modules;
 pub mod c_emit;
 pub mod cli_specrows;
+pub mod compat;
 pub mod compile;
 pub mod contracts_elab;
 pub mod diagnostics;

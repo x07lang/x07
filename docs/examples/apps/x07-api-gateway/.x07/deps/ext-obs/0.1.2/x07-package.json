@@ -13,6 +13,7 @@
     "std.obs.tests"
   ],
   "meta": {
+    "x07c_compat": ">=0.1.111 <0.2.0",
     "determinism_tier": "mixed",
     "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"],
     "requires_packages": [
@@ -20,11 +21,10 @@
       "ext-hex-rs@0.1.4",
       "ext-json-rs@0.1.4",
       "ext-math@0.1.4",
-      "ext-net@0.1.8",
+      "ext-net@0.1.9",
       "ext-pb-rs@0.1.5",
       "ext-u64-rs@0.1.0"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

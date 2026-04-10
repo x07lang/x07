@@ -24,7 +24,7 @@ New encodings become `_v2` (and live side-by-side).
 
 Similarly, JSON schemas and on-disk formats are versioned by explicit identifiers like:
 
-- `x07.project@0.4.0` (project manifest)
+- `x07.project@0.5.0` (project manifest)
 - `x07.lock@0.3.0` (project lockfile)
 - `x07.x07ast@0.8.0` (program/module format)
 
@@ -38,7 +38,7 @@ Policy:
   surfaces.
 - If a change risks breaking downstream code, it must come with either:
   - a compatibility switch, or
-  - a mechanical migration path (`x07 fix` and, once introduced, `x07 migrate`)
+  - a mechanical migration path (`x07 fix` and `x07 migrate`)
 - Any compat-relevant behavior change must be documented in `docs/reference/compat.md` and backed by
   a regression surface in `tests/compat_corpus/`.
 
@@ -68,11 +68,11 @@ Policy:
   resolution is explicit.
 - Packages must declare the worlds they support in `meta.worlds_allowed` (and stay within those
   capability bounds).
+- Packages may declare toolchain support via `meta.x07c_compat` (a SemVer requirement string, for
+  example `\">=0.1.111 <0.2.0\"`). When present, `x07 pkg lock` treats incompatible packages as
+  ineligible and fails with a deterministic error.
 - When a package’s exported contracts change (types, encodings, semantics), it must bump its own
   SemVer version and keep old versioned APIs (`*_v1`) intact.
-
-If future toolchain compatibility metadata is introduced (for example a minimum toolchain version or
-an explicit compat range), it must be documented in `docs/reference/compat.md` before use.
 
 ## Lockfile schema evolution policy
 

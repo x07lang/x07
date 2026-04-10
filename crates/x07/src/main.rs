@@ -112,6 +112,8 @@ enum Command {
     Lint(toolchain::LintArgs),
     /// Apply deterministic quickfixes to an x07AST JSON file.
     Fix(toolchain::FixArgs),
+    /// Apply mechanical migrations to update code for a newer compat mode.
+    Migrate(toolchain::MigrateArgs),
     /// Build a project to C.
     Build(toolchain::BuildArgs),
     /// Check a project (lint + typecheck + backend-check; no emit).
@@ -245,6 +247,10 @@ struct TestArgs {
 
     #[arg(long, value_enum, hide = true)]
     world: Option<WorldId>,
+
+    /// Override the language/toolchain compatibility mode.
+    #[arg(long, value_name = "COMPAT")]
+    compat: Option<String>,
 
     #[arg(long, value_name = "SUBSTR")]
     filter: Option<String>,
@@ -419,6 +425,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Fmt(_)) => vec!["fmt"],
             Some(Command::Lint(_)) => vec!["lint"],
             Some(Command::Fix(_)) => vec!["fix"],
+            Some(Command::Migrate(_)) => vec!["migrate"],
             Some(Command::Build(_)) => vec!["build"],
             Some(Command::Check(_)) => vec!["check"],
             Some(Command::Service(args)) => match &args.cmd {
@@ -533,6 +540,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Fmt(args) => toolchain::cmd_fmt(&cli.machine, args),
         Command::Lint(args) => toolchain::cmd_lint(&cli.machine, args),
         Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),
+        Command::Migrate(args) => toolchain::cmd_migrate(&cli.machine, args),
         Command::Build(args) => toolchain::cmd_build(&cli.machine, args),
         Command::Check(args) => toolchain::cmd_check(&cli.machine, args),
         Command::Service(args) => service::cmd_service(&cli.machine, args),
@@ -715,7 +723,26 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
         );
     }
 
-    let results = run_tests(&args, &module_roots, &tests)?;
+    let project_compat = {
+        let project_path = util::resolve_existing_path_upwards_from(
+            &validated.manifest_dir,
+            Path::new("x07.json"),
+        );
+        if project_path.is_file() {
+            Some(
+                project::load_project_manifest(&project_path)
+                    .context("load project manifest")?
+                    .compat,
+            )
+            .flatten()
+        } else {
+            None
+        }
+    };
+    let compat = crate::util::resolve_compat(args.compat.as_deref(), project_compat.as_deref())
+        .context("resolve compat")?;
+
+    let results = run_tests(&args, &module_roots, compat, &tests)?;
 
     let report = finalize_report(&args, &module_root_used, started.elapsed(), results);
 
@@ -1095,6 +1122,7 @@ fn attach_test_sandbox_evidence(
 fn run_tests(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     tests: &[TestDecl],
 ) -> Result<Vec<TestCaseResult>> {
     if args.jobs != 1 && !args.no_fail_fast {
@@ -1115,7 +1143,7 @@ fn run_tests(
                 eprintln!("test: {}", test.id);
             }
 
-            let result = run_one_test(args, module_roots, test)?;
+            let result = run_one_test(args, module_roots, compat, test)?;
             if !args.no_fail_fast {
                 let fail_fast = if args.no_run {
                     result.compile.as_ref().is_some_and(|c| !c.ok)
@@ -1154,7 +1182,7 @@ fn run_tests(
                 if args.verbose {
                     eprintln!("test: {}", test.id);
                 }
-                match run_one_test(args, module_roots, test) {
+                match run_one_test(args, module_roots, compat, test) {
                     Ok(r) => {
                         if let Ok(mut guard) = results.lock() {
                             guard.push(r);
@@ -1248,6 +1276,7 @@ fn policy_roots_fit_cwd(read_roots: &[PathBuf], cwd: &Path) -> bool {
 fn run_one_test(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     test: &TestDecl,
 ) -> Result<TestCaseResult> {
     let start = Instant::now();
@@ -1271,13 +1300,13 @@ fn run_one_test(
     }
 
     if test.pbt.is_some() {
-        return run_one_pbt_test(args, module_roots, test, start);
+        return run_one_pbt_test(args, module_roots, compat, test, start);
     }
 
     let driver_src = build_test_driver_x07ast_json(test)?;
 
     if !test.world.is_eval_world() {
-        return run_one_test_os(args, module_roots, test, &driver_src, start);
+        return run_one_test_os(args, module_roots, compat, test, &driver_src, start);
     }
 
     let (driver_out_dir, driver_path, exe_out_path) = if args.keep_artifacts {
@@ -1298,6 +1327,7 @@ fn run_one_test(
 
     let mut compile_options =
         x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
+    compile_options.compat = compat;
     compile_options.arch_root = infer_arch_root_from_manifest(&args.manifest)
         .or_else(|| args.manifest.parent().map(|p| p.to_path_buf()))
         .or_else(|| std::env::current_dir().ok());
@@ -1504,6 +1534,7 @@ fn run_one_test(
 fn run_one_pbt_test(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     test: &TestDecl,
     start: Instant,
 ) -> Result<TestCaseResult> {
@@ -1571,6 +1602,7 @@ fn run_one_pbt_test(
 
     let mut compile_options =
         x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
+    compile_options.compat = compat;
     compile_options.arch_root = infer_arch_root_from_manifest(&args.manifest)
         .or_else(|| args.manifest.parent().map(|p| p.to_path_buf()))
         .or_else(|| std::env::current_dir().ok());
@@ -1862,6 +1894,7 @@ fn rm_rf(path: &Path) {
 fn run_one_test_os(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     test: &TestDecl,
     driver_src: &[u8],
     start: Instant,
@@ -1982,6 +2015,7 @@ fn run_one_test_os(
 
     cmd.current_dir(cmd_cwd);
     cmd.arg("--world").arg(test.world.as_str());
+    cmd.arg("--compat").arg(compat.to_string_lossy());
     cmd.arg("--program").arg(&driver_path);
     cmd.arg("--compiled-out").arg(&exe_out_path);
     cmd.arg("--auto-ffi");

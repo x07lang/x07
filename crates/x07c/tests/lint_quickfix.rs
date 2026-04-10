@@ -117,6 +117,7 @@ fn lint_quickfix_removes_forbidden_imports() {
         &file,
         lint::LintOptions {
             world: Default::default(),
+            compat: Default::default(),
             enable_fs: false,
             enable_rr: false,
             enable_kv: false,

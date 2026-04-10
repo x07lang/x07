@@ -5,7 +5,7 @@
       "name": "ext-checksum-rs",
       "version": "0.1.2",
       "path": ".x07/deps/ext-checksum-rs/0.1.2",
-      "package_manifest_sha256": "a720e29445fefed209395aeb138ff1e8a8e0f1e986616bec645ccaee3f40da98",
+      "package_manifest_sha256": "98f6c6dde392de5abd7569e7d76c8284edca3a1900695679cab4ac4c00311a88",
       "module_root": "modules",
       "modules_sha256": {
         "ext.checksum.crc32c": "86dbd6095a6830ebf6e30c9499c6da7d1be199596f705d1a1e5d2e009a98555b",
@@ -18,7 +18,7 @@
       "name": "ext-u64-rs",
       "version": "0.1.4",
       "path": ".x07/deps/ext-u64-rs/0.1.4",
-      "package_manifest_sha256": "987f20363b550ce49870b1e4d6f574bc222c2a3689f2ed9772cb8e9b884f3d76",
+      "package_manifest_sha256": "88f9ae33407835cea6733879ba6449ba64698636c35a0ad085540d7d6468906a",
       "module_root": "modules",
       "modules_sha256": {
         "ext.u64": "c3ba79f0554026716bfa1feea479c1eaa5b31be0ad7a8d166416a6a35d8b9a43",

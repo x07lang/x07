@@ -5,7 +5,7 @@
       "name": "ext-curl-c",
       "version": "0.1.6",
       "path": ".x07/deps/ext-curl-c/0.1.6",
-      "package_manifest_sha256": "d88b6b83b79d8d25cfcf154fa6fa280ab9efa3ec2395c4842e1f859ccd8ed37f",
+      "package_manifest_sha256": "4d857d0b0a0fd702500302927ca1da9c843a5a07faa0798aa0d0e83c882aaa2f",
       "module_root": "modules",
       "modules_sha256": {
         "ext.curl._ffi": "ef7ab5e230cc7bb054cf9b777ae803fe80907a43ab8254d99d231dc9b69d529f",
@@ -17,7 +17,7 @@
       "name": "ext-fs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-fs/0.1.5",
-      "package_manifest_sha256": "b40d97a9ab3b09b10b2c18c6527c05342dc0b775a7a713773e8f7d3a6fb31ae2",
+      "package_manifest_sha256": "65665620dad8cde6e7cf8f64955a0b7ad8a397ce3b8b146ffec23f7209029c9a",
       "module_root": "modules",
       "modules_sha256": {
         "std.os.fs": "5dbbfa61f3a455c5ed7575ec8e87d3c20589f29595fa5ec2f6bdf09ae54e14d5",
@@ -29,7 +29,7 @@
       "name": "ext-html-lite-rs",
       "version": "0.1.2",
       "path": ".x07/deps/ext-html-lite-rs/0.1.2",
-      "package_manifest_sha256": "8f1ce3cf92e87175f6ed1feb014b28049c134f0d5e4cb6c38207b99e05eaefb2",
+      "package_manifest_sha256": "e566bb655ffb429102586f7cb9923fcc784e07808fa0cd9f124aee4a2f9540d9",
       "module_root": "modules",
       "modules_sha256": {
         "ext.html": "5f6fe19e89aaf7cabf93ff7b9beb36fc9769790160dfaed7241eb3f9e45634f2",
@@ -41,7 +41,7 @@
       "name": "ext-net",
       "version": "0.1.11",
       "path": ".x07/deps/ext-net/0.1.11",
-      "package_manifest_sha256": "63725ab4b0293598984a4a3b6bf262f188edfd039aef7da2c8a088d9564440f5",
+      "package_manifest_sha256": "775dbee5a0ee4a56f08b410a7524b29b96f9160a0e78110cd016ad829673063d",
       "module_root": "modules",
       "modules_sha256": {
         "std.net.codec": "46f5e134e7ce36ed9af6917d478f176268c2baf253fc772b33221342402d816e",
@@ -64,7 +64,7 @@
       "name": "ext-sockets-c",
       "version": "0.1.6",
       "path": ".x07/deps/ext-sockets-c/0.1.6",
-      "package_manifest_sha256": "53e9c4ceb4c798a0dd013ac7e2d51b33f92652a7a43b63dbd31687520226dd6a",
+      "package_manifest_sha256": "e8050b0b703b7d52cb630360c837b8fcd6251b123936644adce891fac6878edc",
       "module_root": "modules",
       "modules_sha256": {
         "ext.sockets._ffi": "42e7d864c5f446762bbfa043b080b94280a9a4376a611266219b6f4eaa02554a",
@@ -76,7 +76,7 @@
       "name": "ext-url-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-url-rs/0.1.5",
-      "package_manifest_sha256": "67ed07116b9c50eb0de03324c314199b6f10956eeb4b0fd00d81e8f66803c5fe",
+      "package_manifest_sha256": "50eacbd685c70ac85af81322ab3b56ffac3f5590694c82a0cf00352b8ab5fadd",
       "module_root": "modules",
       "modules_sha256": {
         "ext.http_types": "5a412c6fbe34ba9fd8db6acdf328d89d8a146d94d854c8e7c6cda96168877f2d",

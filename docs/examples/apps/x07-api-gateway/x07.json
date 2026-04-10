@@ -1,4 +1,5 @@
 {
+  "compat": "0.5",
   "default_profile": "os",
   "dependencies": [
     {
@@ -48,8 +49,8 @@
     },
     {
       "name": "ext-net",
-      "path": ".x07/deps/ext-net/0.1.8",
-      "version": "0.1.8"
+      "path": ".x07/deps/ext-net/0.1.9",
+      "version": "0.1.9"
     },
     {
       "name": "ext-obs",
@@ -75,6 +76,11 @@
       "name": "ext-toml-rs",
       "path": ".x07/deps/ext-toml-rs/0.1.5",
       "version": "0.1.5"
+    },
+    {
+      "name": "ext-u64-rs",
+      "path": ".x07/deps/ext-u64-rs/0.1.0",
+      "version": "0.1.0"
     },
     {
       "name": "ext-unicode-rs",
@@ -116,6 +122,6 @@
       "world": "run-os-sandboxed"
     }
   },
-  "schema_version": "x07.project@0.4.0",
+  "schema_version": "x07.project@0.5.0",
   "world": "run-os"
 }

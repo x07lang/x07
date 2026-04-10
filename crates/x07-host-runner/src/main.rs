@@ -32,6 +32,10 @@ struct Cli {
     #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
     world: WorldId,
 
+    /// Override the language/toolchain compatibility mode.
+    #[arg(long, value_name = "COMPAT")]
+    compat: Option<String>,
+
     #[arg(long, value_name = "BYTES")]
     max_c_bytes: Option<usize>,
 
@@ -123,6 +127,7 @@ fn run() -> std::process::ExitCode {
 
 fn try_main() -> Result<std::process::ExitCode> {
     let cli = Cli::parse();
+    let env_compat = std::env::var("X07_COMPAT").ok();
 
     if cli.cli_specrows {
         use clap::CommandFactory as _;
@@ -323,8 +328,10 @@ fn try_main() -> Result<std::process::ExitCode> {
             let program = std::fs::read(program_path)
                 .with_context(|| format!("read program: {}", program_path.display()))?;
 
-            let compile_options =
+            let mut compile_options =
                 x07_host_runner::compile_options_for_world(world, cli.module_root.clone())?;
+            compile_options.compat =
+                x07c::compat::resolve_compat(cli.compat.as_deref(), env_compat.as_deref(), None)?;
 
             if cli.compile_only {
                 let compile = compile_program_with_options(
@@ -516,7 +523,13 @@ fn try_main() -> Result<std::process::ExitCode> {
             })?;
 
             let module_roots = project::collect_module_roots(project_path, &manifest, &lock)?;
-            let compile_options = x07_host_runner::compile_options_for_world(world, module_roots)?;
+            let mut compile_options =
+                x07_host_runner::compile_options_for_world(world, module_roots)?;
+            compile_options.compat = x07c::compat::resolve_compat(
+                cli.compat.as_deref(),
+                env_compat.as_deref(),
+                manifest.compat.as_deref(),
+            )?;
 
             let compile = compile_program_with_options(
                 &program,

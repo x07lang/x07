@@ -35,6 +35,7 @@ fn os_module_root() -> PathBuf {
 fn compile_options(world: WorldId) -> x07c::compile::CompileOptions {
     x07c::compile::CompileOptions {
         world,
+        compat: Default::default(),
         enable_fs: false,
         enable_rr: false,
         enable_kv: false,

@@ -5,7 +5,7 @@
       "name": "ext-unicode-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-unicode-rs/0.1.5",
-      "package_manifest_sha256": "a25f1c73b8f456c2a8719e105ca95d40c50c1489cd88169d51301b845b6411c0",
+      "package_manifest_sha256": "ba7ff60fb2d2bc8406ebb88eaf56b70dda5cdbd2b649beca7bdba344ec260b60",
       "module_root": "modules",
       "modules_sha256": {
         "ext.unicode": "df35037b24fff1346db444d0281f002cc49f992799647d89d1ca80516714bbdb",

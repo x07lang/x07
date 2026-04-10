@@ -1,15 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-project.schema.json",
-  "title": "x07.project@0.4.0",
+  "title": "x07.project@0.5.0",
   "description": "Project manifest (x07.json). Core fields are consumed by the compiler (x07c). Run profiles are consumed by x07 run.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "world", "entry", "module_roots"],
   "properties": {
     "schema_version": {
-      "const": "x07.project@0.4.0",
+      "const": "x07.project@0.5.0",
       "description": "Pinned schema identifier."
+    },
+    "compat": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "description": "Compatibility mode for language/toolchain semantics (example: \"0.3\" or \"strict\")."
     },
     "world": {
       "$ref": "#/$defs/world_id",

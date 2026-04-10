@@ -34,11 +34,11 @@ This enables a binding override pattern: `std.fs` stays source-stable while the 
 
 CLI example (standalone, without a project manifest):
 
-- `cargo run -p x07c -- compile --program <program.x07.json> --world run-os --module-root stdlib/os/0.2.0/modules --module-root src`
+- `x07-host-runner --compile-only --program <program.x07.json> --world run-os --module-root stdlib/os/0.2.0/modules --module-root src --compiled-out target/out`
 
 ## Project workflow (manifest + lockfile)
 
-Project manifest (`x07.project@0.3.0`) is JSON (tooling also accepts `x07.project@0.2.0`, but `patch` requires `@0.3.0`):
+Project manifest (`x07.project@0.5.0`) is JSON (tooling also accepts `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` for legacy; `project.patch` requires `x07.project@0.3.0` or newer):
 
 - `world`: one of `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
 - `entry`: entry program file (compiled as module `main`)
@@ -63,7 +63,8 @@ Example:
 
 ```jsonc
 {
-  "schema_version": "x07.project@0.3.0",
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
   "patch": {
     "c": { "version": "1.0.1" }
   }
@@ -73,8 +74,8 @@ Example:
 Commands:
 
 - Generate/update lockfile: `x07 pkg lock --project <path/to/x07.json>`
-- Build deterministic C output: `cargo run -p x07c -- build --project <path/to/x07.json> --out target/out.c`
-- Compile+run native: `cargo run -p x07-host-runner -- --project <path/to/x07.json> --world solve-pure --input <case.bin>`
+- Build deterministic C output: `x07 build --project <path/to/x07.json> --out target/out.c`
+- Compile+run native: `x07 run --project <path/to/x07.json> --input <case.bin>`
 
 Note: `link.*` is only used by `x07-os-runner` when building standalone (run-os*) executables; deterministic runners ignore it.
 

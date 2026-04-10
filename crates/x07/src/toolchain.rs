@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
+use serde::Serialize;
 use walkdir::WalkDir;
 use x07_runner_common::os_paths;
 use x07_worlds::WorldId;
@@ -136,10 +137,39 @@ pub struct FixArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct MigrateArgs {
+    /// Input file or directory.
+    ///
+    /// If omitted, defaults to the current directory.
+    #[arg(long, value_name = "PATH")]
+    pub input: Vec<PathBuf>,
+
+    /// Target language/toolchain compatibility version (example: `0.5`).
+    #[arg(long, value_name = "COMPAT_VERSION")]
+    pub to: String,
+
+    /// Check whether migrations are required (default when neither flag is set).
+    #[arg(long)]
+    pub check: bool,
+
+    /// Apply migrations in-place.
+    #[arg(long)]
+    pub write: bool,
+
+    /// Maximum migration iterations.
+    #[arg(long, value_name = "N", default_value_t = 3)]
+    pub max_iters: u32,
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct BuildArgs {
     /// Project manifest path (`x07.json`).
     #[arg(long, value_name = "PATH")]
     pub project: PathBuf,
+
+    /// Override the language/toolchain compatibility mode.
+    #[arg(long, value_name = "COMPAT")]
+    pub compat: Option<String>,
 
     /// Emit the runtime C header (requires `emit_main=false`; use `--freestanding` for embedding).
     #[arg(long, value_name = "PATH")]
@@ -178,6 +208,10 @@ pub struct CheckArgs {
     /// Project manifest path (`x07.json`).
     #[arg(long, value_name = "PATH")]
     pub project: PathBuf,
+
+    /// Override the language/toolchain compatibility mode.
+    #[arg(long, value_name = "COMPAT")]
+    pub compat: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -553,6 +587,134 @@ pub fn cmd_fix(
     })
 }
 
+#[derive(Debug, Serialize)]
+struct MigrateFileReport {
+    path: String,
+    changed: bool,
+    applied_ops_count: usize,
+    iterations: u32,
+    report: diagnostics::Report,
+}
+
+#[derive(Debug, Serialize)]
+struct MigrateReport {
+    ok: bool,
+    command: &'static str,
+    to: String,
+    write: bool,
+    files: Vec<MigrateFileReport>,
+}
+
+pub fn cmd_migrate(
+    machine: &crate::reporting::MachineArgs,
+    mut args: MigrateArgs,
+) -> Result<std::process::ExitCode> {
+    if args.check && args.write {
+        anyhow::bail!("--check cannot be combined with --write");
+    }
+    if !args.check && !args.write {
+        args.check = true;
+    }
+
+    let to = x07c::compat::CompatVersion::parse(&args.to).context("parse --to")?;
+    if to != x07c::compat::Compat::CURRENT_VERSION {
+        anyhow::bail!(
+            "unsupported migration target {:?} (supported: {:?})",
+            to.as_str(),
+            x07c::compat::Compat::CURRENT_VERSION.as_str()
+        );
+    }
+    let compat = x07c::compat::Compat {
+        version: to,
+        strict: true,
+    };
+
+    let mut raw_inputs = args.input;
+    if raw_inputs.is_empty() {
+        raw_inputs.push(PathBuf::from("."));
+    }
+    let inputs = collect_x07ast_inputs(&raw_inputs).context("collect inputs")?;
+
+    let mut files: Vec<MigrateFileReport> = Vec::with_capacity(inputs.len());
+    let mut ok = true;
+
+    for input in &inputs {
+        let bytes =
+            std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
+        let mut doc: serde_json::Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse JSON: {}", input.display()))?;
+
+        let report = if args.write {
+            let r = crate::repair::migrate_x07ast_file_doc(
+                &mut doc,
+                WorldId::RunOs,
+                args.max_iters,
+                RepairMode::Write,
+                compat,
+            )
+            .with_context(|| format!("migrate: {}", input.display()))?;
+            let changed = bytes != r.formatted.as_bytes();
+            if changed {
+                std::fs::write(input, r.formatted.as_bytes())
+                    .with_context(|| format!("write: {}", input.display()))?;
+            }
+            if !r.final_report.ok {
+                ok = false;
+            }
+            files.push(MigrateFileReport {
+                path: input.display().to_string(),
+                changed,
+                applied_ops_count: r.summary.applied_ops_count,
+                iterations: r.summary.iterations,
+                report: r.final_report,
+            });
+            continue;
+        } else {
+            let doc_bytes = serde_json::to_vec(&doc)?;
+            let mut file = x07ast::parse_x07ast_json(&doc_bytes)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .with_context(|| format!("parse x07AST: {}", input.display()))?;
+            x07ast::canonicalize_x07ast_file(&mut file);
+            let mut lint_options = x07c::world_config::lint_options_for_world(WorldId::RunOs);
+            lint_options.compat = compat;
+            let report = lint::lint_file_migration(&file, lint_options);
+            if !report.ok {
+                ok = false;
+            }
+            report
+        };
+
+        files.push(MigrateFileReport {
+            path: input.display().to_string(),
+            changed: false,
+            applied_ops_count: 0,
+            iterations: 1,
+            report,
+        });
+    }
+
+    let report = MigrateReport {
+        ok,
+        command: "migrate",
+        to: to.as_str(),
+        write: args.write,
+        files,
+    };
+
+    let out = serde_json::to_string(&report)? + "\n";
+    if let Some(path) = machine.out.as_deref() {
+        crate::reporting::write_bytes(path, out.as_bytes())?;
+    } else {
+        print!("{out}");
+    }
+
+    Ok(if ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
+}
+
 pub fn cmd_build(
     machine: &crate::reporting::MachineArgs,
     args: BuildArgs,
@@ -564,12 +726,14 @@ pub fn cmd_build(
     let ctx = load_project_ctx(&args.project, true).context("load project")?;
     let ProjectCtx {
         base,
-        manifest: _manifest,
+        manifest,
         program_path,
         module_roots,
         world,
         ..
     } = ctx;
+    let compat = crate::util::resolve_compat(args.compat.as_deref(), manifest.compat.as_deref())
+        .context("resolve compat")?;
 
     let repair_result = crate::repair::maybe_repair_x07ast_file(&program_path, world, &args.repair)
         .with_context(|| format!("repair entry: {}", program_path.display()))?;
@@ -581,6 +745,7 @@ pub fn cmd_build(
     };
 
     let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
+    options.compat = compat;
     options.arch_root = Some(base);
     if args.freestanding {
         options.emit_main = false;
@@ -764,13 +929,15 @@ pub fn cmd_check(
 
     let ProjectCtx {
         base,
-        manifest: _manifest,
+        manifest,
         lock: _lock,
         lock_path,
         program_path,
         module_roots,
         world,
     } = ctx;
+    let compat = crate::util::resolve_compat(args.compat.as_deref(), manifest.compat.as_deref())
+        .context("resolve compat")?;
 
     let program_bytes = match std::fs::read(&program_path) {
         Ok(bytes) => bytes,
@@ -891,7 +1058,8 @@ pub fn cmd_check(
         }
     }
 
-    let lint_opts = x07c::world_config::lint_options_for_world(world);
+    let mut lint_opts = x07c::world_config::lint_options_for_world(world);
+    lint_opts.compat = compat;
 
     let mut all_diags: Vec<diagnostics::Diagnostic> = Vec::new();
     let mut has_error = false;
@@ -929,7 +1097,14 @@ pub fn cmd_check(
     sigs.add_builtins();
 
     for (path, file) in &file_set {
-        let report = typecheck::typecheck_file_with_sigs(file, &sigs, &Default::default());
+        let report = typecheck::typecheck_file_with_sigs(
+            file,
+            &sigs,
+            &typecheck::TypecheckOptions {
+                compat,
+                ..Default::default()
+            },
+        );
         for mut d in report.diagnostics {
             if d.severity == diagnostics::Severity::Error {
                 has_error = true;
@@ -944,6 +1119,7 @@ pub fn cmd_check(
 
     if !has_error {
         let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
+        options.compat = compat;
         options.arch_root = Some(base);
         if let Err(err) = compile::check_program(&program_bytes, &options) {
             let (fn_name, ptr) = parse_fn_and_ptr_suffix(&err.message);

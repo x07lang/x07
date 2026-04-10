@@ -60,7 +60,7 @@ Use this skill when:
 - The lockfile path is controlled by `x07.json` (`lockfile`) and defaults to `x07.lock.json`.
 - When fetching is required, `x07 pkg lock` defaults to the official registry index; override with `--index <url>`.
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `--refresh` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
-- Canonical project manifests use `x07.project@0.3.0`. `x07.project@0.2.0` is accepted for legacy manifests, but `project.patch` requires `@0.3.0`.
+- Canonical project manifests use `x07.project@0.5.0`. `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, but `project.patch` requires `x07.project@0.3.0` or newer.
 - In `--check` mode, when the index can be consulted, lock validation also fails on yanked dependencies and active advisories unless explicitly allowed.
 - Use `project.patch` in `x07.json` to override transitive dependency versions (for example, moving off yanked/advised versions).
 - Patch paths under `.x07/deps/...` are treated as vendored deps (fetchable) during `x07 pkg lock` hydration; patch paths elsewhere are local-only and must exist on disk.

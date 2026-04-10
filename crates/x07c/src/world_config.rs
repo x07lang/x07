@@ -79,6 +79,7 @@ pub fn compile_options_for_world(
     let features = features_for_world(world);
     compile::CompileOptions {
         world,
+        compat: crate::compat::Compat::default(),
         enable_fs: features.enable_fs,
         enable_rr: features.enable_rr,
         enable_kv: features.enable_kv,
@@ -99,6 +100,7 @@ pub fn lint_options_for_world(world: WorldId) -> lint::LintOptions {
     let features = features_for_world(world);
     lint::LintOptions {
         world,
+        compat: crate::compat::Compat::default(),
         enable_fs: features.enable_fs,
         enable_rr: features.enable_rr,
         enable_kv: features.enable_kv,

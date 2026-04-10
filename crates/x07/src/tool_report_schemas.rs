@@ -134,6 +134,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("lint") => Some(include_bytes!(
             "../../../spec/x07-tool-lint.report.schema.json"
         )),
+        Some("migrate") => Some(include_bytes!(
+            "../../../spec/x07-tool-migrate.report.schema.json"
+        )),
         Some("mcp") => Some(include_bytes!(
             "../../../spec/x07-tool-mcp.report.schema.json"
         )),

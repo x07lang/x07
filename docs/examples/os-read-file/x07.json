@@ -1,5 +1,6 @@
 {
-  "schema_version": "x07.project@0.4.0",
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
   "world": "run-os",
   "entry": "read_file_by_stdin.x07.json",
   "module_roots": [

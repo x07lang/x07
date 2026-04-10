@@ -22,6 +22,7 @@ ALLOWED_PROJECT_SCHEMA_VERSIONS = {
     "x07.project@0.2.0",
     "x07.project@0.3.0",
     "x07.project@0.4.0",
+    "x07.project@0.5.0",
 }
 
 
@@ -184,9 +185,9 @@ def validate_project(doc: Any, rel: str) -> list[str]:
 
     operational_entry_symbol = doc.get("operational_entry_symbol")
     if operational_entry_symbol is not None:
-        if schema_version != "x07.project@0.4.0":
+        if schema_version not in {"x07.project@0.4.0", "x07.project@0.5.0"}:
             errs.append(
-                f"{rel}: operational_entry_symbol requires schema_version x07.project@0.4.0"
+                f"{rel}: operational_entry_symbol requires schema_version x07.project@0.4.0 or newer"
             )
         elif not isinstance(operational_entry_symbol, str) or not SYMBOL_RE.match(
             operational_entry_symbol
@@ -195,9 +196,9 @@ def validate_project(doc: Any, rel: str) -> list[str]:
 
     certification_entry_symbol = doc.get("certification_entry_symbol")
     if certification_entry_symbol is not None:
-        if schema_version != "x07.project@0.4.0":
+        if schema_version not in {"x07.project@0.4.0", "x07.project@0.5.0"}:
             errs.append(
-                f"{rel}: certification_entry_symbol requires schema_version x07.project@0.4.0"
+                f"{rel}: certification_entry_symbol requires schema_version x07.project@0.4.0 or newer"
             )
         elif certification_entry_symbol is not None and (
             not isinstance(certification_entry_symbol, str)

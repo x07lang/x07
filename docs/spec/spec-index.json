@@ -778,8 +778,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-project.schema.json",
       "schema_id": "https://x07.io/spec/x07-project.schema.json",
-      "schema_version": "x07.project@0.4.0",
-      "title": "x07.project@0.4.0"
+      "schema_version": "x07.project@0.5.0",
+      "title": "x07.project@0.5.0"
     },
     {
       "kind": "schema",
@@ -801,6 +801,13 @@
       "schema_id": "https://x07.io/spec/x07-project.v0.4.0.schema.json",
       "schema_version": "x07.project@0.4.0",
       "title": "x07.project@0.4.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-project.v0.5.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-project.v0.5.0.schema.json",
+      "schema_version": "x07.project@0.5.0",
+      "title": "x07.project@0.5.0"
     },
     {
       "kind": "schema",
@@ -1144,6 +1151,13 @@
       "schema_id": "https://x07.io/spec/x07-tool-mcp.report.schema.json",
       "schema_version": "x07.tool.mcp.report@0.1.0",
       "title": "x07.tool.mcp.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-migrate.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-migrate.report.schema.json",
+      "schema_version": "x07.tool.migrate.report@0.1.0",
+      "title": "x07.tool.migrate.report@0.1.0"
     },
     {
       "kind": "schema",
