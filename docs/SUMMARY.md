@@ -133,6 +133,7 @@
   - [Rand v1](os/rand-v1.md)
 
 - [FAQ](faq.md)
+- [Compatibility contract](reference/compat.md)
 - [Versioning policy](versioning-policy.md)
 - [References](references.md)
 

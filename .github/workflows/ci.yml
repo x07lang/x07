@@ -186,6 +186,39 @@ jobs:
         shell: bash
         run: ./scripts/ci/check_x07test_smoke.sh
 
+  compat-corpus:
+    name: ci / compat-corpus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            curl \
+            pkg-config \
+            openssl \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            unzip
+      - name: Compat corpus
+        shell: bash
+        run: ./scripts/ci/check_compat_corpus.sh
+
   verified-core-pure:
     name: ci / verified-core-pure
     runs-on: ubuntu-latest

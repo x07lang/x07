@@ -2171,6 +2171,15 @@ fn validate_catalog_semantics(catalog: &CatalogDoc) -> Vec<String> {
         if entry.doc.summary.trim().is_empty() {
             errors.push(format!("{}: doc.summary must be non-empty", entry.code));
         }
+        if entry.doc.details_md.trim().is_empty() {
+            errors.push(format!("{}: doc.details_md must be non-empty", entry.code));
+        }
+        if entry.doc.agent_strategy_md.trim().is_empty() {
+            errors.push(format!(
+                "{}: doc.agent_strategy_md must be non-empty",
+                entry.code
+            ));
+        }
         if entry.quickfix.support == QuickfixSupport::Never
             && entry
                 .quickfix

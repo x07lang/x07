@@ -1,33 +1,87 @@
-# Versioning policy (short)
+# Versioning policy
 
-X07 versioning has two layers:
+X07 versioning is layered so agents can rely on stable machine-readable contracts while the
+toolchain and ecosystem continue to evolve.
 
-1) **Package version** (e.g., `0.1.1`)
-2) **Wire/spec version** (e.g., `_v1` suffixes, `MAGIC+VERSION` headers)
+The key idea: **contracts do not change in-place**. New behavior comes with new versions and a
+documented migration story.
 
-## Why `_v1` exists everywhere
+See also:
 
-Agents need stability.
+- `docs/reference/compat.md` (compatibility contract)
+- `docs/packages/index.md` (projects, lockfiles, and dependency resolution)
+- `docs/stability.md` (stability principles)
+
+## Stable contracts: `_v1` and schema ids
 
 A function name like `parse_v1` means:
 
-- its bytes encoding is pinned,
-- its error code space is pinned,
-- its semantics are pinned.
+- its bytes encoding is pinned
+- its error code space is pinned
+- its semantics are pinned
 
 New encodings become `_v2` (and live side-by-side).
 
-## How this relates to package versions
+Similarly, JSON schemas and on-disk formats are versioned by explicit identifiers like:
 
-Package versions can change for:
+- `x07.project@0.4.0` (project manifest)
+- `x07.lock@0.3.0` (project lockfile)
+- `x07.x07ast@0.8.0` (program/module format)
+
+## Toolchain SemVer policy
+
+The toolchain (`x07`, `x07c`) is released with SemVer tags (`vX.Y.Z`).
+
+Policy:
+
+- Toolchain releases should be **compatible by default** with official packages and documented public
+  surfaces.
+- If a change risks breaking downstream code, it must come with either:
+  - a compatibility switch, or
+  - a mechanical migration path (`x07 fix` and, once introduced, `x07 migrate`)
+- Any compat-relevant behavior change must be documented in `docs/reference/compat.md` and backed by
+  a regression surface in `tests/compat_corpus/`.
+
+## Package SemVer policy
+
+Packages are versioned independently (SemVer) and pinned by lockfiles.
+
+Package versions may change for:
 
 - bug fixes
 - performance improvements
 - new helpers
 
-…but `_v1` contracts must remain compatible.
-
-Breaking changes require:
+But versioned contracts (`*_v1`, spec schemas, and other explicitly versioned envelopes) must remain
+compatible. Breaking changes require:
 
 - `_v2` APIs, or
-- a new major package version once you reach 1.0.
+- a new major version when packages reach 1.0.
+
+## Package manifest compatibility metadata
+
+Publishable packages use `x07-package.json` (`x07.package@0.1.0`) plus `meta` fields.
+
+Policy:
+
+- Packages must declare transitive hard requirements through `meta.requires_packages` so dependency
+  resolution is explicit.
+- Packages must declare the worlds they support in `meta.worlds_allowed` (and stay within those
+  capability bounds).
+- When a package’s exported contracts change (types, encodings, semantics), it must bump its own
+  SemVer version and keep old versioned APIs (`*_v1`) intact.
+
+If future toolchain compatibility metadata is introduced (for example a minimum toolchain version or
+an explicit compat range), it must be documented in `docs/reference/compat.md` before use.
+
+## Lockfile schema evolution policy
+
+Projects pin dependency graphs with `x07.lock.json` (`x07.lock@…`).
+
+Policy:
+
+- Lockfiles are canonical JSON and must be deterministic.
+- Tooling should continue to **read** older lockfile schema versions. If a lockfile cannot be read,
+  the toolchain must fail with a deterministic error and a migration path.
+- CI should use `x07 pkg lock --check` to fail on lock drift instead of mutating workspaces.
+- Schema bumps should be additive when possible and gated by the compat corpus.

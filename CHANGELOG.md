@@ -1,0 +1,19 @@
+# Changelog
+
+All notable user-facing changes to the X07 toolchain are documented in this file.
+
+## Unreleased
+
+### Added
+
+- Compat corpus CI gate (`scripts/ci/check_compat_corpus.sh`, `tests/compat_corpus/`) to prevent ecosystem regressions.
+- Compatibility contract documentation (`docs/reference/compat.md`).
+
+### Changed
+
+- Expanded `docs/versioning-policy.md` to clarify toolchain/package/lockfile versioning and compat guardrails.
+
+### Breaking changes
+
+- None.
+
