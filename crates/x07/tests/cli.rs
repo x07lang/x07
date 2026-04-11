@@ -13705,3 +13705,59 @@ fn x07_init_mcp_template_errors_when_x07_mcp_missing() {
     assert_eq!(report["ok"], Value::from(false));
     assert_eq!(report["error"]["code"], Value::from("X07INIT_MCP_MISSING"));
 }
+
+#[test]
+fn x07_explain_works_from_installed_toolchain_layout() {
+    let toolchain_root = fresh_os_tmp_dir("x07_toolchain_root");
+    let project_root = fresh_os_tmp_dir("x07_project_root");
+
+    std::fs::create_dir_all(toolchain_root.join("bin")).expect("create toolchain bin dir");
+    std::fs::create_dir_all(toolchain_root.join("catalog")).expect("create toolchain catalog dir");
+    std::fs::create_dir_all(&project_root).expect("create project root dir");
+
+    let src_exe = PathBuf::from(env!("CARGO_BIN_EXE_x07"));
+    let exe_name = src_exe.file_name().expect("exe filename");
+    let dst_exe = toolchain_root.join("bin").join(exe_name);
+    std::fs::copy(&src_exe, &dst_exe).expect("copy x07 binary");
+    #[cfg(unix)]
+    {
+        let mut perms = std::fs::metadata(&dst_exe)
+            .expect("stat x07 binary")
+            .permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&dst_exe, perms).expect("chmod x07 binary");
+    }
+
+    let root = repo_root();
+    std::fs::copy(root.join("stdlib.lock"), toolchain_root.join("stdlib.lock"))
+        .expect("copy stdlib.lock");
+    std::fs::copy(
+        root.join("catalog").join("diagnostics.json"),
+        toolchain_root.join("catalog").join("diagnostics.json"),
+    )
+    .expect("copy diagnostics catalog");
+
+    let out = Command::new(&dst_exe)
+        .current_dir(&project_root)
+        .args(["explain", "X07-TOOL-EXEC-0001"])
+        .output()
+        .expect("run x07 explain");
+
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("code: X07-TOOL-EXEC-0001"),
+        "unexpected stdout:\n{stdout}"
+    );
+}

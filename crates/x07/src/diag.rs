@@ -414,7 +414,7 @@ fn cmd_diag_catalog(
     machine: &crate::reporting::MachineArgs,
     args: DiagCatalogArgs,
 ) -> Result<std::process::ExitCode> {
-    let catalog_path = resolve_existing_path_like(&args.catalog);
+    let catalog_path = resolve_catalog_path(&args.catalog);
     let mut catalog = load_catalog(&catalog_path)?;
     normalize_catalog(&mut catalog);
 
@@ -543,7 +543,7 @@ fn cmd_diag_init_catalog(
 }
 
 fn cmd_diag_explain(args: DiagExplainArgs) -> Result<std::process::ExitCode> {
-    let catalog_path = resolve_existing_path_like(&args.catalog);
+    let catalog_path = resolve_catalog_path(&args.catalog);
     let mut catalog = load_catalog(&catalog_path)?;
     normalize_catalog(&mut catalog);
     let code = args.code.trim();
@@ -626,7 +626,7 @@ fn cmd_diag_check(args: DiagCheckArgs) -> Result<std::process::ExitCode> {
         println!("wrote: {}", args.extracted_out.display());
     }
 
-    let catalog_path = resolve_existing_path_like(&args.catalog);
+    let catalog_path = resolve_catalog_path(&args.catalog);
     if !catalog_path.exists() {
         eprintln!(
             "error: catalog does not exist: {} (run `x07 diag init-catalog --from {}`)",
@@ -683,7 +683,7 @@ fn cmd_diag_coverage(
         }
     }
 
-    let catalog_path = resolve_existing_path_like(&args.catalog);
+    let catalog_path = resolve_catalog_path(&args.catalog);
     let mut catalog = load_catalog(&catalog_path)?;
     normalize_catalog(&mut catalog);
 
@@ -948,6 +948,25 @@ fn resolve_existing_path_like(path: &Path) -> PathBuf {
     } else {
         path.to_path_buf()
     }
+}
+
+fn resolve_catalog_path(path: &Path) -> PathBuf {
+    let resolved = resolve_existing_path_like(path);
+    if resolved.exists() {
+        return resolved;
+    }
+
+    if path == Path::new(DEFAULT_CATALOG_PATH) {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        if let Some(toolchain_root) = util::detect_toolchain_root_best_effort(&cwd) {
+            let cand = toolchain_root.join(DEFAULT_CATALOG_PATH);
+            if cand.is_file() {
+                return cand;
+            }
+        }
+    }
+
+    path.to_path_buf()
 }
 
 fn resolve_source_roots(raw_roots: &[PathBuf]) -> Vec<PathBuf> {
