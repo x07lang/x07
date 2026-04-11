@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.1.111",
-    "x07c_version": "0.1.111",
+    "x07_version": "0.2.0",
+    "x07c_version": "0.2.0",
     "lang_id": "x07-core@0.2.0",
     "compat": "current"
   },
@@ -14,7 +14,7 @@
       "name": "ext-curl-c",
       "version": "0.1.3",
       "path": ".x07/deps/ext-curl-c/0.1.3",
-      "package_manifest_sha256": "130566391a8eb4c895debc1d041a16424b3b64d1108492398ff2b7c3e427180e",
+      "package_manifest_sha256": "6f6ca0de3641cff705db7bc80be3aa6ffbf6962d313ed11dfaedd6391939a1f8",
       "module_root": "modules",
       "modules_sha256": {
         "ext.curl._ffi": "ef7ab5e230cc7bb054cf9b777ae803fe80907a43ab8254d99d231dc9b69d529f",
@@ -26,7 +26,7 @@
       "name": "ext-net",
       "version": "0.1.2",
       "path": ".x07/deps/ext-net/0.1.2",
-      "package_manifest_sha256": "39f5b379872a28202a7e7b7621246ba115488bd046e4f3b9ad5106a030ba4104",
+      "package_manifest_sha256": "406b51d34c665ee53f4ff68974b63c540e58660b16eaa020f9b7cd50202352b8",
       "module_root": "modules",
       "modules_sha256": {
         "std.net.codec": "078820cf2c3947f983e9b19d750f5715e05357967fed06ea658fc16b9292b39f",

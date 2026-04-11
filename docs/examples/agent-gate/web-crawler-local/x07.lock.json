@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.1.111",
-    "x07c_version": "0.1.111",
+    "x07_version": "0.2.0",
+    "x07c_version": "0.2.0",
     "lang_id": "x07-core@0.2.0",
     "compat": "0.5"
   },
@@ -14,7 +14,7 @@
       "name": "ext-curl-c",
       "version": "0.1.6",
       "path": ".x07/deps/ext-curl-c/0.1.6",
-      "package_manifest_sha256": "4d857d0b0a0fd702500302927ca1da9c843a5a07faa0798aa0d0e83c882aaa2f",
+      "package_manifest_sha256": "b5282349062af09d448180962489bb0984afd611aa6c9ce7ee8068eb6e3b81af",
       "module_root": "modules",
       "modules_sha256": {
         "ext.curl._ffi": "ef7ab5e230cc7bb054cf9b777ae803fe80907a43ab8254d99d231dc9b69d529f",
@@ -26,7 +26,7 @@
       "name": "ext-fs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-fs/0.1.5",
-      "package_manifest_sha256": "65665620dad8cde6e7cf8f64955a0b7ad8a397ce3b8b146ffec23f7209029c9a",
+      "package_manifest_sha256": "90d5092a428ea3a05814ba9f991a9a29dd298711679235a8385453a16e37be1c",
       "module_root": "modules",
       "modules_sha256": {
         "std.os.fs": "5dbbfa61f3a455c5ed7575ec8e87d3c20589f29595fa5ec2f6bdf09ae54e14d5",
@@ -38,7 +38,7 @@
       "name": "ext-html-lite-rs",
       "version": "0.1.2",
       "path": ".x07/deps/ext-html-lite-rs/0.1.2",
-      "package_manifest_sha256": "e566bb655ffb429102586f7cb9923fcc784e07808fa0cd9f124aee4a2f9540d9",
+      "package_manifest_sha256": "7dcf586ee7c45b87efebd08699b139d8e05295f6dca34ee104307db36f525f68",
       "module_root": "modules",
       "modules_sha256": {
         "ext.html": "5f6fe19e89aaf7cabf93ff7b9beb36fc9769790160dfaed7241eb3f9e45634f2",
@@ -50,7 +50,7 @@
       "name": "ext-net",
       "version": "0.1.11",
       "path": ".x07/deps/ext-net/0.1.11",
-      "package_manifest_sha256": "775dbee5a0ee4a56f08b410a7524b29b96f9160a0e78110cd016ad829673063d",
+      "package_manifest_sha256": "9b847dae68b6cc9c43c5188d63319a123296a9138391bafc5d65d36e1461cf92",
       "module_root": "modules",
       "modules_sha256": {
         "std.net.codec": "46f5e134e7ce36ed9af6917d478f176268c2baf253fc772b33221342402d816e",
@@ -73,7 +73,7 @@
       "name": "ext-sockets-c",
       "version": "0.1.6",
       "path": ".x07/deps/ext-sockets-c/0.1.6",
-      "package_manifest_sha256": "e8050b0b703b7d52cb630360c837b8fcd6251b123936644adce891fac6878edc",
+      "package_manifest_sha256": "120d389810b7ffe2db76fc73827b51827c2e3aa16627ca43929d1813540c4f04",
       "module_root": "modules",
       "modules_sha256": {
         "ext.sockets._ffi": "42e7d864c5f446762bbfa043b080b94280a9a4376a611266219b6f4eaa02554a",
@@ -85,7 +85,7 @@
       "name": "ext-url-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-url-rs/0.1.5",
-      "package_manifest_sha256": "50eacbd685c70ac85af81322ab3b56ffac3f5590694c82a0cf00352b8ab5fadd",
+      "package_manifest_sha256": "4d023e01903b41de48334a2452e54f86eb4f3d32cac58c43e8d1ea75af0f9add",
       "module_root": "modules",
       "modules_sha256": {
         "ext.http_types": "5a412c6fbe34ba9fd8db6acdf328d89d8a146d94d854c8e7c6cda96168877f2d",

@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.1.111",
-    "x07c_version": "0.1.111",
+    "x07_version": "0.2.0",
+    "x07c_version": "0.2.0",
     "lang_id": "x07-core@0.2.0",
     "compat": "0.5"
   },
@@ -14,7 +14,7 @@
       "name": "ext-compress-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-compress-rs/0.1.5",
-      "package_manifest_sha256": "abdd3c15e44689167f4860784706f35f562286770184c0006548d3707b6b705b",
+      "package_manifest_sha256": "358daa5732673d4a6068e405f6726fa55848987f0756ace9a507d9b2f8948334",
       "module_root": "modules",
       "modules_sha256": {
         "ext.compress": "950cfa2ca211a5070b15b9e65240c5e666a28c1c9efefd17d01ff077d084b88e",
@@ -30,7 +30,7 @@
       "name": "ext-error",
       "version": "0.1.4",
       "path": ".x07/deps/ext-error/0.1.4",
-      "package_manifest_sha256": "25469f44cf255cf5ef29c45588882814553d5606dcef3e06c9761e213ea16ded",
+      "package_manifest_sha256": "c6b770b279357cb808057fddd8704516b74cef37f2c48fa84f06de063e1e6718",
       "module_root": "modules",
       "modules_sha256": {
         "ext.error.chain": "082d051b9eab7ffba7ab42f20ef6afdbe68389b9060d2fe876575d8fb9f1b76a",

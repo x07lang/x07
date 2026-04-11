@@ -193,6 +193,13 @@ def latest_versioned_file(dir_path: Path, *, pattern: re.Pattern[str]) -> Path:
     return max(candidates, key=lambda item: item[0])[1]
 
 
+def compat_upper_bound(version: str) -> str:
+    major, minor, _patch = parse_version(version)
+    if major == 0:
+        return f"0.{minor + 1}.0"
+    return f"{major + 1}.0.0"
+
+
 def ensure_release_compat(repo_root: Path, *, new_version: str, check: bool) -> str | None:
     compat_dir = repo_root / "releases" / "compat"
     target = compat_dir / f"{new_version}.json"
@@ -201,7 +208,7 @@ def ensure_release_compat(repo_root: Path, *, new_version: str, check: bool) -> 
     if not isinstance(doc, dict):
         raise ValueError(f"expected JSON object in {source.relative_to(repo_root)}")
     expected = dict(doc)
-    expected["x07_core"] = f">={new_version},<0.2.0"
+    expected["x07_core"] = f">={new_version},<{compat_upper_bound(new_version)}"
     rel = str(target.relative_to(repo_root))
     if target.is_file() and read_json(target) == expected:
         return None

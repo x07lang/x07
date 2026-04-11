@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.1.111",
-    "x07c_version": "0.1.111",
+    "x07_version": "0.2.0",
+    "x07c_version": "0.2.0",
     "lang_id": "x07-core@0.2.0",
     "compat": "current"
   },
@@ -14,7 +14,7 @@
       "name": "ext-unicode-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-unicode-rs/0.1.5",
-      "package_manifest_sha256": "ba7ff60fb2d2bc8406ebb88eaf56b70dda5cdbd2b649beca7bdba344ec260b60",
+      "package_manifest_sha256": "8e316f53852c55576d9f65333538b1d90a1b5da380e9812ee97f046943c88779",
       "module_root": "modules",
       "modules_sha256": {
         "ext.unicode": "df35037b24fff1346db444d0281f002cc49f992799647d89d1ca80516714bbdb",

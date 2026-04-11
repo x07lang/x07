@@ -11,7 +11,7 @@
     "std.db.sqlite.pool"
   ],
   "meta": {
-    "x07c_compat": ">=0.1.111 <0.2.0",
+    "x07c_compat": ">=0.1.111 <0.3.0",
     "determinism_tier": "os-world-only",
     "requires_packages": [
       "ext-db-core@0.1.11"

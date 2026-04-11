@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.1.111",
-    "x07c_version": "0.1.111",
+    "x07_version": "0.2.0",
+    "x07c_version": "0.2.0",
     "lang_id": "x07-core@0.2.0",
     "compat": "0.5"
   },
@@ -14,7 +14,7 @@
       "name": "ext-checksum-rs",
       "version": "0.1.2",
       "path": ".x07/deps/ext-checksum-rs/0.1.2",
-      "package_manifest_sha256": "98f6c6dde392de5abd7569e7d76c8284edca3a1900695679cab4ac4c00311a88",
+      "package_manifest_sha256": "ede8c45dcf65f3e18bb6b3f24c1d51b8e1d53eabc2fcc54770ffc29a7bc75240",
       "module_root": "modules",
       "modules_sha256": {
         "ext.checksum.crc32c": "86dbd6095a6830ebf6e30c9499c6da7d1be199596f705d1a1e5d2e009a98555b",
@@ -27,7 +27,7 @@
       "name": "ext-u64-rs",
       "version": "0.1.4",
       "path": ".x07/deps/ext-u64-rs/0.1.4",
-      "package_manifest_sha256": "88f9ae33407835cea6733879ba6449ba64698636c35a0ad085540d7d6468906a",
+      "package_manifest_sha256": "aa92db2ba3222eaceb527e6eedb93eae771103b5b35b0ea1ebf46cb2d83dbb2b",
       "module_root": "modules",
       "modules_sha256": {
         "ext.u64": "c3ba79f0554026716bfa1feea479c1eaa5b31be0ad7a8d166416a6a35d8b9a43",

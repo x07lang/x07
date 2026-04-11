@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.1.111",
-    "x07c_version": "0.1.111",
+    "x07_version": "0.2.0",
+    "x07c_version": "0.2.0",
     "lang_id": "x07-core@0.2.0",
     "compat": "current"
   },
@@ -14,7 +14,7 @@
       "name": "ext-error",
       "version": "0.1.4",
       "path": ".x07/deps/ext-error/0.1.4",
-      "package_manifest_sha256": "25469f44cf255cf5ef29c45588882814553d5606dcef3e06c9761e213ea16ded",
+      "package_manifest_sha256": "c6b770b279357cb808057fddd8704516b74cef37f2c48fa84f06de063e1e6718",
       "module_root": "modules",
       "modules_sha256": {
         "ext.error.chain": "082d051b9eab7ffba7ab42f20ef6afdbe68389b9060d2fe876575d8fb9f1b76a",
@@ -28,7 +28,7 @@
       "name": "ext-fs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-fs/0.1.5",
-      "package_manifest_sha256": "65665620dad8cde6e7cf8f64955a0b7ad8a397ce3b8b146ffec23f7209029c9a",
+      "package_manifest_sha256": "90d5092a428ea3a05814ba9f991a9a29dd298711679235a8385453a16e37be1c",
       "module_root": "modules",
       "modules_sha256": {
         "std.os.fs": "5dbbfa61f3a455c5ed7575ec8e87d3c20589f29595fa5ec2f6bdf09ae54e14d5",
@@ -40,7 +40,7 @@
       "name": "ext-glob-rs",
       "version": "0.1.3",
       "path": ".x07/deps/ext-glob-rs/0.1.3",
-      "package_manifest_sha256": "f6b08b423cd6287c47f2b4cdc0b6d3f0d8ec17069069b3d809e143f84b18fadb",
+      "package_manifest_sha256": "031c75c4ebeceec314ed8640644031ecd5b4d22c5f9c938563358ce6d6009fbc",
       "module_root": "modules",
       "modules_sha256": {
         "ext.glob": "dad342b77eed67aaec80ad597919fac0a6e8af9478ba4dcdd1a423ed215788ff",
@@ -52,7 +52,7 @@
       "name": "ext-path-glob-rs",
       "version": "0.1.3",
       "path": ".x07/deps/ext-path-glob-rs/0.1.3",
-      "package_manifest_sha256": "a4ff7f0dd921559b703d6ed311a0c9de27c6dfa9a99e3fd6bb241540139c4f80",
+      "package_manifest_sha256": "a4a3d643271a361b631d5b7943065669d264a107c340de690997fee6b9856646",
       "module_root": "modules",
       "modules_sha256": {
         "std.os.fs.glob": "931dcfb7c57bce9b024e1ab6ef3416055971a83f36cfa98b9d335e8c9aed7d05",

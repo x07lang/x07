@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.1.111",
-    "x07c_version": "0.1.111",
+    "x07_version": "0.2.0",
+    "x07c_version": "0.2.0",
     "lang_id": "x07-core@0.2.0",
     "compat": "0.5"
   },
@@ -14,7 +14,7 @@
       "name": "ext-text",
       "version": "0.1.2",
       "path": ".x07/deps/ext-text/0.1.2",
-      "package_manifest_sha256": "24e75056deee2d161efb9b19a91522a49f6b335308fc9b1fa6ec09069ad54e5a",
+      "package_manifest_sha256": "2c65ecb7f2958f642319b4e3dfb389ec2b91a0bf2b80529d0ce6098960311227",
       "module_root": "modules",
       "modules_sha256": {
         "std.text": "85f7c0c671f85106086fb14e581c472ce8361a77a34ca854d42ceb0a2f824c52",
