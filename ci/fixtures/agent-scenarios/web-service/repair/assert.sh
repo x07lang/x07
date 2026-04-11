@@ -39,5 +39,7 @@ assert_solve_output "web-service" "$work/tmp/runner.json" "$expected"
 
 run_tests "$work"
 
+(cd "$work" && "$X07_BIN" pkg lock --offline --project x07.json >/dev/null)
+
 rm_ephemeral "$work"
 diff_snapshot "$scenario_dir/expected" "$work" >/dev/null

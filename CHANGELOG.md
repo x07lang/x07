@@ -4,6 +4,8 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+## v0.2.1
+
 ### Fixed
 
 - Tool reports no longer emit empty `X07-TOOL-EXEC-0001` messages when a wrapped command fails with empty stderr (now falls back to child JSON `error.message` when present).
