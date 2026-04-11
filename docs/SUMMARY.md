@@ -134,6 +134,7 @@
 
 - [FAQ](faq.md)
 - [Compatibility contract](reference/compat.md)
+- [Doc envelope](reference/doc-envelope.md)
 - [Versioning policy](versioning-policy.md)
 - [References](references.md)
 

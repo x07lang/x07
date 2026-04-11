@@ -122,15 +122,23 @@ Lockfile metadata (schema `x07.lock@0.4.0`):
 
 ## Built-in stdlib
 
-The compiler ships a small, versioned stdlib package under `stdlib/std/0.1.1/`:
+The compiler ships versioned stdlib packages under:
 
-- Module IDs are declared in `stdlib/std/0.1.1/x07-package.json` and embedded in the compiler in `crates/x07c/src/builtin_modules.rs`.
-  Keep these in sync with the on-disk module files and `stdlib.lock` (CI: `./scripts/ci/check_stdlib_lock.sh`).
+- `stdlib/std-core/0.1.2/` (foundational, pure modules)
+- `stdlib/std/0.1.2/` (extended modules; depends on `std-core` via `meta.requires_packages`)
+
+- Module IDs are declared in:
+  - `stdlib/std-core/0.1.2/x07-package.json`
+  - `stdlib/std/0.1.2/x07-package.json`
+  and embedded in the compiler in `crates/x07c/src/builtin_modules.rs`.
+  Keep these in sync with the on-disk module files and lock manifests (`stdlib.lock`, `stdlib.std-core.lock`, `stdlib.os.lock`) (CI: `./scripts/ci/check_stdlib_lock.sh`).
 
 - `std.vec`: wrappers around `vec_u8` (`with_capacity`, `push`, `extend_bytes`, `as_bytes`, ...)
 - `std.slice`: `clamp`, `cmp_bytes`
 - `std.bytes`: `reverse`, `concat`, `take`, `drop`, `copy`, `slice`, plus bytes_view helpers (`max_u8`, `sum_u8`, `count_u8`, `starts_with`, `ends_with`)
-- `std.codec`: `read_u32_le`, `write_u32_le`
+- `std.view`: clamped view slicing (`slice_v1`)
+- `std.codec`: `read_u32_le`, `write_u32_le`, plus stable encodings (`base64_*_v1`, `hex_*_v1`)
+- `std.doc`: doc envelope helpers (`ok_v1`, `err_*_v1`, `payload_v1`, `error_code_v1`, ...)
 - `std.parse`: `u32_dec`, `u32_dec_at`, `i32_status_le`, `i32_status_le_at`
 - `std.fmt`: `u32_to_dec`, `s32_to_dec`
 - `std.prng`: `lcg_next_u32`, `x07rand32_v1_stream`
@@ -145,8 +153,8 @@ The compiler ships a small, versioned stdlib package under `stdlib/std/0.1.1/`:
 - `std.map`: `word_freq_sorted_ascii`
 - `std.set`: `unique_lines_sorted`
 - `std.u32`: `read_le_at`, `write_le_at`, `push_le`, `pow2_ceil`
-- `std.small_map`: sorted packed `bytes -> u32` map (`empty_bytes_u32`, `get_bytes_u32`, `put_bytes_u32`, ...)
-- `std.small_set`: sorted packed bytes set (`empty_bytes`, `contains_bytes`, `insert_bytes`, ...)
+- `std.small_map`: sorted packed `bytes -> u32` map (`empty_bytes_u32`, `get_bytes_u32`, `put_bytes_u32`, `iter_*_v1`, ...)
+- `std.small_set`: sorted packed bytes set (`empty_bytes`, `contains_bytes`, `insert_bytes`, `iter_*_v1`, ...)
 - `std.hash`: deterministic hashing (`fnv1a32_*`, `mix32`)
 - `std.hash_map`: deterministic u32 map wrappers (`with_capacity_u32`, `get_u32_or`, `set_u32`, ...)
 - `std.hash_set`: deterministic u32 set + view-key set (`view_new`, `view_contains`, `view_insert`)

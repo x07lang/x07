@@ -124,7 +124,7 @@ pub(crate) fn semver_dirs_sorted_desc(base: &Path) -> Vec<PathBuf> {
 pub(crate) fn toolchain_stdlib_module_roots(toolchain_root: &Path) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     let stdlib_dir = toolchain_root.join("stdlib");
-    for family in ["os", "std"] {
+    for family in ["os", "std-core", "std"] {
         let base = stdlib_dir.join(family);
         if !base.is_dir() {
             continue;

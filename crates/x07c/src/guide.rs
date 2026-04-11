@@ -585,6 +585,9 @@ pub fn guide_md() -> String {
     out.push_str("- `[\"view.cmp_range\",\"a\",\"a_off\",\"a_len\",\"b\",\"b_off\",\"b_len\"]` -> i32 (-1/0/1)\n\n");
 
     out.push_str("Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).\n\n");
+    out.push_str(
+        "For clamped slicing (never traps), prefer `std.view.slice_v1` (see Modules).\n\n",
+    );
     out.push_str("Call-argument coercion: some functions typed as `bytes_view` accept `bytes` (and sometimes `vec_u8`) directly at call sites; the compiler implicitly borrows a view for the call.\n\n");
 
     out.push_str("## OS Worlds (run-os / run-os-sandboxed)\n\n");
@@ -663,6 +666,7 @@ pub fn guide_md() -> String {
 
     out.push_str("Propagation sugar:\n\n");
     out.push_str("- `[\"try\",\"r\"]` -> `i32` or `bytes` (requires the current `defn` return type is `result_i32` or `result_bytes`)\n\n");
+    out.push_str("- `[\"try_doc\",\"doc\"]` -> bytes (requires the current `defn` return type is bytes; doc envelope yields payload on ok and returns the original doc on err)\n\n");
 
     out.push_str("## Budget scopes\n\n");
     out.push_str("Budget scopes are special forms that enforce local resource limits (alloc/memcpy/scheduler ticks/fuel).\n\n");
@@ -722,7 +726,7 @@ pub fn guide_md() -> String {
 
     out.push_str("## Stdlib (pure)\n\n");
     out.push_str("Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):\n\n");
-    out.push_str("- `std.codec`: `[\"std.codec.read_u32_le\",\"b\",\"off\"]` (`b` is bytes_view), `[\"std.codec.write_u32_le\",\"x\"]`\n");
+    out.push_str("- `std.codec`: `[\"std.codec.read_u32_le\",\"b\",\"off\"]` (`b` is bytes_view), `[\"std.codec.write_u32_le\",\"x\"]`, `[\"std.codec.base64_encode_v1\",\"b\"]`, `[\"std.codec.base64_decode_v1\",\"s\"]` (doc), `[\"std.codec.hex_encode_v1\",\"b\"]`, `[\"std.codec.hex_decode_v1\",\"s\"]` (doc)\n");
     out.push_str("- `std.parse`: `[\"std.parse.u32_dec\",\"b\"]`, `[\"std.parse.u32_dec_at\",\"b\",\"off\"]`, `[\"std.parse.i32_status_le\",\"b\"]`\n");
     out.push_str(
         "- `std.fmt`: `[\"std.fmt.u32_to_dec\",\"x\"]`, `[\"std.fmt.s32_to_dec\",\"x\"]`\n",

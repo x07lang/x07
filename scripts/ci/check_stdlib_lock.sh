@@ -12,6 +12,7 @@ cd "$root"
 
 python3 scripts/check_stdlib_package_manifests.py --root stdlib
 python3 scripts/generate_stdlib_lock.py --check
+python3 scripts/generate_stdlib_lock.py --stdlib-root stdlib/std-core --out stdlib.std-core.lock --check
 python3 scripts/generate_stdlib_lock.py --stdlib-root stdlib/os --out stdlib.os.lock --check
 
 echo "ok: stdlib package manifests + locks up to date"

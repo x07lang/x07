@@ -15,6 +15,11 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - Project-local `x07 pkg` configuration via `.x07/config.json` or `x07.config.json` (`x07.config@0.1.0`) for `pkg.registry` and `pkg.offline`.
 - `x07 pkg list` and `x07 pkg info` for browsing packages via a local `file://` sparse index mirror (and local `.x07/deps` when available).
 - `x07 pkg repair --toolchain current` for deterministic lock repair after toolchain upgrades.
+- `try_doc` special form: `["try_doc", doc_expr]` for doc-envelope propagation in `bytes`-returning functions.
+- Built-in `std.doc` helpers and `docs/reference/doc-envelope.md` describing the stable doc-envelope encoding.
+- Built-in `std.view.slice_v1` for clamped `bytes_view` slicing (never traps).
+- Stable encoding helpers in `std.codec`: `base64_encode_v1`, `base64_decode_v1`, `hex_encode_v1`, `hex_decode_v1` (decode returns a doc envelope).
+- Iteration helpers in `std.small_map` / `std.small_set`: `iter_init_v1`, `iter_next_v1` (doc envelope results).
 
 ### Changed
 
@@ -29,9 +34,12 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - `x07 pkg lock` now supports `--lock-version {0.3|0.4}` (default: `0.4`) and `x07.lock@0.4.0` records toolchain identity and registry provenance.
 - Recursion termination evidence (`decreases[]`) is now required only for directly recursive `defn` targets that declare any contract clauses; non-contract recursion no longer requires decreases boilerplate.
 - `x07 fix` / `x07 migrate` can now auto-insert `decreases[]` for common recursion patterns (for example `n -> n-1`).
+- Built-in stdlib is now split into `std-core@0.1.2` (foundational, pure modules) and `std@0.1.2` (extended modules depending on `std-core`).
+- `x07 trust report` includes `std-core` SBOM components when `stdlib.std-core.lock` is present.
 
 ### Breaking changes
 
 - `x07 pkg lock` can now refuse package versions whose `meta.x07c_compat` excludes the running compiler.
 - `x07 pkg lock` now writes `x07.lock@0.4.0` by default; external tooling that only supports `x07.lock@0.3.0` must use `--lock-version 0.3`.
 - Contract enforcement is now applied to x07AST `v0.7` and `v0.8` as well (and respects the active compat selection); invalid contract clauses that previously slipped through may now fail until fixed.
+- Toolchain stdlib inventories are now split across `stdlib.lock` and `stdlib.std-core.lock`; out-of-tree tooling that only reads `stdlib.lock` may need updates.

@@ -376,6 +376,7 @@ impl<'a> InferState<'a> {
                     "while" => self.infer_while(list_ptr, items),
                     "return" => self.infer_return(list_ptr, items),
                     "try" => self.infer_try(list_ptr, items, want),
+                    "try_doc" => self.infer_try_doc(list_ptr, items, want),
                     "tapp" => self.infer_tapp(list_ptr, items, want),
                     _ if head.starts_with("ty.") => {
                         self.infer_ty_intrinsic(list_ptr, head, items, want)
@@ -618,6 +619,62 @@ impl<'a> InferState<'a> {
             TyTerm::Named(s) if s == "result_bytes" => TyTerm::Named("bytes".to_string()),
             _ => self.fresh_meta(),
         };
+
+        if let Some(want) = want {
+            self.add_constraint(
+                out.clone(),
+                want.clone(),
+                list_ptr.to_string(),
+                ConstraintOrigin::ExprCheck,
+            );
+            TyInfoTerm::unbranded(want.clone())
+        } else {
+            TyInfoTerm::unbranded(out)
+        }
+    }
+
+    fn infer_try_doc(
+        &mut self,
+        list_ptr: &str,
+        items: &[Expr],
+        want: Option<&TyTerm>,
+    ) -> TyInfoTerm {
+        if items.len() != 2 {
+            return TyInfoTerm::unbranded(self.fresh_meta());
+        }
+
+        // `try_doc` always yields payload bytes.
+        let out = TyTerm::Named("bytes".to_string());
+
+        // Enclosing function must return doc bytes.
+        self.add_constraint(
+            self.fn_ret.clone(),
+            out.clone(),
+            list_ptr.to_string(),
+            ConstraintOrigin::ExprCheck,
+        );
+
+        // Argument must be a doc envelope (bytes/bytes_view).
+        let arg = self.infer_expr(&items[1], None);
+        match &arg.ty {
+            TyTerm::Named(s) if s == "bytes" || s == "bytes_view" => {}
+            TyTerm::Meta(_) => {}
+            _ => {
+                self.diagnostics.push(Diagnostic {
+                    code: "X07-TYPE-TRYDOC-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Type,
+                    message: "try_doc expects bytes or bytes_view".to_string(),
+                    loc: Some(Location::X07Ast {
+                        ptr: list_ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: BTreeMap::new(),
+                    quickfix: None,
+                });
+            }
+        }
 
         if let Some(want) = want {
             self.add_constraint(
@@ -2159,7 +2216,7 @@ fn contract_collect_binding_ptrs(expr: &Expr, out: &mut Vec<(String, String)>) {
                 contract_collect_binding_ptrs(item, out);
             }
         }
-        "begin" | "if" | "unsafe" | "return" | "try" | "tapp" | "set" | "set0" => {
+        "begin" | "if" | "unsafe" | "return" | "try" | "try_doc" | "tapp" | "set" | "set0" => {
             for item in items.iter().skip(1) {
                 contract_collect_binding_ptrs(item, out);
             }
@@ -2355,7 +2412,7 @@ fn contract_collect_impurity(expr: &Expr, out: &mut Vec<(String, String)>) {
                 contract_collect_impurity(item, out);
             }
         }
-        "unsafe" | "set" | "set0" | "for" | "return" | "try" => {
+        "unsafe" | "set" | "set0" | "for" | "return" | "try" | "try_doc" => {
             out.push((
                 list_ptr.clone(),
                 format!("contract expression is not pure: disallowed form {head:?}"),

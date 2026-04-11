@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 467
-- quickfix support (`sometimes` or `always`): 426
-- quickfix coverage: 91.22%
+- total codes: 468
+- quickfix support (`sometimes` or `always`): 427
+- quickfix coverage: 91.24%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -239,6 +239,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-TYPE-RET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-RET-0001`. |
 | `X07-TYPE-SET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0001`. |
 | `X07-TYPE-SET-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0002`. |
+| `X07-TYPE-TRYDOC-0001` | x07c / type / error | sometimes | `try_doc` expects bytes or bytes_view. |
 | `X07-TYPE-UNIFY-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-UNIFY-0001`. |
 | `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
 | `X07-WORLD-0001` | x07c / lint / error | always | Program imports capabilities not allowed by the selected world flags. |
@@ -5105,6 +5106,25 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-TYPE-TRYDOC-0001`
+
+Summary: `try_doc` expects bytes or bytes_view.
+
+Origins:
+- x07c (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`try_doc` consumes a doc envelope (tag byte + payload). Ensure the argument expression evaluates to `bytes` or `bytes_view`.
+
+Agent strategy:
+
+- Fix the `try_doc` argument to produce a doc envelope (`bytes` / `bytes_view`).
+- Re-run `x07 check` / `x07 test`.
 
 
 ## `X07-TYPE-UNIFY-0001`

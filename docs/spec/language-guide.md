@@ -564,6 +564,8 @@ Views are explicit, borrowed slices used for scan/trim/split without copying.
 
 Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).
 
+For clamped slicing (never traps), prefer `std.view.slice_v1` (see Modules).
+
 Call-argument coercion: some functions typed as `bytes_view` accept `bytes` (and sometimes `vec_u8`) directly at call sites; the compiler implicitly borrows a view for the call.
 
 ## OS Worlds (run-os / run-os-sandboxed)
@@ -652,6 +654,8 @@ Propagation sugar:
 
 - `["try","r"]` -> `i32` or `bytes` (requires the current `defn` return type is `result_i32` or `result_bytes`)
 
+- `["try_doc","doc"]` -> bytes (requires the current `defn` return type is bytes; doc envelope yields payload on ok and returns the original doc on err)
+
 ## Budget scopes
 
 Budget scopes are special forms that enforce local resource limits (alloc/memcpy/scheduler ticks/fuel).
@@ -708,7 +712,7 @@ Use `emit_*` stdlib functions to produce canonical deterministic encodings:
 
 Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):
 
-- `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`
+- `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`, `["std.codec.base64_encode_v1","b"]`, `["std.codec.base64_decode_v1","s"]` (doc), `["std.codec.hex_encode_v1","b"]`, `["std.codec.hex_decode_v1","s"]` (doc)
 - `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.i32_status_le","b"]`
 - `std.fmt`: `["std.fmt.u32_to_dec","x"]`, `["std.fmt.s32_to_dec","x"]`
 - `std.prng`: `["std.prng.lcg_next_u32","state"]`

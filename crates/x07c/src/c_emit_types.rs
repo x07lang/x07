@@ -5545,6 +5545,28 @@ impl InferCtx {
                             )),
                         }
                     }
+                    "try_doc" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "try_doc expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.fn_ret_ty.ty != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "try_doc requires function return type bytes".to_string(),
+                            ));
+                        }
+                        let arg = self.infer(&args[0])?;
+                        match arg.ty {
+                            Ty::Bytes | Ty::BytesView => Ok(Ty::Bytes.into()),
+                            other => Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("try_doc expects bytes or bytes_view, got {other:?}"),
+                            )),
+                        }
+                    }
                     "map_u32.get" => {
                         if args.len() != 3 {
                             return Err(CompilerError::new(
