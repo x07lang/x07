@@ -40,6 +40,7 @@ mod pbt_fix;
 mod pkg;
 mod policy;
 mod policy_overrides;
+mod project_ctx;
 mod prove;
 mod repair;
 mod report_common;
@@ -99,6 +100,10 @@ enum Command {
     Doctor(doctor::DoctorArgs),
     /// Inspect and enforce diagnostics catalog/coverage.
     Diag(diag::DiagArgs),
+    /// Explain one diagnostic code from the catalog (alias for `x07 diag explain`).
+    Explain(diag::DiagExplainArgs),
+    /// Generate portable repro bundles (compile-time).
+    Repro(repro::ReproArgs),
     /// Generate and manage run-os-sandboxed policy files.
     Policy(policy::PolicyArgs),
     /// Initialize, validate, and patch x07AST JSON files.
@@ -398,6 +403,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(diag::DiagCommand::Coverage(_)) => vec!["diag", "coverage"],
                 Some(diag::DiagCommand::Sarif(_)) => vec!["diag", "sarif"],
             },
+            Some(Command::Explain(_)) => vec!["explain"],
+            Some(Command::Repro(args)) => match &args.cmd {
+                None => vec!["repro"],
+                Some(repro::ReproCommand::Compile(_)) => vec!["repro", "compile"],
+            },
             Some(Command::Policy(args)) => match &args.cmd {
                 None => vec!["policy"],
                 Some(policy::PolicyCommand::Init(_)) => vec!["policy", "init"],
@@ -536,6 +546,8 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Guide(args) => guide::cmd_guide(&cli.machine, args),
         Command::Doctor(args) => doctor::cmd_doctor(&cli.machine, args),
         Command::Diag(args) => diag::cmd_diag(&cli.machine, args),
+        Command::Explain(args) => diag::cmd_explain(args),
+        Command::Repro(args) => repro::cmd_repro(&cli.machine, args),
         Command::Policy(args) => policy::cmd_policy(&cli.machine, args),
         Command::Ast(args) => ast::cmd_ast(&cli.machine, args),
         Command::Agent(args) => agent::cmd_agent(&cli.machine, args),

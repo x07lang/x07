@@ -119,6 +119,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("doctor") => Some(include_bytes!(
             "../../../spec/x07-tool-doctor.report.schema.json"
         )),
+        Some("explain") => Some(include_bytes!(
+            "../../../spec/x07-tool-explain.report.schema.json"
+        )),
         Some("fix") => Some(include_bytes!(
             "../../../spec/x07-tool-fix.report.schema.json"
         )),
@@ -134,11 +137,11 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("lint") => Some(include_bytes!(
             "../../../spec/x07-tool-lint.report.schema.json"
         )),
-        Some("migrate") => Some(include_bytes!(
-            "../../../spec/x07-tool-migrate.report.schema.json"
-        )),
         Some("mcp") => Some(include_bytes!(
             "../../../spec/x07-tool-mcp.report.schema.json"
+        )),
+        Some("migrate") => Some(include_bytes!(
+            "../../../spec/x07-tool-migrate.report.schema.json"
         )),
         Some("patch") => Some(include_bytes!(
             "../../../spec/x07-tool-patch.report.schema.json"
@@ -197,6 +200,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("prove.check") => Some(include_bytes!(
             "../../../spec/x07-tool-prove-check.report.schema.json"
         )),
+        Some("repro") => Some(include_bytes!(
+            "../../../spec/x07-tool-repro.report.schema.json"
+        )),
+        Some("repro.compile") => Some(include_bytes!(
+            "../../../spec/x07-tool-repro-compile.report.schema.json"
+        )),
         Some("review") => Some(include_bytes!(
             "../../../spec/x07-tool-review.report.schema.json"
         )),
@@ -251,9 +260,6 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("trust") => Some(include_bytes!(
             "../../../spec/x07-tool-trust.report.schema.json"
         )),
-        Some("trust.certify") => Some(include_bytes!(
-            "../../../spec/x07-tool-trust-certify.report.schema.json"
-        )),
         Some("trust.capsule") => Some(include_bytes!(
             "../../../spec/x07-tool-trust-capsule.report.schema.json"
         )),
@@ -262,6 +268,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("trust.capsule.check") => Some(include_bytes!(
             "../../../spec/x07-tool-trust-capsule-check.report.schema.json"
+        )),
+        Some("trust.certify") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-certify.report.schema.json"
         )),
         Some("trust.profile") => Some(include_bytes!(
             "../../../spec/x07-tool-trust-profile.report.schema.json"

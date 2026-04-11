@@ -1119,6 +1119,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-explain.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-explain.report.schema.json",
+      "schema_version": "x07.tool.explain.report@0.1.0",
+      "title": "x07.tool.explain.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-fix.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-fix.report.schema.json",
       "schema_version": "x07.tool.fix.report@0.1.0",
@@ -1298,6 +1305,20 @@
       "schema_id": "https://x07.io/spec/x07-tool-prove.report.schema.json",
       "schema_version": "x07.tool.prove.report@0.2.0",
       "title": "x07.tool.prove.report@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-repro-compile.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-repro-compile.report.schema.json",
+      "schema_version": "x07.tool.repro.compile.report@0.1.0",
+      "title": "x07.tool.repro.compile.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-repro.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-repro.report.schema.json",
+      "schema_version": "x07.tool.repro.report@0.1.0",
+      "title": "x07.tool.repro.report@0.1.0"
     },
     {
       "kind": "schema",

@@ -354,6 +354,8 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "guide"
             | "doctor"
             | "diag"
+            | "explain"
+            | "repro"
             | "policy"
             | "ast"
             | "agent"
@@ -408,6 +410,7 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "coverage",
             "sarif",
         ],
+        "repro" => &["compile"],
         "pkg" => &[
             "add",
             "remove",

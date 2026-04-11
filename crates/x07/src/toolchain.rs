@@ -5,13 +5,11 @@ use anyhow::{Context, Result};
 use clap::Args;
 use serde::Serialize;
 use walkdir::WalkDir;
-use x07_runner_common::os_paths;
 use x07_worlds::WorldId;
 use x07c::compile;
 use x07c::diagnostics;
 use x07c::lint;
 use x07c::module_source;
-use x07c::project;
 use x07c::typecheck;
 use x07c::x07ast;
 
@@ -212,72 +210,6 @@ pub struct CheckArgs {
     /// Override the language/toolchain compatibility mode.
     #[arg(long, value_name = "COMPAT")]
     pub compat: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-struct ProjectCtx {
-    base: PathBuf,
-    manifest: project::ProjectManifest,
-    lock: project::Lockfile,
-    lock_path: PathBuf,
-    program_path: PathBuf,
-    module_roots: Vec<PathBuf>,
-    world: WorldId,
-}
-
-fn load_project_ctx(project_path: &Path, hydrate_deps: bool) -> Result<ProjectCtx> {
-    if hydrate_deps {
-        let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf())
-            .context("hydrate project deps")?;
-        if hydrated {
-            eprintln!(
-                "x07: hydrated project dependencies via `x07 pkg lock --project {}`",
-                project_path.display()
-            );
-        }
-    }
-
-    let manifest = project::load_project_manifest(project_path).context("load project manifest")?;
-    let lock_path = project::default_lockfile_path(project_path, &manifest);
-    let lock_bytes = std::fs::read(&lock_path)
-        .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
-    let lock: project::Lockfile = serde_json::from_slice(&lock_bytes)
-        .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
-
-    project::verify_lockfile(project_path, &manifest, &lock).context("verify lockfile")?;
-
-    let base = project_path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
-    let program_path = base.join(&manifest.entry);
-
-    let module_roots =
-        project::collect_module_roots(project_path, &manifest, &lock).context("module roots")?;
-    let world = x07c::world_config::parse_world_id(&manifest.world)
-        .with_context(|| format!("invalid project world {:?}", manifest.world))?;
-
-    let mut module_roots = module_roots;
-    if matches!(world, WorldId::RunOs | WorldId::RunOsSandboxed) {
-        for root in os_paths::default_os_module_roots_best_effort_from_exe(
-            std::env::current_exe().ok().as_deref(),
-        ) {
-            if !module_roots.contains(&root) {
-                module_roots.push(root);
-            }
-        }
-    }
-
-    Ok(ProjectCtx {
-        base,
-        manifest,
-        lock,
-        lock_path,
-        program_path,
-        module_roots,
-        world,
-    })
 }
 
 pub fn cmd_fmt(
@@ -723,8 +655,8 @@ pub fn cmd_build(
         std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
     }
 
-    let ctx = load_project_ctx(&args.project, true).context("load project")?;
-    let ProjectCtx {
+    let ctx = crate::project_ctx::load_project_ctx(&args.project, true).context("load project")?;
+    let crate::project_ctx::ProjectCtx {
         base,
         manifest,
         program_path,
@@ -906,7 +838,7 @@ pub fn cmd_check(
 ) -> Result<std::process::ExitCode> {
     let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
 
-    let ctx = match load_project_ctx(&args.project, false) {
+    let ctx = match crate::project_ctx::load_project_ctx(&args.project, false) {
         Ok(ctx) => ctx,
         Err(err) => {
             diags.push(crate::reporting::diag_error(
@@ -927,10 +859,10 @@ pub fn cmd_check(
         }
     };
 
-    let ProjectCtx {
+    let crate::project_ctx::ProjectCtx {
         base,
         manifest,
-        lock: _lock,
+        lock,
         lock_path,
         program_path,
         module_roots,
@@ -1019,11 +951,16 @@ pub fn cmd_check(
             &mut modules,
             &mut visiting,
         ) {
-            diags.push(crate::reporting::diag_error(
+            let mut d = crate::reporting::diag_error(
                 "X07-X07AST-PARSE-0001",
                 diagnostics::Stage::Parse,
                 &format!("{:?}: {}", err.kind, err.message),
-            ));
+            );
+            d.data.insert(
+                "module_id".to_string(),
+                serde_json::Value::String(module_id.clone()),
+            );
+            diags.push(d);
             let mut inputs: BTreeSet<String> = BTreeSet::new();
             inputs.insert(args.project.display().to_string());
             inputs.insert(lock_path.display().to_string());
@@ -1064,41 +1001,188 @@ pub fn cmd_check(
     let mut all_diags: Vec<diagnostics::Diagnostic> = Vec::new();
     let mut has_error = false;
 
-    let mut file_set: Vec<(PathBuf, x07ast::X07AstFile)> = Vec::new();
-    file_set.push((program_path.clone(), entry_file.clone()));
-    for m in modules.values() {
+    #[derive(Debug, Clone)]
+    struct CheckedFile {
+        module_id: String,
+        path: PathBuf,
+        file: x07ast::X07AstFile,
+    }
+
+    fn canonicalize_best_effort(p: &Path) -> PathBuf {
+        p.canonicalize().unwrap_or_else(|_| p.to_path_buf())
+    }
+
+    #[derive(Debug, Clone)]
+    struct DepRootInfo {
+        name: String,
+        version: String,
+        root_canon: PathBuf,
+    }
+
+    let mut dep_roots: Vec<DepRootInfo> = Vec::new();
+    for dep in &lock.dependencies {
+        let dep_dir = x07c::project::resolve_rel_path_with_workspace(&base, &dep.path)
+            .with_context(|| format!("resolve dep path: {:?}", dep.path))?;
+        let root = dep_dir.join(&dep.module_root);
+        dep_roots.push(DepRootInfo {
+            name: dep.name.clone(),
+            version: dep.version.clone(),
+            root_canon: canonicalize_best_effort(&root),
+        });
+    }
+    dep_roots.sort_by(|a, b| {
+        b.root_canon
+            .to_string_lossy()
+            .len()
+            .cmp(&a.root_canon.to_string_lossy().len())
+            .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| a.version.cmp(&b.version))
+    });
+
+    let mut imports_by_module: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    imports_by_module.insert(
+        "main".to_string(),
+        entry_file.imports.iter().cloned().collect(),
+    );
+    for (module_id, m) in &modules {
+        imports_by_module.insert(module_id.clone(), m.file.imports.iter().cloned().collect());
+    }
+
+    use std::collections::VecDeque;
+    let mut prev: BTreeMap<String, String> = BTreeMap::new();
+    let mut q: VecDeque<String> = VecDeque::new();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    seen.insert("main".to_string());
+    q.push_back("main".to_string());
+    while let Some(cur) = q.pop_front() {
+        let Some(imports) = imports_by_module.get(&cur) else {
+            continue;
+        };
+        for next in imports {
+            if seen.insert(next.clone()) {
+                prev.insert(next.clone(), cur.clone());
+                q.push_back(next.clone());
+            }
+        }
+    }
+
+    let mut chain_by_module: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for module_id in imports_by_module.keys() {
+        if module_id == "main" {
+            chain_by_module.insert(module_id.clone(), vec!["main".to_string()]);
+            continue;
+        }
+        let mut chain_rev: Vec<String> = vec![module_id.clone()];
+        let mut cur = module_id.as_str();
+        while let Some(p) = prev.get(cur) {
+            chain_rev.push(p.clone());
+            cur = p.as_str();
+            if cur == "main" {
+                break;
+            }
+        }
+        chain_rev.reverse();
+        if chain_rev.first().map(|s| s.as_str()) == Some("main") {
+            chain_by_module.insert(module_id.clone(), chain_rev);
+        }
+    }
+
+    let mut package_by_module: BTreeMap<String, (String, String)> = BTreeMap::new();
+    for (module_id, m) in &modules {
+        let Some(path) = m.path.as_ref() else {
+            continue;
+        };
+        let path_canon = canonicalize_best_effort(path);
+        for dep in &dep_roots {
+            if path_canon.starts_with(&dep.root_canon) {
+                package_by_module
+                    .insert(module_id.clone(), (dep.name.clone(), dep.version.clone()));
+                break;
+            }
+        }
+    }
+
+    let enrich_diag = |d: &mut diagnostics::Diagnostic, module_id: &str| {
+        d.data.insert(
+            "module_id".to_string(),
+            serde_json::Value::String(module_id.to_string()),
+        );
+
+        if let Some((name, version)) = package_by_module.get(module_id) {
+            d.data.insert(
+                "package".to_string(),
+                serde_json::json!({ "name": name, "version": version }),
+            );
+            d.notes.push(format!("from dependency: {name}@{version}"));
+        }
+
+        if let Some(chain) = chain_by_module.get(module_id) {
+            d.data.insert(
+                "dependency_chain".to_string(),
+                serde_json::Value::Array(
+                    chain
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+            );
+            if package_by_module.contains_key(module_id) {
+                d.notes
+                    .push(format!("dependency chain: {}", chain.join(" -> ")));
+            }
+        }
+    };
+
+    let mut file_set: Vec<CheckedFile> = Vec::new();
+    file_set.push(CheckedFile {
+        module_id: "main".to_string(),
+        path: program_path.clone(),
+        file: entry_file.clone(),
+    });
+    for (module_id, m) in &modules {
         if m.is_builtin {
             continue;
         }
-        if let Some(path) = m.path.clone() {
-            file_set.push((path, m.file.clone()));
-        }
+        let Some(path) = m.path.clone() else {
+            continue;
+        };
+        file_set.push(CheckedFile {
+            module_id: module_id.clone(),
+            path,
+            file: m.file.clone(),
+        });
     }
-    file_set.sort_by(|(ap, _), (bp, _)| ap.cmp(bp));
+    file_set.sort_by(|a, b| {
+        a.path
+            .cmp(&b.path)
+            .then_with(|| a.module_id.cmp(&b.module_id))
+    });
 
-    for (path, file) in &file_set {
-        let report = lint::lint_file_no_typecheck(file, lint_opts);
+    for item in &file_set {
+        let report = lint::lint_file_no_typecheck(&item.file, lint_opts);
         if !report.ok {
             has_error = true;
         }
         for mut d in report.diagnostics {
             d.data.insert(
                 "file".to_string(),
-                serde_json::Value::String(path.display().to_string()),
+                serde_json::Value::String(item.path.display().to_string()),
             );
+            enrich_diag(&mut d, &item.module_id);
             all_diags.push(d);
         }
     }
 
     let mut sigs = typecheck::TypecheckSigs::new();
-    for (_path, file) in &file_set {
-        sigs.add_file(file);
+    for item in &file_set {
+        sigs.add_file(&item.file);
     }
     sigs.add_builtins();
 
-    for (path, file) in &file_set {
+    for item in &file_set {
         let report = typecheck::typecheck_file_with_sigs(
-            file,
+            &item.file,
             &sigs,
             &typecheck::TypecheckOptions {
                 compat,
@@ -1111,8 +1195,9 @@ pub fn cmd_check(
             }
             d.data.insert(
                 "file".to_string(),
-                serde_json::Value::String(path.display().to_string()),
+                serde_json::Value::String(item.path.display().to_string()),
             );
+            enrich_diag(&mut d, &item.module_id);
             all_diags.push(d);
         }
     }
@@ -1147,18 +1232,21 @@ pub fn cmd_check(
                 serde_json::Value::String(format!("{:?}", err.kind)),
             );
             let mut diag_path: Option<PathBuf> = None;
+            let mut diag_module_id: Option<String> = None;
             if let Some(fn_name) = fn_name.as_deref() {
                 d.data.insert(
                     "fn".to_string(),
                     serde_json::Value::String(fn_name.to_string()),
                 );
                 if fn_name == "solve" || fn_name.starts_with("main.") {
+                    diag_module_id = Some("main".to_string());
                     d.data.insert(
                         "file".to_string(),
                         serde_json::Value::String(program_path.display().to_string()),
                     );
                     diag_path = Some(program_path.clone());
                 } else if let Some((mod_id, _)) = fn_name.rsplit_once('.') {
+                    diag_module_id = Some(mod_id.to_string());
                     if let Some(m) = modules.get(mod_id) {
                         if let Some(p) = m.path.as_ref() {
                             d.data.insert(
@@ -1177,6 +1265,8 @@ pub fn cmd_check(
                 );
                 diag_path = Some(program_path.clone());
             }
+
+            enrich_diag(&mut d, diag_module_id.as_deref().unwrap_or("main"));
 
             if d.code == "X07-MOVE-0901" {
                 if let (Some(path), Some(moved_ptr)) = (

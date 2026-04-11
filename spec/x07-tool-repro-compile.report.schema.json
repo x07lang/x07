@@ -1,18 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://x07.io/spec/x07-tool-migrate.report.schema.json",
-  "title": "x07.tool.migrate.report@0.1.0",
+  "$id": "https://x07.io/spec/x07-tool-repro-compile.report.schema.json",
+  "title": "x07.tool.repro.compile.report@0.1.0",
   "description": "Generic machine-readable report envelope for x07 CLI command wrappers.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "x07.tool.migrate.report@0.1.0"
+      "const": "x07.tool.repro.compile.report@0.1.0"
     },
     "command": {
       "type": "string",
-      "const": "x07.migrate"
+      "const": "x07.repro.compile"
     },
     "ok": {
       "type": "boolean"

@@ -245,8 +245,15 @@ See: [Review & trust artifacts](review-trust.md).
   - Supports threshold gating with `--min-coverage`.
 - `x07 diag explain <CODE>`
   - Prints summary, origins, quickfix policy, and agent strategy for one code.
+- `x07 explain <CODE>`
+  - Alias for `x07 diag explain <CODE>`.
 - `x07 diag sarif --in <x07diag.json> --out <results.sarif>`
   - Converts `x07diag` to SARIF v2.1.0 for code-scanning UIs.
+
+### Repro bundles
+
+- `x07 repro compile --project x07.json`
+  - Writes a self-contained compile repro directory bundle (project + lock + deps snapshot) and emits a `diagnostics.json` report by running `x07 check` inside the bundle.
 
 ### Patching (RFC 6902 JSON Patch)
 

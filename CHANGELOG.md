@@ -20,6 +20,8 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - Built-in `std.view.slice_v1` for clamped `bytes_view` slicing (never traps).
 - Stable encoding helpers in `std.codec`: `base64_encode_v1`, `base64_decode_v1`, `hex_encode_v1`, `hex_decode_v1` (decode returns a doc envelope).
 - Iteration helpers in `std.small_map` / `std.small_set`: `iter_init_v1`, `iter_next_v1` (doc envelope results).
+- `x07 explain <CODE>` top-level alias for `x07 diag explain <CODE>`.
+- `x07 repro compile` for portable compile repro directory bundles.
 
 ### Changed
 
@@ -36,6 +38,8 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - `x07 fix` / `x07 migrate` can now auto-insert `decreases[]` for common recursion patterns (for example `n -> n-1`).
 - Built-in stdlib is now split into `std-core@0.1.2` (foundational, pure modules) and `std@0.1.2` (extended modules depending on `std-core`).
 - `x07 trust report` includes `std-core` SBOM components when `stdlib.std-core.lock` is present.
+- `x07 check` diagnostics now include provenance fields (`module_id`, dependency `package{name,version}` when applicable, and best-effort `dependency_chain`).
+- `x07 diag explain` now prints suggested `x07 fix` / `x07 migrate` commands when applicable.
 
 ### Breaking changes
 
