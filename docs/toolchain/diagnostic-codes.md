@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 454
-- quickfix support (`sometimes` or `always`): 413
-- quickfix coverage: 90.97%
+- total codes: 455
+- quickfix support (`sometimes` or `always`): 414
+- quickfix coverage: 90.99%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -183,6 +183,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-LET-0001` | x07c / lint / error | sometimes | `let`/`set` has invalid arity. |
 | `X07-ARITY-RETURN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-RETURN-0001`. |
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
+| `X07-ARITY-WHILE-0001` | x07c / lint / error | sometimes | `while` has invalid arity. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
 | `X07-ASYNC-CONTRACT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0001`. |
 | `X07-ASYNC-CONTRACT-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0002`. |
@@ -3965,6 +3966,27 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07-ARITY-WHILE-0001`
+
+Summary: `while` has invalid arity.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A quickfix is emitted when extra trailing expressions are present: they are wrapped into a `begin` body so the loop keeps canonical arity.
+
+Agent strategy:
+
+- If quickfix is present, apply it to wrap extra body expressions.
+- Otherwise rewrite to `while <cond> <body>` manually.
+- Re-run lint.
+
+
 ## `X07-AST-0001`
 
 Summary: Core lint/schema diagnostic `X07-AST-0001`.
@@ -4278,12 +4300,11 @@ Quickfix support: `sometimes`
 
 Details:
 
-The enclosing `defn` declares `decreases[]`, but the function is not a directly self-recursive proof target or it lacks the surrounding contract clauses needed for certification.
+The enclosing `defn` declares `decreases[]`, but the function is not a directly self-recursive proof target.
 
 Agent strategy:
 
 - Keep `decreases[]` only on directly self-recursive `defn` targets.
-- Add at least one `requires`, `ensures`, or `invariant` clause when the function is meant to be proved.
 - Remove `decreases[]` from non-recursive helpers.
 - Re-run `x07 lint` or `x07 check`.
 
@@ -4296,6 +4317,7 @@ Origins:
 - x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 

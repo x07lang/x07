@@ -312,12 +312,11 @@ See: [Property-based testing](pbt.md).
 
 Notes:
 
-- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, and `for` loops with non-literal bounds remain unsupported.
 - Direct `--prove` inputs currently support `i32`, `u32`, raw `bytes`, raw `bytes_view`, raw `vec_u8`, `option_i32`, `option_bytes`, `option_bytes_view`, `result_i32`, `result_bytes`, and `result_bytes_view`.
 - Direct prove inputs accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
 - That means schema-derived record and tagged-union documents can be proved directly as `bytes_view@brand` inputs, with the generated verify driver running the validator before it constructs the branded view seen by the proof target.
 - Owned branded `bytes` and nested result carriers are still rejected explicitly.
-- `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
+- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, `while` loops, and `for` loops with non-literal bounds remain unsupported.
 - `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
 - `--prove` reports include `proof_summary` for the solver engine, recursion kind, `decreases` usage, unwind-bounded recursion, and the reachable dependency symbol set.
 - `--coverage` emits a reachable-closure support artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including `supported*` counters plus per-function `support_summary`, alongside `trusted_scheduler_model` and `capsule_boundary` statuses when they apply.
@@ -546,3 +545,4 @@ Canonical minimal sequence (keep the loop simple; prefer `x07 run`):
 5. Debug/repair explicitly (when needed): `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
 
 See: [Agent quickstart](../getting-started/agent-quickstart.md).
+- `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant` / `decreases`) on the target function.

@@ -96,3 +96,30 @@ When a breaking or near-breaking change is introduced, add an entry here with:
 - the mechanical rewrite (when possible)
 - the compatibility switch (when applicable)
 - links to the relevant diagnostic codes
+
+### Control Flow: `while` (compat `0.5`)
+
+Behavior:
+
+- Adds the core form `["while", cond, body]` (returns `i32` `0`) to reduce recursion-as-loop pressure.
+
+Migration:
+
+- No migration required (additive).
+
+### Recursion: Termination Evidence (compat `0.5`)
+
+Behavior:
+
+- Direct self-recursive `defn` targets require `decreases[]` only when the function declares any contract clauses (`requires`/`ensures`/`invariant`/`decreases`).
+- Functions with no contract clauses may recurse without `decreases[]` boilerplate.
+- `decreases[]` is allowed as the only contract clause.
+
+Detection:
+
+- `X07-CONTRACT-0011` indicates a recursive self-call is missing `decreases[]` on a contract-bearing function.
+
+Mechanical rewrite:
+
+- Add `decreases[]` to the recursive `defn`.
+- When the recursive call matches a common pattern (for example `n -> n-1`), `x07 fix --write` / `x07 migrate --write --to 0.5` can insert an inferred `decreases[]` clause.

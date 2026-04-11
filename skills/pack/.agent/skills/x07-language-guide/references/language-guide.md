@@ -64,6 +64,8 @@ Move rules (critical):
 - `if`: `["if", cond, then, else]` branches on non-zero `cond`
 - `for`: `["for", i, start, end, body]` declares `i` (i32) and runs it from `start` to `end-1`
   - `body` is a single expression; use `begin` for multiple steps.
+- `while`: `["while", cond, body]` runs `body` while `cond` evaluates to non-zero
+  - `cond` must typecheck to `i32`; `body` is a single expression; use `begin` for multiple steps.
 - `return`: `["return", expr]` returns early from the current function
   - In `solve`, the return value must be `bytes`.
 
@@ -77,6 +79,7 @@ Echo (returns input):
 Arity reminder:
 - `if` is `["if", cond, then, else]`
 - `for` is `["for", i, start, end, body]`
+- `while` is `["while", cond, body]`
 - `begin` is `["begin", e1, e2, ...]`
 
 ## Modules
@@ -716,7 +719,7 @@ Prefer calling stdlib helpers through their module namespaces (and include the m
 
 - 1-byte output: `["begin",["let","out",["bytes.alloc",1]],["set","out",["bytes.set_u8","out",0,"x"]],"out"]`
 - Empty output: `["bytes.alloc",0]`
-- Looping: use `bytes.len` once, then `["for","i",0,"n",body]`.
+- Looping: use `for` for counted loops (`["for","i",0,"n",body]`) and `while` for open-ended loops (`["while",cond,body]`).
 
 ### Header + tail pattern
 

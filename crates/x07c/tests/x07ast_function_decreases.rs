@@ -249,12 +249,54 @@ fn typecheck_rejects_recursive_defn_without_decreases() {
 
     let file = typecheck_testutil::file_from_json(&doc);
     let report = typecheck_file_local(&file, &TypecheckOptions::default());
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|diag| diag.code == "X07-CONTRACT-0011")
+        .expect("expected X07-CONTRACT-0011");
     assert!(
-        report
-            .diagnostics
-            .iter()
-            .any(|diag| diag.code == "X07-CONTRACT-0011"),
-        "expected X07-CONTRACT-0011, got: {:?}",
+        d.quickfix.is_some(),
+        "expected decreases inference quickfix on X07-CONTRACT-0011, got: {d:?}"
+    );
+    let q = d.quickfix.as_ref().expect("quickfix");
+    assert!(
+        q.patch.iter().any(
+            |op| matches!(op, x07c::diagnostics::PatchOp::Add { path, value }
+                if path == "/decls/0/decreases" && value == &json!([{ "expr": "n" }]))
+        ),
+        "expected decreases patch op, got: {q:?}"
+    );
+}
+
+#[test]
+fn typecheck_allows_recursive_defn_without_contracts() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_8_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.fact",
+                "params": [{"name": "n", "ty": "i32"}],
+                "result": "i32",
+                "body": [
+                    "if",
+                    ["<=", "n", 0],
+                    0,
+                    ["main.fact", ["-", "n", 1]]
+                ]
+            }
+        ],
+        "solve": ["bytes.alloc", 0],
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = typecheck_file_local(&file, &TypecheckOptions::default());
+    assert!(
+        report.diagnostics.is_empty(),
+        "expected no diagnostics, got: {:?}",
         report.diagnostics
     );
 }

@@ -73,6 +73,10 @@ pub fn guide_md() -> String {
     out.push_str("- `if`: `[\"if\", cond, then, else]` branches on non-zero `cond`\n");
     out.push_str("- `for`: `[\"for\", i, start, end, body]` declares `i` (i32) and runs it from `start` to `end-1`\n");
     out.push_str("  - `body` is a single expression; use `begin` for multiple steps.\n");
+    out.push_str(
+        "- `while`: `[\"while\", cond, body]` runs `body` while `cond` evaluates to non-zero\n",
+    );
+    out.push_str("  - `cond` must typecheck to `i32`; `body` is a single expression; use `begin` for multiple steps.\n");
     out.push_str("- `return`: `[\"return\", expr]` returns early from the current function\n");
     out.push_str("  - In `solve`, the return value must be `bytes`.\n\n");
 
@@ -88,6 +92,7 @@ pub fn guide_md() -> String {
     out.push_str("Arity reminder:\n");
     out.push_str("- `if` is `[\"if\", cond, then, else]`\n");
     out.push_str("- `for` is `[\"for\", i, start, end, body]`\n");
+    out.push_str("- `while` is `[\"while\", cond, body]`\n");
     out.push_str("- `begin` is `[\"begin\", e1, e2, ...]`\n\n");
 
     out.push_str("## Modules\n\n");
@@ -728,7 +733,7 @@ pub fn guide_md() -> String {
     out.push_str("## Common Templates\n\n");
     out.push_str("- 1-byte output: `[\"begin\",[\"let\",\"out\",[\"bytes.alloc\",1]],[\"set\",\"out\",[\"bytes.set_u8\",\"out\",0,\"x\"]],\"out\"]`\n");
     out.push_str("- Empty output: `[\"bytes.alloc\",0]`\n");
-    out.push_str("- Looping: use `bytes.len` once, then `[\"for\",\"i\",0,\"n\",body]`.\n\n");
+    out.push_str("- Looping: use `for` for counted loops (`[\"for\",\"i\",0,\"n\",body]`) and `while` for open-ended loops (`[\"while\",cond,body]`).\n\n");
 
     out.push_str("### Header + tail pattern\n\n");
     out.push_str("Many tasks use `input[0..k]` as parameters and the remaining bytes as data.\n\n");

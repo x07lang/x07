@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
+use x07_contracts::X07AST_SCHEMA_VERSION_V0_8_0;
 
 use crate::ast::Expr;
 use crate::diagnostics::{Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Severity, Stage};
@@ -372,6 +373,7 @@ impl<'a> InferState<'a> {
                     "set0" => self.infer_set0(list_ptr, items),
                     "if" => self.infer_if(list_ptr, items, want),
                     "for" => self.infer_for(list_ptr, items),
+                    "while" => self.infer_while(list_ptr, items),
                     "return" => self.infer_return(list_ptr, items),
                     "try" => self.infer_try(list_ptr, items, want),
                     "tapp" => self.infer_tapp(list_ptr, items, want),
@@ -565,6 +567,28 @@ impl<'a> InferState<'a> {
         );
         let _ = self.infer_expr(&items[4], None);
         self.pop_scope();
+        TyInfoTerm::unbranded(TyTerm::Named("i32".to_string()))
+    }
+
+    fn infer_while(&mut self, _list_ptr: &str, items: &[Expr]) -> TyInfoTerm {
+        if items.len() != 3 {
+            return TyInfoTerm::unbranded(self.fresh_meta());
+        }
+
+        // The condition and the body are evaluated in separate statement-like scopes so any local
+        // bindings introduced while computing the condition do not leak into the body.
+        self.push_scope();
+        self.check_expr(
+            &items[1],
+            &TyTerm::Named("i32".to_string()),
+            ConstraintOrigin::ExprCheck,
+        );
+        self.pop_scope();
+
+        self.push_scope();
+        let _ = self.infer_expr(&items[2], None);
+        self.pop_scope();
+
         TyInfoTerm::unbranded(TyTerm::Named("i32".to_string()))
     }
 
@@ -2002,7 +2026,7 @@ fn async_protocol_has_clauses(protocol: Option<&crate::x07ast::AsyncProtocolAst>
     })
 }
 
-fn collect_direct_call_ptrs(expr: &Expr, symbol: &str, out: &mut Vec<String>) {
+fn collect_direct_calls<'a>(expr: &'a Expr, symbol: &str, out: &mut Vec<&'a Expr>) {
     match expr {
         Expr::List { items, .. } => {
             if items
@@ -2010,14 +2034,84 @@ fn collect_direct_call_ptrs(expr: &Expr, symbol: &str, out: &mut Vec<String>) {
                 .and_then(Expr::as_ident)
                 .is_some_and(|head| head == symbol)
             {
-                out.push(expr.ptr().to_string());
+                out.push(expr);
             }
             for item in items {
-                collect_direct_call_ptrs(item, symbol, out);
+                collect_direct_calls(item, symbol, out);
             }
         }
         Expr::Int { .. } | Expr::Ident { .. } => {}
     }
+}
+
+fn infer_decreases_expr_for_direct_recursion(
+    direct_calls: &[&Expr],
+    params: &[crate::x07ast::AstFunctionParam],
+) -> Option<Expr> {
+    if direct_calls.is_empty() || params.is_empty() {
+        return None;
+    }
+
+    fn param_is_i32(p: &crate::x07ast::AstFunctionParam) -> bool {
+        matches!(&p.ty, TypeRef::Named(s) if s == "i32")
+    }
+
+    fn arg_is_strict_sub_of(arg: &Expr, param_name: &str) -> bool {
+        let Expr::List { items, .. } = arg else {
+            return false;
+        };
+        if items.len() != 3 || items.first().and_then(Expr::as_ident) != Some("-") {
+            return false;
+        }
+        if items.get(1).and_then(Expr::as_ident) != Some(param_name) {
+            return false;
+        }
+        matches!(items.get(2), Some(Expr::Int { value, .. }) if *value > 0)
+    }
+
+    let mut candidates: BTreeSet<usize> = params
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, p)| param_is_i32(p).then_some(idx))
+        .collect();
+    if candidates.is_empty() {
+        return None;
+    }
+
+    for call in direct_calls {
+        let Expr::List { items, .. } = call else {
+            return None;
+        };
+        if items.len() != params.len().saturating_add(1) {
+            return None;
+        }
+
+        let mut call_candidates: BTreeSet<usize> = BTreeSet::new();
+        for idx in &candidates {
+            let p = &params[*idx];
+            let Some(arg) = items.get(idx.saturating_add(1)) else {
+                continue;
+            };
+            if arg_is_strict_sub_of(arg, &p.name) {
+                call_candidates.insert(*idx);
+            }
+        }
+
+        candidates = candidates.intersection(&call_candidates).copied().collect();
+        if candidates.is_empty() {
+            return None;
+        }
+    }
+
+    if candidates.len() != 1 {
+        return None;
+    }
+    let idx = candidates.into_iter().next().expect("len == 1");
+    let p = &params[idx];
+    Some(Expr::Ident {
+        name: p.name.clone(),
+        ptr: String::new(),
+    })
 }
 
 fn contract_collect_ident_ptrs(expr: &Expr, needle: &str, out: &mut Vec<String>) {
@@ -2357,9 +2451,10 @@ fn typecheck_file_impl(
         let decreases = defn_decreases(file, &f.name)
             .expect("internal decreases should decode")
             .unwrap_or_default();
-        let has_contracts = contract_has_clauses(&f.requires, &f.ensures, &f.invariant);
+        let has_contracts =
+            contract_has_clauses(&f.requires, &f.ensures, &f.invariant) || !decreases.is_empty();
 
-        if opts.mode == TypecheckMode::ContractsOnly && !has_contracts && decreases.is_empty() {
+        if opts.mode == TypecheckMode::ContractsOnly && !has_contracts {
             continue;
         }
 
@@ -2369,8 +2464,12 @@ fn typecheck_file_impl(
             opts.compat,
             type_ref_to_term(&f.result),
         );
-        let mut direct_recursive_calls = Vec::new();
-        collect_direct_call_ptrs(&f.body, &f.name, &mut direct_recursive_calls);
+        let mut direct_recursive_call_exprs: Vec<&Expr> = Vec::new();
+        collect_direct_calls(&f.body, &f.name, &mut direct_recursive_call_exprs);
+        let direct_recursive_calls = direct_recursive_call_exprs
+            .iter()
+            .map(|e| e.ptr().to_string())
+            .collect::<Vec<_>>();
         for p in &f.params {
             infer.bind(
                 p.name.clone(),
@@ -2391,12 +2490,6 @@ fn typecheck_file_impl(
                         .to_string(),
                 );
             }
-            if !has_contracts {
-                reasons.push(
-                    "decreases[] requires at least one requires/ensures/invariant clause"
-                        .to_string(),
-                );
-            }
             if !reasons.is_empty() {
                 infer.diagnostics.push(diag_contract_err(
                     "X07-CONTRACT-0010",
@@ -2405,17 +2498,73 @@ fn typecheck_file_impl(
                 ));
             }
         }
-        if decreases.is_empty() {
-            for ptr in &direct_recursive_calls {
-                infer.diagnostics.push(diag_contract_err(
-                    "X07-CONTRACT-0011",
-                    ptr.clone(),
-                    "recursive self-call requires decreases[] on the enclosing defn".to_string(),
-                ));
+        if decreases.is_empty() && has_contracts && !direct_recursive_calls.is_empty() {
+            let legacy_allow = opts.compat.version <= crate::compat::CompatVersion::new(0, 3);
+            let quickfix = (file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0)
+                .then(|| {
+                    infer_decreases_expr_for_direct_recursion(
+                        &direct_recursive_call_exprs,
+                        &f.params,
+                    )
+                })
+                .flatten()
+                .map(|measure_expr| Quickfix {
+                    kind: QuickfixKind::JsonPatch,
+                    patch: vec![PatchOp::Add {
+                        path: format!("/decls/{decl_idx}/decreases"),
+                        value: serde_json::json!([{ "expr": expr_to_value(&measure_expr) }]),
+                    }],
+                    note: Some("Insert inferred decreases[]".to_string()),
+                });
+
+            for (call_idx, ptr) in direct_recursive_calls.iter().enumerate() {
+                let attach_quickfix = call_idx == 0;
+                if legacy_allow {
+                    infer.diagnostics.push(Diagnostic {
+                        code: "X07-CONTRACT-0011".to_string(),
+                        severity: Severity::Warning,
+                        stage: Stage::Type,
+                        message:
+                            "recursive self-call is missing decreases[] on the enclosing defn"
+                                .to_string(),
+                        loc: Some(Location::X07Ast { ptr: ptr.clone() }),
+                        notes: vec![
+                            "compat <= 0.3 allows recursion without decreases[] even when contracts are present."
+                                .to_string(),
+                            "Suggested fix: add decreases[] for the recursive target.".to_string(),
+                            "Auto-fix available when inference succeeds: run `x07 fix --write --input <file>` (or `x07 migrate --write --to 0.5`)."
+                                .to_string(),
+                        ],
+                        related: Vec::new(),
+                        data: BTreeMap::new(),
+                        quickfix: if attach_quickfix {
+                            quickfix.clone()
+                        } else {
+                            None
+                        },
+                    });
+                } else {
+                    let mut diag = diag_contract_err(
+                        "X07-CONTRACT-0011",
+                        ptr.clone(),
+                        "recursive self-call requires decreases[] on the enclosing defn"
+                            .to_string(),
+                    );
+                    if attach_quickfix {
+                        diag.quickfix = quickfix.clone();
+                        if diag.quickfix.is_some() {
+                            diag.notes.push(
+                                "Auto-fix available when inference succeeds: run `x07 fix --write --input <file>` (or `x07 migrate --write --to 0.5`)."
+                                    .to_string(),
+                            );
+                        }
+                    }
+                    infer.diagnostics.push(diag);
+                }
             }
         }
 
-        if has_contracts || !decreases.is_empty() {
+        if has_contracts {
             for (pidx, p) in f.params.iter().enumerate() {
                 if p.name == "__result" {
                     let ptr = format!("/decls/{decl_idx}/params/{pidx}/name");

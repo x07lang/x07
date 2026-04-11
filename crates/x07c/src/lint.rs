@@ -1383,7 +1383,7 @@ fn lint_expr(
                             ctx.value_used
                         }
                     }
-                    "for" => idx != items.len().saturating_sub(1),
+                    "for" | "while" => idx != items.len().saturating_sub(1),
                     _ => true,
                 };
                 match head {
@@ -1394,6 +1394,11 @@ fn lint_expr(
                     }
                     "for" => {
                         if idx == 4 {
+                            child_ctx.hoist_safe = false;
+                        }
+                    }
+                    "while" => {
+                        if idx == 2 {
                             child_ctx.hoist_safe = false;
                         }
                     }
@@ -1778,6 +1783,46 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
                             value: x07ast::expr_to_value(&expr_list(new_items)),
                         }],
                         note: Some("Wrap extra for body expressions in begin".to_string()),
+                    });
+                }
+                diagnostics.push(diag);
+            }
+        }
+        "while" => {
+            if items.len() != 3 {
+                let mut diag = Diagnostic {
+                    code: "X07-ARITY-WHILE-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: format!(
+                        "while expects 2 args; got {}",
+                        items.len().saturating_sub(1)
+                    ),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                };
+                if items.len() > 3 {
+                    let fixed = expr_list(vec![
+                        items[0].clone(),
+                        items[1].clone(),
+                        expr_list(
+                            std::iter::once(expr_ident("begin"))
+                                .chain(items[2..].iter().cloned())
+                                .collect(),
+                        ),
+                    ]);
+                    diag.quickfix = Some(Quickfix {
+                        kind: QuickfixKind::JsonPatch,
+                        patch: vec![PatchOp::Replace {
+                            path: ptr.to_string(),
+                            value: x07ast::expr_to_value(&fixed),
+                        }],
+                        note: Some("Wrap extra while body expressions in begin".to_string()),
                     });
                 }
                 diagnostics.push(diag);

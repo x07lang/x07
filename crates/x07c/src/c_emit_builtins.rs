@@ -307,6 +307,11 @@ impl<'a> Emitter<'a> {
                         self.decl_local(Ty::I32, &tmp);
                         self.emit_for_to(args, Ty::I32, &tmp)
                     }
+                    "while" => {
+                        let tmp = self.alloc_local("t_i32_")?;
+                        self.decl_local(Ty::I32, &tmp);
+                        self.emit_while_to(args, Ty::I32, &tmp)
+                    }
                     "return" => self.emit_return(args),
                     _ => {
                         let _ = self.emit_expr(expr)?;
@@ -603,6 +608,7 @@ impl<'a> Emitter<'a> {
             "set0" => self.emit_set0_to(args, dest_ty, dest),
             "if" => self.emit_if_to(args, dest_ty, dest),
             "for" => self.emit_for_to(args, dest_ty, dest),
+            "while" => self.emit_while_to(args, dest_ty, dest),
             "budget.scope_v1" => self.emit_budget_scope_v1_to(args, dest_ty, dest),
             "budget.scope_from_arch_v1" => {
                 self.emit_budget_scope_from_arch_v1_to(args, dest_ty, dest)
@@ -1464,6 +1470,60 @@ impl<'a> Emitter<'a> {
         self.close_block();
 
         self.line(&format!("{var_c_name} = {var_c_name} + UINT32_C(1);"));
+        self.indent -= 1;
+        self.line("}");
+
+        self.line(&format!("{dest} = UINT32_C(0);"));
+        Ok(())
+    }
+
+    pub(super) fn emit_while_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "while form: (while <cond:i32> <body:any>)".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "while expression returns i32".to_string(),
+            ));
+        }
+
+        // Evaluate the condition in an isolated scope so any temporaries created while computing
+        // the boolean do not leak into the body scope (and are dropped deterministically).
+        let cond_local = self.alloc_local("t_while_cond_")?;
+        self.decl_local(Ty::I32, &cond_local);
+
+        self.push_scope();
+        self.open_block();
+        self.emit_expr_to(&args[0], Ty::I32, &cond_local)?;
+        self.pop_scope()?;
+        self.close_block();
+
+        self.line(&format!("while ({cond_local} != UINT32_C(0)) {{"));
+        self.indent += 1;
+
+        // Body scope (like `for`).
+        self.push_scope();
+        self.open_block();
+        self.emit_stmt(&args[1])?;
+        self.pop_scope()?;
+        self.close_block();
+
+        // Recompute condition for the next iteration.
+        self.push_scope();
+        self.open_block();
+        self.emit_expr_to(&args[0], Ty::I32, &cond_local)?;
+        self.pop_scope()?;
+        self.close_block();
+
         self.indent -= 1;
         self.line("}");
 
