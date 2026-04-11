@@ -49,6 +49,7 @@ For explicit control (or when you want the raw reports), use `x07 fmt` / `x07 li
 - Deterministic context pack artifact (`x07 agent context ...`): `spec/x07-agent.context.schema.json` (`schema_version: "x07.agent.context@0.1.0"`)
 - Context pack wrapper (`x07 --json agent context ...`): `spec/x07-tool-agent-context.report.schema.json` (`schema_version: "x07.tool.agent.context.report@0.1.0"`)
 - Diagnostics catalog (source of truth): `catalog/diagnostics.json` (schema: `spec/x07-diag.catalog.schema.json`)
+  - Installed toolchains ship this catalog; `x07 explain <CODE>` uses it by default.
 - Diagnostics coverage report: `x07.diag.coverage@0.1.0` (schema: `spec/x07-diag.coverage.schema.json`)
 
 Agents should treat these as APIs: parse JSON, key off `schema_version`, and avoid scraping text.

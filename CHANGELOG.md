@@ -4,6 +4,16 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+### Fixed
+
+- Tool reports no longer emit empty `X07-TOOL-EXEC-0001` messages when a wrapped command fails with empty stderr (now falls back to child JSON `error.message` when present).
+- Tool report `meta.nondeterminism.uses_network` is now inferred for `x07 pkg*` scopes (false for `--offline` and `file://` registries).
+- `x07 explain` / `x07 diag explain` now finds the diagnostics catalog from an installed toolchain layout (no longer requires running from the repo root).
+
+### Packaging
+
+- Toolchain archives now include `catalog/diagnostics.json` and `stdlib.std-core.lock`.
+
 ## v0.2.0
 
 ### Added

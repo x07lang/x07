@@ -179,6 +179,9 @@ case "$(uname -s)" in
     ;;
 esac
 
+step "toolchain tarball contents"
+./scripts/ci/check_toolchain_tarball_contents.sh
+
 if [[ "${X07_SKIP_PERF_BASELINE:-0}" == "1" ]]; then
   echo
   echo "==> perf baseline gate (skipped; set X07_SKIP_PERF_BASELINE=0 to enable)"

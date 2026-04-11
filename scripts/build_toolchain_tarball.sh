@@ -15,7 +15,8 @@ Usage:
 Builds a toolchain tarball containing:
   - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07-vm-launcher,x07-vm-reaper,x07import-cli}
   - bin/x07-vz-helper (macOS only; required for `X07_VM_BACKEND=vz`)
-  - stdlib.lock + stdlib.os.lock (stdlib package lockfiles used by `x07 test`)
+  - stdlib.lock + stdlib.os.lock + stdlib.std-core.lock (stdlib package lockfiles used by `x07 test`)
+  - catalog/diagnostics.json (diagnostic explanations for `x07 explain`)
   - deps/x07/native_backends.json + native backend archives (for native backends like ext-regex)
   - stdlib/os/0.2.0/modules (for x07-os-runner)
   - .agent/docs/ (offline docs; also shipped as x07-docs-*.tar.gz)
@@ -102,6 +103,7 @@ fi
 stage_root="$root/dist/.tmp_toolchain_${tag}_${platform}"
 rm -rf "$stage_root"
 mkdir -p "$stage_root/bin"
+mkdir -p "$stage_root/catalog"
 mkdir -p "$stage_root/deps/x07"
 mkdir -p "$stage_root/spec"
 mkdir -p "$stage_root/stdlib/os/0.2.0"
@@ -171,7 +173,7 @@ if [[ ! -d "$stdlib_src" ]]; then
 fi
 cp -R "$stdlib_src" "$stdlib_dst"
 
-for lock in stdlib.lock stdlib.os.lock; do
+for lock in stdlib.lock stdlib.os.lock stdlib.std-core.lock; do
   lock_src="$root/$lock"
   if [[ ! -f "$lock_src" ]]; then
     echo "ERROR: missing stdlib lock file: $lock_src" >&2
@@ -179,6 +181,13 @@ for lock in stdlib.lock stdlib.os.lock; do
   fi
   cp -f "$lock_src" "$stage_root/$lock"
 done
+
+catalog_src="$root/catalog/diagnostics.json"
+if [[ ! -f "$catalog_src" ]]; then
+  echo "ERROR: missing diagnostics catalog: $catalog_src" >&2
+  exit 1
+fi
+cp -f "$catalog_src" "$stage_root/catalog/diagnostics.json"
 
 for schema in "$root"/spec/*.schema.json; do
   cp -f "$schema" "$stage_root/spec/"

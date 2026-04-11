@@ -25,9 +25,10 @@ and channel metadata for installers and companion components.
 
 An X07 release consists of:
 
-- Toolchain archives (`x07-<version>-<target>.*`) for supported platforms.
+- Toolchain archives (`x07-<version>-<target>.*`) for supported platforms (binaries, stdlib lockfiles, schemas, diagnostics catalog, and offline docs/skills).
 - Installer archives (`x07up-v<version>-<target>.*`) for supported platforms.
-- Pinned stdlib inputs (`stdlib/**` and `stdlib.lock`).
+- Pinned stdlib inputs (`stdlib/**`, `stdlib.lock`, `stdlib.os.lock`, `stdlib.std-core.lock`).
+- Diagnostics catalog (`catalog/diagnostics.json`) and generated diagnostic docs (`docs/toolchain/diagnostic-codes.md`).
 - Canonical contracts and schemas (`spec/*.schema.json`).
 - Release manifest (`dist/release-manifest.json`).
 - Core component release manifest (`dist/release/x07-<version>-release.json`).
