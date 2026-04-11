@@ -1,1 +1,1 @@
-{"decls":[{"kind":"export","names":["server.main"]},{"body":["bytes.lit","PONG\n"],"kind":"defn","name":"server.main","params":[{"name":"_input","ty":"bytes_view"}],"result":"bytes"}],"imports":[],"kind":"module","module_id":"server","schema_version":"x07.x07ast@0.4.0"}
+{"decls":[{"kind":"export","names":["server.main"]},{"body":["bytes.lit","PONG\n"],"kind":"defn","name":"server.main","params":[{"name":"_input","ty":"bytes_view"}],"result":"bytes"}],"imports":[],"kind":"module","module_id":"server","schema_version":"x07.x07ast@0.8.0"}

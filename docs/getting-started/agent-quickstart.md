@@ -302,7 +302,7 @@ x07 pkg remove NAME --sync
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
-- Canonical project manifests use `x07.project@0.5.0`. `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, and certification surfaces use the `0.4.0` fields such as `project.operational_entry_symbol` (still present in `0.5.0`).
+- Canonical project manifests use `x07.project@0.5.0`. `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, and certification surfaces use the `x07.project@0.4.0` fields such as `project.operational_entry_symbol` (still present in `x07.project@0.5.0`).
 - To migrate a legacy manifest to the current schema line, run `x07 project migrate --write --project x07.json`.
 - `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.

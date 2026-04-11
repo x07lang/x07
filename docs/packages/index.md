@@ -12,7 +12,7 @@ X07 packages are source-only (x07AST JSON), and projects pin dependencies with a
 
 - New and actively maintained projects should use `x07.project@0.5.0` (adds `project.compat`).
 - The toolchain still accepts `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` for legacy manifests.
-- `project.patch` (transitive dependency overrides) works on the current manifest line, and certification-facing projects use the `project.operational_entry_symbol` fields introduced in `x07.project@0.4.0` (and still present in `0.5.0`).
+- `project.patch` (transitive dependency overrides) works on the current manifest line, and certification-facing projects use the `project.operational_entry_symbol` fields introduced in `x07.project@0.4.0` (and still present in `x07.project@0.5.0`).
 - To migrate a legacy manifest to the current line, run `x07 project migrate --write --project x07.json`.
 
 ## Compatibility mode (`project.compat`)

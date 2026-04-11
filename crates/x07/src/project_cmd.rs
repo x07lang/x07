@@ -186,10 +186,7 @@ fn cmd_project_migrate(
         return Ok(std::process::ExitCode::from(20));
     }
 
-    if !PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED
-        .iter()
-        .any(|v| *v == schema_before.as_str())
-    {
+    if !PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED.contains(&schema_before.as_str()) {
         let report = ProjectMigrateReport {
             ok: false,
             command: "project.migrate",

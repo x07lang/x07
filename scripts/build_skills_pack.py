@@ -67,13 +67,42 @@ def add_bytes(tar: tarfile.TarFile, data: bytes, arcname: str) -> None:
     tar.addfile(ti, io.BytesIO(data))
 
 
+def load_versions(root: Path) -> dict[str, str]:
+    versions_path = root / "docs" / "_generated" / "versions.json"
+    if not versions_path.is_file():
+        raise SystemExit(f"ERROR: missing {versions_path.relative_to(root)}")
+    doc = json.loads(versions_path.read_text(encoding="utf-8"))
+    if not isinstance(doc, dict):
+        raise SystemExit(f"ERROR: {versions_path.relative_to(root)}: expected JSON object")
+    schemas = doc.get("schemas")
+    if not isinstance(schemas, dict):
+        raise SystemExit(f"ERROR: {versions_path.relative_to(root)}: missing schemas")
+
+    project = schemas.get("x07_project")
+    x07ast = schemas.get("x07_x07ast")
+    if not isinstance(project, str) or not project.strip():
+        raise SystemExit(f"ERROR: {versions_path.relative_to(root)}: missing schemas.x07_project")
+    if not isinstance(x07ast, str) or not x07ast.strip():
+        raise SystemExit(f"ERROR: {versions_path.relative_to(root)}: missing schemas.x07_x07ast")
+
+    return {
+        "canonical_manifest_schema": project.strip(),
+        "canonical_x07ast_schema": x07ast.strip(),
+    }
+
+
 def skills_pack_meta_bytes(tag: str) -> bytes:
     toolchain_tag = tag.strip()
     toolchain_version = toolchain_tag[1:] if toolchain_tag.startswith("v") else toolchain_tag
+    versions = load_versions(Path(__file__).resolve().parents[1])
     meta = {
         "schema_version": "x07.skills.pack-meta@0.1.0",
         "toolchain_tag": toolchain_tag,
         "toolchain_version": toolchain_version,
+        "requires_toolchain_min": toolchain_version,
+        "tested_with_toolchain": toolchain_version,
+        "canonical_manifest_schema": versions["canonical_manifest_schema"],
+        "canonical_x07ast_schema": versions["canonical_x07ast_schema"],
     }
     return (json.dumps(meta, sort_keys=True, indent=2) + "\n").encode("utf-8")
 

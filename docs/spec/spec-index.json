@@ -1294,6 +1294,20 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-project-migrate.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-project-migrate.report.schema.json",
+      "schema_version": "x07.tool.project.migrate.report@0.1.0",
+      "title": "x07.tool.project.migrate.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-project.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-project.report.schema.json",
+      "schema_version": "x07.tool.project.report@0.1.0",
+      "title": "x07.tool.project.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-prove-check.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-prove-check.report.schema.json",
       "schema_version": "x07.tool.prove.check.report@0.2.0",

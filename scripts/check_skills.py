@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -24,6 +26,95 @@ class Skill:
 
 class SkillError(Exception):
     pass
+
+
+def _load_module(module_path: Path, *, module_name: str) -> Any:
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise SkillError(f"failed to load module spec: {module_path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _load_versions(root: Path) -> dict[str, str]:
+    versions_path = root / "docs" / "_generated" / "versions.json"
+    if not versions_path.is_file():
+        raise SkillError(
+            f"missing {versions_path.relative_to(root)} (run: python3 scripts/gen_versions_json.py --write)"
+        )
+    doc = json.loads(versions_path.read_text(encoding="utf-8"))
+    if not isinstance(doc, dict):
+        raise SkillError(f"{versions_path.relative_to(root)}: expected JSON object")
+
+    toolchain = doc.get("toolchain")
+    schemas = doc.get("schemas")
+    if not isinstance(toolchain, dict) or not isinstance(schemas, dict):
+        raise SkillError(f"{versions_path.relative_to(root)}: invalid shape")
+
+    def get_str(obj: dict[str, Any], key: str) -> str:
+        v = obj.get(key)
+        if not isinstance(v, str) or not v.strip():
+            raise SkillError(f"{versions_path.relative_to(root)}: missing {key}")
+        return v.strip()
+
+    return {
+        "x07_version": get_str(toolchain, "x07"),
+        "canonical_manifest_schema": get_str(schemas, "x07_project"),
+        "canonical_x07ast_schema": get_str(schemas, "x07_x07ast"),
+    }
+
+
+def validate_skills_pack_meta(root: Path) -> list[str]:
+    errors: list[str] = []
+    try:
+        versions = _load_versions(root)
+    except SkillError as e:
+        errors.append(str(e))
+        return errors
+
+    tag = f"v{versions['x07_version']}"
+    build_path = root / "scripts" / "build_skills_pack.py"
+    try:
+        mod = _load_module(build_path, module_name="build_skills_pack")
+    except Exception as e:
+        errors.append(f"failed to import {build_path.relative_to(root)}: {e}")
+        return errors
+
+    try:
+        meta_bytes = mod.skills_pack_meta_bytes(tag)
+    except BaseException as e:
+        errors.append(f"{build_path.relative_to(root)}: skills_pack_meta_bytes failed: {e}")
+        return errors
+
+    try:
+        meta = json.loads(meta_bytes.decode("utf-8"))
+    except Exception as e:
+        errors.append(f"{build_path.relative_to(root)}: skills_pack_meta_bytes returned invalid JSON: {e}")
+        return errors
+
+    if not isinstance(meta, dict):
+        errors.append(f"{build_path.relative_to(root)}: skills pack meta must be a JSON object")
+        return errors
+
+    expected = {
+        "schema_version": "x07.skills.pack-meta@0.1.0",
+        "toolchain_tag": tag,
+        "toolchain_version": versions["x07_version"],
+        "requires_toolchain_min": versions["x07_version"],
+        "tested_with_toolchain": versions["x07_version"],
+        "canonical_manifest_schema": versions["canonical_manifest_schema"],
+        "canonical_x07ast_schema": versions["canonical_x07ast_schema"],
+    }
+
+    for k, want in expected.items():
+        have = meta.get(k)
+        if have != want:
+            errors.append(
+                f"{build_path.relative_to(root)}: skills pack meta {k} mismatch: have={have!r} want={want!r}"
+            )
+
+    return errors
 
 
 def parse_frontmatter(lines: list[str], *, path: Path) -> tuple[dict[str, Any], int]:
@@ -199,6 +290,8 @@ def main(argv: list[str]) -> int:
             errors.append(f"duplicate skill name: {s.name!r}")
         seen.add(s.name)
         errors.extend(validate_skill(root, skills_root, s))
+
+    errors.extend(validate_skills_pack_meta(root))
 
     if errors:
         for e in errors:
