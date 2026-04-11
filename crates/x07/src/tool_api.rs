@@ -213,6 +213,9 @@ fn wrapped_report(
         .or_else(|| extract_diagnostics(stderr_json.as_ref()))
         .unwrap_or_default();
 
+    let stdout_stream = stream_payload(&out.stdout);
+    let stderr_stream = stream_payload(&out.stderr);
+
     let mut exit_code = out.exit_code;
     if out.internal_failure {
         exit_code = 3;
@@ -236,8 +239,14 @@ fn wrapped_report(
             .iter()
             .all(|d| d.severity != diagnostics::Severity::Error)
     {
-        let msg = stream_payload(&out.stderr)
-            .text
+        let msg = extract_child_error_message_any(stdout_json.as_ref(), stderr_json.as_ref())
+            .or_else(|| {
+                stderr_stream
+                    .text
+                    .as_deref()
+                    .and_then(non_empty_trimmed)
+                    .map(str::to_string)
+            })
             .unwrap_or_else(|| format!("wrapped command failed with exit code {exit_code}"));
         diagnostics.push(reporting::diag_error(
             "X07-TOOL-EXEC-0001",
@@ -247,8 +256,8 @@ fn wrapped_report(
     }
 
     let result = ToolResultPayload {
-        stdout: stream_payload(&out.stdout),
-        stderr: stream_payload(&out.stderr),
+        stdout: stdout_stream,
+        stderr: stderr_stream,
         stdout_json,
         stderr_json,
     };
@@ -272,7 +281,7 @@ fn wrapped_report(
     let meta = reporting::MetaDelta {
         inputs: input_paths.into_iter().collect(),
         outputs: output_paths.into_iter().collect(),
-        ..Default::default()
+        nondeterminism: infer_nondeterminism(scope, &parsed.passthrough),
     };
 
     Ok(reporting::build_report(
@@ -587,6 +596,117 @@ fn parse_json_bytes(bytes: &[u8]) -> Option<Value> {
     serde_json::from_slice(bytes).ok()
 }
 
+fn non_empty_trimmed(s: &str) -> Option<&str> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
+}
+
+fn extract_child_error_message(doc: &Value) -> Option<String> {
+    let obj = doc.as_object()?;
+
+    if let Some(err) = obj.get("error") {
+        match err {
+            Value::Object(eobj) => {
+                let code = eobj
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .and_then(non_empty_trimmed);
+                let message = eobj
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .and_then(non_empty_trimmed)
+                    .or_else(|| {
+                        eobj.get("msg")
+                            .and_then(Value::as_str)
+                            .and_then(non_empty_trimmed)
+                    })
+                    .or_else(|| {
+                        eobj.get("error")
+                            .and_then(Value::as_str)
+                            .and_then(non_empty_trimmed)
+                    });
+
+                return match (code, message) {
+                    (Some(c), Some(m)) => Some(format!("{c}: {m}")),
+                    (None, Some(m)) => Some(m.to_string()),
+                    (Some(c), None) => Some(c.to_string()),
+                    (None, None) => None,
+                };
+            }
+            Value::String(s) => {
+                return non_empty_trimmed(s).map(str::to_string);
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(m) = obj
+        .get("message")
+        .and_then(Value::as_str)
+        .and_then(non_empty_trimmed)
+    {
+        return Some(m.to_string());
+    }
+
+    None
+}
+
+fn extract_child_error_message_any(
+    stdout_json: Option<&Value>,
+    stderr_json: Option<&Value>,
+) -> Option<String> {
+    stdout_json
+        .and_then(extract_child_error_message)
+        .or_else(|| stderr_json.and_then(extract_child_error_message))
+}
+
+fn infer_nondeterminism(scope: Option<&str>, argv: &[OsString]) -> reporting::Nondeterminism {
+    let mut nd = reporting::Nondeterminism::default();
+    let Some(scope) = scope else {
+        return nd;
+    };
+
+    if scope == "pkg" || scope.starts_with("pkg.") {
+        let mut offline = false;
+        let mut file_registry = false;
+
+        let mut i = 0usize;
+        while i < argv.len() {
+            let tok = argv[i].to_string_lossy();
+
+            if tok == "--offline" {
+                offline = true;
+            }
+
+            if let Some(v) = tok
+                .strip_prefix("--index=")
+                .or_else(|| tok.strip_prefix("--registry="))
+            {
+                if v.contains("file://") {
+                    file_registry = true;
+                }
+            }
+
+            if (tok == "--index" || tok == "--registry") && i + 1 < argv.len() {
+                let v = argv[i + 1].to_string_lossy();
+                if v.contains("file://") {
+                    file_registry = true;
+                }
+            }
+
+            i += 1;
+        }
+
+        nd.uses_network = !(offline || file_registry);
+    }
+
+    nd
+}
+
 fn extract_diagnostics(doc: Option<&Value>) -> Option<Vec<diagnostics::Diagnostic>> {
     let doc = doc?;
     let obj = doc.as_object()?;
@@ -752,4 +872,149 @@ fn internal_error_report(
         },
         reporting::MetaDelta::default(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parsed_with_passthrough(passthrough: &[&str]) -> reporting::ParsedMachineFlags {
+        reporting::ParsedMachineFlags {
+            mode: reporting::JsonMode::Off,
+            json_schema: false,
+            json_schema_id: false,
+            report_out: None,
+            quiet_json: false,
+            out: None,
+            passthrough: passthrough.iter().map(OsString::from).collect(),
+            saw_any: false,
+            parse_errors: Vec::new(),
+        }
+    }
+
+    fn tool_exec_diag(
+        report: &reporting::ToolReport<ToolResultPayload>,
+    ) -> &diagnostics::Diagnostic {
+        report
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "X07-TOOL-EXEC-0001")
+            .expect("missing X07-TOOL-EXEC-0001")
+    }
+
+    #[test]
+    fn wrapped_report_uses_stdout_json_error_message_when_stderr_empty() {
+        let raw_args = [
+            OsString::from("x07"),
+            OsString::from("pkg"),
+            OsString::from("versions"),
+        ];
+        let parsed = parsed_with_passthrough(&["pkg", "versions", "std"]);
+        let out = ChildOutput {
+            exit_code: 20,
+            internal_failure: false,
+            stdout: br#"{"ok":false,"error":{"code":"X07PKG_INDEX_CONFIG","message":"fetch index failed"}}"#.to_vec(),
+            stderr: Vec::new(),
+        };
+
+        let report = wrapped_report(
+            &raw_args,
+            &parsed,
+            Some("pkg.versions"),
+            Instant::now(),
+            out,
+        )
+        .expect("wrapped_report");
+
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            tool_exec_diag(&report).message,
+            "X07PKG_INDEX_CONFIG: fetch index failed"
+        );
+    }
+
+    #[test]
+    fn wrapped_report_falls_back_to_exit_code_message_if_no_stderr_and_no_json_error() {
+        let raw_args = [
+            OsString::from("x07"),
+            OsString::from("pkg"),
+            OsString::from("versions"),
+        ];
+        let parsed = parsed_with_passthrough(&["pkg", "versions", "std"]);
+        let out = ChildOutput {
+            exit_code: 7,
+            internal_failure: false,
+            stdout: b"not json".to_vec(),
+            stderr: Vec::new(),
+        };
+
+        let report = wrapped_report(
+            &raw_args,
+            &parsed,
+            Some("pkg.versions"),
+            Instant::now(),
+            out,
+        )
+        .expect("wrapped_report");
+
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            tool_exec_diag(&report).message,
+            "wrapped command failed with exit code 7"
+        );
+    }
+
+    #[test]
+    fn wrapped_report_infers_uses_network_for_pkg_scope() {
+        let raw_args = [
+            OsString::from("x07"),
+            OsString::from("pkg"),
+            OsString::from("versions"),
+        ];
+        let parsed = parsed_with_passthrough(&["pkg", "versions", "std"]);
+        let out = ChildOutput {
+            exit_code: 0,
+            internal_failure: false,
+            stdout: br#"{"ok":true}"#.to_vec(),
+            stderr: Vec::new(),
+        };
+
+        let report = wrapped_report(
+            &raw_args,
+            &parsed,
+            Some("pkg.versions"),
+            Instant::now(),
+            out,
+        )
+        .expect("wrapped_report");
+
+        assert!(report.meta.nondeterminism.uses_network);
+    }
+
+    #[test]
+    fn wrapped_report_offline_pkg_scope_does_not_use_network() {
+        let raw_args = [
+            OsString::from("x07"),
+            OsString::from("pkg"),
+            OsString::from("versions"),
+        ];
+        let parsed = parsed_with_passthrough(&["pkg", "versions", "std", "--offline"]);
+        let out = ChildOutput {
+            exit_code: 0,
+            internal_failure: false,
+            stdout: br#"{"ok":true}"#.to_vec(),
+            stderr: Vec::new(),
+        };
+
+        let report = wrapped_report(
+            &raw_args,
+            &parsed,
+            Some("pkg.versions"),
+            Instant::now(),
+            out,
+        )
+        .expect("wrapped_report");
+
+        assert!(!report.meta.nondeterminism.uses_network);
+    }
 }
