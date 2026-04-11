@@ -18,10 +18,12 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - `try_doc` special form: `["try_doc", doc_expr]` for doc-envelope propagation in `bytes`-returning functions.
 - Built-in `std.doc` helpers and `docs/reference/doc-envelope.md` describing the stable doc-envelope encoding.
 - Built-in `std.view.slice_v1` for clamped `bytes_view` slicing (never traps).
+- Safe unsigned decimal parsing helpers in `std.parse`: `u32_status_le` and `u32_status_le_at` (non-trapping status bytes, with optional next-offset reporting).
 - Stable encoding helpers in `std.codec`: `base64_encode_v1`, `base64_decode_v1`, `hex_encode_v1`, `hex_decode_v1` (decode returns a doc envelope).
 - Iteration helpers in `std.small_map` / `std.small_set`: `iter_init_v1`, `iter_next_v1` (doc envelope results).
 - `x07 explain <CODE>` top-level alias for `x07 diag explain <CODE>`.
 - `x07 repro compile` for portable compile repro directory bundles.
+- Perf canary `canary/ext_json_canonicalize_small` (bench suite now supports per-suite `module_roots` for resolving non-stdlib modules deterministically).
 
 ### Changed
 
@@ -40,6 +42,8 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - `x07 trust report` includes `std-core` SBOM components when `stdlib.std-core.lock` is present.
 - `x07 check` diagnostics now include provenance fields (`module_id`, dependency `package{name,version}` when applicable, and best-effort `dependency_chain`).
 - `x07 diag explain` now prints suggested `x07 fix` / `x07 migrate` commands when applicable.
+- `ext.json.canon.canonicalize` now emits canonical JSON without allocating intermediate per-value `bytes` buffers (lower heap and memcpy for nested objects/arrays).
+- Getting-started docs and agent skills are now aligned on the canonical compat/migrate/while/try_doc narrative (and document `--compat` and `x07 repro compile` where applicable).
 
 ### Breaking changes
 

@@ -18,6 +18,7 @@ This skill provides the single canonical way to run tests for an X07 project usi
 ## Notes
 
 - By default, `x07 test` prints JSON to stdout; use `--report-out <path>` to write a report file.
+- Use `--compat <mode>` to override the project’s pinned compatibility mode for one test run (for example when debugging older code): `x07 test --compat 0.5 --manifest tests/tests.json`.
 - Filter selection:
   - `x07 test --manifest tests/tests.json --filter <substr>`
   - `x07 test --manifest tests/tests.json --filter <id> --exact`

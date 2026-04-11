@@ -308,8 +308,8 @@
       "name": "std.parse",
       "path": "stdlib/std/0.1.1/modules/std/parse.x07.json",
       "relpath": "std/0.1.1/modules/std/parse.x07.json",
-      "sha256": "9c667882740007c6763159f166cdab6f7140424dbcdf08db001c23444a1da0bc",
-      "size_bytes": 4318,
+      "sha256": "23775ed683660440eaf31afd0021aa6dc862d6a09a441fb608fc3b3498d8d764",
+      "size_bytes": 5983,
       "version": "0.1.1"
     },
     {
@@ -675,6 +675,6 @@
       "version": "0.1.2"
     }
   ],
-  "stdlib_hash": "4c95f947c8e33c68faabe7a76fb3e95bd5341228c22025aa1335e6d955d49bd6",
+  "stdlib_hash": "76eb3deb91f29dbd89d9956e97bb88014290fece64dd4af775175a0a33ceb174",
   "stdlib_root": "stdlib/std"
 }

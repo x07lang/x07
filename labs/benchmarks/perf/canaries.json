@@ -3,32 +3,48 @@
   "suites": {
     "labs/benchmarks/solve-full/stdlib-parity-smoke.json": {
       "tasks": {
-	        "full/cache_rr_bodies_in_kv_concat": {
-	          "c_source_size": 288955,
-	          "cases": [
-	            {
-	              "fuel_used": 420,
-	              "heap_used": 181170,
-	              "name": "AABA"
-	            }
-	          ],
-	          "compile_fuel_used": 1270
-	        },
-	        "full/mini_app_report_v1": {
-	          "c_source_size": 464768,
-	          "cases": [
-	            {
-	              "fuel_used": 25381,
-	              "heap_used": 185735,
-	              "name": "full_app"
-	            }
-	          ],
-	          "compile_fuel_used": 12521
-	        }
-	      }
-	    },
+        "full/cache_rr_bodies_in_kv_concat": {
+          "c_source_size": 288955,
+          "cases": [
+            {
+              "fuel_used": 420,
+              "heap_used": 181170,
+              "name": "AABA"
+            }
+          ],
+          "compile_fuel_used": 1270
+        },
+        "full/mini_app_report_v1": {
+          "c_source_size": 464768,
+          "cases": [
+            {
+              "fuel_used": 25381,
+              "heap_used": 185735,
+              "name": "full_app"
+            }
+          ],
+          "compile_fuel_used": 12789
+        }
+      }
+    },
     "labs/benchmarks/solve-pure/abi-types-smoke.json": {
       "tasks": {
+        "canary/ext_json_canonicalize_small": {
+          "c_source_size": 374413,
+          "cases": [
+            {
+              "fuel_used": 2193,
+              "heap_used": 78,
+              "name": "obj_sort1"
+            },
+            {
+              "fuel_used": 2555,
+              "heap_used": 94,
+              "name": "ws_obj_sort1"
+            }
+          ],
+          "compile_fuel_used": 6060
+        },
         "canary/std_json_canonicalize_small": {
           "c_source_size": 370343,
           "cases": [

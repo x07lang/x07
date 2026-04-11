@@ -302,6 +302,12 @@ pub fn guide_md() -> String {
     out.push_str("  - `[\"std.parse.u32_dec\",\"b\"]` -> i32\n");
     out.push_str("  - `[\"std.parse.u32_dec_at\",\"b\",\"off\"]` -> i32\n");
     out.push_str(
+        "  - `[\"std.parse.u32_status_le\",\"b\"]` -> bytes (tag byte 1 + u32_le, or tag byte 0)\n",
+    );
+    out.push_str(
+        "  - `[\"std.parse.u32_status_le_at\",\"b\",\"off\"]` -> bytes (tag byte 1 + u32_le + next_off_u32_le, or tag byte 0)\n",
+    );
+    out.push_str(
         "  - `[\"std.parse.i32_status_le\",\"b\"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)\n",
     );
     out.push_str(
@@ -727,7 +733,7 @@ pub fn guide_md() -> String {
     out.push_str("## Stdlib (pure)\n\n");
     out.push_str("Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):\n\n");
     out.push_str("- `std.codec`: `[\"std.codec.read_u32_le\",\"b\",\"off\"]` (`b` is bytes_view), `[\"std.codec.write_u32_le\",\"x\"]`, `[\"std.codec.base64_encode_v1\",\"b\"]`, `[\"std.codec.base64_decode_v1\",\"s\"]` (doc), `[\"std.codec.hex_encode_v1\",\"b\"]`, `[\"std.codec.hex_decode_v1\",\"s\"]` (doc)\n");
-    out.push_str("- `std.parse`: `[\"std.parse.u32_dec\",\"b\"]`, `[\"std.parse.u32_dec_at\",\"b\",\"off\"]`, `[\"std.parse.i32_status_le\",\"b\"]`\n");
+    out.push_str("- `std.parse`: `[\"std.parse.u32_dec\",\"b\"]`, `[\"std.parse.u32_dec_at\",\"b\",\"off\"]`, `[\"std.parse.u32_status_le\",\"b\"]`, `[\"std.parse.u32_status_le_at\",\"b\",\"off\"]`, `[\"std.parse.i32_status_le\",\"b\"]`, `[\"std.parse.i32_status_le_at\",\"b\",\"off\"]`\n");
     out.push_str(
         "- `std.fmt`: `[\"std.fmt.u32_to_dec\",\"x\"]`, `[\"std.fmt.s32_to_dec\",\"x\"]`\n",
     );

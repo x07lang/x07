@@ -6830,8 +6830,8 @@
           "generated_by": "x07import",
           "module_id": "ext.json.canon",
           "path": "packages/ext/x07-ext-json-rs/0.1.6/modules/ext/json/canon.x07.json",
-          "sha256": "257bd91ff3961fc200c109bd67859f428cf78153fa2aaedaed5bd23a47c59ca8",
-          "size_bytes": 18384,
+          "sha256": "d12bffc708fc4afffd5c89cde28f714967782942291e677086ce505a28b87fb1",
+          "size_bytes": 19389,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/canon.rs",
           "source_sha256": "6e3a09dc1094a38fa1cd56e508d42fd0b6822898a1c22e75b20200803d59e34e"
         },
@@ -6853,8 +6853,8 @@
         {
           "module_id": "ext.json.tests",
           "path": "packages/ext/x07-ext-json-rs/0.1.6/modules/ext/json/tests.x07.json",
-          "sha256": "743f7ed1160311de23d31af307a74af494382dbb275f4dbc42322b61e09e1dac",
-          "size_bytes": 8347
+          "sha256": "7fea448131ac1000410096728326b629d3b9c29d6da04d07493feb3f20adce84",
+          "size_bytes": 8807
         }
       ],
       "name": "ext-json-rs",
@@ -14229,6 +14229,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "5a0b0acc0ff9481cb7fef7b7f322634ea64b55accaafbc72fca6fb379e0b0acf",
+  "packages_hash": "bf0e4526a22f309cb1f462ee536dc0af200fb96f7b66931755a8fd49caf2beff",
   "packages_root": "packages/ext"
 }

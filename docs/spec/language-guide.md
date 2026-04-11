@@ -305,6 +305,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 - `std.parse`
   - `["std.parse.u32_dec","b"]` -> i32
   - `["std.parse.u32_dec_at","b","off"]` -> i32
+  - `["std.parse.u32_status_le","b"]` -> bytes (tag byte 1 + u32_le, or tag byte 0)
+  - `["std.parse.u32_status_le_at","b","off"]` -> bytes (tag byte 1 + u32_le + next_off_u32_le, or tag byte 0)
   - `["std.parse.i32_status_le","b"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)
   - `["std.parse.i32_status_le_at","b","off"]` -> bytes (tag byte 1 + i32_le + next_off_u32_le, or tag byte 0)
 - `std.fmt`
@@ -713,7 +715,7 @@ Use `emit_*` stdlib functions to produce canonical deterministic encodings:
 Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):
 
 - `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`, `["std.codec.base64_encode_v1","b"]`, `["std.codec.base64_decode_v1","s"]` (doc), `["std.codec.hex_encode_v1","b"]`, `["std.codec.hex_decode_v1","s"]` (doc)
-- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.i32_status_le","b"]`
+- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.u32_status_le","b"]`, `["std.parse.u32_status_le_at","b","off"]`, `["std.parse.i32_status_le","b"]`, `["std.parse.i32_status_le_at","b","off"]`
 - `std.fmt`: `["std.fmt.u32_to_dec","x"]`, `["std.fmt.s32_to_dec","x"]`
 - `std.prng`: `["std.prng.lcg_next_u32","state"]`
 

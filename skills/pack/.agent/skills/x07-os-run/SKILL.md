@@ -62,3 +62,9 @@ For net-enabled templates, keep `net.allow_hosts` empty in the base policy and u
 In both cases:
 - Use the process exit code for pass/fail.
 - Parse the JSON for `schema_version`, `mode`, `world`, and base64-encoded output bytes.
+
+## Repro bundles (compile-time)
+
+If compilation fails in CI or a restricted environment, generate a portable compile repro bundle:
+
+- `x07 repro compile --project x07.json`

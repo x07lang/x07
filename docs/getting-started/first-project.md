@@ -21,6 +21,15 @@ This creates:
 
 If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
 
+## Version + compat (when upgrading older code)
+
+New projects pin a compatibility mode in `x07.json` (`project.compat`). If you are working in an older repo or with older package code, prefer mechanical migration:
+
+```bash
+x07 migrate --to 0.5 --check --input src/main.x07.json
+x07 migrate --to 0.5 --write --input src/main.x07.json
+```
+
 ## Make it return bytes
 
 Create `patch.json`:

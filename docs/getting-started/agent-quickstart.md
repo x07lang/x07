@@ -26,6 +26,31 @@ High-level primitives to learn early (the “one whole system”):
 - Function contracts + verification: `requires` / `ensures` / `invariant` + `x07 verify --prove|--coverage` (proof artifacts plus explicit support posture)
 - Certificate-first review: `x07 prove check`, `x07 trust certify`, `x07 review diff`, `x07 trust report`
 
+## 0.5) Version + compat + migration (do this early)
+
+New projects pin a compatibility mode in `x07.json` (`project.compat`, default `"0.5"`). If you open older projects or older package code, prefer mechanical migration over relying on legacy behavior:
+
+```bash
+x07 migrate --to 0.5 --check --input src/main.x07.json
+x07 migrate --to 0.5 --write --input src/main.x07.json
+```
+
+For one-off debugging, you can override compatibility at the command level:
+
+```bash
+x07 run --compat 0.5
+```
+
+See: [Compatibility contract](../reference/compat.md) and `x07 migrate` in [Toolchain CLI](../toolchain/cli.md).
+
+## 0.6) Canonical patterns (loops, bytes/view, errors)
+
+- Loops: use `for` for counted loops and `while` for scanning loops; reserve recursion for contract/verified code.
+- Bytes/view: call-argument coercion exists, but prefer explicit `bytes.view` at library boundaries.
+- Error propagation:
+  - typed results (`result_i32`, `result_bytes`) use `try`
+  - doc envelopes use `try_doc` (see [Doc envelope](../reference/doc-envelope.md))
+
 ## 1) Install and verify the toolchain
 
 - Install with `x07up` (recommended).

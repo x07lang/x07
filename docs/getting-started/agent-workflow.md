@@ -40,6 +40,7 @@ An autonomous agent should follow a loop like:
 4. If it fails:
    - parse `x07diag` output
    - apply a suggested quickfix (`x07 fix`) or produce a new patch and apply it with `x07 ast apply-patch`
+   - if diagnostics indicate a compatibility or migration issue, run `x07 migrate --check/--write --to 0.5` (or temporarily override with `--compat`)
 5. Repeat until green
 
 See also: [Repair loop](../toolchain/repair-loop.md) and [Running programs](../toolchain/running-programs.md).
@@ -50,6 +51,7 @@ When dependencies change, update and verify the lockfile in the same loop:
 - `x07 pkg lock --project x07.json --check` (CI gate)
 - When the index can be consulted, `--check` also fails on yanked/advised deps unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
 - For transitive dependency overrides, use `project.patch` in `x07.json` (canonical schema: `x07.project@0.5.0`; `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are legacy compatibility lines).
+- For offline workflows and local `file://` registry mirrors, see: [Offline workflows](../guides/offline.md).
 
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.
 

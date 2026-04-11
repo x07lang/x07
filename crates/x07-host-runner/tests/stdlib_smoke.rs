@@ -391,6 +391,41 @@ fn std_parse_i32_status_le_matches_suite_vectors() {
 }
 
 #[test]
+fn std_parse_u32_status_le_matches_vectors() {
+    let program = x07_program::entry(&["std.parse"], json!(["std.parse.u32_status_le", "input"]));
+    let exe = compile_exe(program.as_slice());
+    assert_eq!(run_exe(&exe, b"0"), b"\x01\x00\x00\x00\x00");
+    assert_eq!(run_exe(&exe, b"  42\t"), b"\x01*\x00\x00\x00");
+    assert_eq!(run_exe(&exe, b"4294967295"), b"\x01\xff\xff\xff\xff");
+    assert_eq!(run_exe(&exe, b"4294967296"), b"\x00");
+    assert_eq!(run_exe(&exe, b""), b"\x00");
+    assert_eq!(run_exe(&exe, b"abc"), b"\x00");
+}
+
+#[test]
+fn std_parse_u32_status_le_at_reports_next_offset() {
+    let program = x07_program::entry(
+        &["std.parse"],
+        json!(["std.parse.u32_status_le_at", "input", 0]),
+    );
+    let exe = compile_exe(program.as_slice());
+    assert_eq!(
+        run_exe(&exe, b"123,45"),
+        b"\x01{\x00\x00\x00\x03\x00\x00\x00"
+    );
+
+    let program = x07_program::entry(
+        &["std.parse"],
+        json!(["std.parse.u32_status_le_at", "input", 4]),
+    );
+    let exe = compile_exe(program.as_slice());
+    assert_eq!(
+        run_exe(&exe, b"123,45"),
+        b"\x01-\x00\x00\x00\x06\x00\x00\x00"
+    );
+}
+
+#[test]
 fn std_result_chain_sum_csv_i32_matches_suite_vectors() {
     let program = x07_program::entry(
         &["std.result"],
