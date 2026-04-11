@@ -43,6 +43,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
 
     # locks
     "stdlib.lock",
+    "stdlib.std-core.lock",
     "stdlib.os.lock",
 
     # production content
