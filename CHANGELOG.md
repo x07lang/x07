@@ -11,6 +11,7 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - Offline workflow guide (`docs/guides/offline.md`) covering lock checks and local index mirrors.
 - Project-level compatibility selection: `x07.project@0.5.0` adds `project.compat`, with `--compat` and `X07_COMPAT` overrides for compilation entry points.
 - `x07 migrate` for deterministic mechanical rewrites (`--check` / `--write`) targeting `--to 0.5`.
+- `x07 project migrate` for migrating `x07.json` manifests from legacy schema lines to `x07.project@0.5.0` (inserts `compat: "0.5"` when upgrading).
 - Core control-flow form `while`: `["while", cond, body]` (returns `i32` `0`).
 - Project-local `x07 pkg` configuration via `.x07/config.json` or `x07.config.json` (`x07.config@0.1.0`) for `pkg.registry` and `pkg.offline`.
 - `x07 pkg list` and `x07 pkg info` for browsing packages via a local `file://` sparse index mirror (and local `.x07/deps` when available).
@@ -24,6 +25,8 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - `x07 explain <CODE>` top-level alias for `x07 diag explain <CODE>`.
 - `x07 repro compile` for portable compile repro directory bundles.
 - Perf canary `canary/ext_json_canonicalize_small` (bench suite now supports per-suite `module_roots` for resolving non-stdlib modules deterministically).
+- `x07-agent-context` end-user skill for deterministic repair handoffs (`x07 agent context`).
+- Canary gate `scripts/ci/check_doc_examples.sh` that lints `docs/examples/*.x07.json`.
 
 ### Changed
 
@@ -42,6 +45,7 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - `x07 trust report` includes `std-core` SBOM components when `stdlib.std-core.lock` is present.
 - `x07 check` diagnostics now include provenance fields (`module_id`, dependency `package{name,version}` when applicable, and best-effort `dependency_chain`).
 - `x07 diag explain` now prints suggested `x07 fix` / `x07 migrate` commands when applicable.
+- `x07 doc` now resolves common prelude names (for example `codec.*`, `bytes.get_u8`, `vec_u8.*`, `chan.bytes.*`, `task.scope.*`) and documents them in `docs/language/prelude-and-names.md`.
 - `ext.json.canon.canonicalize` now emits canonical JSON without allocating intermediate per-value `bytes` buffers (lower heap and memcpy for nested objects/arrays).
 - Getting-started docs and agent skills are now aligned on the canonical compat/migrate/while/try_doc narrative (and document `--compat` and `x07 repro compile` where applicable).
 

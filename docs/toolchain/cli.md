@@ -151,6 +151,18 @@ Add `--pretty` to produce deterministic multi-line formatting intended for human
 
 See: [PBT repro → regression test](pbt-fix-from-repro.md).
 
+### Project manifest migrations (`x07.json`)
+
+- `x07 project migrate --check --project x07.json`
+  - Exits non-zero when `x07.json` is on a legacy schema line.
+- `x07 project migrate --write --project x07.json`
+  - Rewrites `schema_version` to the current manifest line (`x07.project@0.5.0`) and inserts `compat: "0.5"` when upgrading from a legacy schema line.
+
+Notes:
+
+- `x07 project migrate` is for **`x07.json` schema** migrations.
+- `x07 migrate` is for **`*.x07.json` code** migrations (compat updates).
+
 ### AST slicing (deterministic context views)
 
 - `x07 ast slice --in <path> --ptr <json_pointer> [--enclosure decl|defn|module] [--closure locals|types|imports|all] [--max-nodes N] [--max-bytes BYTES]`

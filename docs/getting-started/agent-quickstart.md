@@ -303,12 +303,13 @@ Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
 - Canonical project manifests use `x07.project@0.5.0`. `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, and certification surfaces use the `0.4.0` fields such as `project.operational_entry_symbol` (still present in `0.5.0`).
+- To migrate a legacy manifest to the current schema line, run `x07 project migrate --write --project x07.json`.
 - `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
 - For builtin `std.*` modules (file: `<builtin>`), use `x07 doc std.<module>` (example: `x07 doc std.bytes`).
 - For package-provided `std.*` modules, run `x07 doc <module-id> --project x07.json` after adding the package (example: after `x07 pkg add ext-net --sync`, run `x07 doc std.net.tcp --project x07.json`).
-- For special forms (pipes, `task.scope_v1`, `budget.*`) and non-module builtins (example: `std.brand.*`), use `x07 guide` + linked docs pages (not `x07 doc`).
+- For builtin forms (example: `bytes.len`, `task.scope_v1`, `budget.scope_v1`), use `x07 doc <name>` (or force builtin resolution with `x07 doc --builtin <name>`). For the full reference (including syntax forms), use `x07 guide`. See: [Prelude & names](../language/prelude-and-names.md).
 - For structured encodings, prefer branded bytes + validators over ad-hoc parsing (see `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` in `x07 guide` and `meta.brands_v1` in schema-derived modules).
 - For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--registry <URL>` (alias: `--index <URL>`), or set a default in `.x07/config.json` / `x07.config.json`. Forbid network with `--offline`.

@@ -188,6 +188,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("pkg.versions") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-versions.report.schema.json"
         )),
+        Some("project") => Some(include_bytes!(
+            "../../../spec/x07-tool-project.report.schema.json"
+        )),
+        Some("project.migrate") => Some(include_bytes!(
+            "../../../spec/x07-tool-project-migrate.report.schema.json"
+        )),
         Some("policy") => Some(include_bytes!(
             "../../../spec/x07-tool-policy.report.schema.json"
         )),

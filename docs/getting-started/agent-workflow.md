@@ -41,6 +41,7 @@ An autonomous agent should follow a loop like:
    - parse `x07diag` output
    - apply a suggested quickfix (`x07 fix`) or produce a new patch and apply it with `x07 ast apply-patch`
    - if diagnostics indicate a compatibility or migration issue, run `x07 migrate --check/--write --to 0.5` (or temporarily override with `--compat`)
+   - if the repo uses a legacy `x07.json` schema line, run `x07 project migrate --check/--write --project x07.json`
 5. Repeat until green
 
 See also: [Repair loop](../toolchain/repair-loop.md) and [Running programs](../toolchain/running-programs.md).

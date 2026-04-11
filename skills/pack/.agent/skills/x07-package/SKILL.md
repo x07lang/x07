@@ -75,6 +75,7 @@ Use this skill when:
 - You can set project-local defaults in `.x07/config.json` or `x07.config.json` (`x07.config@0.1.0`) under `pkg.registry` and `pkg.offline`.
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `--refresh` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
 - Canonical project manifests use `x07.project@0.5.0`. `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, but `project.patch` requires `x07.project@0.3.0` or newer.
+- To migrate a legacy manifest to the current schema line, run `x07 project migrate --write --project x07.json`.
 - In `--check` mode, when the index can be consulted, lock validation also fails on yanked dependencies and active advisories unless explicitly allowed.
 - Use `project.patch` in `x07.json` to override transitive dependency versions (for example, moving off yanked/advised versions).
 - Patch paths under `.x07/deps/...` are treated as vendored deps (fetchable) during `x07 pkg lock` hydration; patch paths elsewhere are local-only and must exist on disk.

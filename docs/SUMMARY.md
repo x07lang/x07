@@ -24,6 +24,7 @@
 
 ## Language
 - [Overview](language/overview.md)
+- [Prelude & names](language/prelude-and-names.md)
 - [Syntax & x07AST](language/syntax-x07ast.md)
 - [Generics](language/generics.md)
 - [Types & memory model](language/types-memory.md)

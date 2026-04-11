@@ -180,6 +180,11 @@ fn special_form_doc(name: &str) -> Option<&'static str> {
              Create bytes from a UTF-8 string literal.\n\
              Example: [\"bytes.lit\", \"hello\"]",
         ),
+        "bytes.view_lit" => Some(
+            "bytes.view_lit(string) -> bytes_view\n\
+             Create a bytes_view from a UTF-8 string literal.\n\
+             Example: [\"bytes.view_lit\", \"hello\"]",
+        ),
         "bytes.concat" => Some(
             "bytes.concat(bytes, bytes) -> bytes\n\
              Concatenate two owned byte values (moves both).\n\
@@ -189,6 +194,51 @@ fn special_form_doc(name: &str) -> Option<&'static str> {
             "bytes.alloc(i32) -> bytes\n\
              Allocate zero-filled bytes of the given length.\n\
              Example: [\"bytes.alloc\", 64]",
+        ),
+        "bytes.len" => Some(
+            "bytes.len(b: bytes_view) -> i32\n\
+             Return the length of a bytes view.\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"bytes.len\", [\"bytes.view\", \"b\"]]",
+        ),
+        "bytes.get_u8" => Some(
+            "bytes.get_u8(b: bytes_view, i: i32) -> i32\n\
+             Read a single byte (0-255) at the given index.\n\
+             Traps on out-of-bounds access.\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"bytes.get_u8\", [\"bytes.view\", \"b\"], 0]",
+        ),
+        "bytes.set_u8" => Some(
+            "bytes.set_u8(b: bytes, i: i32, v: i32) -> bytes\n\
+             Write a single byte (0-255) at the given index and return `b`.\n\
+             Traps on out-of-bounds access.\n\
+             Example: [\"bytes.set_u8\", \"b\", 0, 47]",
+        ),
+        "bytes.eq" => Some(
+            "bytes.eq(a: bytes_view, b: bytes_view) -> i32\n\
+             Compare two views for byte equality (1 if equal, 0 otherwise).\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"bytes.eq\", [\"bytes.view\", \"a\"], [\"bytes.view\", \"b\"]]",
+        ),
+        "bytes.cmp_range" => Some(
+            "bytes.cmp_range(a: bytes_view, a_off: i32, a_len: i32, b: bytes_view, b_off: i32, b_len: i32) -> i32\n\
+             Lexicographically compare two byte ranges.\n\
+             Returns -1/0/1; traps if either range is out of bounds.\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"bytes.cmp_range\", [\"bytes.view\", \"a\"], 0, [\"bytes.len\", [\"bytes.view\", \"a\"]], [\"bytes.view\", \"b\"], 0, [\"bytes.len\", [\"bytes.view\", \"b\"]]]",
+        ),
+        "bytes.slice" => Some(
+            "bytes.slice(b: bytes_view, start: i32, len: i32) -> bytes\n\
+             Copy a sub-range into a new owned bytes value.\n\
+             Traps if start/len is out of bounds.\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"bytes.slice\", [\"bytes.view\", \"b\"], 0, 4]",
+        ),
+        "bytes.copy" => Some(
+            "bytes.copy(src: bytes, dst: bytes) -> bytes\n\
+             Copy `src` into `dst` (prefix copy) and return `dst`.\n\
+             Traps if `dst` is shorter than `src`.\n\
+             Example: [\"bytes.copy\", \"src\", \"dst\"]",
         ),
         "&&" => Some(
             "&&(i32, i32) -> i32\n\
@@ -225,20 +275,265 @@ fn special_form_doc(name: &str) -> Option<&'static str> {
              Compare two views for byte equality (1 if equal, 0 otherwise).\n\
              Example: [\"view.eq\", [\"bytes.view\", \"a\"], [\"bytes.view\", \"b\"]]",
         ),
+        "view.cmp_range" => Some(
+            "view.cmp_range(a: bytes_view, a_off: i32, a_len: i32, b: bytes_view, b_off: i32, b_len: i32) -> i32\n\
+             Lexicographically compare two view ranges.\n\
+             Returns -1/0/1; traps if either range is out of bounds.\n\
+             Example: [\"view.cmp_range\", \"a\", 0, [\"view.len\", \"a\"], \"b\", 0, [\"view.len\", \"b\"]]",
+        ),
         "vec_u8.as_view" => Some(
             "vec_u8.as_view(vec_u8) -> bytes_view\n\
              Borrow a view of the current contents of a vec_u8. Owner must be an identifier.\n\
              Example: [\"vec_u8.as_view\", \"my_vec\"]",
+        ),
+        "vec_u8.with_capacity" => Some(
+            "vec_u8.with_capacity(cap: i32) -> vec_u8\n\
+             Allocate a new byte vector with the given capacity.\n\
+             Example: [\"vec_u8.with_capacity\", 64]",
+        ),
+        "vec_u8.len" => Some(
+            "vec_u8.len(v: vec_u8) -> i32\n\
+             Return the current length.\n\
+             Example: [\"vec_u8.len\", \"v\"]",
+        ),
+        "vec_u8.get" => Some(
+            "vec_u8.get(v: vec_u8, i: i32) -> i32\n\
+             Read one byte (0-255) at index `i`.\n\
+             Traps on out-of-bounds access.\n\
+             Example: [\"vec_u8.get\", \"v\", 0]",
+        ),
+        "vec_u8.set" => Some(
+            "vec_u8.set(v: vec_u8, i: i32, x: i32) -> vec_u8\n\
+             Write one byte (0-255) at index `i` and return the updated vector.\n\
+             Traps on out-of-bounds access.\n\
+             Example: [\"vec_u8.set\", \"v\", 0, 47]",
+        ),
+        "vec_u8.push" => Some(
+            "vec_u8.push(v: vec_u8, x: i32) -> vec_u8\n\
+             Append one byte (0-255) and return the updated vector.\n\
+             Example: [\"vec_u8.push\", \"v\", 10]",
+        ),
+        "vec_u8.reserve_exact" => Some(
+            "vec_u8.reserve_exact(v: vec_u8, additional: i32) -> vec_u8\n\
+             Ensure capacity for at least `additional` more bytes.\n\
+             Example: [\"vec_u8.reserve_exact\", \"v\", 128]",
+        ),
+        "vec_u8.extend_zeroes" => Some(
+            "vec_u8.extend_zeroes(v: vec_u8, n: i32) -> vec_u8\n\
+             Append `n` zero bytes and return the updated vector.\n\
+             Example: [\"vec_u8.extend_zeroes\", \"v\", 32]",
+        ),
+        "vec_u8.extend_bytes" => Some(
+            "vec_u8.extend_bytes(v: vec_u8, b: bytes_view) -> vec_u8\n\
+             Append bytes and return the updated vector.\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"vec_u8.extend_bytes\", \"v\", [\"bytes.view\", \"b\"]]",
+        ),
+        "vec_u8.extend_bytes_range" => Some(
+            "vec_u8.extend_bytes_range(v: vec_u8, b: bytes_view, start: i32, len: i32) -> vec_u8\n\
+             Append a sub-range of `b` and return the updated vector.\n\
+             Traps if start/len is out of bounds.\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"vec_u8.extend_bytes_range\", \"v\", [\"bytes.view\", \"b\"], 0, 4]",
+        ),
+        "vec_u8.into_bytes" => Some(
+            "vec_u8.into_bytes(v: vec_u8) -> bytes\n\
+             Convert to owned bytes (moves the vector).\n\
+             Example: [\"vec_u8.into_bytes\", \"v\"]",
+        ),
+        "codec.read_u32_le" => Some(
+            "codec.read_u32_le(b: bytes_view, off: i32) -> i32\n\
+             Read a little-endian u32 at offset `off` and return it as i32.\n\
+             Traps on out-of-bounds access.\n\
+             Note: in call-argument position, `bytes` is accepted where `bytes_view` is expected.\n\
+             Example: [\"codec.read_u32_le\", [\"bytes.view\", \"b\"], 0]",
+        ),
+        "codec.write_u32_le" => Some(
+            "codec.write_u32_le(x: i32) -> bytes\n\
+             Encode `x` as a 4-byte little-endian u32.\n\
+             Example: [\"codec.write_u32_le\", 42]",
+        ),
+        "fmt.u32_to_dec" => Some(
+            "fmt.u32_to_dec(x: i32) -> bytes\n\
+             Format an unsigned i32 as decimal ASCII bytes.\n\
+             Alias of `std.fmt.u32_to_dec`.\n\
+             Example: [\"fmt.u32_to_dec\", 42]",
+        ),
+        "fmt.s32_to_dec" => Some(
+            "fmt.s32_to_dec(x: i32) -> bytes\n\
+             Format a signed i32 as decimal ASCII bytes.\n\
+             Alias of `std.fmt.s32_to_dec`.\n\
+             Example: [\"fmt.s32_to_dec\", -7]",
+        ),
+        "parse.u32_dec" => Some(
+            "parse.u32_dec(b: bytes_view) -> i32\n\
+             Parse a decimal u32 from bytes_view.\n\
+             Alias of `std.parse.u32_dec`.\n\
+             Example: [\"parse.u32_dec\", [\"bytes.view_lit\", \"123\"]]",
+        ),
+        "parse.u32_dec_at" => Some(
+            "parse.u32_dec_at(b: bytes_view, off: i32) -> i32\n\
+             Parse a decimal u32 starting at offset `off`.\n\
+             Alias of `std.parse.u32_dec_at`.\n\
+             Example: [\"parse.u32_dec_at\", [\"bytes.view_lit\", \"123\"], 0]",
+        ),
+        "prng.lcg_next_u32" => Some(
+            "prng.lcg_next_u32(state: i32) -> i32\n\
+             Deterministic pseudo-random generator step (LCG).\n\
+             Alias of `std.prng.lcg_next_u32`.\n\
+             Example: [\"prng.lcg_next_u32\", 123]",
+        ),
+        "chan.bytes.new" => Some(
+            "chan.bytes.new(cap: i32) -> i32\n\
+             Create a bytes channel with capacity `cap`.\n\
+             Example: [\"chan.bytes.new\", 4]",
+        ),
+        "chan.bytes.send" => Some(
+            "chan.bytes.send(ch: i32, msg: bytes) -> i32\n\
+             Send a bytes payload to a channel.\n\
+             Allowed only in `solve` expressions and inside `defasync` bodies.\n\
+             Example: [\"chan.bytes.send\", \"ch\", \"msg\"]",
+        ),
+        "chan.bytes.try_send" => Some(
+            "chan.bytes.try_send(ch: i32, msg: bytes_view) -> i32\n\
+             Attempt to send without blocking.\n\
+             Returns: 0 full; 1 sent; 2 closed.\n\
+             Example: [\"chan.bytes.try_send\", \"ch\", [\"bytes.view\", \"msg\"]]",
+        ),
+        "chan.bytes.recv" => Some(
+            "chan.bytes.recv(ch: i32) -> bytes\n\
+             Receive a bytes payload (blocking).\n\
+             Allowed only in `solve` expressions and inside `defasync` bodies.\n\
+             Example: [\"chan.bytes.recv\", \"ch\"]",
+        ),
+        "chan.bytes.try_recv" => Some(
+            "chan.bytes.try_recv(ch: i32) -> result_bytes\n\
+             Attempt to receive without blocking.\n\
+             Returns OK(bytes) or ERR(code): 1 empty; 2 closed.\n\
+             Example: [\"chan.bytes.try_recv\", \"ch\"]",
+        ),
+        "chan.bytes.close" => Some(
+            "chan.bytes.close(ch: i32) -> i32\n\
+             Close a channel (subsequent send/recv observe closed).\n\
+             Example: [\"chan.bytes.close\", \"ch\"]",
+        ),
+        "await" => Some(
+            "await(<bytes task handle>) -> bytes\n\
+             Alias of `task.join.bytes`.\n\
+             Note: only allowed in `solve` expressions and inside `defasync` bodies.\n\
+             Example: [\"await\", \"task_handle\"]",
+        ),
+        "task.spawn" => Some(
+            "task.spawn(task_handle: i32) -> i32\n\
+             Register/spawn a task handle (stats/registration; optional for most code).\n\
+             Example: [\"task.spawn\", \"t\"]",
+        ),
+        "task.is_finished" => Some(
+            "task.is_finished(task_handle: i32) -> i32\n\
+             Return 0/1 depending on whether the task is finished.\n\
+             Example: [\"task.is_finished\", \"t\"]",
+        ),
+        "task.try_join.bytes" => Some(
+            "task.try_join.bytes(task_handle: i32) -> result_bytes\n\
+             Non-blocking join of a bytes task.\n\
+             ERR(1) not finished; ERR(2) canceled.\n\
+             Example: [\"task.try_join.bytes\", \"t\"]",
+        ),
+        "task.join.bytes" => Some(
+            "task.join.bytes(task_handle: i32) -> bytes\n\
+             Join a bytes task.\n\
+             Note: only allowed in `solve` expressions and inside `defasync` bodies.\n\
+             Example: [\"task.join.bytes\", \"t\"]",
+        ),
+        "task.try_join.result_bytes" => Some(
+            "task.try_join.result_bytes(task_handle: i32) -> result_result_bytes\n\
+             Non-blocking join of a result_bytes task.\n\
+             ERR(1) not finished; ERR(2) canceled.\n\
+             Example: [\"task.try_join.result_bytes\", \"t\"]",
+        ),
+        "task.join.result_bytes" => Some(
+            "task.join.result_bytes(task_handle: i32) -> result_bytes\n\
+             Join a result_bytes task.\n\
+             Note: only allowed in `solve` expressions and inside `defasync` bodies.\n\
+             Example: [\"task.join.result_bytes\", \"t\"]",
+        ),
+        "task.sleep" => Some(
+            "task.sleep(ticks: i32) -> i32\n\
+             Sleep for `ticks` virtual time ticks.\n\
+             Note: only allowed in `solve` expressions and inside `defasync` bodies.\n\
+             Example: [\"task.sleep\", 1]",
+        ),
+        "task.cancel" => Some(
+            "task.cancel(task_handle: i32) -> i32\n\
+             Cancel a task.\n\
+             Example: [\"task.cancel\", \"t\"]",
         ),
         "task.scope_v1" => Some(
             "task.scope_v1(config, body) -> <body type>\n\
              Open a structured concurrency scope. Only in solve/defasync contexts.\n\
              Example: [\"task.scope_v1\", [\"task.scope.cfg_v1\", {}], <body>]",
         ),
+        "task.scope.cfg_v1" => Some(
+            "task.scope.cfg_v1([\"key\", value]...) -> <cfg>\n\
+             Build a task scope config object for `task.scope_v1`.\n\
+             Fields: max_children, max_ticks, max_blocked_waits, max_join_polls, max_slot_result_bytes.\n\
+             Example: [\"task.scope.cfg_v1\", [\"max_children\", 8], [\"max_slot_result_bytes\", 4096]]",
+        ),
+        "task.scope.start_soon_v1" => Some(
+            "task.scope.start_soon_v1(<immediate defasync call expr>) -> i32\n\
+             Register a child task in the current `task.scope_v1`.\n\
+             Example: [\"task.scope.start_soon_v1\", [\"my.worker\", \"arg1\"]]",
+        ),
+        "task.scope.cancel_all_v1" => Some(
+            "task.scope.cancel_all_v1() -> i32\n\
+             Cancel all registered children in the current scope.\n\
+             Example: [\"task.scope.cancel_all_v1\"]",
+        ),
+        "task.scope.wait_all_v1" => Some(
+            "task.scope.wait_all_v1() -> i32\n\
+             Join+drop all registered children in the current scope so far.\n\
+             Example: [\"task.scope.wait_all_v1\"]",
+        ),
+        "task.scope.async_let_bytes_v1" => Some(
+            "task.scope.async_let_bytes_v1(<immediate defasync call expr>) -> i32\n\
+             Start a scope-owned task slot returning bytes and return its slot id.\n\
+             Example: [\"task.scope.async_let_bytes_v1\", [\"my.worker\", \"arg1\"]]",
+        ),
+        "task.scope.async_let_result_bytes_v1" => Some(
+            "task.scope.async_let_result_bytes_v1(<immediate defasync call expr>) -> i32\n\
+             Start a scope-owned task slot returning result_bytes and return its slot id.\n\
+             Example: [\"task.scope.async_let_result_bytes_v1\", [\"my.worker\", \"arg1\"]]",
+        ),
+        "task.scope.await_slot_bytes_v1" => Some(
+            "task.scope.await_slot_bytes_v1(slot_id: i32) -> bytes\n\
+             Await a bytes slot started in the current scope.\n\
+             Example: [\"task.scope.await_slot_bytes_v1\", \"slot\"]",
+        ),
+        "task.scope.await_slot_result_bytes_v1" => Some(
+            "task.scope.await_slot_result_bytes_v1(slot_id: i32) -> result_bytes\n\
+             Await a result_bytes slot started in the current scope.\n\
+             Example: [\"task.scope.await_slot_result_bytes_v1\", \"slot\"]",
+        ),
+        "task.scope.slot_is_finished_v1" => Some(
+            "task.scope.slot_is_finished_v1(slot_id: i32) -> i32\n\
+             Return 0/1 depending on whether the slot is finished.\n\
+             Example: [\"task.scope.slot_is_finished_v1\", \"slot\"]",
+        ),
+        "task.yield" => Some(
+            "task.yield() -> i32\n\
+             Yield execution within the async scheduler.\n\
+             Example: [\"task.yield\"]",
+        ),
         "budget.scope_v1" => Some(
             "budget.scope_v1(config, body) -> <body type>\n\
              Run body under a resource budget (alloc_bytes, fuel, etc.).\n\
              Example: [\"budget.scope_v1\", [\"budget.cfg_v1\", {\"mode\": \"trap_v1\"}], <body>]",
+        ),
+        "budget.cfg_v1" => Some(
+            "budget.cfg_v1({fields...}) -> <cfg>\n\
+             Build a budget config object for `budget.scope_v1`.\n\
+             Fields: mode(trap_v1|result_err_v1|stats_only_v1|yield_v1), label(bytes literal), alloc_bytes, alloc_calls, realloc_calls, memcpy_bytes, sched_ticks, fuel.\n\
+             Example: [\"budget.cfg_v1\", {\"mode\": \"trap_v1\"}]",
         ),
         "budget.scope_from_arch_v1" => Some(
             "budget.scope_from_arch_v1(profile_id, body) -> <body type>\n\
@@ -473,18 +768,17 @@ fn resolve_doc_json_query(ctx: &DocContext, args: &DocArgs, query: &str) -> Resu
                 hints: Vec::new(),
             });
         }
+        let suggestions: Vec<DocSuggestion> = special_form_names()
+            .iter()
+            .filter(|name| name.starts_with(query))
+            .map(|name| DocSuggestion {
+                query: (*name).to_string(),
+                kind: DocSuggestionKind::BuiltinForm,
+            })
+            .collect();
         return Ok(not_found_resolution(
             query,
-            vec![
-                DocSuggestion {
-                    query: "bytes.view".to_string(),
-                    kind: DocSuggestionKind::BuiltinForm,
-                },
-                DocSuggestion {
-                    query: "task.scope_v1".to_string(),
-                    kind: DocSuggestionKind::BuiltinForm,
-                },
-            ],
+            suggestions,
             vec!["hint: run `x07 guide` for the full language reference".to_string()],
             "X07-DOC-BUILTIN-0001",
             format!("unknown builtin: {query}"),
@@ -1201,21 +1495,75 @@ fn spec_id_from_spec_path(path: &Path) -> String {
 
 fn special_form_names() -> &'static [&'static str] {
     &[
-        "bytes.view",
-        "bytes.subview",
-        "bytes.lit",
-        "bytes.concat",
-        "bytes.alloc",
-        "view.to_bytes",
-        "view.len",
-        "view.get_u8",
-        "view.slice",
-        "view.eq",
-        "vec_u8.as_view",
-        "task.scope_v1",
-        "budget.scope_v1",
+        "&&",
+        "||",
+        "await",
+        "budget.cfg_v1",
         "budget.scope_from_arch_v1",
+        "budget.scope_v1",
+        "bytes.alloc",
+        "bytes.cmp_range",
+        "bytes.concat",
+        "bytes.copy",
+        "bytes.eq",
+        "bytes.get_u8",
+        "bytes.len",
+        "bytes.lit",
+        "bytes.set_u8",
+        "bytes.slice",
+        "bytes.subview",
+        "bytes.view",
+        "bytes.view_lit",
+        "chan.bytes.close",
+        "chan.bytes.new",
+        "chan.bytes.recv",
+        "chan.bytes.send",
+        "chan.bytes.try_recv",
+        "chan.bytes.try_send",
+        "codec.read_u32_le",
+        "codec.write_u32_le",
+        "fmt.s32_to_dec",
+        "fmt.u32_to_dec",
+        "parse.u32_dec",
+        "parse.u32_dec_at",
+        "prng.lcg_next_u32",
         "std.stream.pipe_v1",
+        "task.cancel",
+        "task.is_finished",
+        "task.join.bytes",
+        "task.join.result_bytes",
+        "task.scope.async_let_bytes_v1",
+        "task.scope.async_let_result_bytes_v1",
+        "task.scope.await_slot_bytes_v1",
+        "task.scope.await_slot_result_bytes_v1",
+        "task.scope.cancel_all_v1",
+        "task.scope.cfg_v1",
+        "task.scope.slot_is_finished_v1",
+        "task.scope.start_soon_v1",
+        "task.scope.wait_all_v1",
+        "task.scope_v1",
+        "task.sleep",
+        "task.spawn",
+        "task.try_join.bytes",
+        "task.try_join.result_bytes",
+        "task.yield",
+        "vec_u8.as_view",
+        "vec_u8.extend_bytes",
+        "vec_u8.extend_bytes_range",
+        "vec_u8.extend_zeroes",
+        "vec_u8.get",
+        "vec_u8.into_bytes",
+        "vec_u8.len",
+        "vec_u8.push",
+        "vec_u8.reserve_exact",
+        "vec_u8.set",
+        "vec_u8.with_capacity",
+        "view.cmp_range",
+        "view.eq",
+        "view.get_u8",
+        "view.len",
+        "view.slice",
+        "view.to_bytes",
     ]
 }
 
@@ -1760,6 +2108,63 @@ mod tests {
         assert!(special_form_doc("bytes.view").is_some());
         assert!(special_form_doc("task.scope_v1").is_some());
         assert!(special_form_doc("std.stream.pipe_v1").is_some());
+        assert!(special_form_doc("bytes.len").is_some());
+        assert!(special_form_doc("codec.write_u32_le").is_some());
+        assert!(special_form_doc("chan.bytes.send").is_some());
         assert!(special_form_doc("nonexistent.form").is_none());
+    }
+
+    #[test]
+    fn special_form_names_are_documented() {
+        for &name in special_form_names() {
+            assert!(
+                special_form_doc(name).is_some(),
+                "special_form_names() contains undocumented entry: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn doc_json_builtin_form_resolves_without_flag() {
+        let args = DocArgs {
+            project: None,
+            module_root: Vec::new(),
+            builtin: false,
+            query: "bytes.len".to_string(),
+        };
+        let ctx = resolve_doc_context(&args).unwrap();
+        let resolution = resolve_doc_json_query(&ctx, &args, args.query.as_str()).unwrap();
+        let report = build_doc_report(args.query, resolution);
+
+        assert!(report.ok);
+        match report.result {
+            DocResult::BuiltinForm { name, doc, .. } => {
+                assert_eq!(name, "bytes.len");
+                assert!(doc.starts_with("bytes.len("));
+            }
+            other => panic!("unexpected doc result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn doc_json_builtin_form_resolves_in_builtin_mode() {
+        let args = DocArgs {
+            project: None,
+            module_root: Vec::new(),
+            builtin: true,
+            query: "codec.write_u32_le".to_string(),
+        };
+        let ctx = resolve_doc_context(&args).unwrap();
+        let resolution = resolve_doc_json_query(&ctx, &args, args.query.as_str()).unwrap();
+        let report = build_doc_report(args.query, resolution);
+
+        assert!(report.ok);
+        match report.result {
+            DocResult::BuiltinForm { name, doc, .. } => {
+                assert_eq!(name, "codec.write_u32_le");
+                assert!(doc.starts_with("codec.write_u32_le("));
+            }
+            other => panic!("unexpected doc result: {other:?}"),
+        }
     }
 }

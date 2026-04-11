@@ -26,6 +26,11 @@ If you are creating a publishable package repo (for `x07 pkg publish`), use `x07
 New projects pin a compatibility mode in `x07.json` (`project.compat`). If you are working in an older repo or with older package code, prefer mechanical migration:
 
 ```bash
+x07 project migrate --check --project x07.json
+x07 project migrate --write --project x07.json
+```
+
+```bash
 x07 migrate --to 0.5 --check --input src/main.x07.json
 x07 migrate --to 0.5 --write --input src/main.x07.json
 ```

@@ -363,6 +363,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "lint"
             | "fix"
             | "migrate"
+            | "project"
             | "build"
             | "check"
             | "service"
@@ -426,6 +427,7 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "publish",
         ],
         "policy" => &["init"],
+        "project" => &["migrate"],
         "prove" => &["check"],
         "review" => &["diff"],
         "trust" => &["report", "profile", "capsule", "certify"],

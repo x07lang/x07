@@ -22,6 +22,7 @@ All skills live under `.agent/skills/<skill-name>/SKILL.md`.
 | Skill | Purpose |
 |---|---|
 | `x07-agent-playbook` | Canonical agent workflow (fmt/lint/fix/patch/run/test) + design rails |
+| `x07-agent-context` | Deterministic context packs for repair handoffs (`x07 agent context`) |
 | `x07-language-guide` | Language + stdlib reference workflow (`x07 guide`, `x07 doc`) |
 | `x07-run` | Canonical execution front door (`x07 run`) + profiles |
 | `x07-bundle` | Build distributable native executables (`x07 bundle`) |

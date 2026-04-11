@@ -40,6 +40,7 @@ mod pbt_fix;
 mod pkg;
 mod policy;
 mod policy_overrides;
+mod project_cmd;
 mod project_ctx;
 mod prove;
 mod repair;
@@ -116,8 +117,10 @@ enum Command {
     Lint(toolchain::LintArgs),
     /// Apply deterministic quickfixes to an x07AST JSON file.
     Fix(toolchain::FixArgs),
-    /// Apply mechanical migrations to update code for a newer compat mode.
+    /// Apply mechanical migrations to update `*.x07.json` code for a newer compat mode (use `x07 project migrate` for `x07.json` schema migrations).
     Migrate(toolchain::MigrateArgs),
+    /// Project manifest operations.
+    Project(project_cmd::ProjectArgs),
     /// Build a project to C.
     Build(toolchain::BuildArgs),
     /// Check a project (lint + typecheck + backend-check; no emit).
@@ -435,6 +438,10 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Lint(_)) => vec!["lint"],
             Some(Command::Fix(_)) => vec!["fix"],
             Some(Command::Migrate(_)) => vec!["migrate"],
+            Some(Command::Project(args)) => match &args.cmd {
+                None => vec!["project"],
+                Some(project_cmd::ProjectCommand::Migrate(_)) => vec!["project", "migrate"],
+            },
             Some(Command::Build(_)) => vec!["build"],
             Some(Command::Check(_)) => vec!["check"],
             Some(Command::Service(args)) => match &args.cmd {
@@ -555,6 +562,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Lint(args) => toolchain::cmd_lint(&cli.machine, args),
         Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),
         Command::Migrate(args) => toolchain::cmd_migrate(&cli.machine, args),
+        Command::Project(args) => project_cmd::cmd_project(&cli.machine, args),
         Command::Build(args) => toolchain::cmd_build(&cli.machine, args),
         Command::Check(args) => toolchain::cmd_check(&cli.machine, args),
         Command::Service(args) => service::cmd_service(&cli.machine, args),
