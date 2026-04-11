@@ -103,8 +103,10 @@ Lockfiles pin:
 - Each dependency package manifest SHA-256
 - Each dependency module file SHA-256
 
-Lockfile metadata (schema `x07.lock@0.3.0`):
+Lockfile metadata (schema `x07.lock@0.4.0`):
 
+- `toolchain`: records the compiler/toolchain identity used to produce the lock (x07/x07c version, lang id, compat).
+- `registry`: records which registry index URL was used to resolve and hydrate vendored deps (plus optional snapshot hash).
 - `dependencies[].overridden_by`: set when the dependency was forced by `project.patch`
 - `dependencies[].yanked`: snapshot from the index when `x07 pkg lock` consults an index
 - `dependencies[].advisories`: snapshot from the index when `x07 pkg lock` consults an index

@@ -25,7 +25,7 @@ New encodings become `_v2` (and live side-by-side).
 Similarly, JSON schemas and on-disk formats are versioned by explicit identifiers like:
 
 - `x07.project@0.5.0` (project manifest)
-- `x07.lock@0.3.0` (project lockfile)
+- `x07.lock@0.4.0` (project lockfile)
 - `x07.x07ast@0.8.0` (program/module format)
 
 ## Toolchain SemVer policy
@@ -81,7 +81,13 @@ Projects pin dependency graphs with `x07.lock.json` (`x07.lock@…`).
 Policy:
 
 - Lockfiles are canonical JSON and must be deterministic.
+- The current lockfile schema (`x07.lock@0.4.0`) includes `toolchain` identity and `registry` provenance to make upgrades debuggable.
 - Tooling should continue to **read** older lockfile schema versions. If a lockfile cannot be read,
   the toolchain must fail with a deterministic error and a migration path.
 - CI should use `x07 pkg lock --check` to fail on lock drift instead of mutating workspaces.
 - Schema bumps should be additive when possible and gated by the compat corpus.
+
+Notes:
+
+- `x07 pkg lock` writes `x07.lock@0.4.0` by default; use `x07 pkg lock --lock-version 0.3` only when interoperating with an older toolchain.
+- After a toolchain upgrade, use `x07 pkg repair --toolchain current` to rewrite incompatible locks deterministically.

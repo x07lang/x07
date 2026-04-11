@@ -141,6 +141,7 @@
 - [CLI apps](guides/cli-apps.md)
 - [Data interoperability](guides/data-interop.md)
 - [Kernel/shell in production](guides/kernel-shell-production.md)
+- [Offline workflows](guides/offline.md)
 - [Performance tuning](guides/performance-tuning.md)
 - [Extract core migration](guides/extract-core.md)
 - [Web services](guides/web-apps.md)

@@ -694,8 +694,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-lock.schema.json",
       "schema_id": "https://x07.io/spec/x07-lock.schema.json",
-      "schema_version": "x07.lock@0.3.0",
-      "title": "x07.lock@0.3.0"
+      "schema_version": "x07.lock@0.4.0",
+      "title": "x07.lock@0.4.0"
     },
     {
       "kind": "schema",
@@ -710,6 +710,13 @@
       "schema_id": "https://x07.io/spec/x07-lock.v0.3.0.schema.json",
       "schema_version": "x07.lock@0.3.0",
       "title": "x07.lock@0.3.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-lock.v0.4.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-lock.v0.4.0.schema.json",
+      "schema_version": "x07.lock@0.4.0",
+      "title": "x07.lock@0.4.0"
     },
     {
       "kind": "schema",
@@ -1189,6 +1196,20 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-pkg-info.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-pkg-info.report.schema.json",
+      "schema_version": "x07.tool.pkg.info.report@0.1.0",
+      "title": "x07.tool.pkg.info.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-pkg-list.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-pkg-list.report.schema.json",
+      "schema_version": "x07.tool.pkg.list.report@0.1.0",
+      "title": "x07.tool.pkg.list.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-pkg-lock.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-pkg-lock.report.schema.json",
       "schema_version": "x07.tool.pkg.lock.report@0.1.0",
@@ -1228,6 +1249,13 @@
       "schema_id": "https://x07.io/spec/x07-tool-pkg-remove.report.schema.json",
       "schema_version": "x07.tool.pkg.remove.report@0.1.0",
       "title": "x07.tool.pkg.remove.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-pkg-repair.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-pkg-repair.report.schema.json",
+      "schema_version": "x07.tool.pkg.repair.report@0.1.0",
+      "title": "x07.tool.pkg.repair.report@0.1.0"
     },
     {
       "kind": "schema",

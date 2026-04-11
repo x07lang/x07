@@ -286,9 +286,10 @@ Notes:
 - For special forms (pipes, `task.scope_v1`, `budget.*`) and non-module builtins (example: `std.brand.*`), use `x07 guide` + linked docs pages (not `x07 doc`).
 - For structured encodings, prefer branded bytes + validators over ad-hoc parsing (see `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` in `x07 guide` and `meta.brands_v1` in schema-derived modules).
 - For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
-- `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
+- `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--registry <URL>` (alias: `--index <URL>`), or set a default in `.x07/config.json` / `x07.config.json`. Forbid network with `--offline`.
 - In CI, run `x07 pkg lock --project x07.json --check`.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
+- After upgrading the toolchain, if old locks reference incompatible package versions, use `x07 pkg repair --toolchain current`.
 - If you must force a transitive dependency version, use `project.patch` in `x07.json` on the current `x07.project@0.5.0` manifest line.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).

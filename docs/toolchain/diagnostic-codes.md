@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 455
-- quickfix support (`sometimes` or `always`): 414
-- quickfix coverage: 90.99%
+- total codes: 467
+- quickfix support (`sometimes` or `always`): 426
+- quickfix coverage: 91.22%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -287,17 +287,29 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_INDEX_CONFIG` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_CONFIG`. |
 | `X07PKG_INDEX_FETCH` | x07 / lint / error | never | Diagnostic code `X07PKG_INDEX_FETCH`. |
 | `X07PKG_INDEX_NO_MATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`. |
+| `X07PKG_LIST_INDEX_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LIST_INDEX_MISSING`. |
+| `X07PKG_LIST_UNSUPPORTED` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LIST_UNSUPPORTED`. |
 | `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`. |
 | `X07PKG_LOCK_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISMATCH`. |
 | `X07PKG_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISSING`. |
+| `X07PKG_LOCK_VERSION_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_VERSION_INVALID`. |
 | `X07PKG_LOGIN_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_LOGIN_FAILED`. |
 | `X07PKG_LOGIN_TOKEN` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOGIN_TOKEN`. |
 | `X07PKG_MANIFEST_PARSE` | x07 / lint / error | sometimes | Package manifest could not be parsed. |
+| `X07PKG_OFFLINE_INDEX` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_INDEX`. |
 | `X07PKG_OFFLINE_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`. |
+| `X07PKG_OFFLINE_REFRESH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_REFRESH`. |
 | `X07PKG_PATCH_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PATCH_MISSING_DEP`. |
 | `X07PKG_PUBLISH_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_PUBLISH_FAILED`. |
 | `X07PKG_PUBLISH_RESPONSE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE`. |
 | `X07PKG_PUBLISH_RESPONSE_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE_MISMATCH`. |
+| `X07PKG_REPAIR_LOCAL_INCOMPATIBLE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_LOCAL_INCOMPATIBLE`. |
+| `X07PKG_REPAIR_LOCK_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_LOCK_INVALID`. |
+| `X07PKG_REPAIR_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_LOCK_MISSING`. |
+| `X07PKG_REPAIR_NO_COMPATIBLE_VERSION` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_NO_COMPATIBLE_VERSION`. |
+| `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE`. |
+| `X07PKG_REPAIR_TOOLCHAIN_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_INVALID`. |
+| `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`. |
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
 | `X07PKG_X07C_COMPAT_INVALID` | x07 / lint / error | sometimes | Package compatibility metadata is invalid. |
@@ -6061,6 +6073,46 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_LIST_INDEX_MISSING`
+
+Summary: Package workflow diagnostic `X07PKG_LIST_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_LIST_UNSUPPORTED`
+
+Summary: Package workflow diagnostic `X07PKG_LIST_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
 ## `X07PKG_LOCAL_MISSING_DEP`
 
 Summary: Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`.
@@ -6104,6 +6156,26 @@ Agent strategy:
 ## `X07PKG_LOCK_MISSING`
 
 Summary: Package workflow diagnostic `X07PKG_LOCK_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_LOCK_VERSION_INVALID`
+
+Summary: Package workflow diagnostic `X07PKG_LOCK_VERSION_INVALID`.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -6182,9 +6254,49 @@ Agent strategy:
 - Re-run `x07 pkg lock --check` in CI once the workspace is clean.
 
 
+## `X07PKG_OFFLINE_INDEX`
+
+Summary: Package workflow diagnostic `X07PKG_OFFLINE_INDEX`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
 ## `X07PKG_OFFLINE_MISSING_DEP`
 
 Summary: Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_OFFLINE_REFRESH`
+
+Summary: Package workflow diagnostic `X07PKG_OFFLINE_REFRESH`.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -6266,6 +6378,146 @@ Agent strategy:
 ## `X07PKG_PUBLISH_RESPONSE_MISMATCH`
 
 Summary: Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_LOCAL_INCOMPATIBLE`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_LOCAL_INCOMPATIBLE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_LOCK_INVALID`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_LOCK_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_LOCK_MISSING`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_LOCK_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_NO_COMPATIBLE_VERSION`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_NO_COMPATIBLE_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_TOOLCHAIN_INVALID`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`.
 
 Origins:
 - x07 (stage: lint, severity: error)

@@ -122,7 +122,35 @@ If you need to override a transitive dependency (for example to move off a yanke
 Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add those transitive deps to `x07.json` before locking. Treat this as a convenience, not a contract; prefer the capability map and `x07 init --template ...` so the dependency set is explicit.
 
 When fetching is required, `x07 pkg lock` defaults to the official registry index.
-Override with `--index sparse+https://registry.x07.io/index/`, or use `--offline` to forbid network access.
+Override with `--registry <URL>` (alias: `--index <URL>`), or use a project-local default config file:
+
+- `.x07/config.json`
+- `x07.config.json`
+
+Example `x07.config.json`:
+
+```jsonc
+{
+  "schema_version": "x07.config@0.1.0",
+  "pkg": {
+    "registry": "sparse+file:///ABS/PATH/index/",
+    "offline": true
+  }
+}
+```
+
+Use `--offline` (or `pkg.offline: true`) to forbid network access and reuse only existing `.x07/deps` contents.
+See also: `docs/guides/offline.md`.
+
+After upgrading the toolchain, if an old lock references incompatible package versions, run:
+
+- `x07 pkg repair --toolchain current`
+- add `--offline` and/or `--registry <URL>` as needed
+
+Lockfile notes:
+
+- Default lock schema is `x07.lock@0.4.0` (includes toolchain identity and registry provenance).
+- Use `x07 pkg lock --lock-version 0.3` only when interoperating with an older toolchain that cannot read `x07.lock@0.4.0`.
 
 ## Deterministic builds
 

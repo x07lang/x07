@@ -1494,6 +1494,8 @@ fn resolve_module_roots_for_wrapper(
                     // the project's own module_roots for agent/debugging affordances.
                     let empty_lock = project::Lockfile {
                         schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+                        toolchain: Some(project::default_lockfile_toolchain(&manifest)),
+                        registry: Some(project::default_lockfile_registry()),
                         dependencies: Vec::new(),
                     };
                     if let Ok(project_roots) =

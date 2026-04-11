@@ -155,6 +155,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("pkg.attest-closure") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-attest-closure.report.schema.json"
         )),
+        Some("pkg.info") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-info.report.schema.json"
+        )),
+        Some("pkg.list") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-list.report.schema.json"
+        )),
         Some("pkg.lock") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-lock.report.schema.json"
         )),
@@ -172,6 +178,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("pkg.remove") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-remove.report.schema.json"
+        )),
+        Some("pkg.repair") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-repair.report.schema.json"
         )),
         Some("pkg.versions") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-versions.report.schema.json"

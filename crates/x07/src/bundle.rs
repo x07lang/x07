@@ -9,8 +9,8 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, X07_BUNDLE_REPORT_SCHEMA_VERSION,
-    X07_COMPILE_ATTEST_SCHEMA_VERSION, X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
+    X07_BUNDLE_REPORT_SCHEMA_VERSION, X07_COMPILE_ATTEST_SCHEMA_VERSION,
+    X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
 };
 use x07_host_runner::{apply_cc_profile, CcProfile, NativeCliWrapperOpts, NativeToolchainConfig};
 use x07_runner_common::sandbox_backend::{
@@ -1500,13 +1500,7 @@ fn prepare_project_target(
             .with_context(|| format!("parse lockfile: {}", lock_path.display()))?;
         (Some(lock_path.clone()), lock)
     } else if manifest.dependencies.is_empty() {
-        (
-            None,
-            project::Lockfile {
-                schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
-                dependencies: Vec::new(),
-            },
-        )
+        (None, project::compute_lockfile(project_path, &manifest)?)
     } else {
         anyhow::bail!(
             "missing lockfile for project with dependencies: {}",

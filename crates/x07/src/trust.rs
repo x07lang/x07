@@ -8,8 +8,8 @@ use clap::{Args, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
-    X07DIAG_SCHEMA_VERSION, X07_CAPSULE_ATTEST_SCHEMA_VERSION, X07_CAPSULE_CONTRACT_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, X07DIAG_SCHEMA_VERSION,
+    X07_CAPSULE_ATTEST_SCHEMA_VERSION, X07_CAPSULE_CONTRACT_SCHEMA_VERSION,
     X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION, X07_EFFECT_LOG_SCHEMA_VERSION,
     X07_PEER_POLICY_SCHEMA_VERSION, X07_RUNTIME_ATTEST_SCHEMA_VERSION,
     X07_TRUST_CERTIFICATE_SCHEMA_VERSION, X07_TRUST_PROFILE_SCHEMA_VERSION,
@@ -1951,10 +1951,7 @@ fn resolve_project_context(
             }
             Some(lock)
         } else if manifest.dependencies.is_empty() {
-            Some(project::Lockfile {
-                schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
-                dependencies: Vec::new(),
-            })
+            Some(project::compute_lockfile(&project_path, &manifest)?)
         } else {
             None
         };

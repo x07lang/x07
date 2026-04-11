@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://x07.io/spec/x07-lock.schema.json",
+  "$id": "https://x07.io/spec/x07-lock.v0.4.0.schema.json",
   "title": "x07.lock@0.4.0",
   "description": "Project lockfile (x07.lock.json). Written by `x07 pkg lock`; consumed by x07c and x07 run when resolving dependency module roots.",
   "type": "object",

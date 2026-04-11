@@ -10,6 +10,7 @@ use x07_contracts::{
     PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSION,
     PROJECT_MANIFEST_SCHEMA_VERSION, X07AST_SCHEMA_VERSION,
 };
+use x07c::project;
 
 const X07_TOOLCHAIN_TOML: &str = "x07-toolchain.toml";
 const X07_AGENT_DIR: &str = ".agent";
@@ -1578,6 +1579,7 @@ fn cmd_init_service_template(
         project: root.join("x07.json"),
         index: None,
         check: false,
+        lock_version: "0.4".to_string(),
         offline: false,
         allow_yanked: false,
         allow_advisories: false,
@@ -1896,12 +1898,14 @@ pub fn cmd_init(
         None => (Vec::new(), app_module_bytes()?, main_entry_bytes()?),
     };
 
-    if let Err(err) = write_new_file(&paths.project, &project_json_bytes(args.template, &deps)?) {
+    let project_bytes = project_json_bytes(args.template, &deps)?;
+    if let Err(err) = write_new_file(&paths.project, &project_bytes) {
         return print_io_error(&root, &created, "x07.json", err);
     }
     created.push(rel(&root, &paths.project));
 
-    if let Err(err) = write_new_file(&paths.lock, &lock_json_bytes()?) {
+    let manifest = project::parse_project_manifest_bytes(&project_bytes, &paths.project)?;
+    if let Err(err) = write_new_file(&paths.lock, &lock_json_bytes(&manifest)?) {
         return print_io_error(&root, &created, "x07.lock.json", err);
     }
     created.push(rel(&root, &paths.lock));
@@ -1983,6 +1987,7 @@ pub fn cmd_init(
             project: paths.project.clone(),
             index: None,
             check: false,
+            lock_version: "0.4".to_string(),
             offline: false,
             allow_yanked: false,
             allow_advisories: false,
@@ -2154,7 +2159,8 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
     let mut created: Vec<String> = Vec::new();
 
     // x07.json
-    if let Err(err) = write_new_file(&paths.project, &package_project_json_bytes(&entry_rel)?) {
+    let project_bytes = package_project_json_bytes(&entry_rel)?;
+    if let Err(err) = write_new_file(&paths.project, &project_bytes) {
         return print_io_error(root, &created, "x07.json", err);
     }
     created.push(rel(root, &paths.project));
@@ -2166,7 +2172,8 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
     created.push(rel(root, &paths.package));
 
     // x07.lock.json
-    if let Err(err) = write_new_file(&paths.lock, &lock_json_bytes()?) {
+    let manifest = project::parse_project_manifest_bytes(&project_bytes, &paths.project)?;
+    if let Err(err) = write_new_file(&paths.lock, &lock_json_bytes(&manifest)?) {
         return print_io_error(root, &created, "x07.lock.json", err);
     }
     created.push(rel(root, &paths.lock));
@@ -2901,19 +2908,21 @@ fn package_json_bytes(name: &str, ids: &PackageIds) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-fn lock_json_bytes() -> Result<Vec<u8>> {
-    let v = Value::Object(
-        [
-            (
-                "schema_version".to_string(),
-                Value::String(PROJECT_LOCKFILE_SCHEMA_VERSION.to_string()),
-            ),
-            ("dependencies".to_string(), Value::Array(Vec::new())),
-        ]
-        .into_iter()
-        .collect(),
-    );
-    let mut out = serde_json::to_vec_pretty(&v)?;
+fn lock_json_bytes(manifest: &project::ProjectManifest) -> Result<Vec<u8>> {
+    // Keep the init lockfile valid per the current canonical schema. The resolver will
+    // update it after deps are added, but `x07 run` verifies that it is well-formed.
+    let lock = project::Lockfile {
+        schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+        toolchain: (PROJECT_LOCKFILE_SCHEMA_VERSION
+            == x07_contracts::PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0)
+            .then_some(project::default_lockfile_toolchain(manifest)),
+        registry: (PROJECT_LOCKFILE_SCHEMA_VERSION
+            == x07_contracts::PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0)
+            .then_some(project::default_lockfile_registry()),
+        dependencies: Vec::new(),
+    };
+
+    let mut out = serde_json::to_vec_pretty(&lock)?;
     if out.last() != Some(&b'\n') {
         out.push(b'\n');
     }

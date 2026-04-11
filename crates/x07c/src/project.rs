@@ -7,9 +7,9 @@ use sha2::{Digest, Sha256};
 use x07_contracts::{
     PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSION,
     PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, PROJECT_LOCKFILE_SCHEMA_VERSION_V0_2_0,
-    PROJECT_MANIFEST_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED,
-    PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0, PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0,
-    PROJECT_MANIFEST_SCHEMA_VERSION_V0_5_0,
+    PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0, PROJECT_MANIFEST_SCHEMA_VERSION,
+    PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED, PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0,
+    PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0, PROJECT_MANIFEST_SCHEMA_VERSION_V0_5_0,
 };
 
 fn workspace_path_remainder(raw: &str) -> Option<&str> {
@@ -276,8 +276,61 @@ pub struct PackageManifest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LockfileToolchain {
+    pub x07_version: String,
+    pub x07c_version: String,
+    pub lang_id: String,
+    pub compat: String,
+}
+
+pub fn default_lockfile_toolchain(manifest: &ProjectManifest) -> LockfileToolchain {
+    let compat = manifest
+        .compat
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("current");
+    LockfileToolchain {
+        // `x07` and `x07c` ship as a single release bundle and are version-aligned.
+        x07_version: crate::X07C_VERSION.to_string(),
+        x07c_version: crate::X07C_VERSION.to_string(),
+        lang_id: crate::language::LANG_ID.to_string(),
+        compat: compat.to_string(),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LockfileRegistry {
+    pub index_url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_hash: Option<String>,
+}
+
+pub fn default_lockfile_registry() -> LockfileRegistry {
+    let index_url = match std::env::var("X07_PKG_INDEX_URL") {
+        Ok(raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                x07_contracts::X07_PKG_DEFAULT_INDEX_URL.to_string()
+            } else {
+                trimmed.to_string()
+            }
+        }
+        Err(_) => x07_contracts::X07_PKG_DEFAULT_INDEX_URL.to_string(),
+    };
+    LockfileRegistry {
+        index_url,
+        snapshot_hash: None,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Lockfile {
     pub schema_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub toolchain: Option<LockfileToolchain>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registry: Option<LockfileRegistry>,
     pub dependencies: Vec<LockedDependency>,
 }
 
@@ -566,6 +619,8 @@ pub fn compute_lockfile(project_path: &Path, manifest: &ProjectManifest) -> Resu
 
     Ok(Lockfile {
         schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+        toolchain: Some(default_lockfile_toolchain(manifest)),
+        registry: Some(default_lockfile_registry()),
         dependencies: locked_deps,
     })
 }
@@ -593,6 +648,15 @@ pub fn verify_lockfile(
             lock.schema_version,
             hint
         );
+    }
+
+    if lock.schema_version.trim() == PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0 {
+        if lock.toolchain.is_none() {
+            anyhow::bail!("[X07LOCK_SCHEMA] lockfile is missing required field toolchain");
+        }
+        if lock.registry.is_none() {
+            anyhow::bail!("[X07LOCK_SCHEMA] lockfile is missing required field registry");
+        }
     }
 
     let expected = compute_lockfile(project_path, manifest)?;

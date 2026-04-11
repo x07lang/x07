@@ -142,14 +142,19 @@ pub const PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
 
 pub const PACKAGE_MANIFEST_SCHEMA_VERSION: &str = "x07.package@0.1.0";
 
+/// Default sparse index URL for `x07 pkg` when no override is provided.
+pub const X07_PKG_DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
+
 pub const PROJECT_LOCKFILE_SCHEMA_VERSION_V0_2_0: &str = "x07.lock@0.2.0";
 pub const PROJECT_LOCKFILE_SCHEMA_VERSION_V0_3_0: &str = "x07.lock@0.3.0";
+pub const PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0: &str = "x07.lock@0.4.0";
 
-pub const PROJECT_LOCKFILE_SCHEMA_VERSION: &str = PROJECT_LOCKFILE_SCHEMA_VERSION_V0_3_0;
+pub const PROJECT_LOCKFILE_SCHEMA_VERSION: &str = PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0;
 
 pub const PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
     PROJECT_LOCKFILE_SCHEMA_VERSION_V0_2_0,
     PROJECT_LOCKFILE_SCHEMA_VERSION_V0_3_0,
+    PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0,
 ];
 
 pub const X07_PKG_ADVISORY_SCHEMA_VERSION: &str = "x07.pkg.advisory@0.1.0";

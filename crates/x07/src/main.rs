@@ -12,8 +12,7 @@ use base64::Engine;
 use clap::{Args, Parser};
 use serde_json::Value;
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
-    X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
 };
 use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
 use x07_worlds::WorldId;
@@ -456,8 +455,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Add(_)) => vec!["pkg", "add"],
                 Some(pkg::PkgCommand::Remove(_)) => vec!["pkg", "remove"],
                 Some(pkg::PkgCommand::Versions(_)) => vec!["pkg", "versions"],
+                Some(pkg::PkgCommand::Info(_)) => vec!["pkg", "info"],
+                Some(pkg::PkgCommand::List(_)) => vec!["pkg", "list"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
+                Some(pkg::PkgCommand::Repair(_)) => vec!["pkg", "repair"],
                 Some(pkg::PkgCommand::AttestClosure(_)) => vec!["pkg", "attest-closure"],
                 Some(pkg::PkgCommand::Provides(_)) => vec!["pkg", "provides"],
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
@@ -784,10 +786,7 @@ fn compute_test_module_roots(
         serde_json::from_slice(&bytes)
             .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?
     } else if project_manifest.dependencies.is_empty() {
-        project::Lockfile {
-            schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
-            dependencies: Vec::new(),
-        }
+        project::compute_lockfile(&project_path, &project_manifest)?
     } else {
         anyhow::bail!(
             "missing lockfile for project with dependencies: {}",
