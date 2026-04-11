@@ -73,6 +73,12 @@
     "max_total_bytes": 16777216
   },
   "schema_version": "x07.run-os-policy@0.1.0",
+  "threads": {
+    "enabled": true,
+    "max_blocking": 4,
+    "max_queue": 1024,
+    "max_workers": 0
+  },
   "time": {
     "allow_local_tzid": false,
     "allow_monotonic": true,

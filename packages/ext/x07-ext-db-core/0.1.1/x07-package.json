@@ -6,6 +6,7 @@
   "module_root": "modules",
   "modules": ["std.db", "std.db.spec", "std.db.params", "std.db.pool", "std.db.dm"],
   "meta": {
+    "x07c_compat": ">=0.1.111 <0.2.0",
     "determinism_tier": "os-world-only",
     "worlds_allowed": ["run-os", "run-os-sandboxed"],
     "import_mode": "handwritten"

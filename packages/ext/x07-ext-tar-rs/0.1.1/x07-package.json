@@ -6,6 +6,7 @@
   "module_root": "modules",
   "modules": ["ext.tar", "ext.tar.tests"],
   "meta": {
+    "x07c_compat": ">=0.1.111 <0.2.0",
     "determinism_tier": "pure",
     "worlds_allowed": [
       "solve-pure",

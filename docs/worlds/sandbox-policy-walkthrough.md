@@ -93,7 +93,7 @@ Replace `src/app.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.4.0",
+  "schema_version": "x07.x07ast@0.8.0",
   "kind": "module",
   "module_id": "app",
   "imports": ["std.os.fs"],
@@ -169,7 +169,7 @@ Replace `src/app.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.4.0",
+  "schema_version": "x07.x07ast@0.8.0",
   "kind": "module",
   "module_id": "app",
   "imports": ["std.fmt", "std.net.http", "std.net.http.spec", "std.os.fs"],

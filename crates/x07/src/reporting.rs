@@ -354,12 +354,16 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "guide"
             | "doctor"
             | "diag"
+            | "explain"
+            | "repro"
             | "policy"
             | "ast"
             | "agent"
             | "fmt"
             | "lint"
             | "fix"
+            | "migrate"
+            | "project"
             | "build"
             | "check"
             | "service"
@@ -407,18 +411,23 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "coverage",
             "sarif",
         ],
+        "repro" => &["compile"],
         "pkg" => &[
             "add",
             "remove",
             "versions",
+            "info",
+            "list",
             "pack",
             "lock",
+            "repair",
             "attest-closure",
             "provides",
             "login",
             "publish",
         ],
         "policy" => &["init"],
+        "project" => &["migrate"],
         "prove" => &["check"],
         "review" => &["diff"],
         "trust" => &["report", "profile", "capsule", "certify"],

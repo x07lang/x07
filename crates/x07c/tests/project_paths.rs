@@ -566,6 +566,7 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
 
     let manifest = project::ProjectManifest {
         schema_version: PROJECT_MANIFEST_SCHEMA_VERSION.to_string(),
+        compat: None,
         world: "solve-pure".to_string(),
         entry: "src/main.x07.json".to_string(),
         operational_entry_symbol: None,
@@ -582,6 +583,8 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
 
     let lock = project::Lockfile {
         schema_version: x07_contracts::PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+        toolchain: Some(project::default_lockfile_toolchain(&manifest)),
+        registry: Some(project::default_lockfile_registry()),
         dependencies: vec![project::LockedDependency {
             name: "dep".to_string(),
             version: "0.1.0".to_string(),

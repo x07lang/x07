@@ -29,6 +29,18 @@ Note: `x07 run`, `x07 build`, and `x07 bundle` run the same auto-repair loop by 
 
 Repeat (max 3 iterations). If still failing, stop and change strategy (reduce scope, regenerate the x07AST cleanly, or ask for clarification).
 
+## Migration (compat upgrades)
+
+If diagnostics indicate a compatibility or migration issue (for example `bytes`/`bytes_view` coercions or recursion termination boilerplate in older code), prefer deterministic rewrites:
+
+- `x07 migrate --to 0.5 --check --input <path>`
+- `x07 migrate --to 0.5 --write --input <path>`
+
+For one-off debugging, you can temporarily override compat on execution/test entry points:
+
+- `x07 run --compat 0.5`
+- `x07 test --compat 0.5 --manifest tests/tests.json`
+
 Related:
 
 - If the failure came from `x07 test --pbt` (a counterexample repro), use `x07 fix --from-pbt <repro.json> --write` to generate a deterministic regression test.

@@ -12,8 +12,7 @@ use base64::Engine;
 use clap::{Args, Parser};
 use serde_json::Value;
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
-    X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
 };
 use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
 use x07_worlds::WorldId;
@@ -41,6 +40,8 @@ mod pbt_fix;
 mod pkg;
 mod policy;
 mod policy_overrides;
+mod project_cmd;
+mod project_ctx;
 mod prove;
 mod repair;
 mod report_common;
@@ -100,6 +101,10 @@ enum Command {
     Doctor(doctor::DoctorArgs),
     /// Inspect and enforce diagnostics catalog/coverage.
     Diag(diag::DiagArgs),
+    /// Explain one diagnostic code from the catalog (alias for `x07 diag explain`).
+    Explain(diag::DiagExplainArgs),
+    /// Generate portable repro bundles (compile-time).
+    Repro(repro::ReproArgs),
     /// Generate and manage run-os-sandboxed policy files.
     Policy(policy::PolicyArgs),
     /// Initialize, validate, and patch x07AST JSON files.
@@ -112,6 +117,10 @@ enum Command {
     Lint(toolchain::LintArgs),
     /// Apply deterministic quickfixes to an x07AST JSON file.
     Fix(toolchain::FixArgs),
+    /// Apply mechanical migrations to update `*.x07.json` code for a newer compat mode (use `x07 project migrate` for `x07.json` schema migrations).
+    Migrate(toolchain::MigrateArgs),
+    /// Project manifest operations.
+    Project(project_cmd::ProjectArgs),
     /// Build a project to C.
     Build(toolchain::BuildArgs),
     /// Check a project (lint + typecheck + backend-check; no emit).
@@ -245,6 +254,10 @@ struct TestArgs {
 
     #[arg(long, value_enum, hide = true)]
     world: Option<WorldId>,
+
+    /// Override the language/toolchain compatibility mode.
+    #[arg(long, value_name = "COMPAT")]
+    compat: Option<String>,
 
     #[arg(long, value_name = "SUBSTR")]
     filter: Option<String>,
@@ -393,6 +406,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(diag::DiagCommand::Coverage(_)) => vec!["diag", "coverage"],
                 Some(diag::DiagCommand::Sarif(_)) => vec!["diag", "sarif"],
             },
+            Some(Command::Explain(_)) => vec!["explain"],
+            Some(Command::Repro(args)) => match &args.cmd {
+                None => vec!["repro"],
+                Some(repro::ReproCommand::Compile(_)) => vec!["repro", "compile"],
+            },
             Some(Command::Policy(args)) => match &args.cmd {
                 None => vec!["policy"],
                 Some(policy::PolicyCommand::Init(_)) => vec!["policy", "init"],
@@ -419,6 +437,11 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Fmt(_)) => vec!["fmt"],
             Some(Command::Lint(_)) => vec!["lint"],
             Some(Command::Fix(_)) => vec!["fix"],
+            Some(Command::Migrate(_)) => vec!["migrate"],
+            Some(Command::Project(args)) => match &args.cmd {
+                None => vec!["project"],
+                Some(project_cmd::ProjectCommand::Migrate(_)) => vec!["project", "migrate"],
+            },
             Some(Command::Build(_)) => vec!["build"],
             Some(Command::Check(_)) => vec!["check"],
             Some(Command::Service(args)) => match &args.cmd {
@@ -449,8 +472,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Add(_)) => vec!["pkg", "add"],
                 Some(pkg::PkgCommand::Remove(_)) => vec!["pkg", "remove"],
                 Some(pkg::PkgCommand::Versions(_)) => vec!["pkg", "versions"],
+                Some(pkg::PkgCommand::Info(_)) => vec!["pkg", "info"],
+                Some(pkg::PkgCommand::List(_)) => vec!["pkg", "list"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
+                Some(pkg::PkgCommand::Repair(_)) => vec!["pkg", "repair"],
                 Some(pkg::PkgCommand::AttestClosure(_)) => vec!["pkg", "attest-closure"],
                 Some(pkg::PkgCommand::Provides(_)) => vec!["pkg", "provides"],
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
@@ -527,12 +553,16 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Guide(args) => guide::cmd_guide(&cli.machine, args),
         Command::Doctor(args) => doctor::cmd_doctor(&cli.machine, args),
         Command::Diag(args) => diag::cmd_diag(&cli.machine, args),
+        Command::Explain(args) => diag::cmd_explain(args),
+        Command::Repro(args) => repro::cmd_repro(&cli.machine, args),
         Command::Policy(args) => policy::cmd_policy(&cli.machine, args),
         Command::Ast(args) => ast::cmd_ast(&cli.machine, args),
         Command::Agent(args) => agent::cmd_agent(&cli.machine, args),
         Command::Fmt(args) => toolchain::cmd_fmt(&cli.machine, args),
         Command::Lint(args) => toolchain::cmd_lint(&cli.machine, args),
         Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),
+        Command::Migrate(args) => toolchain::cmd_migrate(&cli.machine, args),
+        Command::Project(args) => project_cmd::cmd_project(&cli.machine, args),
         Command::Build(args) => toolchain::cmd_build(&cli.machine, args),
         Command::Check(args) => toolchain::cmd_check(&cli.machine, args),
         Command::Service(args) => service::cmd_service(&cli.machine, args),
@@ -715,7 +745,26 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
         );
     }
 
-    let results = run_tests(&args, &module_roots, &tests)?;
+    let project_compat = {
+        let project_path = util::resolve_existing_path_upwards_from(
+            &validated.manifest_dir,
+            Path::new("x07.json"),
+        );
+        if project_path.is_file() {
+            Some(
+                project::load_project_manifest(&project_path)
+                    .context("load project manifest")?
+                    .compat,
+            )
+            .flatten()
+        } else {
+            None
+        }
+    };
+    let compat = crate::util::resolve_compat(args.compat.as_deref(), project_compat.as_deref())
+        .context("resolve compat")?;
+
+    let results = run_tests(&args, &module_roots, compat, &tests)?;
 
     let report = finalize_report(&args, &module_root_used, started.elapsed(), results);
 
@@ -757,10 +806,7 @@ fn compute_test_module_roots(
         serde_json::from_slice(&bytes)
             .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?
     } else if project_manifest.dependencies.is_empty() {
-        project::Lockfile {
-            schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
-            dependencies: Vec::new(),
-        }
+        project::compute_lockfile(&project_path, &project_manifest)?
     } else {
         anyhow::bail!(
             "missing lockfile for project with dependencies: {}",
@@ -1095,6 +1141,7 @@ fn attach_test_sandbox_evidence(
 fn run_tests(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     tests: &[TestDecl],
 ) -> Result<Vec<TestCaseResult>> {
     if args.jobs != 1 && !args.no_fail_fast {
@@ -1115,7 +1162,7 @@ fn run_tests(
                 eprintln!("test: {}", test.id);
             }
 
-            let result = run_one_test(args, module_roots, test)?;
+            let result = run_one_test(args, module_roots, compat, test)?;
             if !args.no_fail_fast {
                 let fail_fast = if args.no_run {
                     result.compile.as_ref().is_some_and(|c| !c.ok)
@@ -1154,7 +1201,7 @@ fn run_tests(
                 if args.verbose {
                     eprintln!("test: {}", test.id);
                 }
-                match run_one_test(args, module_roots, test) {
+                match run_one_test(args, module_roots, compat, test) {
                     Ok(r) => {
                         if let Ok(mut guard) = results.lock() {
                             guard.push(r);
@@ -1248,6 +1295,7 @@ fn policy_roots_fit_cwd(read_roots: &[PathBuf], cwd: &Path) -> bool {
 fn run_one_test(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     test: &TestDecl,
 ) -> Result<TestCaseResult> {
     let start = Instant::now();
@@ -1271,13 +1319,13 @@ fn run_one_test(
     }
 
     if test.pbt.is_some() {
-        return run_one_pbt_test(args, module_roots, test, start);
+        return run_one_pbt_test(args, module_roots, compat, test, start);
     }
 
     let driver_src = build_test_driver_x07ast_json(test)?;
 
     if !test.world.is_eval_world() {
-        return run_one_test_os(args, module_roots, test, &driver_src, start);
+        return run_one_test_os(args, module_roots, compat, test, &driver_src, start);
     }
 
     let (driver_out_dir, driver_path, exe_out_path) = if args.keep_artifacts {
@@ -1298,6 +1346,7 @@ fn run_one_test(
 
     let mut compile_options =
         x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
+    compile_options.compat = compat;
     compile_options.arch_root = infer_arch_root_from_manifest(&args.manifest)
         .or_else(|| args.manifest.parent().map(|p| p.to_path_buf()))
         .or_else(|| std::env::current_dir().ok());
@@ -1504,6 +1553,7 @@ fn run_one_test(
 fn run_one_pbt_test(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     test: &TestDecl,
     start: Instant,
 ) -> Result<TestCaseResult> {
@@ -1571,6 +1621,7 @@ fn run_one_pbt_test(
 
     let mut compile_options =
         x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
+    compile_options.compat = compat;
     compile_options.arch_root = infer_arch_root_from_manifest(&args.manifest)
         .or_else(|| args.manifest.parent().map(|p| p.to_path_buf()))
         .or_else(|| std::env::current_dir().ok());
@@ -1862,6 +1913,7 @@ fn rm_rf(path: &Path) {
 fn run_one_test_os(
     args: &TestArgs,
     module_roots: &[PathBuf],
+    compat: x07c::compat::Compat,
     test: &TestDecl,
     driver_src: &[u8],
     start: Instant,
@@ -1982,6 +2034,7 @@ fn run_one_test_os(
 
     cmd.current_dir(cmd_cwd);
     cmd.arg("--world").arg(test.world.as_str());
+    cmd.arg("--compat").arg(compat.to_string_lossy());
     cmd.arg("--program").arg(&driver_path);
     cmd.arg("--compiled-out").arg(&exe_out_path);
     cmd.arg("--auto-ffi");

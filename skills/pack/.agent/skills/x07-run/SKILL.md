@@ -27,6 +27,9 @@ Use this skill for normal program execution via `x07 run`.
   - `x07 run --profile os`
   - `x07 run --profile sandbox`
 
+- Override the project’s pinned compatibility mode for one run:
+  - `x07 run --compat 0.5`
+
 - Check platform prerequisites for OS worlds (C compiler + common native deps):
   - `x07 doctor`
 
@@ -79,3 +82,10 @@ To produce a normal CLI executable (standard `argc/argv`, raw stdout) that runs 
 
 - `x07 bundle --profile os --out dist/app`
 - `x07 bundle --profile sandbox --out dist/app` (policy enforced)
+
+## Repro bundles (when compilation fails)
+
+If compilation fails in CI or in a sandboxed environment, generate a portable compile repro bundle:
+
+- `x07 repro compile --project x07.json`
+- `x07 repro compile --project x07.json --out-dir .x07/artifacts/repro/compile/local`

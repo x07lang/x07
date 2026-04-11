@@ -2,9 +2,16 @@
   "schema_version": "x07.package@0.1.0",
   "name": "appkit",
   "version": "0.1.0",
+  "description": "Local helper package used by the multi-module docs example.",
+  "docs": "Local helper package used by docs/examples/project-multi-module.\n\nModules:\n- appkit.vec\n",
   "module_root": "modules",
-  "modules": [
-    "appkit.vec"
-  ]
+  "modules": ["appkit.vec"],
+  "meta": {
+    "x07c_compat": ">=0.1.111 <0.2.0",
+    "determinism_tier": "pure",
+    "worlds_allowed": ["solve-pure", "run-os", "run-os-sandboxed"],
+    "import_mode": "handwritten",
+    "visibility": "experimental"
+  }
 }
 

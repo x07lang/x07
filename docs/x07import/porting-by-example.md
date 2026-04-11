@@ -185,7 +185,7 @@ Create `modules/ext/hex/tests.x07.json`:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.4.0",
+  "schema_version": "x07.x07ast@0.8.0",
   "kind": "module",
   "module_id": "ext.hex.tests",
   "imports": ["ext.hex", "std.test"],
@@ -239,7 +239,8 @@ Create `x07.json` for local tests:
 
 ```json
 {
-  "schema_version": "x07.project@0.4.0",
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
   "world": "run-os",
   "entry": "modules/ext/hex/tests.x07.json",
   "module_roots": ["modules"],

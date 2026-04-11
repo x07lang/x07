@@ -45,6 +45,7 @@ fn compile_exe(program: &[u8], module_roots: Vec<PathBuf>) -> PathBuf {
     let cfg = config();
     let compile_options = compile::CompileOptions {
         world: Default::default(),
+        compat: Default::default(),
         enable_fs: false,
         enable_rr: false,
         enable_kv: false,

@@ -307,6 +307,11 @@ impl<'a> Emitter<'a> {
                         self.decl_local(Ty::I32, &tmp);
                         self.emit_for_to(args, Ty::I32, &tmp)
                     }
+                    "while" => {
+                        let tmp = self.alloc_local("t_i32_")?;
+                        self.decl_local(Ty::I32, &tmp);
+                        self.emit_while_to(args, Ty::I32, &tmp)
+                    }
                     "return" => self.emit_return(args),
                     _ => {
                         let _ = self.emit_expr(expr)?;
@@ -603,6 +608,7 @@ impl<'a> Emitter<'a> {
             "set0" => self.emit_set0_to(args, dest_ty, dest),
             "if" => self.emit_if_to(args, dest_ty, dest),
             "for" => self.emit_for_to(args, dest_ty, dest),
+            "while" => self.emit_while_to(args, dest_ty, dest),
             "budget.scope_v1" => self.emit_budget_scope_v1_to(args, dest_ty, dest),
             "budget.scope_from_arch_v1" => {
                 self.emit_budget_scope_from_arch_v1_to(args, dest_ty, dest)
@@ -1092,6 +1098,7 @@ impl<'a> Emitter<'a> {
             }
 
             "try" => self.emit_try_to(args, dest_ty, dest),
+            "try_doc" => self.emit_try_doc_to(args, dest_ty, dest),
 
             "vec_value.with_capacity_v1" => {
                 self.emit_vec_value_with_capacity_v1_to(args, dest_ty, dest)
@@ -1464,6 +1471,60 @@ impl<'a> Emitter<'a> {
         self.close_block();
 
         self.line(&format!("{var_c_name} = {var_c_name} + UINT32_C(1);"));
+        self.indent -= 1;
+        self.line("}");
+
+        self.line(&format!("{dest} = UINT32_C(0);"));
+        Ok(())
+    }
+
+    pub(super) fn emit_while_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "while form: (while <cond:i32> <body:any>)".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "while expression returns i32".to_string(),
+            ));
+        }
+
+        // Evaluate the condition in an isolated scope so any temporaries created while computing
+        // the boolean do not leak into the body scope (and are dropped deterministically).
+        let cond_local = self.alloc_local("t_while_cond_")?;
+        self.decl_local(Ty::I32, &cond_local);
+
+        self.push_scope();
+        self.open_block();
+        self.emit_expr_to(&args[0], Ty::I32, &cond_local)?;
+        self.pop_scope()?;
+        self.close_block();
+
+        self.line(&format!("while ({cond_local} != UINT32_C(0)) {{"));
+        self.indent += 1;
+
+        // Body scope (like `for`).
+        self.push_scope();
+        self.open_block();
+        self.emit_stmt(&args[1])?;
+        self.pop_scope()?;
+        self.close_block();
+
+        // Recompute condition for the next iteration.
+        self.push_scope();
+        self.open_block();
+        self.emit_expr_to(&args[0], Ty::I32, &cond_local)?;
+        self.pop_scope()?;
+        self.close_block();
+
         self.indent -= 1;
         self.line("}");
 
@@ -8217,6 +8278,109 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 format!(
                     "try expects result_i32, result_bytes, or result_bytes_view, got {other:?}"
                 ),
+            )),
+        }
+    }
+
+    pub(super) fn emit_try_doc_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "try_doc expects 1 arg".to_string(),
+            ));
+        }
+        if self.fn_ret_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "try_doc requires function return type bytes".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "try_doc returns bytes".to_string(),
+            ));
+        }
+
+        let doc = self.emit_expr(&args[0])?;
+        match doc.ty {
+            Ty::Bytes => {
+                self.line(&format!(
+                    "if ({}.len < UINT32_C(1) || rt_bytes_get_u8(ctx, {}, UINT32_C(0)) != UINT32_C(1)) {{",
+                    doc.c_name, doc.c_name
+                ));
+                self.indent += 1;
+
+                let ret_c_name = "try_doc_ret";
+                self.line(&format!("bytes_t {ret_c_name} = {};", doc.c_name));
+
+                let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
+                for scope in cleanup_scopes_snapshot.iter().rev() {
+                    self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
+                }
+
+                let ret = self.make_var_ref(self.fn_ret_ty, ret_c_name.to_string(), false);
+                self.emit_contract_exit_checks(&ret)?;
+
+                for (ty, c_name) in self.live_owned_drop_list(Some(&doc.c_name)) {
+                    self.emit_drop_var(ty, &c_name);
+                }
+
+                self.line(&format!("return {ret_c_name};"));
+                self.indent -= 1;
+                self.line("}");
+
+                self.line(&format!(
+                    "{dest} = rt_bytes_slice(ctx, {}, UINT32_C(1), {}.len - UINT32_C(1));",
+                    doc.c_name, doc.c_name
+                ));
+                self.line(&format!("rt_bytes_drop(ctx, &{});", doc.c_name));
+                Ok(())
+            }
+            Ty::BytesView => {
+                self.line(&format!(
+                    "if ({}.len < UINT32_C(1) || rt_view_get_u8(ctx, {}, UINT32_C(0)) != UINT32_C(1)) {{",
+                    doc.c_name, doc.c_name
+                ));
+                self.indent += 1;
+
+                let ret_c_name = "try_doc_ret";
+                self.line(&format!(
+                    "bytes_t {ret_c_name} = rt_view_to_bytes(ctx, {});",
+                    doc.c_name
+                ));
+
+                let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
+                for scope in cleanup_scopes_snapshot.iter().rev() {
+                    self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
+                }
+
+                let ret = self.make_var_ref(self.fn_ret_ty, ret_c_name.to_string(), false);
+                self.emit_contract_exit_checks(&ret)?;
+
+                for (ty, c_name) in self.live_owned_drop_list(None) {
+                    self.emit_drop_var(ty, &c_name);
+                }
+
+                self.line(&format!("return {ret_c_name};"));
+                self.indent -= 1;
+                self.line("}");
+
+                self.line(&format!(
+                    "{dest} = rt_view_to_bytes(ctx, rt_view_slice(ctx, {}, UINT32_C(1), {}.len - UINT32_C(1)));",
+                    doc.c_name, doc.c_name
+                ));
+                self.release_temp_view_borrow(&doc)?;
+                Ok(())
+            }
+            other => Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("try_doc expects bytes or bytes_view, got {other:?}"),
             )),
         }
     }

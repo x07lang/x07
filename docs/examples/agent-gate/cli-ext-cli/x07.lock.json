@@ -1,11 +1,20 @@
 {
-  "schema_version": "x07.lock@0.3.0",
+  "schema_version": "x07.lock@0.4.0",
+  "toolchain": {
+    "x07_version": "0.1.111",
+    "x07c_version": "0.1.111",
+    "lang_id": "x07-core@0.2.0",
+    "compat": "0.5"
+  },
+  "registry": {
+    "index_url": "sparse+https://registry.x07.io/index/"
+  },
   "dependencies": [
     {
       "name": "ext-cli",
       "version": "0.1.15",
       "path": ".x07/deps/ext-cli/0.1.15",
-      "package_manifest_sha256": "ca42eb14c4aa21dd0b61329ae5efe113a59033fd145b3c7f0685a3c201d25532",
+      "package_manifest_sha256": "b9c37318cb4e1593e666672b205e29a74815a64e9578569c67b906249b52780d",
       "module_root": "modules",
       "modules_sha256": {
         "ext.cli": "41f051b7183da343fa70e05e6a2aaba6c9f110c748ef0409b65de5dcf1627110",
@@ -20,7 +29,7 @@
       "name": "ext-csv-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-csv-rs/0.1.5",
-      "package_manifest_sha256": "d5c689ffc2fd0a43941070ca48159a025dad7413adda8200e60d64146330d4ca",
+      "package_manifest_sha256": "05d733ad9eb48453250890a6cd4f6cb1846496c5fd59f1c1cd0b34e1505480e8",
       "module_root": "modules",
       "modules_sha256": {
         "ext.csv": "09f75965c511bc084e99e7e0b82e9e19bde36e67b92b5e1eec22c77a2717d793",
@@ -33,7 +42,7 @@
       "name": "ext-data-model",
       "version": "0.1.11",
       "path": ".x07/deps/ext-data-model/0.1.11",
-      "package_manifest_sha256": "ca34a014ff29db9963bae9f099107a04a9cb9d15c263146f79bced999d85edde",
+      "package_manifest_sha256": "4ef218f03addd92dc34ed26b2e35a19738c3f374c759f7c53c046cb2dc35e6ba",
       "module_root": "modules",
       "modules_sha256": {
         "ext.data_model": "0ccbb44a004127875464a769a72f2b56d6a55beb3c3ebaff7686cdddaac8b6c2",
@@ -57,7 +66,7 @@
       "name": "ext-ini-rs",
       "version": "0.1.4",
       "path": ".x07/deps/ext-ini-rs/0.1.4",
-      "package_manifest_sha256": "aea03e8e0d7071538ca4f605cbfae5e2be290f97e27ac52e9dece1f5308daec4",
+      "package_manifest_sha256": "60596ce6c3a175e2b11e14c26757c1d794fa367ff2ee401d7429c849aa66d925",
       "module_root": "modules",
       "modules_sha256": {
         "ext.ini": "9fc4d8075b2b23a3479d2e60b6a42142aac2e27013984d2a1e5b83fae2f80820",
@@ -70,7 +79,7 @@
       "name": "ext-json-rs",
       "version": "0.1.7",
       "path": ".x07/deps/ext-json-rs/0.1.7",
-      "package_manifest_sha256": "f0ebb3b5b8eaf193ac250fc27ac0ee6088c952e83e5a1f304a9fcc9a93694bea",
+      "package_manifest_sha256": "3a6d038d47dfeda511373476664226a586fef10f582d258b1173105182fc2959",
       "module_root": "modules",
       "modules_sha256": {
         "ext.json.canon": "2b1254ac42bdd3a8d616b738e1e0434d13cca30cdc5b97890e35089c66668034",
@@ -84,7 +93,7 @@
       "name": "ext-toml-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-toml-rs/0.1.5",
-      "package_manifest_sha256": "5077603c74f831f417ad0c215cde53c09209bb708db03fcb00227e6c10f07a6e",
+      "package_manifest_sha256": "69ddc64f97d417629da8954151d63e13a64bfd1f806302c618fe6c6a13ddf9fe",
       "module_root": "modules",
       "modules_sha256": {
         "ext.toml": "3bd80fbe0c44b57092432b628d3ce0068abe190d8c27395ebf9bf711bdeeea35",
@@ -97,7 +106,7 @@
       "name": "ext-unicode-rs",
       "version": "0.1.5",
       "path": ".x07/deps/ext-unicode-rs/0.1.5",
-      "package_manifest_sha256": "a25f1c73b8f456c2a8719e105ca95d40c50c1489cd88169d51301b845b6411c0",
+      "package_manifest_sha256": "ba7ff60fb2d2bc8406ebb88eaf56b70dda5cdbd2b649beca7bdba344ec260b60",
       "module_root": "modules",
       "modules_sha256": {
         "ext.unicode": "df35037b24fff1346db444d0281f002cc49f992799647d89d1ca80516714bbdb",
@@ -112,7 +121,7 @@
       "name": "ext-xml-rs",
       "version": "0.1.4",
       "path": ".x07/deps/ext-xml-rs/0.1.4",
-      "package_manifest_sha256": "060e26ecd284fcb88834053b8a849f93e0507434c81bf9e60dee504a3211beb1",
+      "package_manifest_sha256": "e4949914a49240706fba7e5d4f2df95b8db9ffd6f00bc6f6ad42e9b684f6d215",
       "module_root": "modules",
       "modules_sha256": {
         "ext.xml": "758a99622b077650c9ec0fdc7fe8d60261c27720bf944361f09dc2fd66d91b3d",
@@ -125,7 +134,7 @@
       "name": "ext-yaml-rs",
       "version": "0.1.4",
       "path": ".x07/deps/ext-yaml-rs/0.1.4",
-      "package_manifest_sha256": "5b5643f86fffb93ca376015a9669cea4cc6608123fedf9467ebec2edfdd5a568",
+      "package_manifest_sha256": "28b3416f459e9d7ec64c10e8e90468b340670ab2744e42c155ffa5b4dd778de7",
       "module_root": "modules",
       "modules_sha256": {
         "ext.yaml": "065c86d25102c285092c7b9402ca773f38929f58c3acdebbfb4c6c567c1bf853",

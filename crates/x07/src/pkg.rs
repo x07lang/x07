@@ -20,23 +20,218 @@ use crate::util;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) const DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
+pub(crate) const DEFAULT_INDEX_URL: &str = x07_contracts::X07_PKG_DEFAULT_INDEX_URL;
 const PKG_PROVIDES_REPORT_SCHEMA_VERSION: &str = "x07.pkg.provides.report@0.1.0";
 const X07_DEP_CLOSURE_ATTEST_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-dep.closure.attest.schema.json");
 
-fn default_index_url() -> String {
-    match std::env::var("X07_PKG_INDEX_URL") {
-        Ok(raw) => {
-            let trimmed = raw.trim();
-            if trimmed.is_empty() {
-                DEFAULT_INDEX_URL.to_string()
-            } else {
-                trimmed.to_string()
+#[derive(Debug, Clone, Default)]
+struct PkgConfig {
+    registry: Option<String>,
+    offline: Option<bool>,
+    #[allow(dead_code)]
+    cache_policy: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RegistrySource {
+    Cli,
+    Env,
+    Config,
+    Default,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedRegistry {
+    url: String,
+    source: RegistrySource,
+}
+
+fn load_pkg_config(base: &Path) -> Result<PkgConfig> {
+    let mut cfg = PkgConfig::default();
+
+    let paths = [
+        base.join(".x07").join("config.json"),
+        base.join("x07.config.json"),
+    ];
+    for path in paths {
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(err).with_context(|| format!("read {}", path.display())),
+        };
+        let doc: Value =
+            serde_json::from_slice(&bytes).with_context(|| format!("parse {}", path.display()))?;
+        let Some(obj) = doc.as_object() else {
+            anyhow::bail!("config must be a JSON object: {}", path.display());
+        };
+
+        if let Some(schema) = obj.get("schema_version").and_then(Value::as_str) {
+            let schema = schema.trim();
+            if schema == "x07up.config@0.1.0" || schema.starts_with("x07up.") {
+                continue;
+            }
+            if !schema.is_empty() && schema != "x07.config@0.1.0" {
+                anyhow::bail!(
+                    "unsupported config schema_version {:?} (expected x07.config@0.1.0): {}",
+                    schema,
+                    path.display()
+                );
             }
         }
-        Err(_) => DEFAULT_INDEX_URL.to_string(),
+
+        let scope = obj.get("pkg").and_then(Value::as_object).unwrap_or(obj);
+
+        let registry = scope
+            .get("registry")
+            .or_else(|| scope.get("index"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+        if registry.is_some() {
+            cfg.registry = registry;
+        }
+
+        let offline = scope.get("offline").and_then(Value::as_bool);
+        if offline.is_some() {
+            cfg.offline = offline;
+        }
+
+        let cache_policy = scope
+            .get("cache_policy")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+        if cache_policy.is_some() {
+            cfg.cache_policy = cache_policy;
+        }
     }
+
+    Ok(cfg)
+}
+
+fn env_index_url() -> Option<String> {
+    std::env::var("X07_PKG_INDEX_URL")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn resolve_registry_url(cli_index: Option<&str>, cfg: &PkgConfig) -> ResolvedRegistry {
+    if let Some(cli) = cli_index
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+    {
+        return ResolvedRegistry {
+            url: cli,
+            source: RegistrySource::Cli,
+        };
+    }
+    if let Some(env) = env_index_url() {
+        return ResolvedRegistry {
+            url: env,
+            source: RegistrySource::Env,
+        };
+    }
+    if let Some(config) = cfg
+        .registry
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+    {
+        return ResolvedRegistry {
+            url: config,
+            source: RegistrySource::Config,
+        };
+    }
+    ResolvedRegistry {
+        url: DEFAULT_INDEX_URL.to_string(),
+        source: RegistrySource::Default,
+    }
+}
+
+fn resolve_pkg_registry_and_offline(
+    base: &Path,
+    cli_index: Option<&str>,
+    cli_offline: bool,
+) -> Result<(ResolvedRegistry, bool)> {
+    let cfg = load_pkg_config(base)?;
+    let registry = resolve_registry_url(cli_index, &cfg);
+    let offline = cli_offline || cfg.offline.unwrap_or(false);
+    Ok((registry, offline))
+}
+
+fn index_url_is_file(index_url: &str) -> bool {
+    let raw = index_url.strip_prefix("sparse+").unwrap_or(index_url);
+    raw.trim_start().starts_with("file://")
+}
+
+fn percent_decode_url_path(raw: &str) -> Result<String> {
+    if !raw.as_bytes().contains(&b'%') {
+        return Ok(raw.to_string());
+    }
+
+    fn hex(b: u8) -> Option<u8> {
+        match b {
+            b'0'..=b'9' => Some(b - b'0'),
+            b'a'..=b'f' => Some(b - b'a' + 10),
+            b'A'..=b'F' => Some(b - b'A' + 10),
+            _ => None,
+        }
+    }
+
+    let bytes = raw.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'%' {
+            out.push(bytes[i]);
+            i += 1;
+            continue;
+        }
+        if i + 2 >= bytes.len() {
+            anyhow::bail!("invalid percent-encoding in file url path: {:?}", raw);
+        }
+        let hi = hex(bytes[i + 1]).ok_or_else(|| {
+            anyhow::anyhow!("invalid percent-encoding in file url path: {:?}", raw)
+        })?;
+        let lo = hex(bytes[i + 2]).ok_or_else(|| {
+            anyhow::anyhow!("invalid percent-encoding in file url path: {:?}", raw)
+        })?;
+        out.push((hi << 4) | lo);
+        i += 3;
+    }
+
+    String::from_utf8(out).context("file url path is not utf-8")
+}
+
+fn file_index_url_to_dir(index_url: &str) -> Result<PathBuf> {
+    let raw = index_url
+        .strip_prefix("sparse+")
+        .unwrap_or(index_url)
+        .trim();
+    let rest = raw
+        .strip_prefix("file://")
+        .ok_or_else(|| anyhow::anyhow!("expected file:// index url, got {:?}", index_url))?;
+
+    let rest = if let Some(r) = rest.strip_prefix("localhost/") {
+        format!("/{r}")
+    } else {
+        rest.to_string()
+    };
+    if !rest.starts_with('/') {
+        anyhow::bail!(
+            "unsupported file index url form {:?} (expected file:///ABS/PATH/)",
+            index_url
+        );
+    }
+
+    let decoded = percent_decode_url_path(&rest)?;
+    Ok(PathBuf::from(decoded))
 }
 
 #[derive(Debug, Args)]
@@ -53,10 +248,16 @@ pub enum PkgCommand {
     Remove(RemoveArgs),
     /// List available versions of a package from the index.
     Versions(VersionsArgs),
+    /// Show package metadata from the index (and local cache when available).
+    Info(InfoArgs),
+    /// List available packages from a local `file://` sparse index mirror.
+    List(ListArgs),
     /// Pack a local package directory into a publishable archive.
     Pack(PackArgs),
     /// Resolve project dependencies and write `x07.lock.json`.
     Lock(LockArgs),
+    /// Repair an existing lockfile after a toolchain upgrade.
+    Repair(RepairArgs),
     /// Emit a dependency-closure attestation from `x07.json` + `x07.lock.json`.
     AttestClosure(AttestClosureArgs),
     /// Find packages that provide a given module id.
@@ -78,7 +279,7 @@ pub struct AddArgs {
     pub sync: bool,
 
     /// Sparse index URL used when fetching dependencies (default: official registry).
-    #[arg(long, value_name = "URL")]
+    #[arg(long, value_name = "URL", alias = "registry")]
     pub index: Option<String>,
 
     /// Override the dependency path stored in `x07.json`.
@@ -109,7 +310,7 @@ pub struct RemoveArgs {
     pub sync: bool,
 
     /// Sparse index URL used when fetching dependencies (default: official registry).
-    #[arg(long, value_name = "URL")]
+    #[arg(long, value_name = "URL", alias = "registry")]
     pub index: Option<String>,
 
     /// Package name.
@@ -120,16 +321,46 @@ pub struct RemoveArgs {
 #[derive(Debug, Args)]
 pub struct VersionsArgs {
     /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
-    #[arg(long, value_name = "URL")]
+    #[arg(long, value_name = "URL", alias = "registry")]
     pub index: Option<String>,
 
     /// Force a fresh sparse-index fetch (cache-busting).
     #[arg(long)]
     pub refresh: bool,
 
+    /// Disallow network access (requires a `file://` registry index).
+    #[arg(long)]
+    pub offline: bool,
+
     /// Package name.
     #[arg(value_name = "NAME")]
     pub name: String,
+}
+
+#[derive(Debug, Args)]
+pub struct InfoArgs {
+    /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
+    #[arg(long, value_name = "URL", alias = "registry")]
+    pub index: Option<String>,
+
+    /// Disallow network access (requires a `file://` registry index and local package contents).
+    #[arg(long)]
+    pub offline: bool,
+
+    /// Package spec in `NAME` or `NAME@VERSION` form.
+    #[arg(value_name = "NAME[@VERSION]")]
+    pub spec: String,
+}
+
+#[derive(Debug, Args)]
+pub struct ListArgs {
+    /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
+    #[arg(long, value_name = "URL", alias = "registry")]
+    pub index: Option<String>,
+
+    /// Disallow network access (requires a `file://` registry index).
+    #[arg(long)]
+    pub offline: bool,
 }
 
 #[derive(Debug, Args)]
@@ -146,12 +377,19 @@ pub struct LockArgs {
     pub project: PathBuf,
 
     /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
-    #[arg(long, value_name = "URL")]
+    #[arg(long, value_name = "URL", alias = "registry")]
     pub index: Option<String>,
 
     /// Fail if `x07.lock.json` is out of date.
     #[arg(long)]
     pub check: bool,
+
+    /// Lockfile schema version to write/check (example: `0.4`).
+    ///
+    /// Use `0.3` only when you must interoperate with an older toolchain that cannot read
+    /// `x07.lock@0.4.0`.
+    #[arg(long, value_name = "VER", default_value = "0.4")]
+    pub lock_version: String,
 
     /// Disallow network access and reuse existing `.x07/deps` contents.
     #[arg(long)]
@@ -167,6 +405,52 @@ pub struct LockArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct RepairArgs {
+    /// Project manifest path (`x07.json`).
+    #[arg(long, value_name = "PATH", default_value = "x07.json")]
+    pub project: PathBuf,
+
+    /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
+    #[arg(long, value_name = "URL", alias = "registry")]
+    pub index: Option<String>,
+
+    /// Toolchain target to repair against (currently only `current`).
+    #[arg(long, value_name = "TOOLCHAIN", default_value = "current")]
+    pub toolchain: String,
+
+    /// Disallow network access and prefer already-cached compatible versions.
+    #[arg(long)]
+    pub offline: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RequestedLockVersion {
+    V0_3_0,
+    V0_4_0,
+}
+
+impl RequestedLockVersion {
+    fn schema_version(self) -> &'static str {
+        match self {
+            RequestedLockVersion::V0_3_0 => x07_contracts::PROJECT_LOCKFILE_SCHEMA_VERSION_V0_3_0,
+            RequestedLockVersion::V0_4_0 => x07_contracts::PROJECT_LOCKFILE_SCHEMA_VERSION_V0_4_0,
+        }
+    }
+}
+
+fn parse_lock_version(raw: &str) -> Result<RequestedLockVersion> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        anyhow::bail!("lock version must be non-empty");
+    }
+    match raw {
+        "0.3" | "0.3.0" => Ok(RequestedLockVersion::V0_3_0),
+        "0.4" | "0.4.0" => Ok(RequestedLockVersion::V0_4_0),
+        other => anyhow::bail!("unsupported lock version {:?} (expected 0.3 or 0.4)", other),
+    }
+}
+
+#[derive(Debug, Args)]
 pub struct AttestClosureArgs {
     /// Project manifest path (`x07.json`).
     #[arg(long, value_name = "PATH", default_value = "x07.json")]
@@ -177,7 +461,7 @@ pub struct AttestClosureArgs {
     pub out: PathBuf,
 
     /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
-    #[arg(long, value_name = "URL")]
+    #[arg(long, value_name = "URL", alias = "registry")]
     pub index: Option<String>,
 
     /// Disallow network access and reuse existing lockfile metadata.
@@ -207,7 +491,7 @@ pub struct ProvidesArgs {
 #[derive(Debug, Args)]
 pub struct LoginArgs {
     /// Index base URL.
-    #[arg(long, value_name = "URL")]
+    #[arg(long, value_name = "URL", alias = "registry")]
     pub index: String,
 
     /// Token value.
@@ -226,7 +510,7 @@ pub struct PublishArgs {
     pub package: PathBuf,
 
     /// Index base URL.
-    #[arg(long, value_name = "URL")]
+    #[arg(long, value_name = "URL", alias = "registry")]
     pub index: String,
 }
 
@@ -260,6 +544,23 @@ struct LockResult {
     index: Option<String>,
     lockfile: String,
     fetched: Vec<FetchedDep>,
+}
+
+#[derive(Debug, Serialize)]
+struct RepairResult {
+    project: String,
+    index: Option<String>,
+    lockfile: String,
+    toolchain: String,
+    repaired: Vec<RepairedDep>,
+    fetched: Vec<FetchedDep>,
+}
+
+#[derive(Debug, Serialize)]
+struct RepairedDep {
+    name: String,
+    from_version: String,
+    to_version: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -330,7 +631,7 @@ struct PublishResult {
     index_path: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct FetchedDep {
     name: String,
     version: String,
@@ -350,8 +651,11 @@ pub fn cmd_pkg(
         PkgCommand::Add(args) => cmd_pkg_add(args),
         PkgCommand::Remove(args) => cmd_pkg_remove(args),
         PkgCommand::Versions(args) => cmd_pkg_versions(args),
+        PkgCommand::Info(args) => cmd_pkg_info(args),
+        PkgCommand::List(args) => cmd_pkg_list(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(machine, args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
+        PkgCommand::Repair(args) => cmd_pkg_repair(args),
         PkgCommand::AttestClosure(args) => cmd_pkg_attest_closure(args),
         PkgCommand::Provides(args) => cmd_pkg_provides(args),
         PkgCommand::Login(args) => cmd_pkg_login(args),
@@ -506,6 +810,10 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
 
 fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<AddResult>)> {
     let project_path = util::resolve_existing_path_upwards(&args.project);
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
 
     // Validate using the canonical parser for better error messages and stricter checks.
     project::load_project_manifest(&project_path).context("load project manifest")?;
@@ -593,6 +901,7 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
                             project: project_path.clone(),
                             index: args.index.clone(),
                             check: false,
+                            lock_version: "0.4".to_string(),
                             offline: false,
                             allow_yanked: false,
                             allow_advisories: false,
@@ -680,6 +989,7 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
                         project: project_path.clone(),
                         index: args.index.clone(),
                         check: false,
+                        lock_version: "0.4".to_string(),
                         offline: false,
                         allow_yanked: false,
                         allow_advisories: false,
@@ -706,7 +1016,9 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
                 return Ok((std::process::ExitCode::SUCCESS, report));
             }
 
-            let index = args.index.clone().unwrap_or_else(default_index_url);
+            let cfg = load_pkg_config(base)?;
+            let registry = resolve_registry_url(args.index.as_deref(), &cfg);
+            let index = registry.url;
             let token = x07_pkg::load_token(&index).unwrap_or(None);
             let client = match SparseIndexClient::from_index_url(&index, token) {
                 Ok(c) => c,
@@ -799,14 +1111,14 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
             project: project_path.clone(),
             index: args.index.clone(),
             check: false,
+            lock_version: "0.4".to_string(),
             offline: false,
             allow_yanked: false,
             allow_advisories: false,
         };
-        let index = match lock_args.index.as_deref() {
-            Some(index) => index.to_string(),
-            None => default_index_url(),
-        };
+        let cfg = load_pkg_config(base)?;
+        let registry = resolve_registry_url(lock_args.index.as_deref(), &cfg);
+        let index = registry.url;
         let mut fetched: Vec<FetchedDep> = Vec::new();
         let mut index_used: Option<String> = None;
         let mut client: Option<SparseIndexClient> = None;
@@ -879,6 +1191,7 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
             project: project_path.clone(),
             index: args.index.clone(),
             check: false,
+            lock_version: "0.4".to_string(),
             offline: false,
             allow_yanked: false,
             allow_advisories: false,
@@ -1018,6 +1331,7 @@ fn pkg_remove_report(
             project: project_path.clone(),
             index: args.index.clone(),
             check: false,
+            lock_version: "0.4".to_string(),
             offline: false,
             allow_yanked: false,
             allow_advisories: false,
@@ -1093,7 +1407,10 @@ fn cmd_pkg_versions(args: VersionsArgs) -> Result<std::process::ExitCode> {
 fn pkg_versions_report(
     args: &VersionsArgs,
 ) -> Result<(std::process::ExitCode, PkgReport<VersionsResult>)> {
-    let index = args.index.clone().unwrap_or_else(default_index_url);
+    let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let (registry, offline) =
+        resolve_pkg_registry_and_offline(&base, args.index.as_deref(), args.offline)?;
+    let index = registry.url;
     let name = match parse_pkg_name(&args.name) {
         Ok(name) => name,
         Err(err) => {
@@ -1109,6 +1426,35 @@ fn pkg_versions_report(
             return Ok((std::process::ExitCode::from(20), report));
         }
     };
+
+    if offline {
+        if args.refresh {
+            let report = PkgReport::<VersionsResult> {
+                ok: false,
+                command: "pkg.versions",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_OFFLINE_REFRESH".to_string(),
+                    message: "--refresh is not supported in offline mode".to_string(),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+        if !index_url_is_file(&index) {
+            let report = PkgReport::<VersionsResult> {
+                ok: false,
+                command: "pkg.versions",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_OFFLINE_INDEX".to_string(),
+                    message: format!(
+                        "offline mode requires a file:// registry index (got {index:?})"
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    }
 
     let token = x07_pkg::load_token(&index).unwrap_or(None);
     let client = match SparseIndexClient::from_index_url(&index, token) {
@@ -1212,6 +1558,298 @@ fn pkg_versions_report(
     Ok((std::process::ExitCode::SUCCESS, report))
 }
 
+#[derive(Debug, Serialize)]
+struct ListResult {
+    index: String,
+    packages: Vec<String>,
+}
+
+fn cmd_pkg_list(args: ListArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_list_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn pkg_list_report(args: &ListArgs) -> Result<(std::process::ExitCode, PkgReport<ListResult>)> {
+    let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let (registry, offline) =
+        resolve_pkg_registry_and_offline(&base, args.index.as_deref(), args.offline)?;
+    let index = registry.url;
+
+    if offline && !index_url_is_file(&index) {
+        let report = PkgReport::<ListResult> {
+            ok: false,
+            command: "pkg.list",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_OFFLINE_INDEX".to_string(),
+                message: format!("offline mode requires a file:// registry index (got {index:?})"),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+    if !index_url_is_file(&index) {
+        let report = PkgReport::<ListResult> {
+            ok: false,
+            command: "pkg.list",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_LIST_UNSUPPORTED".to_string(),
+                message: format!("pkg list requires a file:// sparse index mirror (got {index:?})"),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let dir = file_index_url_to_dir(&index)?;
+    if !dir.is_dir() {
+        let report = PkgReport::<ListResult> {
+            ok: false,
+            command: "pkg.list",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_LIST_INDEX_MISSING".to_string(),
+                message: format!("index dir is missing: {}", dir.display()),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let packages = collect_packages_from_index_dir(&dir)?;
+    let report = PkgReport {
+        ok: true,
+        command: "pkg.list",
+        result: Some(ListResult { index, packages }),
+        error: None,
+    };
+    Ok((std::process::ExitCode::SUCCESS, report))
+}
+
+fn collect_packages_from_index_dir(index_dir: &Path) -> Result<Vec<String>> {
+    let mut names: Vec<String> = Vec::new();
+    let mut pending: Vec<PathBuf> = vec![index_dir.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        for entry in
+            std::fs::read_dir(&dir).with_context(|| format!("read dir: {}", dir.display()))?
+        {
+            let entry = entry.with_context(|| format!("read dir entry: {}", dir.display()))?;
+            let file_type = entry
+                .file_type()
+                .with_context(|| format!("read file type: {}", entry.path().display()))?;
+            if file_type.is_dir() {
+                pending.push(entry.path());
+                continue;
+            }
+            if !file_type.is_file() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name == "config.json" {
+                continue;
+            }
+            if parse_pkg_name(&name).is_ok() {
+                names.push(name);
+            }
+        }
+    }
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
+#[derive(Debug, Serialize)]
+struct InfoResult {
+    index: String,
+    name: String,
+    version: String,
+    sha256: String,
+    yanked: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    advisories: Vec<VersionsAdvisory>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    package_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    package_manifest: Option<Value>,
+}
+
+fn cmd_pkg_info(args: InfoArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_info_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn pkg_info_report(args: &InfoArgs) -> Result<(std::process::ExitCode, PkgReport<InfoResult>)> {
+    let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let (registry, offline) =
+        resolve_pkg_registry_and_offline(&base, args.index.as_deref(), args.offline)?;
+    let index = registry.url;
+
+    if offline && !index_url_is_file(&index) {
+        let report = PkgReport::<InfoResult> {
+            ok: false,
+            command: "pkg.info",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_OFFLINE_INDEX".to_string(),
+                message: format!("offline mode requires a file:// registry index (got {index:?})"),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let parsed_spec = match parse_user_pkg_spec(&args.spec) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            let report = PkgReport::<InfoResult> {
+                ok: false,
+                command: "pkg.info",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let (name, pinned_version) = match parsed_spec {
+        ParsedUserPkgSpec::Pinned { name, version } => (name, Some(version)),
+        ParsedUserPkgSpec::Unpinned { name } => (name, None),
+    };
+
+    let token = x07_pkg::load_token(&index).unwrap_or(None);
+    let client = match SparseIndexClient::from_index_url(&index, token) {
+        Ok(c) => c,
+        Err(err) => {
+            let report = PkgReport::<InfoResult> {
+                ok: false,
+                command: "pkg.info",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_CONFIG".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+    let entries = match client.fetch_entries(&name) {
+        Ok(entries) => entries,
+        Err(err) => {
+            let report = PkgReport::<InfoResult> {
+                ok: false,
+                command: "pkg.info",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_FETCH".to_string(),
+                    message: format!(
+                        "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                        name
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let version = match pinned_version {
+        Some(v) => v,
+        None => match latest_non_yanked_semver_version(&entries) {
+            Some(v) => v,
+            None => {
+                let report = PkgReport::<InfoResult> {
+                    ok: false,
+                    command: "pkg.info",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                        message: format!("no non-yanked semver versions found for {:?}", name),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            }
+        },
+    };
+
+    let entry = match entries
+        .iter()
+        .find(|e| e.name == name && e.version == version)
+    {
+        Some(e) => e,
+        None => {
+            let report = PkgReport::<InfoResult> {
+                ok: false,
+                command: "pkg.info",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                    message: format!("no index entry for {:?}@{:?}", name, version),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let mut advisories: Vec<VersionsAdvisory> = entry
+        .advisories
+        .iter()
+        .map(|a| VersionsAdvisory {
+            id: a.id.clone(),
+            kind: a.kind.clone(),
+            severity: a.severity.clone(),
+            summary: a.summary.clone(),
+            url: a.url.clone(),
+        })
+        .collect();
+    advisories.sort_by(|a, b| a.id.cmp(&b.id));
+
+    let (package_dir, package_manifest) = {
+        let dep_dir = base.join(".x07").join("deps").join(&name).join(&version);
+        let manifest_path = dep_dir.join("x07-package.json");
+        if manifest_path.is_file() {
+            let (_pkg, _path, bytes) = project::load_package_manifest(&dep_dir)
+                .with_context(|| format!("load package manifest in {}", dep_dir.display()))?;
+            let doc: Value = serde_json::from_slice(&bytes)
+                .with_context(|| format!("parse {}", manifest_path.display()))?;
+            (Some(format!(".x07/deps/{name}/{version}")), Some(doc))
+        } else if offline {
+            let report = PkgReport::<InfoResult> {
+                ok: false,
+                command: "pkg.info",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_OFFLINE_MISSING_DEP".to_string(),
+                    message: format!(
+                        "package is not installed locally: {name}@{version} (expected {})",
+                        manifest_path.display()
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        } else {
+            (None, None)
+        }
+    };
+
+    let report = PkgReport {
+        ok: true,
+        command: "pkg.info",
+        result: Some(InfoResult {
+            index,
+            name,
+            version,
+            sha256: entry.cksum.clone(),
+            yanked: entry.yanked,
+            advisories,
+            package_dir,
+            package_manifest,
+        }),
+        error: None,
+    };
+    Ok((std::process::ExitCode::SUCCESS, report))
+}
+
 pub(crate) fn pkg_add_sync_quiet(
     project: PathBuf,
     spec: String,
@@ -1249,6 +1887,7 @@ pub(crate) fn ensure_project_deps_hydrated_quiet(project: PathBuf) -> Result<boo
         project: project.clone(),
         index: None,
         check: true,
+        lock_version: "0.4".to_string(),
         offline: true,
         allow_yanked: false,
         allow_advisories: false,
@@ -1278,6 +1917,7 @@ pub(crate) fn ensure_project_deps_hydrated_quiet(project: PathBuf) -> Result<boo
         project,
         index: None,
         check: false,
+        lock_version: "0.4".to_string(),
         offline: false,
         allow_yanked: false,
         allow_advisories: false,
@@ -1560,6 +2200,156 @@ fn parse_semver_version(version: &str) -> Option<SemverVersion> {
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SemverReqOp {
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SemverReqClause {
+    op: SemverReqOp,
+    version: SemverVersion,
+}
+
+fn parse_semver_req(raw: &str) -> Result<Vec<SemverReqClause>> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        anyhow::bail!("semver requirement must be non-empty");
+    }
+
+    let mut out: Vec<SemverReqClause> = Vec::new();
+    for tok in raw.split_whitespace() {
+        let tok = tok.trim().trim_end_matches(',');
+        if tok.is_empty() {
+            continue;
+        }
+
+        let (op, version_raw) = if let Some(v) = tok.strip_prefix(">=") {
+            (SemverReqOp::Ge, v)
+        } else if let Some(v) = tok.strip_prefix("<=") {
+            (SemverReqOp::Le, v)
+        } else if let Some(v) = tok.strip_prefix('>') {
+            (SemverReqOp::Gt, v)
+        } else if let Some(v) = tok.strip_prefix('<') {
+            (SemverReqOp::Lt, v)
+        } else if let Some(v) = tok.strip_prefix('=') {
+            (SemverReqOp::Eq, v)
+        } else {
+            (SemverReqOp::Eq, tok)
+        };
+
+        let version_raw = version_raw.trim();
+        if version_raw.is_empty() {
+            anyhow::bail!("semver requirement token is missing a version: {:?}", tok);
+        }
+        let Some(version) = parse_semver_version(version_raw) else {
+            anyhow::bail!(
+                "semver requirement token has invalid version {:?}: {:?}",
+                version_raw,
+                tok
+            );
+        };
+        out.push(SemverReqClause { op, version });
+    }
+
+    if out.is_empty() {
+        anyhow::bail!("semver requirement did not contain any clauses: {:?}", raw);
+    }
+
+    Ok(out)
+}
+
+fn semver_satisfies(version: &SemverVersion, req: &[SemverReqClause]) -> bool {
+    req.iter().all(|c| match version.cmp(&c.version) {
+        std::cmp::Ordering::Less => matches!(c.op, SemverReqOp::Lt | SemverReqOp::Le),
+        std::cmp::Ordering::Equal => {
+            matches!(c.op, SemverReqOp::Le | SemverReqOp::Ge | SemverReqOp::Eq)
+        }
+        std::cmp::Ordering::Greater => matches!(c.op, SemverReqOp::Gt | SemverReqOp::Ge),
+    })
+}
+
+fn current_x07c_semver() -> Result<SemverVersion> {
+    let Some(v) = parse_semver_version(x07c::X07C_VERSION) else {
+        anyhow::bail!(
+            "internal error: x07c version is not semver: {:?}",
+            x07c::X07C_VERSION
+        );
+    };
+    Ok(v)
+}
+
+fn check_pkg_x07c_compat(
+    pkg_name: &str,
+    pkg_version: &str,
+    pkg_manifest_path: &Path,
+    pkg_manifest_bytes: &[u8],
+) -> Result<Option<PkgError>> {
+    let doc: Value = match serde_json::from_slice(pkg_manifest_bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            return Ok(Some(PkgError {
+                code: "X07PKG_MANIFEST_PARSE".to_string(),
+                message: format!(
+                    "parse package manifest for {pkg_name}@{pkg_version}: {err} ({})",
+                    pkg_manifest_path.display()
+                ),
+            }));
+        }
+    };
+
+    let Some(meta) = doc.get("meta").and_then(Value::as_object) else {
+        return Ok(None);
+    };
+    let Some(raw) = meta.get("x07c_compat") else {
+        return Ok(None);
+    };
+    let Some(raw) = raw.as_str() else {
+        return Ok(Some(PkgError {
+            code: "X07PKG_X07C_COMPAT_INVALID".to_string(),
+            message: format!(
+                "package meta.x07c_compat must be a string for {pkg_name}@{pkg_version} ({})",
+                pkg_manifest_path.display()
+            ),
+        }));
+    };
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Ok(None);
+    }
+
+    let req = match parse_semver_req(raw) {
+        Ok(req) => req,
+        Err(err) => {
+            return Ok(Some(PkgError {
+                code: "X07PKG_X07C_COMPAT_INVALID".to_string(),
+                message: format!(
+                    "invalid package meta.x07c_compat for {pkg_name}@{pkg_version}: {:?} ({err})",
+                    raw
+                ),
+            }));
+        }
+    };
+
+    let cur = current_x07c_semver()?;
+    if semver_satisfies(&cur, &req) {
+        return Ok(None);
+    }
+
+    Ok(Some(PkgError {
+        code: "X07PKG_X07C_INCOMPATIBLE".to_string(),
+        message: format!(
+            "package {pkg_name}@{pkg_version} is incompatible with x07c {} (meta.x07c_compat = {:?})",
+            x07c::X07C_VERSION,
+            raw
+        ),
+    }))
+}
+
 fn latest_non_yanked_semver_version(entries: &[x07_pkg::IndexEntry]) -> Option<String> {
     let mut best: Option<(SemverVersion, String)> = None;
     for entry in entries {
@@ -1617,6 +2407,12 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
     Ok(code)
 }
 
+fn cmd_pkg_repair(args: RepairArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_repair_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
 fn cmd_pkg_attest_closure(args: AttestClosureArgs) -> Result<std::process::ExitCode> {
     let (attestation, ok) = build_dep_closure_attestation(&args)?;
     let value = serde_json::to_value(&attestation).context("serialize dependency closure")?;
@@ -1645,6 +2441,10 @@ fn build_dep_closure_attestation(
     args: &AttestClosureArgs,
 ) -> Result<(DepClosureAttestation, bool)> {
     let project_path = util::resolve_existing_path_upwards(&args.project);
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let project_bytes = std::fs::read(&project_path)
         .with_context(|| format!("read: {}", project_path.display()))?;
     let manifest =
@@ -1670,11 +2470,14 @@ fn build_dep_closure_attestation(
         )
     })?;
 
-    let index = args.index.clone().unwrap_or_else(default_index_url);
+    let cfg = load_pkg_config(base)?;
+    let registry = resolve_registry_url(args.index.as_deref(), &cfg);
+    let index = registry.url;
     let lock_args = LockArgs {
         project: project_path.clone(),
         index: args.index.clone(),
         check: false,
+        lock_version: "0.4".to_string(),
         offline: args.offline,
         allow_yanked: args.allow_yanked,
         allow_advisories: args.allow_advisories,
@@ -1694,7 +2497,6 @@ fn build_dep_closure_attestation(
         anyhow::bail!("X07DEP_LOCK_CHECK_FAILED: {}", err.message);
     }
 
-    let base = project_path.parent().unwrap_or_else(|| Path::new("."));
     let mut dependencies = Vec::with_capacity(refreshed_lock.dependencies.len());
     let mut yanked = Vec::new();
     let mut advisories = Vec::new();
@@ -1807,6 +2609,591 @@ fn module_root_digest(dep: &project::LockedDependency) -> String {
     format!("sha256:{:x}", hasher.finalize())
 }
 
+fn cached_versions_for_package(
+    project_base: &Path,
+    name: &str,
+) -> Result<Vec<(SemverVersion, String)>> {
+    let root = project_base.join(".x07").join("deps").join(name);
+    let rd = match std::fs::read_dir(&root) {
+        Ok(rd) => rd,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(err) => return Err(err).with_context(|| format!("read {}", root.display())),
+    };
+
+    let mut out: Vec<(SemverVersion, String)> = Vec::new();
+    for entry in rd {
+        let entry = entry.with_context(|| format!("read entry in {}", root.display()))?;
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("file_type for {}", entry.path().display()))?;
+        if !file_type.is_dir() {
+            continue;
+        }
+        let raw = entry.file_name().to_string_lossy().to_string();
+        let Some(v) = parse_semver_version(&raw) else {
+            continue;
+        };
+        out.push((v, raw));
+    }
+
+    out.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
+    Ok(out)
+}
+
+fn repair_band_matches_strict(cur: &SemverVersion, cand: &SemverVersion) -> bool {
+    if cur.major == 0 {
+        cand.major == 0 && cand.minor == cur.minor
+    } else {
+        cand.major == cur.major
+    }
+}
+
+fn repair_band_matches_fallback(cur: &SemverVersion, cand: &SemverVersion) -> bool {
+    if cur.major == 0 {
+        cand.major == 0
+    } else {
+        cand.major == cur.major
+    }
+}
+
+fn is_repair_ineligible_error(err: &PkgError) -> bool {
+    matches!(
+        err.code.as_str(),
+        "X07PKG_X07C_INCOMPATIBLE" | "X07PKG_X07C_COMPAT_INVALID" | "X07PKG_MANIFEST_PARSE"
+    )
+}
+
+fn set_patch_version_in_project_doc(doc: &mut Value, name: &str, version: &str) -> Result<()> {
+    let obj = doc
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+
+    // `project.patch` requires at least `x07.project@0.3.0`, so bump old manifests automatically.
+    let schema_version_raw = obj
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if schema_version_raw == x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0 {
+        obj.insert(
+            "schema_version".to_string(),
+            Value::String(x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
+        );
+    }
+
+    let patch_val = obj
+        .entry("patch".to_string())
+        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+    let patch_obj = patch_val
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project.patch must be a JSON object"))?;
+
+    let spec_val = patch_obj
+        .entry(name.to_string())
+        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+    let spec_obj = spec_val
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project.patch[{name:?}] must be a JSON object"))?;
+
+    if let Some(path) = spec_obj.get("path").and_then(Value::as_str) {
+        if !path.trim().is_empty() {
+            anyhow::bail!(
+                "cannot repair {name:?}: project.patch has a local path override ({path:?})"
+            );
+        }
+    }
+
+    spec_obj.insert("version".to_string(), Value::String(version.to_string()));
+    Ok(())
+}
+
+fn pkg_repair_report(
+    args: &RepairArgs,
+) -> Result<(std::process::ExitCode, PkgReport<RepairResult>)> {
+    let toolchain = args.toolchain.trim();
+    if toolchain.is_empty() {
+        let report = PkgReport {
+            ok: false,
+            command: "pkg.repair",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_REPAIR_TOOLCHAIN_INVALID".to_string(),
+                message: "toolchain must be non-empty".to_string(),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+    if toolchain != "current" {
+        let report = PkgReport {
+            ok: false,
+            command: "pkg.repair",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED".to_string(),
+                message: format!("unsupported toolchain {:?} (expected current)", toolchain),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let project_path = util::resolve_existing_path_upwards(&args.project);
+    let project_bytes = std::fs::read(&project_path)
+        .with_context(|| format!("read: {}", project_path.display()))?;
+    let original_project_bytes = project_bytes.clone();
+    let mut doc: Value = serde_json::from_slice(&project_bytes).with_context(|| {
+        format!(
+            "[X07PROJECT_PARSE] parse project JSON: {}",
+            project_path.display()
+        )
+    })?;
+
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    let patch_non_empty = doc
+        .get("patch")
+        .and_then(Value::as_object)
+        .is_some_and(|p| !p.is_empty());
+    let schema_version_raw = doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if patch_non_empty
+        && schema_version_raw == x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0
+    {
+        let obj = doc
+            .as_object_mut()
+            .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+        obj.insert(
+            "schema_version".to_string(),
+            Value::String(x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
+        );
+    }
+
+    let manifest = {
+        let bytes = serde_json::to_vec(&doc)?;
+        project::parse_project_manifest_bytes(&bytes, &project_path)
+            .context("load project manifest")?
+    };
+    for (name, spec) in &manifest.patch {
+        if !is_valid_semver_version(&spec.version) {
+            let report = PkgReport {
+                ok: false,
+                command: "pkg.repair",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!(
+                        "project.patch[{name:?}].version must be semver (MAJOR.MINOR.PATCH), got {:?}",
+                        spec.version
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    }
+
+    let lock_path = project::default_lockfile_path(&project_path, &manifest);
+    let lock_bytes = match std::fs::read(&lock_path) {
+        Ok(bytes) => bytes,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            let report = PkgReport {
+                ok: false,
+                command: "pkg.repair",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_REPAIR_LOCK_MISSING".to_string(),
+                    message: format!("missing lockfile: {}", lock_path.display()),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+        Err(err) => return Err(err).with_context(|| format!("read {}", lock_path.display())),
+    };
+    let original_lock_bytes = lock_bytes.clone();
+    let existing_lock: project::Lockfile = serde_json::from_slice(&lock_bytes)
+        .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
+
+    let (registry, offline) =
+        resolve_pkg_registry_and_offline(base, args.index.as_deref(), args.offline)?;
+    let index = registry.url.clone();
+
+    let mut fetched: Vec<FetchedDep> = Vec::new();
+    let mut index_used: Option<String> = None;
+
+    let mut repaired: Vec<RepairedDep> = Vec::new();
+    let mut repaired_names: HashSet<String> = HashSet::new();
+
+    {
+        let lock_args = LockArgs {
+            project: project_path.clone(),
+            index: args.index.clone(),
+            check: false,
+            lock_version: "0.4".to_string(),
+            offline,
+            allow_yanked: false,
+            allow_advisories: false,
+        };
+        let mut client: Option<SparseIndexClient> = None;
+
+        let mut resolve_ctx = TransitiveResolveCtx {
+            base,
+            args: &lock_args,
+            index: index.as_str(),
+            patch: &manifest.patch,
+            client: &mut client,
+            fetched: &mut fetched,
+            index_used: &mut index_used,
+        };
+
+        let mut locked: Vec<project::DependencySpec> = existing_lock
+            .dependencies
+            .iter()
+            .map(|d| project::DependencySpec {
+                name: d.name.clone(),
+                version: d.version.clone(),
+                path: d.path.clone(),
+            })
+            .collect();
+        locked.sort_by(|a, b| {
+            (a.name.as_str(), a.version.as_str(), a.path.as_str()).cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+            ))
+        });
+
+        for dep in locked {
+            if repaired_names.contains(&dep.name) {
+                continue;
+            }
+
+            let err = match ensure_deps_present(std::slice::from_ref(&dep), &mut resolve_ctx)? {
+                None => continue,
+                Some(err) => err,
+            };
+            if err.code != "X07PKG_X07C_INCOMPATIBLE" {
+                let report = PkgReport {
+                    ok: false,
+                    command: "pkg.repair",
+                    result: None,
+                    error: Some(err),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            }
+
+            if !project::is_vendored_dep_path(&dep.path) {
+                let report = PkgReport {
+                    ok: false,
+                    command: "pkg.repair",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_REPAIR_LOCAL_INCOMPATIBLE".to_string(),
+                        message: format!(
+                            "cannot repair incompatible local dependency {}@{} ({})",
+                            dep.name, dep.version, dep.path
+                        ),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            }
+            if manifest
+                .patch
+                .get(&dep.name)
+                .is_some_and(|s| s.path.is_some())
+            {
+                let report = PkgReport {
+                    ok: false,
+                    command: "pkg.repair",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE".to_string(),
+                        message: format!(
+                            "cannot repair incompatible dependency {}@{}: project.patch has a local path override",
+                            dep.name, dep.version
+                        ),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            }
+
+            let Some(cur) = parse_semver_version(&dep.version) else {
+                let report = PkgReport {
+                    ok: false,
+                    command: "pkg.repair",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_REPAIR_LOCK_INVALID".to_string(),
+                        message: format!(
+                            "locked version for {} is not semver: {:?}",
+                            dep.name, dep.version
+                        ),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            };
+
+            let mut selected: Option<String> = None;
+            if offline {
+                let cached = cached_versions_for_package(base, &dep.name)?;
+                for (v, ver) in &cached {
+                    if !repair_band_matches_strict(&cur, v) {
+                        continue;
+                    }
+                    let dir = base.join(".x07").join("deps").join(&dep.name).join(ver);
+                    let (pkg, pkg_manifest_path, pkg_manifest_bytes) =
+                        match project::load_package_manifest(&dir) {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                    if pkg.name != dep.name || pkg.version != *ver {
+                        continue;
+                    }
+                    if check_pkg_x07c_compat(
+                        &pkg.name,
+                        &pkg.version,
+                        &pkg_manifest_path,
+                        &pkg_manifest_bytes,
+                    )?
+                    .is_none()
+                    {
+                        selected = Some(ver.clone());
+                        break;
+                    }
+                }
+                if selected.is_none() && cur.major == 0 {
+                    for (v, ver) in &cached {
+                        if !repair_band_matches_fallback(&cur, v) {
+                            continue;
+                        }
+                        let dir = base.join(".x07").join("deps").join(&dep.name).join(ver);
+                        let (pkg, pkg_manifest_path, pkg_manifest_bytes) =
+                            match project::load_package_manifest(&dir) {
+                                Ok(v) => v,
+                                Err(_) => continue,
+                            };
+                        if pkg.name != dep.name || pkg.version != *ver {
+                            continue;
+                        }
+                        if check_pkg_x07c_compat(
+                            &pkg.name,
+                            &pkg.version,
+                            &pkg_manifest_path,
+                            &pkg_manifest_bytes,
+                        )?
+                        .is_none()
+                        {
+                            selected = Some(ver.clone());
+                            break;
+                        }
+                    }
+                }
+            } else {
+                if let Some(err) =
+                    ensure_index_client(&index, resolve_ctx.client, resolve_ctx.index_used)?
+                {
+                    let report = PkgReport {
+                        ok: false,
+                        command: "pkg.repair",
+                        result: None,
+                        error: Some(err),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+                let entries = {
+                    let client_ref = resolve_ctx.client.as_ref().expect("client initialized");
+                    match client_ref.fetch_entries(&dep.name) {
+                        Ok(entries) => entries,
+                        Err(err) => {
+                            let report = PkgReport {
+                                ok: false,
+                                command: "pkg.repair",
+                                result: None,
+                                error: Some(PkgError {
+                                    code: "X07PKG_INDEX_FETCH".to_string(),
+                                    message: format!(
+                                        "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                                        dep.name
+                                    ),
+                                }),
+                            };
+                            return Ok((std::process::ExitCode::from(20), report));
+                        }
+                    }
+                };
+
+                let mut candidates: Vec<(SemverVersion, String)> = Vec::new();
+                for entry in &entries {
+                    if entry.yanked {
+                        continue;
+                    }
+                    let Some(v) = parse_semver_version(&entry.version) else {
+                        continue;
+                    };
+                    if !repair_band_matches_strict(&cur, &v) {
+                        continue;
+                    }
+                    candidates.push((v, entry.version.clone()));
+                }
+                candidates.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
+
+                if candidates.is_empty() && cur.major == 0 {
+                    for entry in &entries {
+                        if entry.yanked {
+                            continue;
+                        }
+                        let Some(v) = parse_semver_version(&entry.version) else {
+                            continue;
+                        };
+                        if !repair_band_matches_fallback(&cur, &v) {
+                            continue;
+                        }
+                        candidates.push((v, entry.version.clone()));
+                    }
+                    candidates.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
+                }
+
+                for (_v, ver) in candidates {
+                    let spec = project::DependencySpec {
+                        name: dep.name.clone(),
+                        version: ver.clone(),
+                        path: format!(".x07/deps/{}/{ver}", dep.name),
+                    };
+                    match ensure_deps_present(std::slice::from_ref(&spec), &mut resolve_ctx)? {
+                        None => {
+                            selected = Some(ver);
+                            break;
+                        }
+                        Some(err) if is_repair_ineligible_error(&err) => continue,
+                        Some(err) => {
+                            let report = PkgReport {
+                                ok: false,
+                                command: "pkg.repair",
+                                result: None,
+                                error: Some(err),
+                            };
+                            return Ok((std::process::ExitCode::from(20), report));
+                        }
+                    }
+                }
+            }
+
+            let Some(to_version) = selected else {
+                let report = PkgReport {
+                    ok: false,
+                    command: "pkg.repair",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_REPAIR_NO_COMPATIBLE_VERSION".to_string(),
+                        message: format!(
+                            "no compatible versions found for {} (locked {} is incompatible with x07c {})",
+                            dep.name,
+                            dep.version,
+                            x07c::X07C_VERSION
+                        ),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            };
+
+            set_patch_version_in_project_doc(&mut doc, &dep.name, &to_version)?;
+            let _ = ensure_dep_entry(
+                &mut doc,
+                &dep.name,
+                &to_version,
+                &format!(".x07/deps/{}/{to_version}", dep.name),
+                true,
+            )?;
+            repaired_names.insert(dep.name.clone());
+            repaired.push(RepairedDep {
+                name: dep.name,
+                from_version: dep.version,
+                to_version,
+            });
+        }
+    }
+
+    if !repaired.is_empty() {
+        let _ = {
+            let bytes = serde_json::to_vec(&doc)?;
+            project::parse_project_manifest_bytes(&bytes, &project_path)
+                .context("validate updated project manifest")?
+        };
+        write_canonical_json_file(&project_path, &doc)
+            .with_context(|| format!("write: {}", project_path.display()))?;
+    }
+
+    let lock_args = LockArgs {
+        project: project_path.clone(),
+        index: args.index.clone(),
+        check: false,
+        lock_version: "0.4".to_string(),
+        offline: args.offline,
+        allow_yanked: false,
+        allow_advisories: false,
+    };
+    let (lock_code, lock_report) = pkg_lock_report(&lock_args)?;
+
+    let mut all_fetched = fetched;
+    if let Some(lock_res) = lock_report.result.as_ref() {
+        all_fetched.extend(lock_res.fetched.iter().cloned());
+    }
+    all_fetched.sort_by(|a, b| {
+        (
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+            a.sha256.as_str(),
+        )
+            .cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+                b.sha256.as_str(),
+            ))
+    });
+    all_fetched.dedup_by(|a, b| {
+        a.name == b.name && a.version == b.version && a.path == b.path && a.sha256 == b.sha256
+    });
+
+    let result = RepairResult {
+        project: project_path.display().to_string(),
+        index: index_used.clone().or_else(|| Some(index.clone())),
+        lockfile: lock_path.display().to_string(),
+        toolchain: toolchain.to_string(),
+        repaired,
+        fetched: all_fetched,
+    };
+
+    if !lock_report.ok {
+        if let Err(err) = std::fs::write(&project_path, &original_project_bytes) {
+            return Err(err).with_context(|| format!("rollback {}", project_path.display()));
+        }
+        if let Err(err) = std::fs::write(&lock_path, &original_lock_bytes) {
+            return Err(err).with_context(|| format!("rollback {}", lock_path.display()));
+        }
+
+        let report = PkgReport {
+            ok: false,
+            command: "pkg.repair",
+            result: Some(result),
+            error: lock_report.error,
+        };
+        return Ok((lock_code, report));
+    }
+
+    let report = PkgReport {
+        ok: true,
+        command: "pkg.repair",
+        result: Some(result),
+        error: None,
+    };
+    Ok((std::process::ExitCode::SUCCESS, report))
+}
+
 fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport<LockResult>)> {
     let project_path = util::resolve_existing_path_upwards(&args.project);
     let project_bytes = std::fs::read(&project_path)
@@ -1823,9 +3210,37 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
 
-    let index = match args.index.as_deref() {
-        Some(index) => index.to_string(),
-        None => default_index_url(),
+    let (registry, offline) =
+        resolve_pkg_registry_and_offline(base, args.index.as_deref(), args.offline)?;
+    let index = registry.url.clone();
+
+    let mut effective_args = LockArgs {
+        project: args.project.clone(),
+        index: args.index.clone(),
+        check: args.check,
+        lock_version: args.lock_version.clone(),
+        offline,
+        allow_yanked: args.allow_yanked,
+        allow_advisories: args.allow_advisories,
+    };
+    if effective_args.index.is_none() && registry.source == RegistrySource::Config {
+        effective_args.index = Some(index.clone());
+    }
+
+    let requested_lock_version = match parse_lock_version(&effective_args.lock_version) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = PkgReport {
+                ok: false,
+                command: "pkg.lock",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_LOCK_VERSION_INVALID".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
     };
 
     let patch_non_empty = doc
@@ -1904,7 +3319,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
 
     let mut ctx = TransitiveResolveCtx {
         base,
-        args,
+        args: &effective_args,
         index: index.as_str(),
         patch: &manifest.patch,
         client: &mut client,
@@ -2004,7 +3419,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
     if let Some(err) = apply_lock_overrides_and_metadata(
         &manifest,
         &index,
-        args,
+        &effective_args,
         &mut client,
         &mut index_used,
         existing_lock.as_ref(),
@@ -2015,13 +3430,50 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
             command: "pkg.lock",
             result: Some(LockResult {
                 project: project_path.display().to_string(),
-                index: index_used.clone().or(args.index.clone()),
+                index: index_used.clone().or(effective_args.index.clone()),
                 lockfile: lock_path.display().to_string(),
                 fetched,
             }),
             error: Some(err),
         };
         return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    lock.schema_version = requested_lock_version.schema_version().to_string();
+    match requested_lock_version {
+        RequestedLockVersion::V0_3_0 => {
+            lock.toolchain = None;
+            lock.registry = None;
+        }
+        RequestedLockVersion::V0_4_0 => {
+            let compat = manifest
+                .compat
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("current");
+            lock.toolchain = Some(project::LockfileToolchain {
+                x07_version: env!("CARGO_PKG_VERSION").to_string(),
+                x07c_version: x07c::X07C_VERSION.to_string(),
+                lang_id: x07c::language::LANG_ID.to_string(),
+                compat: compat.to_string(),
+            });
+            let mut registry = project::LockfileRegistry {
+                index_url: index_used.clone().unwrap_or_else(|| index.clone()),
+                snapshot_hash: None,
+            };
+            // `--check` is often used with an index mirror solely for hydration.
+            // Preserve the lockfile's declared registry so `--check` stays stable
+            // across environments.
+            if effective_args.check {
+                if let Some(existing) = existing_lock.as_ref() {
+                    if let Some(existing_registry) = existing.registry.clone() {
+                        registry = existing_registry;
+                    }
+                }
+            }
+            lock.registry = Some(registry);
+        }
     }
 
     if args.check {
@@ -2041,10 +3493,11 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
             }
         };
 
-        let metadata_online = !args.offline && (args.index.is_some() || index_used.is_some());
+        let metadata_online =
+            !effective_args.offline && (effective_args.index.is_some() || index_used.is_some());
 
         if metadata_online {
-            if !args.allow_yanked {
+            if !effective_args.allow_yanked {
                 let yanked: Vec<String> = lock
                     .dependencies
                     .iter()
@@ -2057,7 +3510,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
                         command: "pkg.lock",
                         result: Some(LockResult {
                             project: project_path.display().to_string(),
-                            index: index_used.clone().or(args.index.clone()),
+                            index: index_used.clone().or(effective_args.index.clone()),
                             lockfile: lock_path.display().to_string(),
                             fetched,
                         }),
@@ -2073,7 +3526,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
                 }
             }
 
-            if !args.allow_advisories {
+            if !effective_args.allow_advisories {
                 let mut advised: Vec<String> = Vec::new();
                 for dep in &lock.dependencies {
                     if dep.advisories.is_empty() {
@@ -2093,7 +3546,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
                         command: "pkg.lock",
                         result: Some(LockResult {
                             project: project_path.display().to_string(),
-                            index: index_used.clone().or(args.index.clone()),
+                            index: index_used.clone().or(effective_args.index.clone()),
                             lockfile: lock_path.display().to_string(),
                             fetched,
                         }),
@@ -2121,7 +3574,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
                 command: "pkg.lock",
                 result: Some(LockResult {
                     project: project_path.display().to_string(),
-                    index: index_used.clone().or(args.index.clone()),
+                    index: index_used.clone().or(effective_args.index.clone()),
                     lockfile: lock_path.display().to_string(),
                     fetched,
                 }),
@@ -2138,7 +3591,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
             command: "pkg.lock",
             result: Some(LockResult {
                 project: project_path.display().to_string(),
-                index: index_used.clone().or(args.index.clone()),
+                index: index_used.clone().or(effective_args.index.clone()),
                 lockfile: lock_path.display().to_string(),
                 fetched,
             }),
@@ -2163,7 +3616,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         command: "pkg.lock",
         result: Some(LockResult {
             project: project_path.display().to_string(),
-            index: index_used.or(args.index.clone()),
+            index: index_used.or(effective_args.index.clone()),
             lockfile: lock_path.display().to_string(),
             fetched,
         }),
@@ -2524,6 +3977,12 @@ fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {
     if a.schema_version.trim() != b.schema_version.trim() {
         return false;
     }
+    if a.toolchain != b.toolchain {
+        return false;
+    }
+    if a.registry != b.registry {
+        return false;
+    }
     if a.dependencies.len() != b.dependencies.len() {
         return false;
     }
@@ -2768,6 +4227,147 @@ mod tests {
             std::env::temp_dir().join(format!("x07_pkg_{prefix}_{}_{}", std::process::id(), stamp));
         std::fs::create_dir_all(&dir).expect("create temp dir");
         dir
+    }
+
+    #[test]
+    fn temp_unpack_dir_cleanup_is_best_effort_and_does_not_leak() {
+        let dir = temp_dir("unpack_cleanup");
+        let unpack_path = {
+            let guard = TempUnpackDir::create(&dir).expect("create temp unpack dir");
+            let p = guard.path().to_path_buf();
+            std::fs::write(p.join("fixture.txt"), b"ok").expect("write fixture");
+            assert!(p.is_dir());
+            p
+        };
+        assert!(!unpack_path.exists());
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn temp_unpack_dir_can_be_persisted_without_being_deleted() {
+        let dir = temp_dir("unpack_persist");
+        let dest = dir.join(".x07").join("deps").join("persisted");
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent).expect("create dest parent");
+        }
+
+        let mut guard = TempUnpackDir::create(&dir).expect("create temp unpack dir");
+        let unpack_path = guard.path().to_path_buf();
+        std::fs::write(unpack_path.join("fixture.txt"), b"ok").expect("write fixture");
+        guard.persist_to(&dest).expect("persist");
+        drop(guard);
+
+        assert!(!unpack_path.exists());
+        assert!(dest.is_dir());
+        assert_eq!(
+            std::fs::read(dest.join("fixture.txt")).expect("read"),
+            b"ok"
+        );
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn pkg_repair_offline_upgrades_incompatible_locked_dependency() {
+        let dir = temp_dir("repair_offline");
+        std::fs::create_dir_all(dir.join("src")).expect("create src dir");
+
+        let dep_name = "dep-repair";
+        let v_bad = "1.0.0";
+        let v_ok = "1.0.1";
+
+        for (ver, compat) in [(v_bad, "<0.0.1"), (v_ok, ">=0.0.1")] {
+            let dep_dir = dir.join(".x07/deps").join(dep_name).join(ver);
+            std::fs::create_dir_all(dep_dir.join("src/dep")).expect("create dep module dir");
+            std::fs::write(
+                dep_dir.join("x07-package.json"),
+                serde_json::to_vec_pretty(&serde_json::json!({
+                    "schema_version": "x07.package@0.1.0",
+                    "name": dep_name,
+                    "version": ver,
+                    "module_root": "src",
+                    "modules": ["dep.lib"],
+                    "meta": { "x07c_compat": compat }
+                }))
+                .expect("serialize package manifest"),
+            )
+            .expect("write package manifest");
+            std::fs::write(
+                dep_dir.join("src/dep/lib.x07.json"),
+                br#"{"schema_version":"x07.x07ast@0.8.0","decls":[]}"#,
+            )
+            .expect("write module");
+        }
+
+        let project_path = dir.join("x07.json");
+        std::fs::write(
+            &project_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": "x07.project@0.5.0",
+                "world": "solve-pure",
+                "entry": "src/main.x07.json",
+                "module_roots": ["src"],
+                "dependencies": [
+                    { "name": dep_name, "version": v_bad, "path": format!(".x07/deps/{dep_name}/{v_bad}") }
+                ]
+            }))
+            .expect("serialize project"),
+        )
+        .expect("write project");
+        std::fs::write(
+            dir.join("src/main.x07.json"),
+            br#"{"schema_version":"x07.x07ast@0.8.0","decls":[]}"#,
+        )
+        .expect("write entry");
+
+        let manifest = project::load_project_manifest(&project_path).expect("load project");
+        let lock = project::compute_lockfile(&project_path, &manifest).expect("compute lock");
+        let lock_path = project::default_lockfile_path(&project_path, &manifest);
+        std::fs::write(
+            &lock_path,
+            serde_json::to_vec_pretty(&lock).expect("serialize lock"),
+        )
+        .expect("write lock");
+
+        let args = RepairArgs {
+            project: project_path.clone(),
+            index: None,
+            toolchain: "current".to_string(),
+            offline: true,
+        };
+        let (code, report) = pkg_repair_report(&args).expect("repair report");
+        assert_eq!(code, std::process::ExitCode::SUCCESS);
+        assert!(report.ok);
+
+        let repaired = report.result.expect("result").repaired;
+        assert_eq!(repaired.len(), 1);
+        assert_eq!(repaired[0].name, dep_name);
+        assert_eq!(repaired[0].from_version, v_bad);
+        assert_eq!(repaired[0].to_version, v_ok);
+
+        let updated_project: Value =
+            serde_json::from_slice(&std::fs::read(&project_path).expect("read project"))
+                .expect("parse project");
+        assert_eq!(
+            updated_project
+                .pointer("/dependencies/0/version")
+                .and_then(Value::as_str),
+            Some(v_ok)
+        );
+        assert_eq!(
+            updated_project
+                .pointer(&format!("/patch/{dep_name}/version"))
+                .and_then(Value::as_str),
+            Some(v_ok)
+        );
+
+        let updated_lock: project::Lockfile =
+            serde_json::from_slice(&std::fs::read(&lock_path).expect("read lock"))
+                .expect("parse lock");
+        assert_eq!(updated_lock.dependencies.len(), 1);
+        assert_eq!(updated_lock.dependencies[0].name, dep_name);
+        assert_eq!(updated_lock.dependencies[0].version, v_ok);
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 
     fn write_fixture_project(root: &Path) -> (PathBuf, PathBuf) {
@@ -3131,25 +4731,35 @@ fn ensure_deps_present(
     let mut missing: Vec<&project::DependencySpec> = Vec::new();
     for dep in deps {
         let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
-        if !dep_dir.join("x07-package.json").is_file() {
-            let patched_by_path = ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some());
-            if patched_by_path && !project::is_vendored_dep_path(&dep.path) {
-                missing_local_override.push(format!(
-                    "{}@{} ({})",
-                    dep.name,
-                    dep.version,
-                    dep_dir.display()
-                ));
-            } else if !project::is_vendored_dep_path(&dep.path) {
-                missing_local.push(format!(
-                    "{}@{} ({})",
-                    dep.name,
-                    dep.version,
-                    dep_dir.display()
-                ));
-            } else {
-                missing.push(dep);
+        let pkg_manifest_path = dep_dir.join("x07-package.json");
+        if pkg_manifest_path.is_file() {
+            let bytes = std::fs::read(&pkg_manifest_path).with_context(|| {
+                format!("read package manifest: {}", pkg_manifest_path.display())
+            })?;
+            if let Some(err) =
+                check_pkg_x07c_compat(&dep.name, &dep.version, &pkg_manifest_path, &bytes)?
+            {
+                return Ok(Some(err));
             }
+            continue;
+        }
+        let patched_by_path = ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some());
+        if patched_by_path && !project::is_vendored_dep_path(&dep.path) {
+            missing_local_override.push(format!(
+                "{}@{} ({})",
+                dep.name,
+                dep.version,
+                dep_dir.display()
+            ));
+        } else if !project::is_vendored_dep_path(&dep.path) {
+            missing_local.push(format!(
+                "{}@{} ({})",
+                dep.name,
+                dep.version,
+                dep_dir.display()
+            ));
+        } else {
+            missing.push(dep);
         }
     }
 
@@ -3185,6 +4795,16 @@ fn ensure_deps_present(
         let mut still_missing: Vec<&project::DependencySpec> = Vec::new();
         for dep in missing {
             if try_copy_official_dep(&official_ext, dep, ctx.base)? {
+                let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
+                let pkg_manifest_path = dep_dir.join("x07-package.json");
+                let bytes = std::fs::read(&pkg_manifest_path).with_context(|| {
+                    format!("read package manifest: {}", pkg_manifest_path.display())
+                })?;
+                if let Some(err) =
+                    check_pkg_x07c_compat(&dep.name, &dep.version, &pkg_manifest_path, &bytes)?
+                {
+                    return Ok(Some(err));
+                }
                 continue;
             }
             still_missing.push(dep);
@@ -3263,12 +4883,13 @@ fn ensure_deps_present(
 
         let archive_bytes = std::fs::read(&archive_path)
             .with_context(|| format!("read archive for {:?}@{:?}", dep.name, dep.version))?;
-        let tmp_dir = temp_unpack_dir(ctx.base)?;
-        x07_pkg::unpack_tar_bytes(&archive_bytes, &tmp_dir)?;
+        let mut tmp_dir = TempUnpackDir::create(ctx.base)?;
+        x07_pkg::unpack_tar_bytes(&archive_bytes, tmp_dir.path())?;
 
-        let (pkg, _pkg_manifest_path, _pkg_manifest_bytes) =
-            project::load_package_manifest(&tmp_dir)
-                .with_context(|| format!("validate unpacked package at {}", tmp_dir.display()))?;
+        let (pkg, pkg_manifest_path, pkg_manifest_bytes) =
+            project::load_package_manifest(tmp_dir.path()).with_context(|| {
+                format!("validate unpacked package at {}", tmp_dir.path().display())
+            })?;
         if pkg.name != dep.name || pkg.version != dep.version {
             anyhow::bail!(
                 "unpacked package identity mismatch: expected {:?}@{:?} got {:?}@{:?}",
@@ -3277,6 +4898,14 @@ fn ensure_deps_present(
                 pkg.name,
                 pkg.version
             );
+        }
+        if let Some(err) = check_pkg_x07c_compat(
+            &pkg.name,
+            &pkg.version,
+            &pkg_manifest_path,
+            &pkg_manifest_bytes,
+        )? {
+            return Ok(Some(err));
         }
 
         if dep_dir.exists() {
@@ -3287,10 +4916,10 @@ fn ensure_deps_present(
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("create dep parent: {}", parent.display()))?;
         }
-        std::fs::rename(&tmp_dir, &dep_dir).with_context(|| {
+        tmp_dir.persist_to(&dep_dir).with_context(|| {
             format!(
                 "move unpacked package into place: {} -> {}",
-                tmp_dir.display(),
+                tmp_dir.path().display(),
                 dep_dir.display()
             )
         })?;
@@ -3607,4 +5236,41 @@ fn temp_unpack_dir(base: &Path) -> Result<PathBuf> {
         }
     }
     anyhow::bail!("failed to create temp dir under {}", tmp_root.display());
+}
+
+struct TempUnpackDir {
+    path: PathBuf,
+    persisted: bool,
+}
+
+impl TempUnpackDir {
+    fn create(base: &Path) -> Result<Self> {
+        Ok(Self {
+            path: temp_unpack_dir(base)?,
+            persisted: false,
+        })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn persist_to(&mut self, dst: &Path) -> Result<()> {
+        std::fs::rename(&self.path, dst)?;
+        self.persisted = true;
+        Ok(())
+    }
+}
+
+impl Drop for TempUnpackDir {
+    fn drop(&mut self) {
+        if self.persisted {
+            return;
+        }
+        if let Err(err) = std::fs::remove_dir_all(&self.path) {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                // Best-effort cleanup; leaking temp dirs is worse than masking cleanup errors.
+            }
+        }
+    }
 }

@@ -144,8 +144,24 @@ Add `--pretty` to produce deterministic multi-line formatting intended for human
   - Applies quickfixes (JSON Patch) and rewrites the file deterministically.
 - `x07 fix --from-pbt <repro.json> --write`
   - Converts a PBT repro artifact into a deterministic regression test (wrapper module + manifest entry).
+- `x07 migrate --to 0.5 --check --input <path>`
+  - Runs migration lints and exits non-zero when mechanical rewrites are required.
+- `x07 migrate --to 0.5 --write --input <path>`
+  - Applies mechanical migrations in-place via deterministic quickfix patches.
 
 See: [PBT repro → regression test](pbt-fix-from-repro.md).
+
+### Project manifest migrations (`x07.json`)
+
+- `x07 project migrate --check --project x07.json`
+  - Exits non-zero when `x07.json` is on a legacy schema line.
+- `x07 project migrate --write --project x07.json`
+  - Rewrites `schema_version` to the current manifest line (`x07.project@0.5.0`) and inserts `compat: "0.5"` when upgrading from a legacy schema line.
+
+Notes:
+
+- `x07 project migrate` is for **`x07.json` schema** migrations.
+- `x07 migrate` is for **`*.x07.json` code** migrations (compat updates).
 
 ### AST slicing (deterministic context views)
 
@@ -241,8 +257,15 @@ See: [Review & trust artifacts](review-trust.md).
   - Supports threshold gating with `--min-coverage`.
 - `x07 diag explain <CODE>`
   - Prints summary, origins, quickfix policy, and agent strategy for one code.
+- `x07 explain <CODE>`
+  - Alias for `x07 diag explain <CODE>`.
 - `x07 diag sarif --in <x07diag.json> --out <results.sarif>`
   - Converts `x07diag` to SARIF v2.1.0 for code-scanning UIs.
+
+### Repro bundles
+
+- `x07 repro compile --project x07.json`
+  - Writes a self-contained compile repro directory bundle (project + lock + deps snapshot) and emits a `diagnostics.json` report by running `x07 check` inside the bundle.
 
 ### Patching (RFC 6902 JSON Patch)
 
@@ -308,12 +331,11 @@ See: [Property-based testing](pbt.md).
 
 Notes:
 
-- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, and `for` loops with non-literal bounds remain unsupported.
 - Direct `--prove` inputs currently support `i32`, `u32`, raw `bytes`, raw `bytes_view`, raw `vec_u8`, `option_i32`, `option_bytes`, `option_bytes_view`, `result_i32`, `result_bytes`, and `result_bytes_view`.
 - Direct prove inputs accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
 - That means schema-derived record and tagged-union documents can be proved directly as `bytes_view@brand` inputs, with the generated verify driver running the validator before it constructs the branded view seen by the proof target.
 - Owned branded `bytes` and nested result carriers are still rejected explicitly.
-- `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
+- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, `while` loops, and `for` loops with non-literal bounds remain unsupported.
 - `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
 - `--prove` reports include `proof_summary` for the solver engine, recursion kind, `decreases` usage, unwind-bounded recursion, and the reachable dependency symbol set.
 - `--coverage` emits a reachable-closure support artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including `supported*` counters plus per-function `support_summary`, alongside `trusted_scheduler_model` and `capsule_boundary` statuses when they apply.
@@ -400,7 +422,7 @@ Notes:
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `x07 pkg versions --refresh <name>` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
-- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.4.0`; `x07.project@0.2.0` and `x07.project@0.3.0` are accepted for legacy manifests, but the current certification surfaces use `project.operational_entry_symbol` and related `0.4.0` fields).
+- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.5.0`; `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, but the current certification surfaces use `project.operational_entry_symbol` and related `0.4.0` fields which remain present in `0.5.0`).
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
 ### Project check (no emit)
@@ -529,6 +551,7 @@ Notes:
 - `x07 lint` without `--json` prints the raw diagnostics report (`x07diag`, see `spec/x07diag.schema.json`).
 - `x07 fix` without `--json` prints the fixed x07AST JSON to stdout unless `--write` is set.
 - `x07 fix --suggest-generics` emits a suggested `x07.patchset@0.1.0` to stdout (or `--out <PATH>` in `--json` workflows).
+- Compatibility mode overrides are available on build/compile entry points (`x07 run`, `x07 build`, `x07 check`, `x07 test`) via `--compat ...` or `X07_COMPAT=...`. See: [Compatibility modes](../reference/compat.md).
 
 ## Agent bootstrap recipe
 
@@ -541,3 +564,4 @@ Canonical minimal sequence (keep the loop simple; prefer `x07 run`):
 5. Debug/repair explicitly (when needed): `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
 
 See: [Agent quickstart](../getting-started/agent-quickstart.md).
+- `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant` / `decreases`) on the target function.

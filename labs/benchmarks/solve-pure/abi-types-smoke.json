@@ -1,6 +1,9 @@
 {
   "suite_id": "abi-types-smoke@0.1.0",
   "world": "solve-pure",
+  "module_roots": [
+    "packages/ext/x07-ext-json-rs/0.1.6/modules"
+  ],
   "tasks": [
     {
       "task_id": "smoke/echo",
@@ -104,6 +107,22 @@
     {
       "task_id": "canary/std_json_canonicalize_small",
       "description": "Canary: std.json.canonicalize_small must compile and run.",
+      "cases": [
+        {
+          "name": "obj_sort1",
+          "input_b64": "eyJiIjoyLCJhIjoxfQ==",
+          "expected_b64": "eyJhIjoxLCJiIjoyfQ=="
+        },
+        {
+          "name": "ws_obj_sort1",
+          "input_b64": "eyAiYiIgOiAyICwgImEiIDogMSB9",
+          "expected_b64": "eyJhIjoxLCJiIjoyfQ=="
+        }
+      ]
+    },
+    {
+      "task_id": "canary/ext_json_canonicalize_small",
+      "description": "Canary: ext.json.canon.canonicalize must compile and run.",
       "cases": [
         {
           "name": "obj_sort1",

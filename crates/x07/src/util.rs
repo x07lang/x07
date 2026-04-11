@@ -6,6 +6,16 @@ use sha2::{Digest, Sha256};
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+pub(crate) const ENV_X07_COMPAT: &str = "X07_COMPAT";
+
+pub(crate) fn resolve_compat(
+    cli: Option<&str>,
+    project: Option<&str>,
+) -> Result<x07c::compat::Compat> {
+    let env = std::env::var(ENV_X07_COMPAT).ok();
+    x07c::compat::resolve_compat(cli, env.as_deref(), project)
+}
+
 pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
@@ -114,7 +124,7 @@ pub(crate) fn semver_dirs_sorted_desc(base: &Path) -> Vec<PathBuf> {
 pub(crate) fn toolchain_stdlib_module_roots(toolchain_root: &Path) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     let stdlib_dir = toolchain_root.join("stdlib");
-    for family in ["os", "std"] {
+    for family in ["os", "std-core", "std"] {
         let base = stdlib_dir.join(family);
         if !base.is_dir() {
             continue;

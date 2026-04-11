@@ -392,6 +392,32 @@ impl InferCtx {
                         self.pop_scope();
                         Ok(Ty::I32.into())
                     }
+                    "while" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "while form: (while <cond:i32> <body:any>)".to_string(),
+                            ));
+                        }
+
+                        // Condition evaluation is statement-like, but any local bindings introduced
+                        // by the condition must not leak into the loop body or the enclosing scope.
+                        self.push_scope();
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "while condition must be i32".to_string(),
+                            ));
+                        }
+                        self.pop_scope();
+
+                        // Loop body runs in its own statement scope (like `for`).
+                        self.push_scope();
+                        self.infer_stmt(&args[1])?;
+                        self.pop_scope();
+
+                        Ok(Ty::I32.into())
+                    }
                     "return" => {
                         if args.len() != 1 {
                             return Err(CompilerError::new(
@@ -5519,6 +5545,28 @@ impl InferCtx {
                             )),
                         }
                     }
+                    "try_doc" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "try_doc expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.fn_ret_ty.ty != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "try_doc requires function return type bytes".to_string(),
+                            ));
+                        }
+                        let arg = self.infer(&args[0])?;
+                        match arg.ty {
+                            Ty::Bytes | Ty::BytesView => Ok(Ty::Bytes.into()),
+                            other => Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("try_doc expects bytes or bytes_view, got {other:?}"),
+                            )),
+                        }
+                    }
                     "map_u32.get" => {
                         if args.len() != 3 {
                             return Err(CompilerError::new(
@@ -5785,6 +5833,29 @@ impl InferCtx {
                         self.push_scope();
                         let _ = self.infer_stmt(&args[3])?;
                         self.pop_scope();
+                        Ty::I32
+                    }
+                    "while" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "while form: (while <cond:i32> <body:any>)".to_string(),
+                            ));
+                        }
+
+                        self.push_scope();
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "while condition must be i32".to_string(),
+                            ));
+                        }
+                        self.pop_scope();
+
+                        self.push_scope();
+                        let _ = self.infer_stmt(&args[1])?;
+                        self.pop_scope();
+
                         Ty::I32
                     }
                     _ => self.infer(expr)?.ty,

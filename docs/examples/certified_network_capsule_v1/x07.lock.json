@@ -1,11 +1,20 @@
 {
-  "schema_version": "x07.lock@0.3.0",
+  "schema_version": "x07.lock@0.4.0",
+  "toolchain": {
+    "x07_version": "0.1.111",
+    "x07c_version": "0.1.111",
+    "lang_id": "x07-core@0.2.0",
+    "compat": "0.5"
+  },
+  "registry": {
+    "index_url": "sparse+https://registry.x07.io/index/"
+  },
   "dependencies": [
     {
       "name": "ext-curl-c",
       "version": "0.1.6",
       "path": ".x07/deps/ext-curl-c/0.1.6",
-      "package_manifest_sha256": "d88b6b83b79d8d25cfcf154fa6fa280ab9efa3ec2395c4842e1f859ccd8ed37f",
+      "package_manifest_sha256": "4d857d0b0a0fd702500302927ca1da9c843a5a07faa0798aa0d0e83c882aaa2f",
       "module_root": "modules",
       "modules_sha256": {
         "ext.curl._ffi": "ef7ab5e230cc7bb054cf9b777ae803fe80907a43ab8254d99d231dc9b69d529f",
@@ -17,7 +26,7 @@
       "name": "ext-net",
       "version": "0.1.10",
       "path": ".x07/deps/ext-net/0.1.10",
-      "package_manifest_sha256": "dc589cabe800554acd3fe6dcb976db4531f3a85c85f0c4b15544b889e1453c9e",
+      "package_manifest_sha256": "eb992a262eb905691dbbda501ce2e08d2e6057a20e3d05548f93354fc1d81637",
       "module_root": "modules",
       "modules_sha256": {
         "std.net.codec": "46f5e134e7ce36ed9af6917d478f176268c2baf253fc772b33221342402d816e",
@@ -25,12 +34,12 @@
         "std.net.err": "59ebdde6334db0bb8b6fbe6f0eee91d5176c52aa03aa302e1c903e1be1db3b0d",
         "std.net.http": "8ea8ad440d47981b4564c067ebc9556e5ac3e7b9289980dd2d3fb9f7c1798b17",
         "std.net.http.client": "b4c8e82bb564f48b9ed5d79760b14f46668a09d8cc7e06f35c8630befb928c4e",
-        "std.net.http.form_urlencoded": "600aa6c20f7b1907748eb74d7951e69074f157bd6303b7a3c0faf62fec23c618",
+        "std.net.http.form_urlencoded": "db7d9091c129b46dad740a50b2a57947d2dbf6f8c0ed75d29186c235a13889e0",
         "std.net.http.form_urlencoded.tests": "4ac0e9a286b86e653be14fb429a39d01e45f6275eb446cda26e87f5a5bc9ce2b",
-        "std.net.http.server": "0f91d841a0fce37fa44c5798fa1b09ee3290f78da1fdf9729ba9e22db4877fa7",
-        "std.net.http.spec": "9aa08c6914d658d85c0c1dea29bd72047b67200a7f8f41825d2dd5036dbe13f1",
+        "std.net.http.server": "2ef3bd79e9f5aca21ebe1b474152e08939f1fc30781dfb327d30bcd0d0d47082",
+        "std.net.http.spec": "59d321f192be616dd00fbefb7fcf019ffe1ce5290caea8a06f86ca3b5f306009",
         "std.net.io": "560c67cf8c57fef50064a7a645fe4a1115a7ca1fae3afc11ca093dc4987fefe4",
-        "std.net.tcp": "1d649ad0f97dc50fb44815fb3d006d7dd8fcdd63f7bc22e888431e083ba40cb5",
+        "std.net.tcp": "7c99f0fa3415c9151d9b1342c6c87261c79a1e6737b608503b4f868db7a7fb39",
         "std.net.tls": "cb468549350f2c8409688706e068a444662604ac9f3200003fc980793a303b90",
         "std.net.udp": "d6d7311b3b77e2b549146a1cab4ea5f36248cd29daeebbdd5329c584a0781e50"
       },
@@ -40,7 +49,7 @@
       "name": "ext-sockets-c",
       "version": "0.1.6",
       "path": ".x07/deps/ext-sockets-c/0.1.6",
-      "package_manifest_sha256": "53e9c4ceb4c798a0dd013ac7e2d51b33f92652a7a43b63dbd31687520226dd6a",
+      "package_manifest_sha256": "e8050b0b703b7d52cb630360c837b8fcd6251b123936644adce891fac6878edc",
       "module_root": "modules",
       "modules_sha256": {
         "ext.sockets._ffi": "42e7d864c5f446762bbfa043b080b94280a9a4376a611266219b6f4eaa02554a",
@@ -52,7 +61,7 @@
       "name": "ext-url-rs",
       "version": "0.1.4",
       "path": ".x07/deps/ext-url-rs/0.1.4",
-      "package_manifest_sha256": "c87e3e68a8520ae7538a3b76ba497088cc76629075a90ef67ce31190051db4f4",
+      "package_manifest_sha256": "d17bea1fc1b55febc365ef3252e9177618a7e3f800e71933e7045e4ba248a75e",
       "module_root": "modules",
       "modules_sha256": {
         "ext.http_types": "dd14b3da1a82a2424e7f7205df8d3b97559fbe556e319dcf7d32e9a2b46a6bbd",

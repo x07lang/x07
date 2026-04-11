@@ -34,11 +34,11 @@ This enables a binding override pattern: `std.fs` stays source-stable while the 
 
 CLI example (standalone, without a project manifest):
 
-- `cargo run -p x07c -- compile --program <program.x07.json> --world run-os --module-root stdlib/os/0.2.0/modules --module-root src`
+- `x07-host-runner --compile-only --program <program.x07.json> --world run-os --module-root stdlib/os/0.2.0/modules --module-root src --compiled-out target/out`
 
 ## Project workflow (manifest + lockfile)
 
-Project manifest (`x07.project@0.3.0`) is JSON (tooling also accepts `x07.project@0.2.0`, but `patch` requires `@0.3.0`):
+Project manifest (`x07.project@0.5.0`) is JSON (tooling also accepts `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` for legacy; `project.patch` requires `x07.project@0.3.0` or newer):
 
 - `world`: one of `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
 - `entry`: entry program file (compiled as module `main`)
@@ -63,7 +63,8 @@ Example:
 
 ```jsonc
 {
-  "schema_version": "x07.project@0.3.0",
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
   "patch": {
     "c": { "version": "1.0.1" }
   }
@@ -73,8 +74,8 @@ Example:
 Commands:
 
 - Generate/update lockfile: `x07 pkg lock --project <path/to/x07.json>`
-- Build deterministic C output: `cargo run -p x07c -- build --project <path/to/x07.json> --out target/out.c`
-- Compile+run native: `cargo run -p x07-host-runner -- --project <path/to/x07.json> --world solve-pure --input <case.bin>`
+- Build deterministic C output: `x07 build --project <path/to/x07.json> --out target/out.c`
+- Compile+run native: `x07 run --project <path/to/x07.json> --input <case.bin>`
 
 Note: `link.*` is only used by `x07-os-runner` when building standalone (run-os*) executables; deterministic runners ignore it.
 
@@ -97,8 +98,10 @@ Lockfiles pin:
 - Each dependency package manifest SHA-256
 - Each dependency module file SHA-256
 
-Lockfile metadata (schema `x07.lock@0.3.0`):
+Lockfile metadata (schema `x07.lock@0.4.0`):
 
+- `toolchain`: records the compiler/toolchain identity used to produce the lock (x07/x07c version, lang id, compat).
+- `registry`: records which registry index URL was used to resolve and hydrate vendored deps (plus optional snapshot hash).
 - `dependencies[].overridden_by`: set when the dependency was forced by `project.patch`
 - `dependencies[].yanked`: snapshot from the index when `x07 pkg lock` consults an index
 - `dependencies[].advisories`: snapshot from the index when `x07 pkg lock` consults an index
@@ -114,15 +117,23 @@ Lockfile metadata (schema `x07.lock@0.3.0`):
 
 ## Built-in stdlib
 
-The compiler ships a small, versioned stdlib package under `stdlib/std/0.1.1/`:
+The compiler ships versioned stdlib packages under:
 
-- Module IDs are declared in `stdlib/std/0.1.1/x07-package.json` and embedded in the compiler in `crates/x07c/src/builtin_modules.rs`.
-  Keep these in sync with the on-disk module files and `stdlib.lock` (CI: `./scripts/ci/check_stdlib_lock.sh`).
+- `stdlib/std-core/0.1.2/` (foundational, pure modules)
+- `stdlib/std/0.1.2/` (extended modules; depends on `std-core` via `meta.requires_packages`)
+
+- Module IDs are declared in:
+  - `stdlib/std-core/0.1.2/x07-package.json`
+  - `stdlib/std/0.1.2/x07-package.json`
+  and embedded in the compiler in `crates/x07c/src/builtin_modules.rs`.
+  Keep these in sync with the on-disk module files and lock manifests (`stdlib.lock`, `stdlib.std-core.lock`, `stdlib.os.lock`) (CI: `./scripts/ci/check_stdlib_lock.sh`).
 
 - `std.vec`: wrappers around `vec_u8` (`with_capacity`, `push`, `extend_bytes`, `as_bytes`, ...)
 - `std.slice`: `clamp`, `cmp_bytes`
 - `std.bytes`: `reverse`, `concat`, `take`, `drop`, `copy`, `slice`, plus bytes_view helpers (`max_u8`, `sum_u8`, `count_u8`, `starts_with`, `ends_with`)
-- `std.codec`: `read_u32_le`, `write_u32_le`
+- `std.view`: clamped view slicing (`slice_v1`)
+- `std.codec`: `read_u32_le`, `write_u32_le`, plus stable encodings (`base64_*_v1`, `hex_*_v1`)
+- `std.doc`: doc envelope helpers (`ok_v1`, `err_*_v1`, `payload_v1`, `error_code_v1`, ...)
 - `std.parse`: `u32_dec`, `u32_dec_at`, `i32_status_le`, `i32_status_le_at`
 - `std.fmt`: `u32_to_dec`, `s32_to_dec`
 - `std.prng`: `lcg_next_u32`, `x07rand32_v1_stream`
@@ -137,8 +148,8 @@ The compiler ships a small, versioned stdlib package under `stdlib/std/0.1.1/`:
 - `std.map`: `word_freq_sorted_ascii`
 - `std.set`: `unique_lines_sorted`
 - `std.u32`: `read_le_at`, `write_le_at`, `push_le`, `pow2_ceil`
-- `std.small_map`: sorted packed `bytes -> u32` map (`empty_bytes_u32`, `get_bytes_u32`, `put_bytes_u32`, ...)
-- `std.small_set`: sorted packed bytes set (`empty_bytes`, `contains_bytes`, `insert_bytes`, ...)
+- `std.small_map`: sorted packed `bytes -> u32` map (`empty_bytes_u32`, `get_bytes_u32`, `put_bytes_u32`, `iter_*_v1`, ...)
+- `std.small_set`: sorted packed bytes set (`empty_bytes`, `contains_bytes`, `insert_bytes`, `iter_*_v1`, ...)
 - `std.hash`: deterministic hashing (`fnv1a32_*`, `mix32`)
 - `std.hash_map`: deterministic u32 map wrappers (`with_capacity_u32`, `get_u32_or`, `set_u32`, ...)
 - `std.hash_set`: deterministic u32 set + view-key set (`view_new`, `view_contains`, `view_insert`)

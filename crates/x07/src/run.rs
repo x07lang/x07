@@ -60,6 +60,10 @@ pub struct RunArgs {
     #[arg(long, value_name = "NAME")]
     pub profile: Option<String>,
 
+    /// Override the language/toolchain compatibility mode.
+    #[arg(long, value_name = "COMPAT")]
+    pub compat: Option<String>,
+
     /// Force runner selection.
     #[arg(long, value_enum, conflicts_with_all = ["host", "os"], hide = true)]
     pub runner: Option<RunnerMode>,
@@ -469,6 +473,16 @@ pub fn cmd_run(
         }
     };
 
+    let project_compat = project_manifest
+        .as_deref()
+        .and_then(|project_path| project::load_project_manifest(project_path).ok())
+        .and_then(|m| m.compat);
+    let pass_compat = args.compat.is_some()
+        || std::env::var_os(crate::util::ENV_X07_COMPAT).is_some()
+        || project_compat.is_some();
+    let compat = crate::util::resolve_compat(args.compat.as_deref(), project_compat.as_deref())
+        .context("resolve compat")?;
+
     let mut argv: Vec<String> = vec![
         "--cc-profile".to_string(),
         match cc_profile {
@@ -478,6 +492,11 @@ pub fn cmd_run(
         "--world".to_string(),
         world.as_str().to_string(),
     ];
+
+    if pass_compat {
+        argv.push("--compat".to_string());
+        argv.push(compat.to_string_lossy());
+    }
 
     if let Some(max_c_bytes) = args.max_c_bytes {
         argv.push("--max-c-bytes".to_string());
@@ -1475,6 +1494,8 @@ fn resolve_module_roots_for_wrapper(
                     // the project's own module_roots for agent/debugging affordances.
                     let empty_lock = project::Lockfile {
                         schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+                        toolchain: Some(project::default_lockfile_toolchain(&manifest)),
+                        registry: Some(project::default_lockfile_registry()),
                         dependencies: Vec::new(),
                     };
                     if let Ok(project_roots) =

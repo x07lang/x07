@@ -12,7 +12,7 @@
               "name": "AABA"
             }
           ],
-          "compile_fuel_used": 1265
+          "compile_fuel_used": 1270
         },
         "full/mini_app_report_v1": {
           "c_source_size": 464768,
@@ -23,12 +23,28 @@
               "name": "full_app"
             }
           ],
-          "compile_fuel_used": 12516
+          "compile_fuel_used": 12789
         }
       }
     },
     "labs/benchmarks/solve-pure/abi-types-smoke.json": {
       "tasks": {
+        "canary/ext_json_canonicalize_small": {
+          "c_source_size": 374413,
+          "cases": [
+            {
+              "fuel_used": 2193,
+              "heap_used": 78,
+              "name": "obj_sort1"
+            },
+            {
+              "fuel_used": 2555,
+              "heap_used": 94,
+              "name": "ws_obj_sort1"
+            }
+          ],
+          "compile_fuel_used": 6060
+        },
         "canary/std_json_canonicalize_small": {
           "c_source_size": 370343,
           "cases": [

@@ -859,6 +859,7 @@ impl<'a> Emitter<'a> {
                     "set0" => return self.emit_set0(state, args, dest, cont),
                     "if" => return self.emit_if(state, args, dest, cont),
                     "for" => return self.emit_for(state, args, dest, cont),
+                    "while" => return self.emit_while(state, args, dest, cont),
                     "budget.scope_v1" => return self.emit_budget_scope_v1(state, args, dest, cont),
                     "budget.scope_from_arch_v1" => {
                         return self.emit_budget_scope_from_arch_v1(state, args, dest, cont)
@@ -8183,6 +8184,76 @@ impl<'a> Emitter<'a> {
 
                 self.line(inc_state, format!("{var} = {var} + UINT32_C(1);"));
                 self.line(inc_state, format!("goto st_{loop_check};"));
+
+                self.line(done_state, format!("{} = UINT32_C(0);", dest.c_name));
+                self.line(done_state, format!("goto st_{cont};"));
+                Ok(())
+            }
+
+            fn emit_while(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if args.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "while form: (while <cond:i32> <body:any>)".to_string(),
+                    ));
+                }
+                if dest.ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "while returns i32".to_string(),
+                    ));
+                }
+
+                self.push_scope();
+                let cond_ty = self.infer_expr(&args[0])?;
+                self.pop_scope();
+                if cond_ty.ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "while condition must be i32".to_string(),
+                    ));
+                }
+
+                self.line(state, "rt_fuel(ctx, 1);");
+
+                let cond_tmp = self.alloc_local("t_while_cond_", Ty::I32)?;
+                let loop_check = self.new_state();
+                let cond_state = self.new_state();
+                let cond_done = self.new_state();
+                let body_state = self.new_state();
+                let body_done = self.new_state();
+                let done_state = self.new_state();
+
+                self.line(state, format!("goto st_{loop_check};"));
+
+                self.line(loop_check, format!("goto st_{cond_state};"));
+                self.push_scope();
+                self.emit_expr_entry(cond_state, &args[0], cond_tmp.clone(), cond_done)?;
+                self.pop_scope();
+
+                self.line(
+                    cond_done,
+                    format!(
+                        "if ({} == UINT32_C(0)) goto st_{done_state};",
+                        cond_tmp.c_name
+                    ),
+                );
+                self.line(cond_done, format!("goto st_{body_state};"));
+
+                self.push_scope();
+                let body_ty = self.infer_expr(&args[1])?;
+                let body_storage = Self::storage_ty_for(body_ty.ty);
+                let body_tmp = self.alloc_local("t_while_body_", body_storage)?;
+                self.emit_expr_entry(body_state, &args[1], body_tmp, body_done)?;
+                self.pop_scope();
+
+                self.line(body_done, format!("goto st_{loop_check};"));
 
                 self.line(done_state, format!("{} = UINT32_C(0);", dest.c_name));
                 self.line(done_state, format!("goto st_{cont};"));

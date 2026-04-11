@@ -26,6 +26,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
     "AGENT.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
+    "CHANGELOG.md",
     "GOVERNANCE.md",
     "OWNERS.md",
     "README.md",
@@ -42,6 +43,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
 
     # locks
     "stdlib.lock",
+    "stdlib.std-core.lock",
     "stdlib.os.lock",
 
     # production content

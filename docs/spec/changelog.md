@@ -5,6 +5,10 @@ Status: stable
 Applies-to: toolchain >= v0.0.95
 Related schemas: ["x07.spec.index@0.1.0"]
 
+## v0.1.111
+
+- Added `x07.project@0.5.0` and the frozen `spec/x07-project.v0.5.0.schema.json` public manifest line (adds `project.compat`).
+
 ## v0.1.81
 
 - Added proof-only verification schemas:

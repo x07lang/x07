@@ -1,0 +1,32 @@
+{
+  "schema_version": "x07.compat_corpus@0.1.0",
+  "projects": [
+    {
+      "id": "agent-gate.checksum-fast.current",
+      "source": "docs/examples/agent-gate/checksum-fast/smoke",
+      "run": true
+    },
+    {
+      "id": "agent-gate.checksum-fast.old-ext",
+      "source": "docs/examples/agent-gate/checksum-fast/smoke",
+      "run": false,
+      "dependency_overrides": {
+        "ext-checksum-rs": "0.1.0",
+        "ext-u64-rs": "0.1.2"
+      }
+    },
+    {
+      "id": "agent-gate.cli-newline",
+      "source": "docs/examples/agent-gate/cli-newline",
+      "run": false
+    }
+  ],
+  "fix_cases": [
+    {
+      "id": "fix.generics.missing-type-param",
+      "input": "tests/compat_corpus/fixcases/generics_missing_type_param.x07.json",
+      "world": "run-os",
+      "min_fixable_rate": 1.0
+    }
+  ]
+}

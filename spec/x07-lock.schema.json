@@ -1,13 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-lock.schema.json",
-  "title": "x07.lock@0.3.0",
+  "title": "x07.lock@0.4.0",
   "description": "Project lockfile (x07.lock.json). Written by `x07 pkg lock`; consumed by x07c and x07 run when resolving dependency module roots.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "dependencies"],
+  "required": ["schema_version", "toolchain", "registry", "dependencies"],
   "properties": {
-    "schema_version": { "const": "x07.lock@0.3.0" },
+    "schema_version": { "const": "x07.lock@0.4.0" },
+    "toolchain": { "$ref": "#/$defs/lock_toolchain" },
+    "registry": { "$ref": "#/$defs/lock_registry" },
     "dependencies": {
       "type": "array",
       "items": { "$ref": "#/$defs/locked_dependency" },
@@ -53,6 +55,29 @@
       "additionalProperties": false,
       "default": {}
     },
+    "lock_toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x07_version", "x07c_version", "lang_id", "compat"],
+      "properties": {
+        "x07_version": { "$ref": "#/$defs/semver" },
+        "x07c_version": { "$ref": "#/$defs/semver" },
+        "lang_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "compat": { "type": "string", "minLength": 1, "maxLength": 32 }
+      }
+    },
+    "lock_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index_url"],
+      "properties": {
+        "index_url": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "snapshot_hash": {
+          "anyOf": [{ "$ref": "#/$defs/sha256_hex" }, { "type": "null" }],
+          "default": null
+        }
+      }
+    },
     "locked_dependency": {
       "type": "object",
       "additionalProperties": false,
@@ -88,3 +113,4 @@
     }
   }
 }
+

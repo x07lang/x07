@@ -1,5 +1,14 @@
 {
-  "schema_version": "x07.lock@0.3.0",
+  "schema_version": "x07.lock@0.4.0",
+  "toolchain": {
+    "x07_version": "0.1.111",
+    "x07c_version": "0.1.111",
+    "lang_id": "x07-core@0.2.0",
+    "compat": "0.5"
+  },
+  "registry": {
+    "index_url": "sparse+https://registry.x07.io/index/"
+  },
   "dependencies": [
     {
       "name": "std-web-ui",

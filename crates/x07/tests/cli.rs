@@ -21,7 +21,7 @@ use x07_contracts::{
     X07_VERIFY_SUMMARY_SCHEMA_VERSION,
 };
 use x07_runner_common::sandbox_backend::{ENV_ACCEPT_WEAKER_ISOLATION, ENV_SANDBOX_BACKEND};
-use x07c::json_patch;
+use x07c::{json_patch, project};
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static MCP_NATIVE_BACKENDS_READY: Once = Once::new();
@@ -362,12 +362,7 @@ fn x07_check_valid_project_no_emit() {
     .expect("serialize x07.json");
     write_bytes(&root.join("x07.json"), &project);
 
-    let lock = serde_json::to_vec(&serde_json::json!({
-        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-        "dependencies": []
-    }))
-    .expect("serialize x07.lock.json");
-    write_bytes(&root.join("x07.lock.json"), &lock);
+    write_lockfile_for_project_bytes(&root, &project);
 
     let entry = serde_json::to_vec(&serde_json::json!({
         "schema_version": X07AST_SCHEMA_VERSION,
@@ -422,12 +417,7 @@ fn x07_check_project_wide_typecheck_across_modules() {
     .expect("serialize x07.json");
     write_bytes(&root.join("x07.json"), &project);
 
-    let lock = serde_json::to_vec(&serde_json::json!({
-        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-        "dependencies": []
-    }))
-    .expect("serialize x07.lock.json");
-    write_bytes(&root.join("x07.lock.json"), &lock);
+    write_lockfile_for_project_bytes(&root, &project);
 
     let foo = serde_json::to_vec(&serde_json::json!({
         "schema_version": X07AST_SCHEMA_VERSION,
@@ -497,12 +487,7 @@ fn x07_check_surfaces_move_errors() {
     .expect("serialize x07.json");
     write_bytes(&root.join("x07.json"), &project);
 
-    let lock = serde_json::to_vec(&serde_json::json!({
-        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-        "dependencies": []
-    }))
-    .expect("serialize x07.lock.json");
-    write_bytes(&root.join("x07.lock.json"), &lock);
+    write_lockfile_for_project_bytes(&root, &project);
 
     let entry = serde_json::to_vec(&serde_json::json!({
         "schema_version": X07AST_SCHEMA_VERSION,
@@ -556,12 +541,7 @@ fn x07_check_backend_use_after_move_has_quickfix_and_can_apply_it() {
     .expect("serialize x07.json");
     write_bytes(&root.join("x07.json"), &project);
 
-    let lock = serde_json::to_vec(&serde_json::json!({
-        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-        "dependencies": []
-    }))
-    .expect("serialize x07.lock.json");
-    write_bytes(&root.join("x07.lock.json"), &lock);
+    write_lockfile_for_project_bytes(&root, &project);
 
     let entry = serde_json::to_vec(&serde_json::json!({
         "schema_version": X07AST_SCHEMA_VERSION,
@@ -4216,24 +4196,7 @@ print("sat")
     write_bytes(&z3_stub, z3_src.as_bytes());
     std::fs::set_permissions(&z3_stub, std::fs::Permissions::from_mode(0o755)).expect("chmod z3");
 
-    write_json(
-        &dir.join("x07.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
-            "world": "solve-pure",
-            "entry": "verify_fixture.x07.json",
-            "module_roots": ["."],
-            "dependencies": [],
-            "lockfile": "x07.lock.json"
-        }),
-    );
-    write_json(
-        &dir.join("x07.lock.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-            "dependencies": []
-        }),
-    );
+    write_verify_project_files(&dir);
     write_json(
         &dir.join("verify_fixture.x07.json"),
         &serde_json::json!({
@@ -5702,24 +5665,26 @@ fn write_json(path: &Path, doc: &Value) {
 }
 
 fn write_verify_project_files(dir: &Path) {
-    write_json(
-        &dir.join("x07.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
-            "world": "solve-pure",
-            "entry": "verify_fixture.x07.json",
-            "module_roots": ["."],
-            "dependencies": [],
-            "lockfile": "x07.lock.json"
-        }),
-    );
-    write_json(
-        &dir.join("x07.lock.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-            "dependencies": []
-        }),
-    );
+    let project_doc = serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "verify_fixture.x07.json",
+        "module_roots": ["."],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    });
+    let project_bytes = serde_json::to_vec(&project_doc).expect("serialize x07.json");
+    write_json(&dir.join("x07.json"), &project_doc);
+    write_lockfile_for_project_bytes(dir, &project_bytes);
+}
+
+fn write_lockfile_for_project_bytes(dir: &Path, project_bytes: &[u8]) {
+    let project_path = dir.join("x07.json");
+    let manifest = project::parse_project_manifest_bytes(project_bytes, &project_path)
+        .expect("parse x07.json");
+    let lock = project::compute_lockfile(&project_path, &manifest).expect("compute lockfile");
+    let bytes = serde_json::to_vec_pretty(&lock).expect("serialize x07.lock.json");
+    write_bytes(&dir.join("x07.lock.json"), &bytes);
 }
 
 #[cfg(unix)]

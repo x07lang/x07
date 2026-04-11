@@ -83,6 +83,7 @@ class BenchSuite:
     fs_root: str | None = None
     fs_latency_index: str | None = None
     kv_seed: str | None = None
+    module_roots: list[str] | None = None
     requires_debug_borrow_checks: bool = False
 
 
@@ -167,6 +168,18 @@ def _load_suite_obj(obj: dict[str, Any]) -> BenchSuite:
     kv_seed = opt_str_field("kv_seed")
     requires_debug_borrow_checks = bool(obj.get("requires_debug_borrow_checks") or False)
 
+    module_roots_raw = obj.get("module_roots")
+    module_roots: list[str] = []
+    if isinstance(module_roots_raw, list):
+        for v in module_roots_raw:
+            s = str(v or "").strip()
+            if not s:
+                continue
+            p = Path(s)
+            if p.is_absolute() or any(part == ".." for part in p.parts):
+                raise ValueError(f"unsafe suite.module_roots entry: {s!r}")
+            module_roots.append(s)
+
     tasks_raw = obj.get("tasks")
     if not isinstance(tasks_raw, list):
         raise ValueError("suite.tasks must be a list")
@@ -236,6 +249,7 @@ def _load_suite_obj(obj: dict[str, Any]) -> BenchSuite:
         fs_root=fs_root,
         fs_latency_index=fs_latency_index,
         kv_seed=kv_seed,
+        module_roots=module_roots or None,
         requires_debug_borrow_checks=requires_debug_borrow_checks,
     )
 
@@ -799,7 +813,7 @@ def _run_suite(
     tasks = [t for t in suite.tasks if t.cases]
     tasks_total = len(tasks)
     tasks_ok = 0
-    module_roots = _bench_module_roots()
+    module_roots = list(suite.module_roots or []) + _bench_module_roots()
 
     perf_baseline_tasks: dict[str, Any] | None = None
     if perf_baseline_suite is not None:

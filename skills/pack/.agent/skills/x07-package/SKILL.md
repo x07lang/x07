@@ -28,6 +28,7 @@ Use this skill when:
 
 - Generate or update a project lockfile:
   - `x07 pkg lock --project x07.json`
+  - If you must interoperate with an older toolchain: `x07 pkg lock --project x07.json --lock-version 0.3`
 
 - Non-mutating whole-project validation (no emit):
   - `x07 check --project x07.json`
@@ -38,6 +39,14 @@ Use this skill when:
 - List available versions of a package:
   - `x07 pkg versions <name>`
   - `x07 pkg versions <name> --refresh`
+  - Offline (requires a `file://` registry index): `x07 pkg versions <name> --offline`
+
+- List packages from a local `file://` sparse index mirror:
+  - `x07 pkg list --registry sparse+file:///ABS/PATH/index/`
+
+- Show package metadata (and, when installed, the local `x07-package.json`):
+  - `x07 pkg info <name>@<version>`
+  - Offline (requires `file://` index + installed package): `x07 pkg info <name>@<version> --offline`
 
 - Verify a lockfile is up to date (CI mode):
   - `x07 pkg lock --project x07.json --check`
@@ -53,14 +62,20 @@ Use this skill when:
 - Publish:
   - `x07 pkg publish --package <dir> --index <url>`
 
+- Repair an existing lockfile after a toolchain upgrade:
+  - `x07 pkg repair --project x07.json --toolchain current`
+  - Add `--offline` to prefer already-cached compatible versions from `.x07/deps`.
+
 ## Notes
 
 - Official registry index URL: `sparse+https://registry.x07.io/index/`
 - Publishing to the official registry requires non-empty `description` and `docs` in `x07-package.json`.
 - The lockfile path is controlled by `x07.json` (`lockfile`) and defaults to `x07.lock.json`.
-- When fetching is required, `x07 pkg lock` defaults to the official registry index; override with `--index <url>`.
+- When fetching is required, `x07 pkg lock` defaults to the official registry index; override with `--registry <url>` (alias: `--index <url>`).
+- You can set project-local defaults in `.x07/config.json` or `x07.config.json` (`x07.config@0.1.0`) under `pkg.registry` and `pkg.offline`.
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `--refresh` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
-- Canonical project manifests use `x07.project@0.3.0`. `x07.project@0.2.0` is accepted for legacy manifests, but `project.patch` requires `@0.3.0`.
+- Canonical project manifests use `x07.project@0.5.0`. `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, but `project.patch` requires `x07.project@0.3.0` or newer.
+- To migrate a legacy manifest to the current schema line, run `x07 project migrate --write --project x07.json`.
 - In `--check` mode, when the index can be consulted, lock validation also fails on yanked dependencies and active advisories unless explicitly allowed.
 - Use `project.patch` in `x07.json` to override transitive dependency versions (for example, moving off yanked/advised versions).
 - Patch paths under `.x07/deps/...` are treated as vendored deps (fetchable) during `x07 pkg lock` hydration; patch paths elsewhere are local-only and must exist on disk.

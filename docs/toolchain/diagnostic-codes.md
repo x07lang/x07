@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 449
-- quickfix support (`sometimes` or `always`): 408
-- quickfix coverage: 90.87%
+- total codes: 468
+- quickfix support (`sometimes` or `always`): 427
+- quickfix coverage: 91.24%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -183,6 +183,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-LET-0001` | x07c / lint / error | sometimes | `let`/`set` has invalid arity. |
 | `X07-ARITY-RETURN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-RETURN-0001`. |
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
+| `X07-ARITY-WHILE-0001` | x07c / lint / error | sometimes | `while` has invalid arity. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
 | `X07-ASYNC-CONTRACT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0001`. |
 | `X07-ASYNC-CONTRACT-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0002`. |
@@ -208,6 +209,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-IO-READ-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-READ-0001`. |
 | `X07-IO-WRITE-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-WRITE-0001`. |
 | `X07-JSON-PARSE-0001` | x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-JSON-PARSE-0001`. |
+| `X07-MIGRATE-COERCE-0001` | x07c / lint / error | sometimes | Migration required: explicitize compat coercions. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
 | `X07-PATCHSET-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PATCHSET-0001`. |
@@ -231,11 +233,13 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-TYPE-CALL-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0001`. |
 | `X07-TYPE-CALL-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0002`. |
 | `X07-TYPE-CALL-0003` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0003`. |
+| `X07-TYPE-COERCE-0001` | x07c / type / warning | sometimes | Implicit call-argument compat coercion occurred. |
 | `X07-TYPE-IF-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-IF-0001`. |
 | `X07-TYPE-IF-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-IF-0002`. |
 | `X07-TYPE-RET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-RET-0001`. |
 | `X07-TYPE-SET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0001`. |
 | `X07-TYPE-SET-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0002`. |
+| `X07-TYPE-TRYDOC-0001` | x07c / type / error | sometimes | `try_doc` expects bytes or bytes_view. |
 | `X07-TYPE-UNIFY-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-UNIFY-0001`. |
 | `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
 | `X07-WORLD-0001` | x07c / lint / error | always | Program imports capabilities not allowed by the selected world flags. |
@@ -284,18 +288,33 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_INDEX_CONFIG` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_CONFIG`. |
 | `X07PKG_INDEX_FETCH` | x07 / lint / error | never | Diagnostic code `X07PKG_INDEX_FETCH`. |
 | `X07PKG_INDEX_NO_MATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`. |
+| `X07PKG_LIST_INDEX_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LIST_INDEX_MISSING`. |
+| `X07PKG_LIST_UNSUPPORTED` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LIST_UNSUPPORTED`. |
 | `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`. |
 | `X07PKG_LOCK_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISMATCH`. |
 | `X07PKG_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISSING`. |
+| `X07PKG_LOCK_VERSION_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_VERSION_INVALID`. |
 | `X07PKG_LOGIN_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_LOGIN_FAILED`. |
 | `X07PKG_LOGIN_TOKEN` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOGIN_TOKEN`. |
+| `X07PKG_MANIFEST_PARSE` | x07 / lint / error | sometimes | Package manifest could not be parsed. |
+| `X07PKG_OFFLINE_INDEX` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_INDEX`. |
 | `X07PKG_OFFLINE_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`. |
+| `X07PKG_OFFLINE_REFRESH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_REFRESH`. |
 | `X07PKG_PATCH_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PATCH_MISSING_DEP`. |
 | `X07PKG_PUBLISH_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_PUBLISH_FAILED`. |
 | `X07PKG_PUBLISH_RESPONSE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE`. |
 | `X07PKG_PUBLISH_RESPONSE_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE_MISMATCH`. |
+| `X07PKG_REPAIR_LOCAL_INCOMPATIBLE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_LOCAL_INCOMPATIBLE`. |
+| `X07PKG_REPAIR_LOCK_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_LOCK_INVALID`. |
+| `X07PKG_REPAIR_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_LOCK_MISSING`. |
+| `X07PKG_REPAIR_NO_COMPATIBLE_VERSION` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_NO_COMPATIBLE_VERSION`. |
+| `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE`. |
+| `X07PKG_REPAIR_TOOLCHAIN_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_INVALID`. |
+| `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`. |
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
+| `X07PKG_X07C_COMPAT_INVALID` | x07 / lint / error | sometimes | Package compatibility metadata is invalid. |
+| `X07PKG_X07C_INCOMPATIBLE` | x07 / lint / error | sometimes | Package is incompatible with the current compiler. |
 | `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
 | `X07PROOF_ECHECK_FAILED` | x07 / run / error | sometimes | Independent proof check rejected the proof bundle. |
 | `X07PROOF_EIMPORTED_SUMMARY_MISMATCH` | x07 / run / error | sometimes | Semantic proof replay found imported proof-summary drift. |
@@ -3960,6 +3979,27 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07-ARITY-WHILE-0001`
+
+Summary: `while` has invalid arity.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A quickfix is emitted when extra trailing expressions are present: they are wrapped into a `begin` body so the loop keeps canonical arity.
+
+Agent strategy:
+
+- If quickfix is present, apply it to wrap extra body expressions.
+- Otherwise rewrite to `while <cond> <body>` manually.
+- Re-run lint.
+
+
 ## `X07-AST-0001`
 
 Summary: Core lint/schema diagnostic `X07-AST-0001`.
@@ -4273,12 +4313,11 @@ Quickfix support: `sometimes`
 
 Details:
 
-The enclosing `defn` declares `decreases[]`, but the function is not a directly self-recursive proof target or it lacks the surrounding contract clauses needed for certification.
+The enclosing `defn` declares `decreases[]`, but the function is not a directly self-recursive proof target.
 
 Agent strategy:
 
 - Keep `decreases[]` only on directly self-recursive `defn` targets.
-- Add at least one `requires`, `ensures`, or `invariant` clause when the function is meant to be proved.
 - Remove `decreases[]` from non-recursive helpers.
 - Re-run `x07 lint` or `x07 check`.
 
@@ -4291,6 +4330,7 @@ Origins:
 - x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 
@@ -4463,6 +4503,27 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-MIGRATE-COERCE-0001`
+
+Summary: Migration required: explicitize compat coercions.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+This program relies on call-argument compatibility coercions (for example `bytes`/`vec_u8` where `bytes_view` is expected). Use `x07 migrate` to rewrite calls to explicit conversions such as `bytes.view`, `bytes.view_lit`, or `vec_u8.as_view`, introducing temporaries when needed to avoid borrowing from temporaries.
+
+Agent strategy:
+
+- Run `x07 migrate --check --to 0.5` to find required migrations.
+- Run `x07 migrate --write --to 0.5` to apply deterministic rewrites.
+- Re-run `x07 check` / tests with `--compat strict` (or `X07_COMPAT=strict`) to confirm no remaining implicit coercions.
 
 
 ## `X07-MOVE-0001`
@@ -4927,6 +4988,26 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07-TYPE-COERCE-0001`
+
+Summary: Implicit call-argument compat coercion occurred.
+
+Origins:
+- x07c (stage: type, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+In strict compat mode, the typechecker reports when it accepted an implicit call-argument coercion (for example `bytes`/`vec_u8` into `bytes_view`). The compiler still permits these coercions for now, but the warning indicates a mechanical migration is available.
+
+Agent strategy:
+
+- Run `x07 migrate --write --to 0.5` to make coercions explicit.
+- Or rewrite the call site manually using `bytes.view` / `bytes.view_lit` / `vec_u8.as_view`.
+- Re-run `x07 check --compat strict` (or `X07_COMPAT=strict`) until the warning is gone.
+
+
 ## `X07-TYPE-IF-0001`
 
 Summary: Core lint/schema diagnostic `X07-TYPE-IF-0001`.
@@ -5025,6 +5106,25 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-TYPE-TRYDOC-0001`
+
+Summary: `try_doc` expects bytes or bytes_view.
+
+Origins:
+- x07c (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`try_doc` consumes a doc envelope (tag byte + payload). Ensure the argument expression evaluates to `bytes` or `bytes_view`.
+
+Agent strategy:
+
+- Fix the `try_doc` argument to produce a doc envelope (`bytes` / `bytes_view`).
+- Re-run `x07 check` / `x07 test`.
 
 
 ## `X07-TYPE-UNIFY-0001`
@@ -5993,6 +6093,46 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_LIST_INDEX_MISSING`
+
+Summary: Package workflow diagnostic `X07PKG_LIST_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_LIST_UNSUPPORTED`
+
+Summary: Package workflow diagnostic `X07PKG_LIST_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
 ## `X07PKG_LOCAL_MISSING_DEP`
 
 Summary: Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`.
@@ -6053,6 +6193,26 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_LOCK_VERSION_INVALID`
+
+Summary: Package workflow diagnostic `X07PKG_LOCK_VERSION_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
 ## `X07PKG_LOGIN_FAILED`
 
 Summary: Diagnostic code `X07PKG_LOGIN_FAILED`.
@@ -6094,9 +6254,69 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_MANIFEST_PARSE`
+
+Summary: Package manifest could not be parsed.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package manifest (`x07-package.json`) is not valid JSON, so dependency resolution cannot proceed.
+
+Agent strategy:
+
+- If the package is local/vendored: fix JSON syntax in `x07-package.json` and re-run `x07 pkg lock`.
+- If it was fetched: delete the bad vendored directory (or cache entry) and re-run `x07 pkg lock` to re-fetch.
+- Re-run `x07 pkg lock --check` in CI once the workspace is clean.
+
+
+## `X07PKG_OFFLINE_INDEX`
+
+Summary: Package workflow diagnostic `X07PKG_OFFLINE_INDEX`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
 ## `X07PKG_OFFLINE_MISSING_DEP`
 
 Summary: Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_OFFLINE_REFRESH`
+
+Summary: Package workflow diagnostic `X07PKG_OFFLINE_REFRESH`.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -6195,6 +6415,146 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_REPAIR_LOCAL_INCOMPATIBLE`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_LOCAL_INCOMPATIBLE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_LOCK_INVALID`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_LOCK_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_LOCK_MISSING`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_LOCK_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_NO_COMPATIBLE_VERSION`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_NO_COMPATIBLE_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_TOOLCHAIN_INVALID`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`
+
+Summary: Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
 ## `X07PKG_SPEC_INVALID`
 
 Summary: Package workflow diagnostic `X07PKG_SPEC_INVALID`.
@@ -6233,6 +6593,46 @@ Agent strategy:
 - Normalize dependency specs and run `x07 pkg lock`.
 - Use `x07 pkg add/remove/versions/login/publish` as needed.
 - Re-run the original package command.
+
+
+## `X07PKG_X07C_COMPAT_INVALID`
+
+Summary: Package compatibility metadata is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package manifest declares `meta.x07c_compat`, but it is not a valid semver requirement string.
+
+Agent strategy:
+
+- Fix `x07-package.json` so `meta.x07c_compat` is a semver range (example: `">=0.1.111 <0.2.0"`).
+- If you do not control the package, pin a different version that carries valid metadata.
+- Re-run `x07 pkg lock`.
+
+
+## `X07PKG_X07C_INCOMPATIBLE`
+
+Summary: Package is incompatible with the current compiler.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package `meta.x07c_compat` range excludes the running `x07c` version. Select a compatible package version or change toolchain versions to satisfy the declared range.
+
+Agent strategy:
+
+- Check the package `meta.x07c_compat` range and your toolchain version.
+- Upgrade/downgrade the toolchain or pin a package version that matches the range.
+- Re-run `x07 pkg lock` and tests.
 
 
 ## `X07PKG_YANKED_DEP`
@@ -7352,7 +7752,7 @@ Quickfix kinds: `json_patch`
 
 Details:
 
-Strong trust profiles require `project.operational_entry_symbol` in `x07.project@0.4.0` manifests so the shipped entry is explicit.
+Strong trust profiles require `project.operational_entry_symbol` in `x07.project@0.5.0` manifests (or legacy `0.4.0`) so the shipped entry is explicit.
 
 Agent strategy:
 

@@ -1,11 +1,20 @@
 {
-  "schema_version": "x07.lock@0.3.0",
+  "schema_version": "x07.lock@0.4.0",
+  "toolchain": {
+    "x07_version": "0.1.111",
+    "x07c_version": "0.1.111",
+    "lang_id": "x07-core@0.2.0",
+    "compat": "0.5"
+  },
+  "registry": {
+    "index_url": "sparse+https://registry.x07.io/index/"
+  },
   "dependencies": [
     {
       "name": "ext-text",
       "version": "0.1.2",
       "path": ".x07/deps/ext-text/0.1.2",
-      "package_manifest_sha256": "35817e98987848cf0711268f4172bfa49c205109c93bd17d18fb5f149bedae77",
+      "package_manifest_sha256": "24e75056deee2d161efb9b19a91522a49f6b335308fc9b1fa6ec09069ad54e5a",
       "module_root": "modules",
       "modules_sha256": {
         "std.text": "85f7c0c671f85106086fb14e581c472ce8361a77a34ca854d42ceb0a2f824c52",

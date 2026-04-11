@@ -57,7 +57,7 @@ Canonical docs:
 
    If the index can be consulted, `--check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
    If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` may also update `x07.json` to add those transitive deps.
-   If a transitive dependency must be forced to a safe version, use `project.patch` in `x07.json` (requires `x07.project@0.3.0`).
+   If a transitive dependency must be forced to a safe version, use `project.patch` in `x07.json` (requires `x07.project@0.3.0` or newer; canonical manifests use `x07.project@0.5.0`). If the manifest is on a legacy schema line, run `x07 project migrate --write --project x07.json`.
 
 4. Run non-mutating whole-project validation before packaging:
    - `x07 check --project x07.json`
@@ -107,7 +107,7 @@ module files under `modules/` and run tests via `x07 test --manifest tests/tests
 
 For app projects (`x07 init`):
 
-- `x07.json`: project manifest (`x07.project@0.3.0`; do not author new manifests on `x07.project@0.2.0`)
+- `x07.json`: project manifest (`x07.project@0.5.0`; `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are legacy compatibility lines)
 - `x07.lock.json`: project lockfile (or `lockfile` configured in `x07.json`)
 - `src/main.x07.json`: entry
 - `src/`: module roots

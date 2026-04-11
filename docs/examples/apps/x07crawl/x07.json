@@ -38,8 +38,8 @@
     },
     {
       "name": "ext-net",
-      "path": ".x07/deps/ext-net/0.1.8",
-      "version": "0.1.8"
+      "path": ".x07/deps/ext-net/0.1.9",
+      "version": "0.1.9"
     },
     {
       "name": "ext-robots-txt-rs",
@@ -101,6 +101,7 @@
       "world": "run-os-sandboxed"
     }
   },
-  "schema_version": "x07.project@0.4.0",
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
   "world": "run-os"
 }

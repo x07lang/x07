@@ -575,6 +575,20 @@ fn cmd_diag_explain(args: DiagExplainArgs) -> Result<std::process::ExitCode> {
             println!("no quickfix reason: {}", reason.trim());
         }
     }
+
+    let mut suggested: Vec<String> = Vec::new();
+    if entry.quickfix.support != QuickfixSupport::Never {
+        suggested.push("x07 fix --write --input <PATH>".to_string());
+    }
+    if entry.code.starts_with("X07-MIGRATE-") {
+        suggested.push("x07 migrate --to <COMPAT_VERSION> --write --input <PATH>".to_string());
+    }
+    if !suggested.is_empty() {
+        println!("suggested commands:");
+        for cmd in suggested {
+            println!("- {cmd}");
+        }
+    }
     println!();
     println!("origins:");
     for origin in &entry.origins {
@@ -596,6 +610,10 @@ fn cmd_diag_explain(args: DiagExplainArgs) -> Result<std::process::ExitCode> {
         println!("{}", entry.doc.agent_strategy_md.trim());
     }
     Ok(std::process::ExitCode::SUCCESS)
+}
+
+pub(crate) fn cmd_explain(args: DiagExplainArgs) -> Result<std::process::ExitCode> {
+    cmd_diag_explain(args)
 }
 
 fn cmd_diag_check(args: DiagCheckArgs) -> Result<std::process::ExitCode> {
@@ -2170,6 +2188,15 @@ fn validate_catalog_semantics(catalog: &CatalogDoc) -> Vec<String> {
         }
         if entry.doc.summary.trim().is_empty() {
             errors.push(format!("{}: doc.summary must be non-empty", entry.code));
+        }
+        if entry.doc.details_md.trim().is_empty() {
+            errors.push(format!("{}: doc.details_md must be non-empty", entry.code));
+        }
+        if entry.doc.agent_strategy_md.trim().is_empty() {
+            errors.push(format!(
+                "{}: doc.agent_strategy_md must be non-empty",
+                entry.code
+            ));
         }
         if entry.quickfix.support == QuickfixSupport::Never
             && entry

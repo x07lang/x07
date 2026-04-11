@@ -24,6 +24,7 @@
 
 ## Language
 - [Overview](language/overview.md)
+- [Prelude & names](language/prelude-and-names.md)
 - [Syntax & x07AST](language/syntax-x07ast.md)
 - [Generics](language/generics.md)
 - [Types & memory model](language/types-memory.md)
@@ -133,6 +134,8 @@
   - [Rand v1](os/rand-v1.md)
 
 - [FAQ](faq.md)
+- [Compatibility contract](reference/compat.md)
+- [Doc envelope](reference/doc-envelope.md)
 - [Versioning policy](versioning-policy.md)
 - [References](references.md)
 
@@ -140,6 +143,7 @@
 - [CLI apps](guides/cli-apps.md)
 - [Data interoperability](guides/data-interop.md)
 - [Kernel/shell in production](guides/kernel-shell-production.md)
+- [Offline workflows](guides/offline.md)
 - [Performance tuning](guides/performance-tuning.md)
 - [Extract core migration](guides/extract-core.md)
 - [Web services](guides/web-apps.md)

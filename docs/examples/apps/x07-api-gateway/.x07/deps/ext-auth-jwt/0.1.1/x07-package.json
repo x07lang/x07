@@ -11,6 +11,7 @@
     "std.auth.jwt.tests"
   ],
   "meta": {
+    "x07c_compat": ">=0.1.111 <0.2.0",
     "determinism_tier": "os-world-only",
     "worlds_allowed": ["run-os", "run-os-sandboxed"],
     "requires_packages": [
@@ -19,7 +20,6 @@
       "ext-json-rs@0.1.4",
       "ext-openssl-c@0.1.6"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

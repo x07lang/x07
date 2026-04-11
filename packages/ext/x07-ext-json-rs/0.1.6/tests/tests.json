@@ -14,6 +14,12 @@
       "expect": "pass"
     },
     {
+      "id": "ext.json/canon_nested",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_canon_nested",
+      "expect": "pass"
+    },
+    {
       "id": "ext.json/canon_number_formats",
       "world": "solve-pure",
       "entry": "ext.json.tests.test_canon_number_formats",

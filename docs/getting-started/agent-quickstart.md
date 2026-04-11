@@ -26,6 +26,31 @@ High-level primitives to learn early (the “one whole system”):
 - Function contracts + verification: `requires` / `ensures` / `invariant` + `x07 verify --prove|--coverage` (proof artifacts plus explicit support posture)
 - Certificate-first review: `x07 prove check`, `x07 trust certify`, `x07 review diff`, `x07 trust report`
 
+## 0.5) Version + compat + migration (do this early)
+
+New projects pin a compatibility mode in `x07.json` (`project.compat`, default `"0.5"`). If you open older projects or older package code, prefer mechanical migration over relying on legacy behavior:
+
+```bash
+x07 migrate --to 0.5 --check --input src/main.x07.json
+x07 migrate --to 0.5 --write --input src/main.x07.json
+```
+
+For one-off debugging, you can override compatibility at the command level:
+
+```bash
+x07 run --compat 0.5
+```
+
+See: [Compatibility contract](../reference/compat.md) and `x07 migrate` in [Toolchain CLI](../toolchain/cli.md).
+
+## 0.6) Canonical patterns (loops, bytes/view, errors)
+
+- Loops: use `for` for counted loops and `while` for scanning loops; reserve recursion for contract/verified code.
+- Bytes/view: call-argument coercion exists, but prefer explicit `bytes.view` at library boundaries.
+- Error propagation:
+  - typed results (`result_i32`, `result_bytes`) use `try`
+  - doc envelopes use `try_doc` (see [Doc envelope](../reference/doc-envelope.md))
+
 ## 1) Install and verify the toolchain
 
 - Install with `x07up` (recommended).
@@ -132,7 +157,7 @@ x07 init
 
 - The root `world` field is required (it’s used as a fallback when no run profile is selected).
 - For multi-profile projects, set the root `world` to the solve-* world you want for deterministic lint/repair (for example `solve-pure`), and run OS worlds via profiles (`run-os*`).
-- If the project will be certified, set `project.operational_entry_symbol` on the `x07.project@0.4.0` manifest line. Strong trust profiles certify that operational entry and reject proof-only surrogate entries.
+- If the project will be certified, set `project.operational_entry_symbol` on the current manifest line (`x07.project@0.5.0`). Strong trust profiles certify that operational entry and reject proof-only surrogate entries.
 
 ### Contracts-by-example (copy/paste)
 
@@ -277,19 +302,21 @@ x07 pkg remove NAME --sync
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
-- Canonical project manifests use `x07.project@0.4.0`. `x07.project@0.2.0` and `x07.project@0.3.0` are accepted for legacy manifests, but current certification surfaces use the `0.4.0` fields such as `project.operational_entry_symbol`.
+- Canonical project manifests use `x07.project@0.5.0`. `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, and certification surfaces use the `x07.project@0.4.0` fields such as `project.operational_entry_symbol` (still present in `x07.project@0.5.0`).
+- To migrate a legacy manifest to the current schema line, run `x07 project migrate --write --project x07.json`.
 - `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
 - For builtin `std.*` modules (file: `<builtin>`), use `x07 doc std.<module>` (example: `x07 doc std.bytes`).
 - For package-provided `std.*` modules, run `x07 doc <module-id> --project x07.json` after adding the package (example: after `x07 pkg add ext-net --sync`, run `x07 doc std.net.tcp --project x07.json`).
-- For special forms (pipes, `task.scope_v1`, `budget.*`) and non-module builtins (example: `std.brand.*`), use `x07 guide` + linked docs pages (not `x07 doc`).
+- For builtin forms (example: `bytes.len`, `task.scope_v1`, `budget.scope_v1`), use `x07 doc <name>` (or force builtin resolution with `x07 doc --builtin <name>`). For the full reference (including syntax forms), use `x07 guide`. See: [Prelude & names](../language/prelude-and-names.md).
 - For structured encodings, prefer branded bytes + validators over ad-hoc parsing (see `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` in `x07 guide` and `meta.brands_v1` in schema-derived modules).
 - For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
-- `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
+- `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--registry <URL>` (alias: `--index <URL>`), or set a default in `.x07/config.json` / `x07.config.json`. Forbid network with `--offline`.
 - In CI, run `x07 pkg lock --project x07.json --check`.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
-- If you must force a transitive dependency version, use `project.patch` in `x07.json` on the current `x07.project@0.4.0` manifest line.
+- After upgrading the toolchain, if old locks reference incompatible package versions, use `x07 pkg repair --toolchain current`.
+- If you must force a transitive dependency version, use `project.patch` in `x07.json` on the current `x07.project@0.5.0` manifest line.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
 

@@ -16,6 +16,7 @@ use crate::types::Ty;
 use crate::x07ast;
 use x07_contracts::{
     NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -30,6 +31,7 @@ pub enum ContractMode {
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
     pub world: x07_worlds::WorldId,
+    pub compat: crate::compat::Compat,
     pub enable_fs: bool,
     pub enable_rr: bool,
     pub enable_kv: bool,
@@ -49,6 +51,7 @@ impl Default for CompileOptions {
     fn default() -> Self {
         Self {
             world: x07_worlds::WorldId::default(),
+            compat: crate::compat::Compat::default(),
             enable_fs: false,
             enable_rr: false,
             enable_kv: false,
@@ -366,7 +369,7 @@ fn compile_frontend(
 
     let file = x07ast::parse_x07ast_json(program)
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("main: {e}")))?;
-    enforce_contract_typecheck("main", &file)?;
+    enforce_contract_typecheck("main", &file, options.compat)?;
     fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     let main = parse_main_file_x07ast(file)?;
     if !options.allow_internal_only_heads_in_entry {
@@ -1122,7 +1125,7 @@ fn load_module_recursive(
 
     let file = x07ast::parse_x07ast_json(src.as_bytes())
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("{module_id:?}: {e}")))?;
-    enforce_contract_typecheck(module_id, &file)?;
+    enforce_contract_typecheck(module_id, &file, options.compat)?;
     *fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     let (m, mut info) = parse_module_file_x07ast(module_id, file)?;
     info.is_builtin = is_builtin;
@@ -1178,18 +1181,34 @@ fn x07ast_node_count(file: &x07ast::X07AstFile) -> u64 {
 }
 
 fn file_has_contracts(file: &x07ast::X07AstFile) -> bool {
-    file.functions
-        .iter()
-        .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
-        || file
-            .async_functions
-            .iter()
-            .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
+    file.functions.iter().any(|f| {
+        let has_decreases = match x07ast::defn_decreases(file, &f.name) {
+            Ok(Some(decreases)) => !decreases.is_empty(),
+            Ok(None) => false,
+            Err(_) => true,
+        };
+        !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty() || has_decreases
+    }) || file.async_functions.iter().any(|f| {
+        !f.requires.is_empty()
+            || !f.ensures.is_empty()
+            || !f.invariant.is_empty()
+            || f.protocol.as_ref().is_some_and(|p| {
+                !p.await_invariant.is_empty()
+                    || !p.scope_invariant.is_empty()
+                    || !p.cancellation_ensures.is_empty()
+            })
+    })
 }
 
-fn enforce_contract_typecheck(label: &str, file: &x07ast::X07AstFile) -> Result<(), CompilerError> {
+fn enforce_contract_typecheck(
+    label: &str,
+    file: &x07ast::X07AstFile,
+    compat: crate::compat::Compat,
+) -> Result<(), CompilerError> {
     if file.schema_version != X07AST_SCHEMA_VERSION_V0_5_0
         && file.schema_version != X07AST_SCHEMA_VERSION_V0_6_0
+        && file.schema_version != X07AST_SCHEMA_VERSION_V0_7_0
+        && file.schema_version != X07AST_SCHEMA_VERSION_V0_8_0
     {
         return Ok(());
     }
@@ -1197,7 +1216,13 @@ fn enforce_contract_typecheck(label: &str, file: &x07ast::X07AstFile) -> Result<
         return Ok(());
     }
 
-    let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
+    let tc = crate::typecheck::typecheck_file_local(
+        file,
+        &crate::typecheck::TypecheckOptions {
+            mode: crate::typecheck::TypecheckMode::ContractsOnly,
+            compat,
+        },
+    );
     let errors = tc
         .diagnostics
         .iter()

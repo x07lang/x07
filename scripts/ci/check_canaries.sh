@@ -90,6 +90,7 @@ run_quiet "check_package_policy" "$python_bin" scripts/ci/check_package_policy.p
 run_quiet "check_doc_command_surface" "$python_bin" scripts/ci/check_doc_command_surface.py
 run_quiet "check_guides_structure" "$python_bin" scripts/ci/check_guides_structure.py
 run_quiet "check_doc_version_pins" "$python_bin" scripts/ci/check_doc_version_pins.py
+run_quiet "check_doc_examples" ./scripts/ci/check_doc_examples.sh
 run_quiet "check_policy_templates" ./scripts/ci/check_policy_templates.sh
 run_quiet "check_repair_corpus" "$python_bin" scripts/ci/check_repair_corpus.py
 run_quiet "check_agent_scenarios" ./scripts/ci/check_agent_scenarios.sh

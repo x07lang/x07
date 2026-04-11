@@ -16,7 +16,7 @@ points caused significant slowdowns and required multiple retry cycles.
 Some items in the original report were verified against the toolchain and current stdlib and turned out to be **report errors**:
 
 - `std.hash_set` **is implemented** in the shipped stdlib; `"unsupported head: std.hash_set.view_new"` typically indicates the module was not loaded into the program (missing import), not that the API is absent.
-- x07 has an error-code explainer: `x07 diag explain <CODE>` (so “no `--explain` command” is not accurate).
+- x07 has an error-code explainer: `x07 explain <CODE>` (alias: `x07 diag explain <CODE>`), so “no `--explain` command” is not accurate.
 
 Items verified as real issues (and fixed in the toolchain):
 

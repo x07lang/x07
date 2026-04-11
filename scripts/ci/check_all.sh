@@ -55,6 +55,21 @@ step "release script goldens"
 step "published spec sync"
 "$python_bin" scripts/sync_published_spec.py --check
 
+step "generated versions artifact"
+"$python_bin" scripts/gen_versions_json.py --check
+
+step "docs/skills schema references"
+"$python_bin" scripts/ci/check_doc_schema_refs.py
+
+step "docs example lockfiles schema"
+"$python_bin" scripts/ci/check_doc_lockfiles_schema.py
+
+step "docs examples x07AST schema_version"
+"$python_bin" scripts/upgrade_docs_example_x07ast_schema.py --check
+
+step "docs examples x07AST formatting"
+./scripts/ci/check_doc_examples_x07ast_fmt.sh
+
 step "genpack error-codes completeness"
 "$python_bin" scripts/check_genpack_error_codes.py --check
 

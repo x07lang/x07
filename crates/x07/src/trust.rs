@@ -8,8 +8,8 @@ use clap::{Args, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
-    X07DIAG_SCHEMA_VERSION, X07_CAPSULE_ATTEST_SCHEMA_VERSION, X07_CAPSULE_CONTRACT_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, X07DIAG_SCHEMA_VERSION,
+    X07_CAPSULE_ATTEST_SCHEMA_VERSION, X07_CAPSULE_CONTRACT_SCHEMA_VERSION,
     X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION, X07_EFFECT_LOG_SCHEMA_VERSION,
     X07_PEER_POLICY_SCHEMA_VERSION, X07_RUNTIME_ATTEST_SCHEMA_VERSION,
     X07_TRUST_CERTIFICATE_SCHEMA_VERSION, X07_TRUST_PROFILE_SCHEMA_VERSION,
@@ -1951,10 +1951,7 @@ fn resolve_project_context(
             }
             Some(lock)
         } else if manifest.dependencies.is_empty() {
-            Some(project::Lockfile {
-                schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
-                dependencies: Vec::new(),
-            })
+            Some(project::compute_lockfile(&project_path, &manifest)?)
         } else {
             None
         };
@@ -6714,36 +6711,47 @@ fn now_unix_ms() -> u64 {
 }
 
 fn stdlib_sbom_components(path: &Path) -> Vec<SbomComponent> {
-    let Ok(doc) = report_common::read_json_file(path) else {
-        return Vec::new();
-    };
-
     let mut out = Vec::new();
     let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
-    let Some(packages) = doc.get("packages").and_then(Value::as_array) else {
-        return out;
-    };
-    for pkg in packages {
-        let Some(name) = pkg.get("name").and_then(Value::as_str) else {
+
+    let mut lock_paths: Vec<PathBuf> = Vec::new();
+    lock_paths.push(path.to_path_buf());
+    if let Some(dir) = path.parent() {
+        let core = dir.join("stdlib.std-core.lock");
+        if core.is_file() && core != path {
+            lock_paths.push(core);
+        }
+    }
+
+    for lock_path in lock_paths {
+        let Ok(doc) = report_common::read_json_file(&lock_path) else {
             continue;
         };
-        let version = pkg
-            .get("version")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string();
-        let key = (name.to_string(), version);
-        if !seen.insert(key.clone()) {
+        let Some(packages) = doc.get("packages").and_then(Value::as_array) else {
             continue;
+        };
+        for pkg in packages {
+            let Some(name) = pkg.get("name").and_then(Value::as_str) else {
+                continue;
+            };
+            let version = pkg
+                .get("version")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let key = (name.to_string(), version);
+            if !seen.insert(key.clone()) {
+                continue;
+            }
+            out.push(SbomComponent {
+                kind: "stdlib".to_string(),
+                name: key.0,
+                version: if key.1.is_empty() { None } else { Some(key.1) },
+                source: Some(lock_path.display().to_string()),
+                purl: None,
+                license: None,
+            });
         }
-        out.push(SbomComponent {
-            kind: "stdlib".to_string(),
-            name: key.0,
-            version: if key.1.is_empty() { None } else { Some(key.1) },
-            source: Some(path.display().to_string()),
-            purl: None,
-            license: None,
-        });
     }
     out
 }

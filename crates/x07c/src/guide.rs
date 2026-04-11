@@ -73,6 +73,10 @@ pub fn guide_md() -> String {
     out.push_str("- `if`: `[\"if\", cond, then, else]` branches on non-zero `cond`\n");
     out.push_str("- `for`: `[\"for\", i, start, end, body]` declares `i` (i32) and runs it from `start` to `end-1`\n");
     out.push_str("  - `body` is a single expression; use `begin` for multiple steps.\n");
+    out.push_str(
+        "- `while`: `[\"while\", cond, body]` runs `body` while `cond` evaluates to non-zero\n",
+    );
+    out.push_str("  - `cond` must typecheck to `i32`; `body` is a single expression; use `begin` for multiple steps.\n");
     out.push_str("- `return`: `[\"return\", expr]` returns early from the current function\n");
     out.push_str("  - In `solve`, the return value must be `bytes`.\n\n");
 
@@ -88,6 +92,7 @@ pub fn guide_md() -> String {
     out.push_str("Arity reminder:\n");
     out.push_str("- `if` is `[\"if\", cond, then, else]`\n");
     out.push_str("- `for` is `[\"for\", i, start, end, body]`\n");
+    out.push_str("- `while` is `[\"while\", cond, body]`\n");
     out.push_str("- `begin` is `[\"begin\", e1, e2, ...]`\n\n");
 
     out.push_str("## Modules\n\n");
@@ -250,8 +255,8 @@ pub fn guide_md() -> String {
     out.push_str("## Built-in Modules (stdlib)\n\n");
     out.push_str("Call module functions using fully-qualified names (e.g. `[\"std.bytes.reverse\",\"b\"]`).\n\n");
     out.push_str("- `std.bytes`\n");
-    out.push_str("  - `[\"std.bytes.len\",\"b\"]` -> i32\n");
-    out.push_str("  - `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255)\n");
+    out.push_str("  - `[\"std.bytes.len\",\"b\"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)\n");
+    out.push_str("  - `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)\n");
     out.push_str("  - `[\"std.bytes.set_u8\",\"b\",\"i\",\"v\"]` -> bytes (returns `b`)\n");
     out.push_str("  - `[\"std.bytes.alloc\",\"n\"]` -> bytes (length `n`)\n");
     out.push_str("  - `[\"std.bytes.eq\",\"a\",\"b\"]` -> i32 (1 if equal else 0)\n");
@@ -296,6 +301,12 @@ pub fn guide_md() -> String {
     out.push_str("- `std.parse`\n");
     out.push_str("  - `[\"std.parse.u32_dec\",\"b\"]` -> i32\n");
     out.push_str("  - `[\"std.parse.u32_dec_at\",\"b\",\"off\"]` -> i32\n");
+    out.push_str(
+        "  - `[\"std.parse.u32_status_le\",\"b\"]` -> bytes (tag byte 1 + u32_le, or tag byte 0)\n",
+    );
+    out.push_str(
+        "  - `[\"std.parse.u32_status_le_at\",\"b\",\"off\"]` -> bytes (tag byte 1 + u32_le + next_off_u32_le, or tag byte 0)\n",
+    );
     out.push_str(
         "  - `[\"std.parse.i32_status_le\",\"b\"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)\n",
     );
@@ -536,8 +547,8 @@ pub fn guide_md() -> String {
 
     out.push_str("## Bytes Ops\n\n");
     out.push_str("Use `std.bytes.*` functions (import `std.bytes`):\n\n");
-    out.push_str("- `[\"std.bytes.len\",\"b\"]` -> i32\n");
-    out.push_str("- `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255)\n");
+    out.push_str("- `[\"std.bytes.len\",\"b\"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)\n");
+    out.push_str("- `[\"std.bytes.get_u8\",\"b\",\"i\"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)\n");
     out.push_str("- `[\"std.bytes.set_u8\",\"b\",\"i\",\"v\"]` -> bytes (returns `b`)\n");
     out.push_str("- `[\"std.bytes.alloc\",\"n\"]` -> bytes (length `n`)\n\n");
 
@@ -580,6 +591,10 @@ pub fn guide_md() -> String {
     out.push_str("- `[\"view.cmp_range\",\"a\",\"a_off\",\"a_len\",\"b\",\"b_off\",\"b_len\"]` -> i32 (-1/0/1)\n\n");
 
     out.push_str("Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).\n\n");
+    out.push_str(
+        "For clamped slicing (never traps), prefer `std.view.slice_v1` (see Modules).\n\n",
+    );
+    out.push_str("Call-argument coercion: some functions typed as `bytes_view` accept `bytes` (and sometimes `vec_u8`) directly at call sites; the compiler implicitly borrows a view for the call.\n\n");
 
     out.push_str("## OS Worlds (run-os / run-os-sandboxed)\n\n");
     out.push_str("OS effects are accessed through `std.os.*` modules, which call `os.*` builtins (listed above).\n");
@@ -657,6 +672,7 @@ pub fn guide_md() -> String {
 
     out.push_str("Propagation sugar:\n\n");
     out.push_str("- `[\"try\",\"r\"]` -> `i32` or `bytes` (requires the current `defn` return type is `result_i32` or `result_bytes`)\n\n");
+    out.push_str("- `[\"try_doc\",\"doc\"]` -> bytes (requires the current `defn` return type is bytes; doc envelope yields payload on ok and returns the original doc on err)\n\n");
 
     out.push_str("## Budget scopes\n\n");
     out.push_str("Budget scopes are special forms that enforce local resource limits (alloc/memcpy/scheduler ticks/fuel).\n\n");
@@ -716,8 +732,8 @@ pub fn guide_md() -> String {
 
     out.push_str("## Stdlib (pure)\n\n");
     out.push_str("Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):\n\n");
-    out.push_str("- `std.codec`: `[\"std.codec.read_u32_le\",\"b\",\"off\"]` (`b` is bytes_view), `[\"std.codec.write_u32_le\",\"x\"]`\n");
-    out.push_str("- `std.parse`: `[\"std.parse.u32_dec\",\"b\"]`, `[\"std.parse.u32_dec_at\",\"b\",\"off\"]`, `[\"std.parse.i32_status_le\",\"b\"]`\n");
+    out.push_str("- `std.codec`: `[\"std.codec.read_u32_le\",\"b\",\"off\"]` (`b` is bytes_view), `[\"std.codec.write_u32_le\",\"x\"]`, `[\"std.codec.base64_encode_v1\",\"b\"]`, `[\"std.codec.base64_decode_v1\",\"s\"]` (doc), `[\"std.codec.hex_encode_v1\",\"b\"]`, `[\"std.codec.hex_decode_v1\",\"s\"]` (doc)\n");
+    out.push_str("- `std.parse`: `[\"std.parse.u32_dec\",\"b\"]`, `[\"std.parse.u32_dec_at\",\"b\",\"off\"]`, `[\"std.parse.u32_status_le\",\"b\"]`, `[\"std.parse.u32_status_le_at\",\"b\",\"off\"]`, `[\"std.parse.i32_status_le\",\"b\"]`, `[\"std.parse.i32_status_le_at\",\"b\",\"off\"]`\n");
     out.push_str(
         "- `std.fmt`: `[\"std.fmt.u32_to_dec\",\"x\"]`, `[\"std.fmt.s32_to_dec\",\"x\"]`\n",
     );
@@ -727,7 +743,7 @@ pub fn guide_md() -> String {
     out.push_str("## Common Templates\n\n");
     out.push_str("- 1-byte output: `[\"begin\",[\"let\",\"out\",[\"bytes.alloc\",1]],[\"set\",\"out\",[\"bytes.set_u8\",\"out\",0,\"x\"]],\"out\"]`\n");
     out.push_str("- Empty output: `[\"bytes.alloc\",0]`\n");
-    out.push_str("- Looping: use `bytes.len` once, then `[\"for\",\"i\",0,\"n\",body]`.\n\n");
+    out.push_str("- Looping: use `for` for counted loops (`[\"for\",\"i\",0,\"n\",body]`) and `while` for open-ended loops (`[\"while\",cond,body]`).\n\n");
 
     out.push_str("### Header + tail pattern\n\n");
     out.push_str("Many tasks use `input[0..k]` as parameters and the remaining bytes as data.\n\n");

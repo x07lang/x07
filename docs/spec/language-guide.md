@@ -64,6 +64,8 @@ Move rules (critical):
 - `if`: `["if", cond, then, else]` branches on non-zero `cond`
 - `for`: `["for", i, start, end, body]` declares `i` (i32) and runs it from `start` to `end-1`
   - `body` is a single expression; use `begin` for multiple steps.
+- `while`: `["while", cond, body]` runs `body` while `cond` evaluates to non-zero
+  - `cond` must typecheck to `i32`; `body` is a single expression; use `begin` for multiple steps.
 - `return`: `["return", expr]` returns early from the current function
   - In `solve`, the return value must be `bytes`.
 
@@ -77,6 +79,7 @@ Echo (returns input):
 Arity reminder:
 - `if` is `["if", cond, then, else]`
 - `for` is `["for", i, start, end, body]`
+- `while` is `["while", cond, body]`
 - `begin` is `["begin", e1, e2, ...]`
 
 ## Modules
@@ -258,8 +261,8 @@ Channels (bytes payloads):
 Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b"]`).
 
 - `std.bytes`
-  - `["std.bytes.len","b"]` -> i32
-  - `["std.bytes.get_u8","b","i"]` -> i32 (0..255)
+  - `["std.bytes.len","b"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)
+  - `["std.bytes.get_u8","b","i"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)
   - `["std.bytes.set_u8","b","i","v"]` -> bytes (returns `b`)
   - `["std.bytes.alloc","n"]` -> bytes (length `n`)
   - `["std.bytes.eq","a","b"]` -> i32 (1 if equal else 0)
@@ -302,6 +305,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 - `std.parse`
   - `["std.parse.u32_dec","b"]` -> i32
   - `["std.parse.u32_dec_at","b","off"]` -> i32
+  - `["std.parse.u32_status_le","b"]` -> bytes (tag byte 1 + u32_le, or tag byte 0)
+  - `["std.parse.u32_status_le_at","b","off"]` -> bytes (tag byte 1 + u32_le + next_off_u32_le, or tag byte 0)
   - `["std.parse.i32_status_le","b"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)
   - `["std.parse.i32_status_le_at","b","off"]` -> bytes (tag byte 1 + i32_le + next_off_u32_le, or tag byte 0)
 - `std.fmt`
@@ -520,8 +525,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 
 Use `std.bytes.*` functions (import `std.bytes`):
 
-- `["std.bytes.len","b"]` -> i32
-- `["std.bytes.get_u8","b","i"]` -> i32 (0..255)
+- `["std.bytes.len","b"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)
+- `["std.bytes.get_u8","b","i"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)
 - `["std.bytes.set_u8","b","i","v"]` -> bytes (returns `b`)
 - `["std.bytes.alloc","n"]` -> bytes (length `n`)
 
@@ -560,6 +565,10 @@ Views are explicit, borrowed slices used for scan/trim/split without copying.
 - `["view.cmp_range","a","a_off","a_len","b","b_off","b_len"]` -> i32 (-1/0/1)
 
 Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).
+
+For clamped slicing (never traps), prefer `std.view.slice_v1` (see Modules).
+
+Call-argument coercion: some functions typed as `bytes_view` accept `bytes` (and sometimes `vec_u8`) directly at call sites; the compiler implicitly borrows a view for the call.
 
 ## OS Worlds (run-os / run-os-sandboxed)
 
@@ -647,6 +656,8 @@ Propagation sugar:
 
 - `["try","r"]` -> `i32` or `bytes` (requires the current `defn` return type is `result_i32` or `result_bytes`)
 
+- `["try_doc","doc"]` -> bytes (requires the current `defn` return type is bytes; doc envelope yields payload on ok and returns the original doc on err)
+
 ## Budget scopes
 
 Budget scopes are special forms that enforce local resource limits (alloc/memcpy/scheduler ticks/fuel).
@@ -703,8 +714,8 @@ Use `emit_*` stdlib functions to produce canonical deterministic encodings:
 
 Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):
 
-- `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`
-- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.i32_status_le","b"]`
+- `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`, `["std.codec.base64_encode_v1","b"]`, `["std.codec.base64_decode_v1","s"]` (doc), `["std.codec.hex_encode_v1","b"]`, `["std.codec.hex_decode_v1","s"]` (doc)
+- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.u32_status_le","b"]`, `["std.parse.u32_status_le_at","b","off"]`, `["std.parse.i32_status_le","b"]`, `["std.parse.i32_status_le_at","b","off"]`
 - `std.fmt`: `["std.fmt.u32_to_dec","x"]`, `["std.fmt.s32_to_dec","x"]`
 - `std.prng`: `["std.prng.lcg_next_u32","state"]`
 
@@ -714,7 +725,7 @@ Prefer calling stdlib helpers through their module namespaces (and include the m
 
 - 1-byte output: `["begin",["let","out",["bytes.alloc",1]],["set","out",["bytes.set_u8","out",0,"x"]],"out"]`
 - Empty output: `["bytes.alloc",0]`
-- Looping: use `bytes.len` once, then `["for","i",0,"n",body]`.
+- Looping: use `for` for counted loops (`["for","i",0,"n",body]`) and `while` for open-ended loops (`["while",cond,body]`).
 
 ### Header + tail pattern
 

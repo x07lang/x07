@@ -1,14 +1,23 @@
 {
-  "schema_version": "x07.lock@0.3.0",
+  "schema_version": "x07.lock@0.4.0",
+  "toolchain": {
+    "x07_version": "0.1.111",
+    "x07c_version": "0.1.111",
+    "lang_id": "x07-core@0.2.0",
+    "compat": "0.5"
+  },
+  "registry": {
+    "index_url": "sparse+https://registry.x07.io/index/"
+  },
   "dependencies": [
     {
       "name": "appkit",
       "version": "0.1.0",
       "path": "pkgs/appkit/0.1.0",
-      "package_manifest_sha256": "e460423248d695707d6f7c3412ea0352263873385a91e0ff547bf6e80d4a4ca2",
+      "package_manifest_sha256": "0032862d4f672598c27b18a968736ffbe29a740efe05a6752bc53c35dcd9906c",
       "module_root": "modules",
       "modules_sha256": {
-        "appkit.vec": "c4ba8820ed788fa2dfad45f563f3378677d86ef067c42862658d7243f2a0f385"
+        "appkit.vec": "e5d7f00890a4e284f7a5a13669383d3a72abe215926f6303c36c9512de1daa0a"
       }
     }
   ]
