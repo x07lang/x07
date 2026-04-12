@@ -8,6 +8,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 - `x07 init`
   - Creates `x07.json` (with `os`/`sandbox` profiles), `x07.lock.json`, a minimal `src/` program, and a `tests/` harness (`tests/tests.json`).
+  - Most `x07 init --template ...` scaffolds run a dependency lock step (`x07 pkg lock`), which may use the package registry (network) unless the index is `file://` (for example via `X07_PKG_INDEX_URL`).
 - `x07 init --package`
   - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
   - Not compatible with `--template` (templates are for app scaffolds).
@@ -507,6 +508,8 @@ Structured commands must guarantee:
 - valid JSON
 - schema-valid output
 - stable ordering (canonical JSON writer)
+
+Tool reports include `meta.nondeterminism` flags. For `x07 init`, `meta.nondeterminism.uses_network` is set to true when a template triggers dependency locking against a non-`file://` package index.
 
 Review/trust artifact commands also follow this contract:
 

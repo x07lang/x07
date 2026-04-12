@@ -4,6 +4,14 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+## v0.2.2
+
+### Fixed
+
+- `x07 check` now typechecks calls into imported builtin stdlib modules (for example `std.bytes.*`), so many former codegen `X07-INTERNAL-0001` failures become proper type diagnostics.
+- Unknown callee typos in imported modules now produce `X07-TYPE-CALL-0001` (type stage) instead of falling through into codegen errors.
+- Tool wrapper nondeterminism inference now marks `x07 init --template ...` flows as `meta.nondeterminism.uses_network=true` when they lock dependencies against a non-`file://` package index.
+
 ## v0.2.1
 
 ### Fixed

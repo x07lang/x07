@@ -205,7 +205,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-FMT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FMT-0001`. |
 | `X07-GENERICS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0001`. |
 | `X07-GENERICS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0002`. |
-| `X07-INTERNAL-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-INTERNAL-0001`. |
+| `X07-INTERNAL-0001` | x07 / lint / error | sometimes | Internal toolchain/compiler error. |
 | `X07-IO-READ-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-READ-0001`. |
 | `X07-IO-WRITE-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-WRITE-0001`. |
 | `X07-JSON-PARSE-0001` | x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-JSON-PARSE-0001`. |
@@ -230,8 +230,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-TOOL-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-ARGS-0001`. |
 | `X07-TOOL-EXEC-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-EXEC-0001`. |
 | `X07-TYPE-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-0001`. |
-| `X07-TYPE-CALL-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0001`. |
-| `X07-TYPE-CALL-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0002`. |
+| `X07-TYPE-CALL-0001` | x07c / type / error | sometimes | Unknown callee (function not found). |
+| `X07-TYPE-CALL-0002` | x07c / type / error | sometimes | Call argument type mismatch. |
 | `X07-TYPE-CALL-0003` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0003`. |
 | `X07-TYPE-COERCE-0001` | x07c / type / warning | sometimes | Implicit call-argument compat coercion occurred. |
 | `X07-TYPE-IF-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-IF-0001`. |
@@ -4425,7 +4425,7 @@ Agent strategy:
 
 ## `X07-INTERNAL-0001`
 
-Summary: Core lint/schema diagnostic `X07-INTERNAL-0001`.
+Summary: Internal toolchain/compiler error.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -4434,13 +4434,15 @@ Quickfix support: `sometimes`
 
 Details:
 
-The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+`X07-INTERNAL-0001` indicates an unexpected toolchain/compiler failure (an invariant violation or missing implementation).
+
+This should not be emitted for ordinary user type errors; if you see it from `x07 check`, please file a bug with a minimal repro.
 
 Agent strategy:
 
-- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
-- Apply deterministic AST/config edits.
-- Re-run compile/test.
+- Reduce to the smallest x07AST that reproduces the failure.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix` to rule out shape/schema issues.
+- Capture the machine report (`--json=pretty`) and toolchain version (`x07 --version`) when filing a bug.
 
 
 ## `X07-IO-READ-0001`
@@ -4930,7 +4932,7 @@ Agent strategy:
 
 ## `X07-TYPE-CALL-0001`
 
-Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0001`.
+Summary: Unknown callee (function not found).
 
 Origins:
 - x07c (stage: type, severity: error)
@@ -4939,18 +4941,21 @@ Quickfix support: `sometimes`
 
 Details:
 
-The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+The callee name is not present in the available type signatures (usually a typo, a missing import, or a missing export). `data.callee` is provided.
+
+This diagnostic applies to imported modules (including builtin stdlib modules such as `std.bytes.*` and `std.vec.*`).
 
 Agent strategy:
 
-- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
-- Apply deterministic AST/config edits.
-- Re-run compile/test.
+- Check the spelling of `data.callee`.
+- Ensure the defining module is imported and exports the symbol.
+- Use `x07 doc`/`x07 guide` to find the canonical function name and signature.
+- Re-run `x07 check`.
 
 
 ## `X07-TYPE-CALL-0002`
 
-Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0002`.
+Summary: Call argument type mismatch.
 
 Origins:
 - x07c (stage: type, severity: error)
@@ -4959,13 +4964,17 @@ Quickfix support: `sometimes`
 
 Details:
 
-The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+The argument type does not match the callee signature. The diagnostic includes:
+
+- `data.callee` (string)
+- `data.arg_index` (0-based)
+- `data.expected` (type)
+- `data.got` (type)
 
 Agent strategy:
 
-- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
-- Apply deterministic AST/config edits.
-- Re-run compile/test.
+- Adjust the argument expression, or insert an explicit conversion to the expected type.
+- Re-run `x07 check` (or `x07 run`) to confirm the type error is resolved.
 
 
 ## `X07-TYPE-CALL-0003`

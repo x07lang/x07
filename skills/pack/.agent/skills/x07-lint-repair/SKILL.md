@@ -29,6 +29,16 @@ Note: `x07 run`, `x07 build`, and `x07 bundle` run the same auto-repair loop by 
 
 Repeat (max 3 iterations). If still failing, stop and change strategy (reduce scope, regenerate the x07AST cleanly, or ask for clarification).
 
+## When you see `X07-INTERNAL-0001`
+
+`X07-INTERNAL-0001` indicates an unexpected toolchain/compiler failure. For `x07 check`, ordinary type mistakes (including common `std.*` call-site errors) should surface as `X07-TYPE-*` diagnostics.
+
+If `x07 check` emits `X07-INTERNAL-0001`:
+
+- Reduce to the smallest x07AST repro.
+- Capture the machine report (`--json=pretty`) and toolchain version (`x07 --version`).
+- File a bug with the repro + report.
+
 ## Migration (compat upgrades)
 
 If diagnostics indicate a compatibility or migration issue (for example `bytes`/`bytes_view` coercions or recursion termination boilerplate in older code), prefer deterministic rewrites:
