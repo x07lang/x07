@@ -56,6 +56,8 @@ x07 init
 x07 run
 ```
 
+For offline-first workflows, forbid network access during dependency hydration with `x07 run --offline` or `X07_OFFLINE=1` (and use `x07 pkg tree` to inspect the resolved lockfile closure).
+
 `x07 run` is the canonical entrypoint for the agent loop. When you need explicit control over individual steps, the core commands are:
 
 ```bash

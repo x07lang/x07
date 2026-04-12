@@ -671,7 +671,12 @@ fn infer_nondeterminism(scope: Option<&str>, argv: &[OsString]) -> reporting::No
     };
 
     if scope == "pkg" || scope.starts_with("pkg.") {
-        let mut offline = false;
+        if scope == "pkg.tree" {
+            nd.uses_network = false;
+            return nd;
+        }
+
+        let mut offline = crate::util::x07_offline_enabled();
         let mut file_registry = false;
 
         let mut i = 0usize;
@@ -705,6 +710,11 @@ fn infer_nondeterminism(scope: Option<&str>, argv: &[OsString]) -> reporting::No
     }
 
     if scope == "init" || scope.starts_with("init.") {
+        if crate::util::x07_offline_enabled() {
+            nd.uses_network = false;
+            return nd;
+        }
+
         let mut template: Option<String> = None;
 
         let mut i = 0usize;
@@ -740,6 +750,28 @@ fn infer_nondeterminism(scope: Option<&str>, argv: &[OsString]) -> reporting::No
             let raw = index.strip_prefix("sparse+").unwrap_or(index.as_str());
             nd.uses_network = !raw.trim_start().starts_with("file://");
         }
+    }
+
+    if scope == "run" || scope.starts_with("run.") {
+        let mut offline = crate::util::x07_offline_enabled();
+
+        let mut i = 0usize;
+        while i < argv.len() {
+            let tok = argv[i].to_string_lossy();
+            if tok == "--offline" {
+                offline = true;
+            }
+            i += 1;
+        }
+
+        if offline {
+            nd.uses_network = false;
+            return nd;
+        }
+
+        let index = std::env::var("X07_PKG_INDEX_URL").ok().unwrap_or_default();
+        let raw = index.strip_prefix("sparse+").unwrap_or(index.as_str());
+        nd.uses_network = !raw.trim_start().starts_with("file://");
     }
 
     nd

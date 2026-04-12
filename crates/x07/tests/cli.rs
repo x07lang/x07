@@ -2420,6 +2420,112 @@ fn x07_run_project_accepts_dir_path() {
 }
 
 #[test]
+fn x07_run_project_with_only_path_deps_does_not_require_registry() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_project_path_deps_no_registry");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let pkg_dir = dir.join("pkgs/local/1.0.0");
+    write_minimal_pkg_manifest(&pkg_dir, "local", "1.0.0", &[]);
+    std::fs::create_dir_all(pkg_dir.join("modules")).expect("create module_root dir");
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"local","version":"1.0.0","path":"pkgs/local/1.0.0"}),
+        ]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let lock_path = dir.join("x07.lock.json");
+    if lock_path.is_file() {
+        std::fs::remove_file(&lock_path).expect("remove old lockfile");
+    }
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let unreachable_index = "sparse+http://127.0.0.1:1/index/";
+
+    // Path-only deps should not require consulting the registry index, even when the lockfile is
+    // missing and dependency hydration runs.
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env("X07_PKG_INDEX_URL", unreachable_index)
+        .args([
+            "run",
+            "--project",
+            ".",
+            "--report",
+            "wrapped",
+            "--cpu-time-limit-seconds",
+            "30",
+        ])
+        .output()
+        .expect("run x07");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07_RUN_REPORT_SCHEMA_VERSION);
+    assert!(lock_path.is_file(), "expected lockfile to be created");
+
+    std::fs::remove_file(&lock_path).expect("remove lockfile");
+
+    // `--offline` should also work for path-only projects (and still should not consult the
+    // registry index).
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env("X07_PKG_INDEX_URL", unreachable_index)
+        .args([
+            "run",
+            "--project",
+            ".",
+            "--offline",
+            "--report",
+            "wrapped",
+            "--cpu-time-limit-seconds",
+            "30",
+        ])
+        .output()
+        .expect("run x07 --offline");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07_RUN_REPORT_SCHEMA_VERSION);
+    assert!(lock_path.is_file(), "expected lockfile to be created");
+}
+
+#[test]
 fn x07_run_contract_violation_emits_repro() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_run_contract_repro");
@@ -9850,6 +9956,116 @@ fn x07_pkg_lock_check_fails_on_advisories() {
 }
 
 #[test]
+fn x07_pkg_tree_outputs_deterministic_graph() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_tree_deterministic");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("a/1.0.0"), "a", "1.0.0", &["b@1.0.0"]);
+    write_minimal_pkg_manifest(&deps_root.join("b/1.0.0"), "b", "1.0.0", &["c@1.0.0"]);
+    write_minimal_pkg_manifest(&deps_root.join("c/1.0.0"), "c", "1.0.0", &[]);
+
+    let proj_path = dir.join("x07.json");
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+            "world": "solve-pure",
+            "entry": "src/main.x07.json",
+            "module_roots": ["src"],
+            "dependencies": [
+                {"name":"a","version":"1.0.0","path":".x07/deps/a/1.0.0"},
+                {"name":"b","version":"1.0.0","path":".x07/deps/b/1.0.0"},
+                {"name":"c","version":"1.0.0","path":".x07/deps/c/1.0.0"}
+            ]
+        }))
+        .expect("serialize x07.json")
+        .as_slice(),
+    );
+
+    let manifest = project::load_project_manifest(&proj_path).expect("load project manifest");
+    let lock = project::compute_lockfile(&proj_path, &manifest).expect("compute lockfile");
+    let lock_path = project::default_lockfile_path(&proj_path, &manifest);
+    write_bytes(
+        &lock_path,
+        serde_json::to_vec_pretty(&lock)
+            .expect("serialize x07.lock.json")
+            .as_slice(),
+    );
+
+    let out1 = run_x07_in_dir(&dir, &["pkg", "tree", "--project", "x07.json"]);
+    assert_eq!(
+        out1.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out1.stderr),
+        String::from_utf8_lossy(&out1.stdout)
+    );
+    let report = parse_json_stdout(&out1);
+    assert_eq!(report["schema_version"], "x07.pkg.tree.report@0.1.0");
+    assert_eq!(report["ok"], true);
+
+    let nodes = report["nodes"].as_array().expect("nodes[]");
+    let project_node = nodes
+        .iter()
+        .find(|n| n["kind"] == "project")
+        .expect("project node");
+    let declared = project_node["declared_module_roots"]
+        .as_array()
+        .expect("declared_module_roots[]");
+    assert!(!declared.is_empty(), "expected declared module roots");
+    let resolved = project_node["resolved_module_roots"]
+        .as_array()
+        .expect("resolved_module_roots[]");
+    assert!(!resolved.is_empty(), "expected resolved module roots");
+    let expected_src = dir.join("src").display().to_string();
+    assert!(
+        resolved
+            .iter()
+            .any(|r| r.as_str() == Some(expected_src.as_str())),
+        "expected resolved_module_roots to contain {expected_src}, got:\n{}",
+        serde_json::to_string_pretty(project_node).unwrap()
+    );
+
+    let edges = report["edges"].as_array().expect("edges[]");
+    assert!(
+        edges
+            .iter()
+            .any(|e| { e["kind"] == "requires" && e["from"] == "a@1.0.0" && e["to"] == "b@1.0.0" }),
+        "missing requires edge a -> b"
+    );
+    assert!(
+        edges
+            .iter()
+            .any(|e| { e["kind"] == "requires" && e["from"] == "b@1.0.0" && e["to"] == "c@1.0.0" }),
+        "missing requires edge b -> c"
+    );
+    assert!(
+        edges
+            .iter()
+            .any(|e| e["kind"] == "root" && e["from"] == "project" && e["to"] == "a@1.0.0"),
+        "missing root edge project -> a"
+    );
+
+    let out2 = run_x07_in_dir(&dir, &["pkg", "tree", "--project", "x07.json"]);
+    assert_eq!(
+        out2.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out2.stderr),
+        String::from_utf8_lossy(&out2.stdout)
+    );
+    assert_eq!(
+        out1.stdout, out2.stdout,
+        "pkg tree output changed between identical runs"
+    );
+}
+
+#[test]
 fn x07_pkg_lock_offline_patch_requires_dep_present() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_offline_patch_present");
@@ -9900,6 +10116,33 @@ fn x07_pkg_lock_offline_patch_requires_dep_present() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
     assert_eq!(v["error"]["code"], "X07PKG_OFFLINE_MISSING_DEP");
+    let msg = v["error"]["message"]
+        .as_str()
+        .unwrap_or("<missing error.message>");
+    assert!(
+        msg.contains("missing:"),
+        "expected missing list in error.message, got:\n{msg}"
+    );
+    assert!(
+        msg.contains("c@1.0.1"),
+        "expected missing spec in error.message, got:\n{msg}"
+    );
+    assert!(
+        msg.contains(".x07/deps/c/1.0.1"),
+        "expected missing path in error.message, got:\n{msg}"
+    );
+    assert!(
+        msg.contains("x07 pkg lock --project"),
+        "expected next-step hint in error.message, got:\n{msg}"
+    );
+    assert!(
+        msg.contains("--offline"),
+        "expected offline hint in error.message, got:\n{msg}"
+    );
+    assert!(
+        msg.contains("X07_OFFLINE=1"),
+        "expected env offline hint in error.message, got:\n{msg}"
+    );
 
     let after = std::fs::read(&proj_path).expect("read x07.json after failed lock");
     assert_eq!(

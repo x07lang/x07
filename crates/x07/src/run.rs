@@ -64,6 +64,13 @@ pub struct RunArgs {
     #[arg(long, value_name = "COMPAT")]
     pub compat: Option<String>,
 
+    /// Disallow network access when hydrating project dependencies.
+    ///
+    /// This affects `x07 pkg lock` behavior during dependency hydration. It does not modify the
+    /// runtime's OS-world networking policy.
+    #[arg(long)]
+    pub offline: bool,
+
     /// Force runner selection.
     #[arg(long, value_enum, conflicts_with_all = ["host", "os"], hide = true)]
     pub runner: Option<RunnerMode>,
@@ -268,11 +275,15 @@ pub fn cmd_run(
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     let (target_kind, target_path, project_manifest) = resolve_target(&cwd, &args)?;
+    let effective_offline = args.offline || crate::util::x07_offline_enabled();
 
     if target_kind == TargetKind::Project {
         if let Some(project_path) = project_manifest.as_ref() {
-            let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.clone())
-                .context("hydrate project deps")?;
+            let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(
+                project_path.clone(),
+                effective_offline,
+            )
+            .context("hydrate project deps")?;
             if hydrated {
                 eprintln!(
                     "x07 run: hydrated project dependencies via `x07 pkg lock --project {}`",
@@ -633,7 +644,7 @@ pub fn cmd_run(
             let module_roots = if !args.module_root.is_empty() {
                 args.module_root.clone()
             } else {
-                infer_program_module_roots(program, project_manifest.as_deref())?
+                infer_program_module_roots(program, project_manifest.as_deref(), effective_offline)?
             };
             for root in module_roots {
                 argv.push("--module-root".to_string());
@@ -658,6 +669,7 @@ pub fn cmd_run(
 
     let can_auto_deps = target_kind == TargetKind::Project
         && args.repair.repair != RepairMode::Off
+        && !effective_offline
         && std::env::var_os(AUTO_DEPS_ENV).is_none();
 
     let mut output = run_runner(false)?;
@@ -1411,9 +1423,11 @@ fn project_lockfile_path(project_path: &Path) -> Result<PathBuf> {
 
 fn try_collect_project_module_roots(
     project_path: &Path,
+    offline: bool,
 ) -> Result<Option<(PathBuf, Vec<PathBuf>)>> {
-    let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf())
-        .context("hydrate project deps")?;
+    let hydrated =
+        crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf(), offline)
+            .context("hydrate project deps")?;
     if hydrated {
         eprintln!(
             "x07 run: hydrated project dependencies via `x07 pkg lock --project {}`",
@@ -1440,9 +1454,10 @@ fn try_collect_project_module_roots(
 fn infer_program_module_roots(
     program: &Path,
     project_manifest: Option<&Path>,
+    offline: bool,
 ) -> Result<Vec<PathBuf>> {
     if let Some(project_path) = project_manifest {
-        if let Ok(Some((_lock, roots))) = try_collect_project_module_roots(project_path) {
+        if let Ok(Some((_lock, roots))) = try_collect_project_module_roots(project_path, offline) {
             return Ok(roots);
         }
     }
@@ -1453,7 +1468,7 @@ fn infer_program_module_roots(
         .unwrap_or_else(|| Path::new("."));
     let found = discover_project_manifest(base)?;
     if let Some(project_path) = found.as_deref() {
-        if let Ok(Some((_lock, roots))) = try_collect_project_module_roots(project_path) {
+        if let Ok(Some((_lock, roots))) = try_collect_project_module_roots(project_path, offline) {
             return Ok(roots);
         }
     }
@@ -1469,13 +1484,14 @@ fn resolve_module_roots_for_wrapper(
     args: &RunArgs,
     runner_bin: &Path,
 ) -> Result<Vec<PathBuf>> {
+    let offline = args.offline || crate::util::x07_offline_enabled();
     match target_kind {
         TargetKind::Artifact => Ok(Vec::new()),
         TargetKind::Program => {
             let mut roots = if !args.module_root.is_empty() {
                 args.module_root.clone()
             } else {
-                infer_program_module_roots(target_path, project_manifest)?
+                infer_program_module_roots(target_path, project_manifest, offline)?
             };
             if runner == RunnerKind::Os {
                 append_unique(&mut roots, default_os_module_roots_best_effort(runner_bin));
@@ -1486,7 +1502,7 @@ fn resolve_module_roots_for_wrapper(
             let mut roots = Vec::new();
             if let Some(project_path) = project_manifest {
                 if let Ok(Some((_lock, project_roots))) =
-                    try_collect_project_module_roots(project_path)
+                    try_collect_project_module_roots(project_path, offline)
                 {
                     roots = project_roots;
                 } else if let Ok(manifest) = project::load_project_manifest(project_path) {

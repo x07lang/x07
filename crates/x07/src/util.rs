@@ -7,6 +7,27 @@ use sha2::{Digest, Sha256};
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) const ENV_X07_COMPAT: &str = "X07_COMPAT";
+pub(crate) const ENV_X07_OFFLINE: &str = "X07_OFFLINE";
+
+pub(crate) fn parse_env_flag(raw: &str) -> bool {
+    let v = raw.trim();
+    if v.is_empty() {
+        return false;
+    }
+    match v.to_ascii_lowercase().as_str() {
+        "0" | "false" | "no" | "off" => false,
+        "1" | "true" | "yes" | "on" => true,
+        _ => true,
+    }
+}
+
+pub(crate) fn env_flag_enabled(name: &str) -> bool {
+    std::env::var(name).ok().is_some_and(|v| parse_env_flag(&v))
+}
+
+pub(crate) fn x07_offline_enabled() -> bool {
+    env_flag_enabled(ENV_X07_OFFLINE)
+}
 
 pub(crate) fn resolve_compat(
     cli: Option<&str>,
@@ -238,5 +259,26 @@ fn nybble_to_hex(n: u8) -> char {
         0..=9 => (b'0' + n) as char,
         10..=15 => (b'a' + (n - 10)) as char,
         _ => '0',
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_env_flag_handles_common_forms() {
+        assert!(!parse_env_flag(""));
+        assert!(!parse_env_flag("  "));
+
+        for v in ["1", "true", "TRUE", "yes", "on", "  on  "] {
+            assert!(parse_env_flag(v), "expected {v:?} true");
+        }
+        for v in ["0", "false", "FALSE", "no", "off", "  off  "] {
+            assert!(!parse_env_flag(v), "expected {v:?} false");
+        }
+
+        assert!(parse_env_flag("anything"));
+        assert!(parse_env_flag("2"));
     }
 }

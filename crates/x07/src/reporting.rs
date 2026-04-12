@@ -420,6 +420,7 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "list",
             "pack",
             "lock",
+            "tree",
             "repair",
             "attest-closure",
             "provides",

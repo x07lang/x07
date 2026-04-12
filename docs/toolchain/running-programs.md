@@ -11,6 +11,21 @@ Exactly one target mode is used:
 - `x07 run --program path/to/main.x07.json`: compile+run a single file (module roots are inferred unless `--module-root` is provided).
 - `x07 run --artifact path/to/exe`: run a precompiled executable (run-os only; runner output only; no project metadata).
 
+## Project dependencies and offline runs
+
+When targeting a project (`x07 run` / `--project ...`), `x07 run` resolves module roots from `x07.json` + `x07.lock.json` and may hydrate missing dependencies by running `x07 pkg lock` internally.
+
+To forbid network access during that dependency hydration step:
+
+- `x07 run --offline ...`
+- `X07_OFFLINE=1 x07 run ...`
+
+Notes:
+
+- `--offline` / `X07_OFFLINE=1` applies to dependency hydration only; it does not change the runtime's OS-world networking policy.
+- Projects with only local `path` dependencies that are already present on disk do not need to consult the registry index to lock/run.
+- For closure visibility and debugging, use `x07 pkg tree --project x07.json`.
+
 ## Auto-repair (default)
 
 By default, `x07 run` performs a bounded repair loop on the entry program before compiling:

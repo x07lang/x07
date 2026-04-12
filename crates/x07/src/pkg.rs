@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -22,6 +22,7 @@ static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) const DEFAULT_INDEX_URL: &str = x07_contracts::X07_PKG_DEFAULT_INDEX_URL;
 const PKG_PROVIDES_REPORT_SCHEMA_VERSION: &str = "x07.pkg.provides.report@0.1.0";
+const PKG_TREE_REPORT_SCHEMA_VERSION: &str = "x07.pkg.tree.report@0.1.0";
 const X07_DEP_CLOSURE_ATTEST_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-dep.closure.attest.schema.json");
 
@@ -161,7 +162,7 @@ fn resolve_pkg_registry_and_offline(
 ) -> Result<(ResolvedRegistry, bool)> {
     let cfg = load_pkg_config(base)?;
     let registry = resolve_registry_url(cli_index, &cfg);
-    let offline = cli_offline || cfg.offline.unwrap_or(false);
+    let offline = cli_offline || cfg.offline.unwrap_or(false) || crate::util::x07_offline_enabled();
     Ok((registry, offline))
 }
 
@@ -256,6 +257,8 @@ pub enum PkgCommand {
     Pack(PackArgs),
     /// Resolve project dependencies and write `x07.lock.json`.
     Lock(LockArgs),
+    /// Print a deterministic dependency graph for the resolved lockfile closure.
+    Tree(TreeArgs),
     /// Repair an existing lockfile after a toolchain upgrade.
     Repair(RepairArgs),
     /// Emit a dependency-closure attestation from `x07.json` + `x07.lock.json`.
@@ -402,6 +405,13 @@ pub struct LockArgs {
     /// When using `--check`, allow dependencies with active advisories.
     #[arg(long)]
     pub allow_advisories: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct TreeArgs {
+    /// Project manifest path (`x07.json`).
+    #[arg(long, value_name = "PATH", default_value = "x07.json")]
+    pub project: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -655,6 +665,7 @@ pub fn cmd_pkg(
         PkgCommand::List(args) => cmd_pkg_list(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(machine, args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
+        PkgCommand::Tree(args) => cmd_pkg_tree(args),
         PkgCommand::Repair(args) => cmd_pkg_repair(args),
         PkgCommand::AttestClosure(args) => cmd_pkg_attest_closure(args),
         PkgCommand::Provides(args) => cmd_pkg_provides(args),
@@ -679,6 +690,406 @@ struct ProvidesReport {
     ok: bool,
     module_id: String,
     providers: Vec<ProvidesProvider>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+enum TreeNode {
+    Project {
+        id: String,
+        declared_module_roots: Vec<String>,
+        resolved_module_roots: Vec<String>,
+    },
+    Package {
+        id: String,
+        name: String,
+        version: String,
+        path: String,
+        module_root: String,
+        module_root_dir: String,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct TreeEdge {
+    kind: &'static str,
+    from: String,
+    to: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TreeMissing {
+    required_by: String,
+    name: String,
+    version: String,
+    path: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TreeError {
+    code: String,
+    message: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TreeReport {
+    schema_version: &'static str,
+    ok: bool,
+    project_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lockfile_path: Option<String>,
+    nodes: Vec<TreeNode>,
+    edges: Vec<TreeEdge>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    missing: Vec<TreeMissing>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<TreeError>,
+}
+
+fn cmd_pkg_tree(args: TreeArgs) -> Result<std::process::ExitCode> {
+    let project_path = util::resolve_existing_path_upwards(&args.project);
+    let project_path_display = project_path.display().to_string();
+
+    let manifest = match project::load_project_manifest(&project_path) {
+        Ok(m) => m,
+        Err(err) => {
+            let report = TreeReport {
+                schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                ok: false,
+                project_path: project_path_display,
+                lockfile_path: None,
+                nodes: Vec::new(),
+                edges: Vec::new(),
+                missing: Vec::new(),
+                error: Some(TreeError {
+                    code: "X07PKG_TREE_PROJECT".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let lock_path = project::default_lockfile_path(&project_path, &manifest);
+    let lock_path_display = lock_path.display().to_string();
+
+    let lock_bytes = match std::fs::read(&lock_path) {
+        Ok(bytes) => bytes,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            let report = TreeReport {
+                schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                ok: false,
+                project_path: project_path_display,
+                lockfile_path: Some(lock_path_display),
+                nodes: Vec::new(),
+                edges: Vec::new(),
+                missing: Vec::new(),
+                error: Some(TreeError {
+                    code: "X07PKG_TREE_LOCK_MISSING".to_string(),
+                    message: format!(
+                        "missing lockfile: {} (hint: run `x07 pkg lock --project {}`)",
+                        lock_path.display(),
+                        project_path.display()
+                    ),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+        Err(err) => {
+            let report = TreeReport {
+                schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                ok: false,
+                project_path: project_path_display,
+                lockfile_path: Some(lock_path_display),
+                nodes: Vec::new(),
+                edges: Vec::new(),
+                missing: Vec::new(),
+                error: Some(TreeError {
+                    code: "X07PKG_TREE_LOCK_READ".to_string(),
+                    message: format!("read lockfile: {}: {err}", lock_path.display()),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    let lock: project::Lockfile = match serde_json::from_slice(&lock_bytes) {
+        Ok(lock) => lock,
+        Err(err) => {
+            let report = TreeReport {
+                schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                ok: false,
+                project_path: project_path_display,
+                lockfile_path: Some(lock_path_display),
+                nodes: Vec::new(),
+                edges: Vec::new(),
+                missing: Vec::new(),
+                error: Some(TreeError {
+                    code: "X07PKG_TREE_LOCK_PARSE".to_string(),
+                    message: format!("parse lockfile JSON: {}: {err}", lock_path.display()),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    if let Err(err) = project::verify_lockfile(&project_path, &manifest, &lock) {
+        let report = TreeReport {
+            schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+            ok: false,
+            project_path: project_path_display,
+            lockfile_path: Some(lock_path_display),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            missing: Vec::new(),
+            error: Some(TreeError {
+                code: "X07PKG_TREE_LOCK_VERIFY".to_string(),
+                message: format!("{err:#}"),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let mut nodes: Vec<TreeNode> = Vec::new();
+    let resolved_module_roots = match project::collect_module_roots(&project_path, &manifest, &lock)
+    {
+        Ok(roots) => roots.into_iter().map(|p| p.display().to_string()).collect(),
+        Err(err) => {
+            let report = TreeReport {
+                schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                ok: false,
+                project_path: project_path_display,
+                lockfile_path: Some(lock_path_display),
+                nodes: Vec::new(),
+                edges: Vec::new(),
+                missing: Vec::new(),
+                error: Some(TreeError {
+                    code: "X07PKG_TREE_MODULE_ROOTS".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+    nodes.push(TreeNode::Project {
+        id: "project".to_string(),
+        declared_module_roots: manifest.module_roots.clone(),
+        resolved_module_roots,
+    });
+
+    let mut packages: Vec<&project::LockedDependency> = lock.dependencies.iter().collect();
+    packages.sort_by(|a, b| {
+        (
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+            a.module_root.as_str(),
+        )
+            .cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+                b.module_root.as_str(),
+            ))
+    });
+
+    let mut pkg_ids: BTreeMap<(String, String), String> = BTreeMap::new();
+    for dep in &packages {
+        let id = format!("{}@{}", dep.name, dep.version);
+        let dep_dir = match project::resolve_rel_path_with_workspace(base, &dep.path) {
+            Ok(dir) => dir,
+            Err(err) => {
+                let report = TreeReport {
+                    schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                    ok: false,
+                    project_path: project_path_display,
+                    lockfile_path: Some(lock_path_display),
+                    nodes,
+                    edges: Vec::new(),
+                    missing: Vec::new(),
+                    error: Some(TreeError {
+                        code: "X07PKG_TREE_DEP_PATH".to_string(),
+                        message: format!(
+                            "resolve dependency path for {id}: {err:#} (path {:?})",
+                            dep.path
+                        ),
+                    }),
+                };
+                println!("{}", serde_json::to_string(&report)?);
+                return Ok(std::process::ExitCode::from(20));
+            }
+        };
+        let module_root_dir = dep_dir.join(&dep.module_root).display().to_string();
+        pkg_ids.insert((dep.name.clone(), dep.version.clone()), id.clone());
+        nodes.push(TreeNode::Package {
+            id,
+            name: dep.name.clone(),
+            version: dep.version.clone(),
+            path: dep.path.clone(),
+            module_root: dep.module_root.clone(),
+            module_root_dir,
+        });
+    }
+
+    let mut edges: Vec<TreeEdge> = Vec::new();
+    let mut missing: Vec<TreeMissing> = Vec::new();
+    let mut required_by_other: BTreeSet<String> = BTreeSet::new();
+
+    for dep in &packages {
+        let from = format!("{}@{}", dep.name, dep.version);
+        let dep_dir = match project::resolve_rel_path_with_workspace(base, &dep.path) {
+            Ok(dir) => dir,
+            Err(err) => {
+                let report = TreeReport {
+                    schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                    ok: false,
+                    project_path: project_path_display,
+                    lockfile_path: Some(lock_path_display),
+                    nodes,
+                    edges,
+                    missing,
+                    error: Some(TreeError {
+                        code: "X07PKG_TREE_DEP_PATH".to_string(),
+                        message: format!(
+                            "resolve dependency path for {from}: {err:#} (path {:?})",
+                            dep.path
+                        ),
+                    }),
+                };
+                println!("{}", serde_json::to_string(&report)?);
+                return Ok(std::process::ExitCode::from(20));
+            }
+        };
+
+        let reqs = match requires_packages_from_manifest(&dep_dir) {
+            Ok(reqs) => reqs,
+            Err(err) => {
+                let report = TreeReport {
+                    schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                    ok: false,
+                    project_path: project_path_display,
+                    lockfile_path: Some(lock_path_display),
+                    nodes,
+                    edges,
+                    missing,
+                    error: Some(TreeError {
+                        code: "X07PKG_TREE_DEP_MANIFEST".to_string(),
+                        message: format!("read package manifest for {from}: {err:#}"),
+                    }),
+                };
+                println!("{}", serde_json::to_string(&report)?);
+                return Ok(std::process::ExitCode::from(20));
+            }
+        };
+
+        for spec in reqs {
+            let (name, version) = match parse_pkg_spec(&spec) {
+                Ok(parsed) => parsed,
+                Err(err) => {
+                    let report = TreeReport {
+                        schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+                        ok: false,
+                        project_path: project_path_display,
+                        lockfile_path: Some(lock_path_display),
+                        nodes,
+                        edges,
+                        missing,
+                        error: Some(TreeError {
+                            code: "X07PKG_TREE_REQUIRES_INVALID".to_string(),
+                            message: format!(
+                                "invalid meta.requires_packages entry {spec:?} in {from}: {err:#}"
+                            ),
+                        }),
+                    };
+                    println!("{}", serde_json::to_string(&report)?);
+                    return Ok(std::process::ExitCode::from(20));
+                }
+            };
+            let (version, path) = apply_patch_override(&name, &version, &manifest.patch);
+            let to = format!("{name}@{version}");
+            required_by_other.insert(to.clone());
+            if pkg_ids.contains_key(&(name.clone(), version.clone())) {
+                edges.push(TreeEdge {
+                    kind: "requires",
+                    from: from.clone(),
+                    to,
+                });
+            } else {
+                missing.push(TreeMissing {
+                    required_by: from.clone(),
+                    name,
+                    version,
+                    path,
+                });
+            }
+        }
+    }
+
+    let mut roots: Vec<String> = Vec::new();
+    for dep in &manifest.dependencies {
+        let id = format!("{}@{}", dep.name, dep.version);
+        if pkg_ids.contains_key(&(dep.name.clone(), dep.version.clone()))
+            && !required_by_other.contains(&id)
+        {
+            roots.push(id);
+        }
+    }
+    roots.sort();
+    roots.dedup();
+
+    for id in roots {
+        edges.push(TreeEdge {
+            kind: "root",
+            from: "project".to_string(),
+            to: id,
+        });
+    }
+
+    edges.sort_by(|a, b| {
+        (a.kind, a.from.as_str(), a.to.as_str()).cmp(&(b.kind, b.from.as_str(), b.to.as_str()))
+    });
+    missing.sort_by(|a, b| {
+        (
+            a.required_by.as_str(),
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+        )
+            .cmp(&(
+                b.required_by.as_str(),
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+            ))
+    });
+
+    let ok = missing.is_empty();
+    let report = TreeReport {
+        schema_version: PKG_TREE_REPORT_SCHEMA_VERSION,
+        ok,
+        project_path: project_path_display,
+        lockfile_path: Some(lock_path_display),
+        nodes,
+        edges,
+        missing,
+        error: None,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(20)
+    })
 }
 
 fn cmd_pkg_provides(args: ProvidesArgs) -> Result<std::process::ExitCode> {
@@ -1882,7 +2293,10 @@ pub(crate) fn pkg_add_sync_quiet(
     anyhow::bail!("{msg}");
 }
 
-pub(crate) fn ensure_project_deps_hydrated_quiet(project: PathBuf) -> Result<bool> {
+pub(crate) fn ensure_project_deps_hydrated_quiet(
+    project: PathBuf,
+    force_offline: bool,
+) -> Result<bool> {
     let check_args = LockArgs {
         project: project.clone(),
         index: None,
@@ -1918,7 +2332,7 @@ pub(crate) fn ensure_project_deps_hydrated_quiet(project: PathBuf) -> Result<boo
         index: None,
         check: false,
         lock_version: "0.4".to_string(),
-        offline: false,
+        offline: force_offline,
         allow_yanked: false,
         allow_advisories: false,
     };
@@ -2473,12 +2887,14 @@ fn build_dep_closure_attestation(
     let cfg = load_pkg_config(base)?;
     let registry = resolve_registry_url(args.index.as_deref(), &cfg);
     let index = registry.url;
+    let offline =
+        args.offline || cfg.offline.unwrap_or(false) || crate::util::x07_offline_enabled();
     let lock_args = LockArgs {
         project: project_path.clone(),
         index: args.index.clone(),
         check: false,
         lock_version: "0.4".to_string(),
-        offline: args.offline,
+        offline,
         allow_yanked: args.allow_yanked,
         allow_advisories: args.allow_advisories,
     };
@@ -4817,9 +5233,20 @@ fn ensure_deps_present(
     }
 
     if ctx.args.offline {
+        let mut missing_specs: Vec<String> = missing
+            .iter()
+            .map(|dep| format!("{}@{} ({})", dep.name, dep.version, dep.path))
+            .collect();
+        missing_specs.sort();
+        missing_specs.dedup();
+
+        let hint_project = ctx.args.project.display();
         return Ok(Some(PkgError {
             code: "X07PKG_OFFLINE_MISSING_DEP".to_string(),
-            message: format!("{} missing dependencies (offline mode)", missing.len()),
+            message: format!(
+                "offline mode requires vendored dependencies to be present on disk; missing: {}. Hint: hydrate deps with `x07 pkg lock --project {hint_project}` (allowing network if needed) and then rerun with `--offline` (or set X07_OFFLINE=1).",
+                missing_specs.join(", ")
+            ),
         }));
     }
 
@@ -4836,8 +5263,9 @@ fn ensure_deps_present(
                 return Ok(Some(PkgError {
                     code: "X07PKG_INDEX_FETCH".to_string(),
                     message: format!(
-                        "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                        "fetch index entries for {:?}: {err:#} (hint: this was needed because {:?}@{:?} is missing on disk; rerun with --offline (or X07_OFFLINE=1) to forbid network, or run `x07 pkg lock --project {}` to hydrate deps first)",
                         dep.name
+                        , dep.name, dep.version, ctx.args.project.display()
                     ),
                 }))
             }
@@ -4875,8 +5303,9 @@ fn ensure_deps_present(
             return Ok(Some(PkgError {
                 code: "X07PKG_DOWNLOAD_FAILED".to_string(),
                 message: format!(
-                    "download {:?}@{:?}: {err:#} (hint: check network access and index URL)",
+                    "download {:?}@{:?}: {err:#} (hint: this was needed because {:?}@{:?} is missing on disk; rerun with --offline (or X07_OFFLINE=1) to forbid network, or run `x07 pkg lock --project {}` to hydrate deps first)",
                     dep.name, dep.version
+                    , dep.name, dep.version, ctx.args.project.display()
                 ),
             }));
         }

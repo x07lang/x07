@@ -4,6 +4,16 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+### Added
+
+- `x07 run --offline` (and `X07_OFFLINE=1`) to forbid network access during dependency hydration (the implicit `x07 pkg lock` step).
+- `x07 pkg tree` for a deterministic dependency-closure graph from `x07.json` + `x07.lock.json`, including declared and resolved module roots.
+
+### Fixed
+
+- Dependency hydration and packaging errors now include more actionable next steps (including `--offline` / `X07_OFFLINE=1` guidance when the index would otherwise be consulted).
+- Tool wrapper scope detection now recognizes `pkg tree` as `pkg.tree` (schema discovery and nondeterminism inference).
+
 ## v0.2.2
 
 ### Fixed

@@ -408,6 +408,7 @@ See: [State machines](state-machines.md).
 - `x07 pkg versions <name>`
 - `x07 pkg versions <name> --refresh`
 - `x07 pkg lock --project x07.json`
+- `x07 pkg tree --project x07.json`
 - `x07 pkg attest-closure --project x07.json --out <path>`
 - `x07 pkg provides <module-id>`
 - `x07 pkg pack --package <dir> --out <path>`
@@ -419,6 +420,8 @@ Notes:
 - `x07 pkg add <name>@<version>` edits `x07.json` only (no network) unless you pass `--sync`.
 - `x07 pkg add <name>` consults the index to resolve a version (network unless you use a file-based index).
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
+- `X07_OFFLINE=1` is equivalent to passing `--offline` for `x07 pkg` commands that support offline mode.
+- `x07 pkg tree` prints a deterministic dependency graph from `x07.json` + `x07.lock.json` (and never consults the registry index).
 - `x07 pkg attest-closure` emits `x07.dep.closure.attest@0.1.0` and exits with code `20` when the closure is materialized but yanked/advisory policy fails.
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
@@ -475,6 +478,11 @@ Use `x07 run` as the canonical entry point for execution. Prefer intent-driven p
 - `x07 run --repair=write` (default)
 
 For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes `x07.runtime.attest@0.2.0` and records the reference in the runner and wrapped reports.
+
+To forbid network access during dependency hydration (the implicit `x07 pkg lock` step), use:
+
+- `x07 run --offline`
+- `X07_OFFLINE=1 x07 run ...`
 
 For the complete guide (targets, worlds, input, policies, reports), see [Running programs](running-programs.md).
 

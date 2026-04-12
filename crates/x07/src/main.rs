@@ -476,6 +476,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::List(_)) => vec!["pkg", "list"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
+                Some(pkg::PkgCommand::Tree(_)) => vec!["pkg", "tree"],
                 Some(pkg::PkgCommand::Repair(_)) => vec!["pkg", "repair"],
                 Some(pkg::PkgCommand::AttestClosure(_)) => vec!["pkg", "attest-closure"],
                 Some(pkg::PkgCommand::Provides(_)) => vec!["pkg", "provides"],
@@ -787,8 +788,11 @@ fn compute_test_module_roots(
         return Ok(vec![manifest_dir.clone()]);
     }
 
-    let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.clone())
-        .context("hydrate project deps")?;
+    let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(
+        project_path.clone(),
+        util::x07_offline_enabled(),
+    )
+    .context("hydrate project deps")?;
     if hydrated {
         eprintln!(
             "x07 test: hydrated project dependencies via `x07 pkg lock --project {}`",

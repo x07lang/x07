@@ -4,6 +4,7 @@ This directory is a standalone X07 project that demonstrates:
 
 - multi-module compilation via `(import ...)`
 - a local path dependency package (with a lockfile)
+- offline-first dependency hydration (`x07 run --offline`, `X07_OFFLINE=1`)
 - using `x07 build` to compile to C
 
 ## Files
@@ -19,5 +20,7 @@ This directory is a standalone X07 project that demonstrates:
 From repo root:
 
 - Regenerate lockfile: `x07 pkg lock --project docs/examples/project-multi-module/x07.json`
+- Inspect the resolved closure: `x07 pkg tree --project docs/examples/project-multi-module/x07.json`
 - Compile to C: `x07 build --project docs/examples/project-multi-module/x07.json --out target/project-multi-module/example.c`
 - Compile+run: `printf '' | x07 run --repair=off --project docs/examples/project-multi-module/x07.json --stdin`
+- Compile+run with offline deps: `printf '' | x07 run --repair=off --offline --project docs/examples/project-multi-module/x07.json --stdin`

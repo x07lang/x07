@@ -1,10 +1,18 @@
 # Offline Workflows (Pkg + Registry Mirrors)
 
-This guide covers using `x07 pkg` in environments without network access (CI sandboxes, offline agents) using a local `file://` sparse index mirror and pre-hydrated `.x07/deps`.
+This guide covers using `x07 pkg` and `x07 run` in environments without network access (CI sandboxes, offline agents) using a local `file://` sparse index mirror and pre-hydrated `.x07/deps`.
 
 ## Canonical Offline Workflow
 
-1. Point the project at a local `file://` sparse index mirror and enable offline mode.
+1. Enable offline mode (either via project-local config or a global env override).
+
+Env override (equivalent to `--offline` for `x07 pkg` commands that support it, and for `x07 run` dependency hydration):
+
+```bash
+export X07_OFFLINE=1
+```
+
+Project-local config (preferred for CI and reproducible dev shells):
 
 ```jsonc
 {
@@ -26,7 +34,7 @@ x07 pkg lock --project x07.json
 
 ```bash
 x07 pkg lock --project x07.json --offline
-x07 run --project x07.json --input case.bin
+x07 run --project x07.json --offline --input case.bin
 ```
 
 4. After a toolchain upgrade, repair incompatible dependencies.
@@ -36,6 +44,20 @@ x07 pkg repair --project x07.json --toolchain current
 ```
 
 ## Expert Notes
+
+### `x07 run --offline` vs runtime networking
+
+`x07 run --offline` (and `X07_OFFLINE=1`) forbids network access when *hydrating project dependencies* (the implicit `x07 pkg lock` step).
+
+It does **not** change the runtime's OS-world networking policy; use `run-os-sandboxed` policies and allow/deny host lists for runtime network controls.
+
+### Path-only projects (no registry needed)
+
+If a project has only local `path` dependencies that are already present on disk, `x07 pkg lock` and `x07 run` do not need to consult the package registry index.
+
+Still prefer `--offline` / `X07_OFFLINE=1` in CI to fail closed if a missing vendored dependency would otherwise trigger a fetch.
+
+Minimal copy-paste template (local path dep + lockfile): `docs/examples/project-multi-module/`.
 
 ### Registry Selection
 
@@ -85,6 +107,16 @@ Typical flow:
    ```
 
 If a vendored dependency is missing, offline mode fails deterministically with `X07PKG_OFFLINE_MISSING_DEP`.
+
+### Inspect the resolved closure: `x07 pkg tree`
+
+To print a deterministic dependency graph (including module roots inferred from the lockfile):
+
+```bash
+x07 pkg tree --project x07.json
+```
+
+This command reads `x07.json` + `x07.lock.json` and never consults the registry index.
 
 ### Browsing Offline
 

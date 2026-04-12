@@ -18,8 +18,11 @@ pub(crate) struct ProjectCtx {
 
 pub(crate) fn load_project_ctx(project_path: &Path, hydrate_deps: bool) -> Result<ProjectCtx> {
     if hydrate_deps {
-        let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf())
-            .context("hydrate project deps")?;
+        let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(
+            project_path.to_path_buf(),
+            crate::util::x07_offline_enabled(),
+        )
+        .context("hydrate project deps")?;
         if hydrated {
             eprintln!(
                 "x07: hydrated project dependencies via `x07 pkg lock --project {}`",

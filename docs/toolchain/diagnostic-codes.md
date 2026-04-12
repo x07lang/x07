@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 468
-- quickfix support (`sometimes` or `always`): 427
-- quickfix coverage: 91.24%
+- total codes: 477
+- quickfix support (`sometimes` or `always`): 436
+- quickfix coverage: 91.40%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -313,6 +313,15 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`. |
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
+| `X07PKG_TREE_DEP_MANIFEST` | x07 / lint / error | sometimes | pkg.tree could not read a dependency package manifest. |
+| `X07PKG_TREE_DEP_PATH` | x07 / lint / error | sometimes | pkg.tree could not resolve a dependency path. |
+| `X07PKG_TREE_LOCK_MISSING` | x07 / lint / error | sometimes | pkg.tree requires a lockfile. |
+| `X07PKG_TREE_LOCK_PARSE` | x07 / lint / error | sometimes | pkg.tree lockfile is not valid JSON. |
+| `X07PKG_TREE_LOCK_READ` | x07 / lint / error | sometimes | pkg.tree could not read the lockfile. |
+| `X07PKG_TREE_LOCK_VERIFY` | x07 / lint / error | sometimes | pkg.tree lockfile does not match the project manifest. |
+| `X07PKG_TREE_MODULE_ROOTS` | x07 / lint / error | sometimes | pkg.tree could not compute resolved module roots. |
+| `X07PKG_TREE_PROJECT` | x07 / lint / error | sometimes | pkg.tree failed to load the project manifest. |
+| `X07PKG_TREE_REQUIRES_INVALID` | x07 / lint / error | sometimes | pkg.tree found an invalid `meta.requires_packages` entry. |
 | `X07PKG_X07C_COMPAT_INVALID` | x07 / lint / error | sometimes | Package compatibility metadata is invalid. |
 | `X07PKG_X07C_INCOMPATIBLE` | x07 / lint / error | sometimes | Package is incompatible with the current compiler. |
 | `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
@@ -6602,6 +6611,180 @@ Agent strategy:
 - Normalize dependency specs and run `x07 pkg lock`.
 - Use `x07 pkg add/remove/versions/login/publish` as needed.
 - Re-run the original package command.
+
+
+## `X07PKG_TREE_DEP_MANIFEST`
+
+Summary: pkg.tree could not read a dependency package manifest.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A dependency directory is missing `x07-package.json` or the file is unreadable/schema-invalid.
+
+Agent strategy:
+
+- Ensure the dependency directory exists and contains `x07-package.json`.
+- For vendored deps under `.x07/deps`, run `x07 pkg lock --project x07.json` to hydrate missing deps.
+
+
+## `X07PKG_TREE_DEP_PATH`
+
+Summary: pkg.tree could not resolve a dependency path.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A dependency path in the lockfile could not be resolved relative to the project root/workspace.
+
+Agent strategy:
+
+- Check `dependencies[].path` in `x07.json` and the corresponding lockfile entries.
+- If using workspace paths, set `X07_WORKSPACE_ROOT=...` and rerun `x07 pkg lock`.
+
+
+## `X07PKG_TREE_LOCK_MISSING`
+
+Summary: pkg.tree requires a lockfile.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg tree` reads `x07.json` + the resolved lockfile (`x07.lock.json`) to report the dependency closure and module roots. Without a lockfile it cannot produce a stable closure graph.
+
+Agent strategy:
+
+- Run `x07 pkg lock --project x07.json`.
+- Re-run `x07 pkg tree --project x07.json`.
+- In CI, add `x07 pkg lock --check --project x07.json` to fail if the lock is missing/out of date.
+
+
+## `X07PKG_TREE_LOCK_PARSE`
+
+Summary: pkg.tree lockfile is not valid JSON.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The lockfile could not be parsed as JSON. This usually means the file is corrupted or was edited manually.
+
+Agent strategy:
+
+- Regenerate the lockfile with `x07 pkg lock --project x07.json`.
+- Re-run `x07 pkg tree --project x07.json`.
+
+
+## `X07PKG_TREE_LOCK_READ`
+
+Summary: pkg.tree could not read the lockfile.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The lockfile exists but could not be read (permissions, broken symlink, IO error).
+
+Agent strategy:
+
+- Verify the lockfile path is readable and is a regular file.
+- If the file is corrupted, regenerate it with `x07 pkg lock --project x07.json`.
+
+
+## `X07PKG_TREE_LOCK_VERIFY`
+
+Summary: pkg.tree lockfile does not match the project manifest.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The lockfile contents do not match `x07.json` (deps, paths, or hashes). This can happen after editing dependencies, moving workspaces, or upgrading the toolchain.
+
+Agent strategy:
+
+- Regenerate with `x07 pkg lock --project x07.json`.
+- If your project uses workspace-relative paths, set `X07_WORKSPACE_ROOT=...` when locking.
+
+
+## `X07PKG_TREE_MODULE_ROOTS`
+
+Summary: pkg.tree could not compute resolved module roots.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The dependency closure was loaded, but module root resolution failed (usually due to invalid dependency paths or workspace path resolution).
+
+Agent strategy:
+
+- Validate `module_roots[]` and `dependencies[].path` in `x07.json` are valid relative paths.
+- If you use workspace paths, ensure `X07_WORKSPACE_ROOT` is set consistently.
+- Re-run `x07 pkg lock --project x07.json`, then `x07 pkg tree`.
+
+
+## `X07PKG_TREE_PROJECT`
+
+Summary: pkg.tree failed to load the project manifest.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The project manifest (usually `x07.json`) is missing, unreadable, or schema-invalid. `x07 pkg tree` cannot compute a dependency closure without a valid manifest.
+
+Agent strategy:
+
+- Fix JSON parse/schema errors in the project manifest.
+- If this is an older manifest line, run `x07 project migrate --project x07.json --write`.
+- Re-run `x07 pkg tree --project x07.json`.
+
+
+## `X07PKG_TREE_REQUIRES_INVALID`
+
+Summary: pkg.tree found an invalid `meta.requires_packages` entry.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A package manifest contains an invalid `meta.requires_packages` entry. Entries must be strings in `NAME@VERSION` form (for example: `"b@1.0.0"`).
+
+Agent strategy:
+
+- Fix the package `x07-package.json` so `meta.requires_packages` is an array of `NAME@VERSION` strings.
+- Re-run `x07 pkg lock` (to refresh closure) and then `x07 pkg tree`.
 
 
 ## `X07PKG_X07C_COMPAT_INVALID`
