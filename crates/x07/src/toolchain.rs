@@ -1178,6 +1178,11 @@ pub fn cmd_check(
     for item in &file_set {
         sigs.add_file(&item.file);
     }
+    for m in modules.values() {
+        if m.is_builtin {
+            sigs.add_file(&m.file);
+        }
+    }
     sigs.add_builtins();
 
     for item in &file_set {

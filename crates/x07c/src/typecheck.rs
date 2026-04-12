@@ -50,6 +50,7 @@ pub struct ImplicitCallArgCoercion {
 #[derive(Debug, Default, Clone)]
 pub struct TypecheckSigs {
     sigs: BTreeMap<String, FnSigAst>,
+    known_module_prefixes: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,12 +64,35 @@ impl TypecheckSigs {
         Self::default()
     }
 
+    fn record_prefix(&mut self, name: &str) {
+        if let Some((prefix, _)) = name.rsplit_once('.') {
+            self.known_module_prefixes.insert(prefix.to_string());
+        }
+    }
+
+    pub fn knows_module_prefix(&self, prefix: &str) -> bool {
+        self.known_module_prefixes.contains(prefix)
+    }
+
     pub fn add_file(&mut self, file: &X07AstFile) {
         add_file_sigs(file, &mut self.sigs);
+        for f in &file.extern_functions {
+            self.record_prefix(&f.name);
+        }
+        for f in &file.functions {
+            self.record_prefix(&f.name);
+        }
+        for f in &file.async_functions {
+            self.record_prefix(&f.name);
+        }
     }
 
     pub fn add_builtins(&mut self) {
         add_builtin_sigs(&mut self.sigs);
+        let names: Vec<String> = self.sigs.keys().cloned().collect();
+        for name in names {
+            self.record_prefix(&name);
+        }
     }
 
     pub fn for_file_with_builtins(file: &X07AstFile) -> Self {
@@ -156,7 +180,7 @@ struct PendingImplicitTapp {
 }
 
 struct InferState<'a> {
-    sigs: &'a BTreeMap<String, FnSigAst>,
+    sigs: &'a TypecheckSigs,
     module_id: String,
     compat: crate::compat::Compat,
     fn_ret: TyTerm,
@@ -172,7 +196,7 @@ struct InferState<'a> {
 
 impl<'a> InferState<'a> {
     fn new(
-        sigs: &'a BTreeMap<String, FnSigAst>,
+        sigs: &'a TypecheckSigs,
         module_id: &str,
         compat: crate::compat::Compat,
         fn_ret: TyTerm,
@@ -197,10 +221,10 @@ impl<'a> InferState<'a> {
     }
 
     fn should_diag_unknown_callee(&self, callee: &str) -> bool {
-        match callee.split_once('.') {
-            None => false,
-            Some((mod_id, _)) => mod_id == self.module_id,
-        }
+        let Some((prefix, _)) = callee.rsplit_once('.') else {
+            return false;
+        };
+        prefix == self.module_id || self.sigs.knows_module_prefix(prefix)
     }
 
     fn fresh_meta(&mut self) -> TyTerm {
@@ -696,7 +720,7 @@ impl<'a> InferState<'a> {
         let Some(callee) = items.get(1).and_then(Expr::as_ident) else {
             return TyInfoTerm::unbranded(self.fresh_meta());
         };
-        let Some(sig) = self.sigs.get(callee) else {
+        let Some(sig) = self.sigs.sigs.get(callee) else {
             if self.should_diag_unknown_callee(callee) {
                 self.diagnostics.push(Diagnostic {
                     code: "X07-TYPE-CALL-0001".to_string(),
@@ -1000,7 +1024,7 @@ impl<'a> InferState<'a> {
             return TyInfoTerm::unbranded(TyTerm::Named("bytes_view".to_string()));
         }
 
-        let Some(sig) = self.sigs.get(callee) else {
+        let Some(sig) = self.sigs.sigs.get(callee) else {
             if self.should_diag_unknown_callee(callee) {
                 self.diagnostics.push(Diagnostic {
                     code: "X07-TYPE-CALL-0001".to_string(),
@@ -2023,6 +2047,10 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
             "bytes_view",
         ),
     );
+    sigs.insert(
+        "bytes.concat".to_string(),
+        mono("bytes.concat", &[("a", "bytes"), ("b", "bytes")], "bytes"),
+    );
 
     sigs.insert(
         "view.len".to_string(),
@@ -2456,17 +2484,17 @@ pub fn typecheck_file_with_sigs(
     sigs: &TypecheckSigs,
     opts: &TypecheckOptions,
 ) -> TypecheckReport {
-    typecheck_file_impl(file, &sigs.sigs, opts)
+    typecheck_file_impl(file, sigs, opts)
 }
 
 pub fn typecheck_file_local(file: &X07AstFile, opts: &TypecheckOptions) -> TypecheckReport {
     let sigs = TypecheckSigs::for_file_with_builtins(file);
-    typecheck_file_impl(file, &sigs.sigs, opts)
+    typecheck_file_impl(file, &sigs, opts)
 }
 
 fn typecheck_file_impl(
     file: &X07AstFile,
-    sigs: &BTreeMap<String, FnSigAst>,
+    sigs: &TypecheckSigs,
     opts: &TypecheckOptions,
 ) -> TypecheckReport {
     let expr_values = file_expr_values(file);

@@ -472,6 +472,141 @@ fn x07_check_project_wide_typecheck_across_modules() {
 }
 
 #[test]
+fn x07_check_stdlib_call_arg_mismatch_is_type_error_not_internal() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_stdlib_call_arg_mismatch");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+    write_lockfile_for_project_bytes(&root, &project);
+
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": ["std.bytes", "std.codec"],
+        "decls": [],
+        "solve": ["std.codec.write_u32_le", ["std.bytes.len", 0]]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "expected failure; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v["ok"], false);
+
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(
+        !diags.iter().any(|d| d["code"] == "X07-INTERNAL-0001"),
+        "did not expect internal error diagnostics; got:\n{}",
+        serde_json::to_string_pretty(diags).unwrap()
+    );
+    let d = diags
+        .iter()
+        .find(|d| d["code"] == "X07-TYPE-CALL-0002" && d["stage"] == "type")
+        .unwrap_or_else(|| {
+            panic!(
+                "expected X07-TYPE-CALL-0002 at stage=type; got:\n{}",
+                serde_json::to_string_pretty(diags).unwrap()
+            )
+        });
+    assert_eq!(d["data"]["callee"], "std.bytes.len");
+    assert_eq!(d["data"]["arg_index"], 0);
+    assert_eq!(d["data"]["expected"], "bytes_view");
+    assert_eq!(d["data"]["got"], "i32");
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_check_unknown_callee_in_stdlib_is_type_error_not_codegen() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_unknown_callee_in_stdlib");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+    write_lockfile_for_project_bytes(&root, &project);
+
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": ["std.bytes", "std.codec"],
+        "decls": [],
+        "solve": ["std.codec.write_u32_le", ["std.bytes.lenn", ["bytes.lit", "abc"]]]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "expected failure; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v["ok"], false);
+
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(
+        !diags.iter().any(|d| d["code"] == "X07-INTERNAL-0001"),
+        "did not expect internal error diagnostics; got:\n{}",
+        serde_json::to_string_pretty(diags).unwrap()
+    );
+    let d = diags
+        .iter()
+        .find(|d| d["code"] == "X07-TYPE-CALL-0001" && d["stage"] == "type")
+        .unwrap_or_else(|| {
+            panic!(
+                "expected X07-TYPE-CALL-0001 at stage=type; got:\n{}",
+                serde_json::to_string_pretty(diags).unwrap()
+            )
+        });
+    assert_eq!(d["data"]["callee"], "std.bytes.lenn");
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
 fn x07_check_surfaces_move_errors() {
     let root = fresh_tmp_dir(&repo_root(), "x07_check_move");
     std::fs::create_dir_all(&root).expect("create root");
