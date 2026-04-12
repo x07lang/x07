@@ -704,6 +704,44 @@ fn infer_nondeterminism(scope: Option<&str>, argv: &[OsString]) -> reporting::No
         nd.uses_network = !(offline || file_registry);
     }
 
+    if scope == "init" || scope.starts_with("init.") {
+        let mut template: Option<String> = None;
+
+        let mut i = 0usize;
+        while i < argv.len() {
+            let tok = argv[i].to_string_lossy();
+            if tok == "--template" {
+                if let Some(v) = argv.get(i + 1) {
+                    template = Some(v.to_string_lossy().to_string());
+                }
+            } else if let Some(v) = tok.strip_prefix("--template=") {
+                template = Some(v.to_string());
+            }
+            i += 1;
+        }
+
+        let runs_pkg_lock = template.is_some_and(|t| {
+            !matches!(
+                t.as_str(),
+                "verified-core-pure"
+                    | "trusted-sandbox-program"
+                    | "trusted-network-service"
+                    | "certified-capsule"
+                    | "certified-network-capsule"
+                    | "mcp-server"
+                    | "mcp-server-stdio"
+                    | "mcp-server-http"
+                    | "mcp-server-http-tasks"
+            )
+        });
+
+        if runs_pkg_lock {
+            let index = std::env::var("X07_PKG_INDEX_URL").ok().unwrap_or_default();
+            let raw = index.strip_prefix("sparse+").unwrap_or(index.as_str());
+            nd.uses_network = !raw.trim_start().starts_with("file://");
+        }
+    }
+
     nd
 }
 
@@ -878,6 +916,35 @@ fn internal_error_report(
 mod tests {
     use super::*;
 
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    struct EnvVarGuard {
+        key: &'static str,
+        old: Option<OsString>,
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            match self.old.take() {
+                Some(v) => std::env::set_var(self.key, v),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
+    fn with_env_var<T>(key: &'static str, value: Option<&str>, f: impl FnOnce() -> T) -> T {
+        let _guard = ENV_LOCK.lock().expect("lock env");
+        let old = std::env::var_os(key);
+        match value {
+            Some(v) => std::env::set_var(key, v),
+            None => std::env::remove_var(key),
+        }
+        let env_guard = EnvVarGuard { key, old };
+        let out = f();
+        drop(env_guard);
+        out
+    }
+
     fn parsed_with_passthrough(passthrough: &[&str]) -> reporting::ParsedMachineFlags {
         reporting::ParsedMachineFlags {
             mode: reporting::JsonMode::Off,
@@ -1014,6 +1081,114 @@ mod tests {
             out,
         )
         .expect("wrapped_report");
+
+        assert!(!report.meta.nondeterminism.uses_network);
+    }
+
+    #[test]
+    fn wrapped_report_infers_uses_network_for_init_default_no_template() {
+        let raw_args = [OsString::from("x07"), OsString::from("init")];
+        let parsed = parsed_with_passthrough(&["init"]);
+        let out = ChildOutput {
+            exit_code: 0,
+            internal_failure: false,
+            stdout: br#"{"ok":true}"#.to_vec(),
+            stderr: Vec::new(),
+        };
+
+        let report = wrapped_report(&raw_args, &parsed, Some("init"), Instant::now(), out)
+            .expect("wrapped_report");
+
+        assert!(!report.meta.nondeterminism.uses_network);
+    }
+
+    #[test]
+    fn wrapped_report_infers_uses_network_for_init_static_template() {
+        let raw_args = [
+            OsString::from("x07"),
+            OsString::from("init"),
+            OsString::from("--template"),
+            OsString::from("verified-core-pure"),
+        ];
+        let parsed = parsed_with_passthrough(&["init", "--template", "verified-core-pure"]);
+        let out = ChildOutput {
+            exit_code: 0,
+            internal_failure: false,
+            stdout: br#"{"ok":true}"#.to_vec(),
+            stderr: Vec::new(),
+        };
+
+        let report = wrapped_report(&raw_args, &parsed, Some("init"), Instant::now(), out)
+            .expect("wrapped_report");
+
+        assert!(!report.meta.nondeterminism.uses_network);
+    }
+
+    #[test]
+    fn wrapped_report_infers_uses_network_for_init_template_locking() {
+        with_env_var("X07_PKG_INDEX_URL", None, || {
+            let raw_args = [
+                OsString::from("x07"),
+                OsString::from("init"),
+                OsString::from("--template"),
+                OsString::from("cli"),
+            ];
+            let parsed = parsed_with_passthrough(&["init", "--template", "cli"]);
+            let out = ChildOutput {
+                exit_code: 0,
+                internal_failure: false,
+                stdout: br#"{"ok":true}"#.to_vec(),
+                stderr: Vec::new(),
+            };
+
+            let report = wrapped_report(&raw_args, &parsed, Some("init"), Instant::now(), out)
+                .expect("wrapped_report");
+
+            assert!(report.meta.nondeterminism.uses_network);
+        })
+    }
+
+    #[test]
+    fn wrapped_report_infers_uses_network_for_init_template_file_index() {
+        with_env_var("X07_PKG_INDEX_URL", Some("file:///tmp/index/"), || {
+            let raw_args = [
+                OsString::from("x07"),
+                OsString::from("init"),
+                OsString::from("--template"),
+                OsString::from("cli"),
+            ];
+            let parsed = parsed_with_passthrough(&["init", "--template", "cli"]);
+            let out = ChildOutput {
+                exit_code: 0,
+                internal_failure: false,
+                stdout: br#"{"ok":true}"#.to_vec(),
+                stderr: Vec::new(),
+            };
+
+            let report = wrapped_report(&raw_args, &parsed, Some("init"), Instant::now(), out)
+                .expect("wrapped_report");
+
+            assert!(!report.meta.nondeterminism.uses_network);
+        })
+    }
+
+    #[test]
+    fn wrapped_report_infers_uses_network_for_init_package() {
+        let raw_args = [
+            OsString::from("x07"),
+            OsString::from("init"),
+            OsString::from("--package"),
+        ];
+        let parsed = parsed_with_passthrough(&["init", "--package"]);
+        let out = ChildOutput {
+            exit_code: 0,
+            internal_failure: false,
+            stdout: br#"{"ok":true}"#.to_vec(),
+            stderr: Vec::new(),
+        };
+
+        let report = wrapped_report(&raw_args, &parsed, Some("init"), Instant::now(), out)
+            .expect("wrapped_report");
 
         assert!(!report.meta.nondeterminism.uses_network);
     }
