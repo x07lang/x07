@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["app.stream_reader.test_stream_reader_v1"]},{"body":["ext.streams.fs.tests.test_open_read_fs_hello"],"kind":"defn","name":"app.stream_reader.test_stream_reader_v1","params":[],"result":"result_i32"}],"imports":["ext.streams.fs.tests"],"kind":"module","module_id":"app.stream_reader","schema_version":"x07.x07ast@0.8.0"}

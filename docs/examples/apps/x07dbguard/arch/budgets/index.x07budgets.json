@@ -11,8 +11,8 @@
       "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"]
     },
     {
-      "id": "db_apply_v1",
-      "profile_path": "arch/budgets/profiles/db_apply_v1.budget.json",
+      "id": "db_migrate_v1",
+      "profile_path": "arch/budgets/profiles/db_migrate_v1.budget.json",
       "enforce": "error",
       "selectors": [
         { "module_prefix": "std.db.migrate", "fn": "apply_from_arch_v1" }

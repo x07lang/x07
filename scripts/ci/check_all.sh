@@ -70,6 +70,9 @@ step "docs examples x07AST schema_version"
 step "docs examples x07AST formatting"
 ./scripts/ci/check_doc_examples_x07ast_fmt.sh
 
+step "docs examples compile"
+"$python_bin" scripts/ci/check_doc_examples_compile.py
+
 step "genpack error-codes completeness"
 "$python_bin" scripts/check_genpack_error_codes.py --check
 

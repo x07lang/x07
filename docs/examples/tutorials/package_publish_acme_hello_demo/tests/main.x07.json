@@ -1,0 +1,1 @@
+{"decls":[],"imports":["ext.acme_hello_demo.tests"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.8.0","solve":["bytes.alloc",0]}

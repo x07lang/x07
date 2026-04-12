@@ -5,6 +5,7 @@ use x07_contracts::X07AST_SCHEMA_VERSION_V0_8_0;
 
 use crate::ast::Expr;
 use crate::diagnostics::{Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Severity, Stage};
+use crate::types::Ty;
 use crate::unify::{unify, Subst, TyInfoTerm, TyTerm, UnifyError};
 use crate::x07ast::{
     defn_decreases, expr_to_value, ty_to_name, type_ref_from_expr, type_ref_to_value,
@@ -227,6 +228,80 @@ impl<'a> InferState<'a> {
         prefix == self.module_id || self.sigs.knows_module_prefix(prefix)
     }
 
+    fn diag_call_arity_mismatch(
+        &mut self,
+        list_ptr: &str,
+        callee: &str,
+        want_arity: usize,
+        got_arity: usize,
+    ) {
+        self.diagnostics.push(Diagnostic {
+            code: "X07-TYPE-CALL-0003".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Type,
+            message: format!(
+                "arity mismatch for {callee:?}: expected {want_arity} args got {got_arity}"
+            ),
+            loc: Some(Location::X07Ast {
+                ptr: list_ptr.to_string(),
+            }),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: BTreeMap::from([
+                ("callee".to_string(), Value::String(callee.to_string())),
+                (
+                    "want".to_string(),
+                    Value::Number((want_arity as u64).into()),
+                ),
+                ("got".to_string(), Value::Number((got_arity as u64).into())),
+            ]),
+            quickfix: None,
+        });
+    }
+
+    fn diag_call_arg_type_mismatch(
+        &mut self,
+        blame_ptr: String,
+        callee: &str,
+        arg_index: usize,
+        expected: Value,
+        got: Value,
+    ) {
+        self.diagnostics.push(Diagnostic {
+            code: "X07-TYPE-CALL-0002".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Type,
+            message: format!("call arg type mismatch for {callee:?} (arg {arg_index})"),
+            loc: Some(Location::X07Ast { ptr: blame_ptr }),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: BTreeMap::from([
+                ("callee".to_string(), Value::String(callee.to_string())),
+                (
+                    "arg_index".to_string(),
+                    Value::Number((arg_index as u64).into()),
+                ),
+                ("expected".to_string(), expected),
+                ("got".to_string(), got),
+            ]),
+            quickfix: None,
+        });
+    }
+
+    fn finish_known_ty(&mut self, list_ptr: &str, ty: TyTerm, want: Option<&TyTerm>) -> TyInfoTerm {
+        if let Some(want) = want {
+            self.add_constraint(
+                ty,
+                want.clone(),
+                list_ptr.to_string(),
+                ConstraintOrigin::ExprCheck,
+            );
+            TyInfoTerm::unbranded(want.clone())
+        } else {
+            TyInfoTerm::unbranded(ty)
+        }
+    }
+
     fn fresh_meta(&mut self) -> TyTerm {
         let id = self.meta_counter;
         self.meta_counter = self.meta_counter.saturating_add(1);
@@ -402,10 +477,90 @@ impl<'a> InferState<'a> {
                     "try" => self.infer_try(list_ptr, items, want),
                     "try_doc" => self.infer_try_doc(list_ptr, items, want),
                     "tapp" => self.infer_tapp(list_ptr, items, want),
+                    "budget.cfg_v1" => self.infer_budget_cfg_v1(list_ptr, items, want),
                     _ if head.starts_with("ty.") => {
                         self.infer_ty_intrinsic(list_ptr, head, items, want)
                     }
                     _ => self.infer_call(list_ptr, head, items, want),
+                }
+            }
+        }
+    }
+
+    fn infer_stmt(&mut self, expr: &Expr) -> TyTerm {
+        match expr {
+            Expr::List { items, ptr } => {
+                let list_ptr = ptr.as_str();
+                let Some(head) = items.first().and_then(Expr::as_ident) else {
+                    for it in items {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return TyTerm::Named("i32".to_string());
+                };
+
+                match head {
+                    "begin" | "unsafe" => {
+                        if items.len() < 2 {
+                            return TyTerm::Named("i32".to_string());
+                        }
+                        self.push_scope();
+                        let mut out = TyTerm::Named("i32".to_string());
+                        for e in items.iter().skip(1) {
+                            if matches!(self.infer_stmt(e), TyTerm::Never) {
+                                out = TyTerm::Never;
+                            }
+                        }
+                        self.pop_scope();
+                        out
+                    }
+                    "if" => {
+                        if items.len() != 4 {
+                            return TyTerm::Named("i32".to_string());
+                        }
+                        self.check_expr(
+                            &items[1],
+                            &TyTerm::Named("i32".to_string()),
+                            ConstraintOrigin::IfCond,
+                        );
+
+                        self.push_scope();
+                        let then_ty = self.infer_stmt(&items[2]);
+                        self.pop_scope();
+
+                        self.push_scope();
+                        let else_ty = self.infer_stmt(&items[3]);
+                        self.pop_scope();
+
+                        if matches!(then_ty, TyTerm::Never) && matches!(else_ty, TyTerm::Never) {
+                            TyTerm::Never
+                        } else {
+                            TyTerm::Named("i32".to_string())
+                        }
+                    }
+                    "for" => {
+                        let _ = self.infer_for(list_ptr, items);
+                        TyTerm::Named("i32".to_string())
+                    }
+                    "while" => {
+                        let _ = self.infer_while(list_ptr, items);
+                        TyTerm::Named("i32".to_string())
+                    }
+                    _ => {
+                        let ty = self.infer_expr(expr, None).ty;
+                        if matches!(ty, TyTerm::Never) {
+                            TyTerm::Never
+                        } else {
+                            TyTerm::Named("i32".to_string())
+                        }
+                    }
+                }
+            }
+            _ => {
+                let ty = self.infer_expr(expr, None).ty;
+                if matches!(ty, TyTerm::Never) {
+                    TyTerm::Never
+                } else {
+                    TyTerm::Named("i32".to_string())
                 }
             }
         }
@@ -422,7 +577,7 @@ impl<'a> InferState<'a> {
         }
         self.push_scope();
         for e in &items[1..items.len() - 1] {
-            let _ = self.infer_expr(e, None);
+            let _ = self.infer_stmt(e);
         }
         let tail = items.last().expect("len >= 2");
         let out = if let Some(want) = want {
@@ -590,7 +745,7 @@ impl<'a> InferState<'a> {
             var.to_string(),
             TyInfoTerm::unbranded(TyTerm::Named("i32".to_string())),
         );
-        let _ = self.infer_expr(&items[4], None);
+        let _ = self.infer_stmt(&items[4]);
         self.pop_scope();
         TyInfoTerm::unbranded(TyTerm::Named("i32".to_string()))
     }
@@ -611,7 +766,7 @@ impl<'a> InferState<'a> {
         self.pop_scope();
 
         self.push_scope();
-        let _ = self.infer_expr(&items[2], None);
+        let _ = self.infer_stmt(&items[2]);
         self.pop_scope();
 
         TyInfoTerm::unbranded(TyTerm::Named("i32".to_string()))
@@ -1000,28 +1155,738 @@ impl<'a> InferState<'a> {
         want: Option<&TyTerm>,
     ) -> TyInfoTerm {
         if callee == "bytes.lit" {
-            if let Some(want) = want {
-                self.add_constraint(
-                    TyTerm::Named("bytes".to_string()),
-                    want.clone(),
-                    list_ptr.to_string(),
-                    ConstraintOrigin::ExprCheck,
-                );
-                return TyInfoTerm::unbranded(want.clone());
-            }
-            return TyInfoTerm::unbranded(TyTerm::Named("bytes".to_string()));
+            return self.finish_known_ty(list_ptr, TyTerm::Named("bytes".to_string()), want);
         }
         if callee == "bytes.view_lit" {
-            if let Some(want) = want {
-                self.add_constraint(
-                    TyTerm::Named("bytes_view".to_string()),
-                    want.clone(),
-                    list_ptr.to_string(),
-                    ConstraintOrigin::ExprCheck,
-                );
-                return TyInfoTerm::unbranded(want.clone());
+            return self.finish_known_ty(list_ptr, TyTerm::Named("bytes_view".to_string()), want);
+        }
+
+        match callee {
+            "std.brand.cast_bytes_v1" => {
+                let want_arity = 3;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let Some(brand_id) = items.get(1).and_then(Expr::as_ident) else {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message:
+                            "std.brand.cast_bytes_v1 form: (std.brand.cast_bytes_v1 <brand_id> <validator_id> <bytes>)"
+                                .to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: items[1].ptr().to_string(),
+                        }),
+                        notes: vec!["brand_id must be an identifier symbol.".to_string()],
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                    let _ = self.infer_expr(&items[3], None);
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                };
+
+                if items.get(2).and_then(Expr::as_ident).is_none() {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message:
+                            "std.brand.cast_bytes_v1 form: (std.brand.cast_bytes_v1 <brand_id> <validator_id> <bytes>)"
+                                .to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: items[2].ptr().to_string(),
+                        }),
+                        notes: vec!["validator_id must be an identifier symbol.".to_string()],
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                    let _ = self.infer_expr(&items[3], None);
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let b_expr = &items[3];
+                let got = self.infer_expr(b_expr, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty,
+                        TyTerm::Named("bytes".to_string()),
+                        b_expr.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 2,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+
+                let ret = TyTerm::Named("result_bytes".to_string());
+                let ret_brand = Some(brand_id.to_string());
+                if let Some(want) = want {
+                    self.add_constraint(
+                        ret.clone(),
+                        want.clone(),
+                        list_ptr.to_string(),
+                        ConstraintOrigin::ExprCheck,
+                    );
+                    return TyInfoTerm {
+                        ty: want.clone(),
+                        brand: ret_brand,
+                        view_full: false,
+                    };
+                }
+                return TyInfoTerm {
+                    ty: ret,
+                    brand: ret_brand,
+                    view_full: false,
+                };
             }
-            return TyInfoTerm::unbranded(TyTerm::Named("bytes_view".to_string()));
+            "std.brand.cast_view_copy_v1" => {
+                let want_arity = 3;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let Some(brand_id) = items.get(1).and_then(Expr::as_ident) else {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message: "std.brand.cast_view_copy_v1 form: (std.brand.cast_view_copy_v1 <brand_id> <validator_id> <bytes_view>)".to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: items[1].ptr().to_string(),
+                        }),
+                        notes: vec!["brand_id must be an identifier symbol.".to_string()],
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                    let _ = self.infer_expr(&items[3], None);
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                };
+
+                if items.get(2).and_then(Expr::as_ident).is_none() {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message: "std.brand.cast_view_copy_v1 form: (std.brand.cast_view_copy_v1 <brand_id> <validator_id> <bytes_view>)".to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: items[2].ptr().to_string(),
+                        }),
+                        notes: vec!["validator_id must be an identifier symbol.".to_string()],
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                    let _ = self.infer_expr(&items[3], None);
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let v_expr = &items[3];
+                let got = self.infer_expr(v_expr, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty,
+                        TyTerm::Named("bytes_view".to_string()),
+                        v_expr.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 2,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+
+                let ret = TyTerm::Named("result_bytes".to_string());
+                let ret_brand = Some(brand_id.to_string());
+                if let Some(want) = want {
+                    self.add_constraint(
+                        ret.clone(),
+                        want.clone(),
+                        list_ptr.to_string(),
+                        ConstraintOrigin::ExprCheck,
+                    );
+                    return TyInfoTerm {
+                        ty: want.clone(),
+                        brand: ret_brand,
+                        view_full: false,
+                    };
+                }
+                return TyInfoTerm {
+                    ty: ret,
+                    brand: ret_brand,
+                    view_full: false,
+                };
+            }
+            "std.brand.cast_view_v1" => {
+                let want_arity = 3;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let Some(brand_id) = items.get(1).and_then(Expr::as_ident) else {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message:
+                            "std.brand.cast_view_v1 form: (std.brand.cast_view_v1 <brand_id> <validator_id> <bytes_view>)"
+                                .to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: items[1].ptr().to_string(),
+                        }),
+                        notes: vec!["brand_id must be an identifier symbol.".to_string()],
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                    let _ = self.infer_expr(&items[3], None);
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                };
+
+                if items.get(2).and_then(Expr::as_ident).is_none() {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message:
+                            "std.brand.cast_view_v1 form: (std.brand.cast_view_v1 <brand_id> <validator_id> <bytes_view>)"
+                                .to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: items[2].ptr().to_string(),
+                        }),
+                        notes: vec!["validator_id must be an identifier symbol.".to_string()],
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                    let _ = self.infer_expr(&items[3], None);
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let v_expr = &items[3];
+                let got = self.infer_expr(v_expr, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty,
+                        TyTerm::Named("bytes_view".to_string()),
+                        v_expr.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 2,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+
+                let ret = TyTerm::Named("result_bytes_view".to_string());
+                let ret_brand = Some(brand_id.to_string());
+                if let Some(want) = want {
+                    self.add_constraint(
+                        ret.clone(),
+                        want.clone(),
+                        list_ptr.to_string(),
+                        ConstraintOrigin::ExprCheck,
+                    );
+                    return TyInfoTerm {
+                        ty: want.clone(),
+                        brand: ret_brand,
+                        view_full: false,
+                    };
+                }
+                return TyInfoTerm {
+                    ty: ret,
+                    brand: ret_brand,
+                    view_full: false,
+                };
+            }
+            "std.brand.erase_bytes_v1" => {
+                let want_arity = 1;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let b_expr = &items[1];
+                let got = self.infer_expr(b_expr, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty,
+                        TyTerm::Named("bytes".to_string()),
+                        b_expr.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 0,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+                return self.finish_known_ty(list_ptr, TyTerm::Named("bytes".to_string()), want);
+            }
+            "std.brand.erase_view_v1" => {
+                let want_arity = 1;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let v_expr = &items[1];
+                let got = self.infer_expr(v_expr, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty,
+                        TyTerm::Named("bytes_view".to_string()),
+                        v_expr.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 0,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+                return self.finish_known_ty(
+                    list_ptr,
+                    TyTerm::Named("bytes_view".to_string()),
+                    want,
+                );
+            }
+            "std.brand.view_v1" => {
+                let want_arity = 1;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let b_expr = &items[1];
+                let got = self.infer_expr(b_expr, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty.clone(),
+                        TyTerm::Named("bytes".to_string()),
+                        b_expr.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 0,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+                let ret = TyTerm::Named("bytes_view".to_string());
+                let ret_brand = got.brand.clone();
+                if let Some(want) = want {
+                    self.add_constraint(
+                        ret.clone(),
+                        want.clone(),
+                        list_ptr.to_string(),
+                        ConstraintOrigin::ExprCheck,
+                    );
+                    return TyInfoTerm {
+                        ty: want.clone(),
+                        brand: ret_brand,
+                        view_full: true,
+                    };
+                }
+                return TyInfoTerm {
+                    ty: ret,
+                    brand: ret_brand,
+                    view_full: true,
+                };
+            }
+            "std.brand.to_bytes_preserve_if_full_v1" => {
+                let want_arity = 1;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let v_expr = &items[1];
+                let got = self.infer_expr(v_expr, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty.clone(),
+                        TyTerm::Named("bytes_view".to_string()),
+                        v_expr.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 0,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+
+                let ret = TyTerm::Named("bytes".to_string());
+                let ret_brand = got.view_full.then_some(got.brand).flatten();
+                if let Some(want) = want {
+                    self.add_constraint(
+                        ret.clone(),
+                        want.clone(),
+                        list_ptr.to_string(),
+                        ConstraintOrigin::ExprCheck,
+                    );
+                    return TyInfoTerm {
+                        ty: want.clone(),
+                        brand: ret_brand,
+                        view_full: false,
+                    };
+                }
+                return TyInfoTerm {
+                    ty: ret,
+                    brand: ret_brand,
+                    view_full: false,
+                };
+            }
+            "std.stream.fn_v1" => {
+                let want_arity = 1;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                if items.get(1).and_then(Expr::as_ident).is_none() {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message: "std.stream.fn_v1 expects a function identifier".to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: items[1].ptr().to_string(),
+                        }),
+                        notes: Vec::new(),
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                }
+
+                return if let Some(want) = want {
+                    TyInfoTerm::unbranded(want.clone())
+                } else {
+                    TyInfoTerm::unbranded(self.fresh_meta())
+                };
+            }
+            "std.stream.xf.require_brand_v1" => {
+                for field in items.iter().skip(1) {
+                    let Expr::List { items: pair, .. } = field else {
+                        let _ = self.infer_expr(field, None);
+                        continue;
+                    };
+                    if pair.len() != 2 {
+                        for it in pair {
+                            let _ = self.infer_expr(it, None);
+                        }
+                        continue;
+                    }
+                    let key = pair[0].as_ident();
+                    if key == Some("brand") || key == Some("validator") {
+                        continue;
+                    }
+                    let _ = self.infer_expr(&pair[1], None);
+                }
+
+                return if let Some(want) = want {
+                    TyInfoTerm::unbranded(want.clone())
+                } else {
+                    TyInfoTerm::unbranded(self.fresh_meta())
+                };
+            }
+            "std.rr.with_v1" => {
+                let want_arity = 2;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let cfg_expr = &items[1];
+                let cfg_ty = self.infer_expr(cfg_expr, None).ty;
+                let cfg_ok = matches!(
+                    &cfg_ty,
+                    TyTerm::Named(s) if s == "bytes" || s == "bytes_view" || s == "vec_u8"
+                ) || matches!(&cfg_ty, TyTerm::Never);
+                if !cfg_ok {
+                    self.diag_call_arg_type_mismatch(
+                        cfg_expr.ptr().to_string(),
+                        callee,
+                        0,
+                        Value::String("bytes, bytes_view, or vec_u8".to_string()),
+                        ty_term_to_value_like(&cfg_ty),
+                    );
+                }
+
+                let body_expr = &items[2];
+                return self.infer_expr(body_expr, want);
+            }
+            "std.rr.with_policy_v1" => {
+                let want_arity = 4;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let policy_id_expr = &items[1];
+                let _ = self.infer_expr(policy_id_expr, Some(&TyTerm::Named("bytes".to_string())));
+
+                let cassette_path_expr = &items[2];
+                let _ = self.infer_expr(
+                    cassette_path_expr,
+                    Some(&TyTerm::Named("bytes".to_string())),
+                );
+
+                let mode_expr = &items[3];
+                let _ = self.infer_expr(mode_expr, Some(&TyTerm::Named("i32".to_string())));
+
+                let body_expr = &items[4];
+                return self.infer_expr(body_expr, want);
+            }
+            "view.as_ptr" => {
+                let want_arity = 1;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+                let arg = &items[1];
+                let got = self.infer_expr(arg, None);
+                if !matches!(got.ty, TyTerm::Never) {
+                    self.add_constraint(
+                        got.ty,
+                        TyTerm::Named("bytes_view".to_string()),
+                        arg.ptr().to_string(),
+                        ConstraintOrigin::CallArg {
+                            callee: callee.to_string(),
+                            arg_index: 0,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+                return self.finish_known_ty(
+                    list_ptr,
+                    TyTerm::Named("ptr_const_u8".to_string()),
+                    want,
+                );
+            }
+            "ptr.cast" => {
+                let want_arity = 2;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diag_call_arity_mismatch(list_ptr, callee, want_arity, got_arity);
+                    for it in items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                }
+
+                let Some(target_name) = items.get(1).and_then(Expr::as_ident) else {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message: "ptr.cast form: (ptr.cast <ptr_ty> <ptr>)".to_string(),
+                        loc: Some(Location::X07Ast {
+                            ptr: list_ptr.to_string(),
+                        }),
+                        notes: vec!["First argument must be a pointer type identifier.".to_string()],
+                        related: Vec::new(),
+                        data: BTreeMap::from([(
+                            "callee".to_string(),
+                            Value::String(callee.to_string()),
+                        )]),
+                        quickfix: None,
+                    });
+                    let _ = self.infer_expr(&items[1], None);
+                    let _ = self.infer_expr(&items[2], None);
+                    return if let Some(want) = want {
+                        TyInfoTerm::unbranded(want.clone())
+                    } else {
+                        TyInfoTerm::unbranded(self.fresh_meta())
+                    };
+                };
+
+                match Ty::parse_named(target_name) {
+                    Some(ty) if ty.is_ptr_ty() => {}
+                    Some(ty) => {
+                        self.diag_call_arg_type_mismatch(
+                            items[1].ptr().to_string(),
+                            callee,
+                            0,
+                            Value::String("pointer type".to_string()),
+                            Value::String(format!("{ty:?}")),
+                        );
+                    }
+                    None => {
+                        self.diag_call_arg_type_mismatch(
+                            items[1].ptr().to_string(),
+                            callee,
+                            0,
+                            Value::String("pointer type".to_string()),
+                            Value::String(target_name.to_string()),
+                        );
+                    }
+                }
+
+                let src_expr = &items[2];
+                let src_ty = self.infer_expr(src_expr, None).ty;
+                if let TyTerm::Named(src_name) = &src_ty {
+                    if !Ty::parse_named(src_name).is_some_and(|ty| ty.is_ptr_ty()) {
+                        self.diag_call_arg_type_mismatch(
+                            src_expr.ptr().to_string(),
+                            callee,
+                            1,
+                            Value::String("pointer".to_string()),
+                            ty_term_to_value_like(&src_ty),
+                        );
+                    }
+                }
+
+                return self.finish_known_ty(
+                    list_ptr,
+                    TyTerm::Named(target_name.to_string()),
+                    want,
+                );
+            }
+            _ => {}
         }
 
         let Some(sig) = self.sigs.sigs.get(callee) else {
@@ -1080,6 +1945,37 @@ impl<'a> InferState<'a> {
         });
 
         self.infer_call_with_subst(list_ptr, sig, &items[1..], want, subst)
+    }
+
+    fn infer_budget_cfg_v1(
+        &mut self,
+        _list_ptr: &str,
+        items: &[Expr],
+        want: Option<&TyTerm>,
+    ) -> TyInfoTerm {
+        for field in items.iter().skip(1) {
+            let Expr::List { items: pair, .. } = field else {
+                let _ = self.infer_expr(field, None);
+                continue;
+            };
+            if pair.len() != 2 {
+                for it in pair {
+                    let _ = self.infer_expr(it, None);
+                }
+                continue;
+            }
+            let key = pair[0].as_ident();
+            if key == Some("mode") {
+                continue;
+            }
+            let _ = self.infer_expr(&pair[1], None);
+        }
+
+        if let Some(want) = want {
+            TyInfoTerm::unbranded(want.clone())
+        } else {
+            TyInfoTerm::unbranded(self.fresh_meta())
+        }
     }
 
     fn infer_call_with_subst(
@@ -1265,8 +2161,8 @@ fn allow_implicit_bytes_view_call_arg_coercion(
 
     // Compiler call-arg compatibility is broader than strict unification, but builtins vary.
     // - For local functions, the compiler allows `bytes`/`vec_u8` where `bytes_view` is expected.
-    // - For builtins in this typechecker signature set, only the bytes-related helpers accept
-    //   `bytes` (not `vec_u8`) in `bytes_view` positions.
+    // - For builtins in this typechecker signature set, only certain helpers accept `bytes`
+    //   (not `vec_u8`) in `bytes_view` positions.
     match got.as_str() {
         "bytes" => match callee_decl_ptr {
             Some(_) => true,
@@ -1274,9 +2170,12 @@ fn allow_implicit_bytes_view_call_arg_coercion(
                 callee,
                 "bytes.len"
                     | "bytes.get_u8"
+                    | "bytes.slice"
                     | "vec_u8.extend_bytes"
+                    | "vec_u8.extend_bytes_range"
                     | "bytes.eq"
                     | "bytes.cmp_range"
+                    | "codec.read_u32_le"
             ),
         },
         "vec_u8" => callee_decl_ptr.is_some(),
@@ -1993,9 +2892,19 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
     }
 
     sigs.insert(
+        "i32.lit".to_string(),
+        mono("i32.lit", &[("x", "i32")], "i32"),
+    );
+    sigs.insert(
+        "await".to_string(),
+        mono("await", &[("handle", "i32")], "bytes"),
+    );
+
+    sigs.insert(
         "bytes.alloc".to_string(),
         mono("bytes.alloc", &[("n", "i32")], "bytes"),
     );
+    sigs.insert("bytes.empty".to_string(), mono("bytes.empty", &[], "bytes"));
     sigs.insert(
         "bytes.len".to_string(),
         mono("bytes.len", &[("b", "bytes_view")], "i32"),
@@ -2036,6 +2945,10 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
         ),
     );
     sigs.insert(
+        "bytes.copy".to_string(),
+        mono("bytes.copy", &[("a", "bytes"), ("b", "bytes")], "bytes"),
+    );
+    sigs.insert(
         "bytes.view".to_string(),
         mono("bytes.view", &[("b", "bytes")], "bytes_view"),
     );
@@ -2050,6 +2963,14 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
     sigs.insert(
         "bytes.concat".to_string(),
         mono("bytes.concat", &[("a", "bytes"), ("b", "bytes")], "bytes"),
+    );
+    sigs.insert(
+        "bytes.slice".to_string(),
+        mono(
+            "bytes.slice",
+            &[("b", "bytes_view"), ("start", "i32"), ("len", "i32")],
+            "bytes",
+        ),
     );
 
     sigs.insert(
@@ -2072,14 +2993,61 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
         "view.to_bytes".to_string(),
         mono("view.to_bytes", &[("v", "bytes_view")], "bytes"),
     );
+    sigs.insert(
+        "view.eq".to_string(),
+        mono(
+            "view.eq",
+            &[("a", "bytes_view"), ("b", "bytes_view")],
+            "i32",
+        ),
+    );
+    sigs.insert(
+        "view.cmp_range".to_string(),
+        mono(
+            "view.cmp_range",
+            &[
+                ("a", "bytes_view"),
+                ("a_off", "i32"),
+                ("a_len", "i32"),
+                ("b", "bytes_view"),
+                ("b_off", "i32"),
+                ("b_len", "i32"),
+            ],
+            "i32",
+        ),
+    );
 
     sigs.insert(
         "vec_u8.with_capacity".to_string(),
         mono("vec_u8.with_capacity", &[("cap", "i32")], "vec_u8"),
     );
     sigs.insert(
+        "vec_u8.len".to_string(),
+        mono("vec_u8.len", &[("v", "vec_u8")], "i32"),
+    );
+    sigs.insert(
+        "vec_u8.get".to_string(),
+        mono("vec_u8.get", &[("v", "vec_u8"), ("i", "i32")], "i32"),
+    );
+    sigs.insert(
+        "vec_u8.set".to_string(),
+        mono(
+            "vec_u8.set",
+            &[("v", "vec_u8"), ("i", "i32"), ("x", "i32")],
+            "vec_u8",
+        ),
+    );
+    sigs.insert(
         "vec_u8.push".to_string(),
         mono("vec_u8.push", &[("v", "vec_u8"), ("x", "i32")], "vec_u8"),
+    );
+    sigs.insert(
+        "vec_u8.reserve_exact".to_string(),
+        mono(
+            "vec_u8.reserve_exact",
+            &[("v", "vec_u8"), ("additional", "i32")],
+            "vec_u8",
+        ),
     );
     sigs.insert(
         "vec_u8.extend_bytes".to_string(),
@@ -2090,8 +3058,285 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
         ),
     );
     sigs.insert(
+        "vec_u8.extend_bytes_range".to_string(),
+        mono(
+            "vec_u8.extend_bytes_range",
+            &[
+                ("v", "vec_u8"),
+                ("b", "bytes_view"),
+                ("start", "i32"),
+                ("len", "i32"),
+            ],
+            "vec_u8",
+        ),
+    );
+    sigs.insert(
+        "vec_u8.as_view".to_string(),
+        mono("vec_u8.as_view", &[("v", "vec_u8")], "bytes_view"),
+    );
+    sigs.insert(
         "vec_u8.into_bytes".to_string(),
         mono("vec_u8.into_bytes", &[("v", "vec_u8")], "bytes"),
+    );
+
+    sigs.insert(
+        "codec.read_u32_le".to_string(),
+        mono(
+            "codec.read_u32_le",
+            &[("b", "bytes_view"), ("off", "i32")],
+            "i32",
+        ),
+    );
+    sigs.insert(
+        "codec.write_u32_le".to_string(),
+        mono("codec.write_u32_le", &[("x", "i32")], "bytes"),
+    );
+
+    sigs.insert(
+        "fmt.u32_to_dec".to_string(),
+        mono("fmt.u32_to_dec", &[("x", "i32")], "bytes"),
+    );
+    sigs.insert(
+        "fmt.s32_to_dec".to_string(),
+        mono("fmt.s32_to_dec", &[("x", "i32")], "bytes"),
+    );
+
+    sigs.insert(
+        "parse.u32_dec".to_string(),
+        mono("parse.u32_dec", &[("b", "bytes_view")], "i32"),
+    );
+    sigs.insert(
+        "parse.u32_dec_at".to_string(),
+        mono(
+            "parse.u32_dec_at",
+            &[("b", "bytes_view"), ("off", "i32")],
+            "i32",
+        ),
+    );
+
+    sigs.insert(
+        "prng.lcg_next_u32".to_string(),
+        mono("prng.lcg_next_u32", &[("seed", "i32")], "i32"),
+    );
+
+    sigs.insert(
+        "option_i32.none".to_string(),
+        mono("option_i32.none", &[], "option_i32"),
+    );
+    sigs.insert(
+        "option_i32.some".to_string(),
+        mono("option_i32.some", &[("x", "i32")], "option_i32"),
+    );
+    sigs.insert(
+        "option_i32.is_some".to_string(),
+        mono("option_i32.is_some", &[("o", "option_i32")], "i32"),
+    );
+    sigs.insert(
+        "option_i32.unwrap_or".to_string(),
+        mono(
+            "option_i32.unwrap_or",
+            &[("o", "option_i32"), ("default", "i32")],
+            "i32",
+        ),
+    );
+
+    sigs.insert(
+        "option_bytes.none".to_string(),
+        mono("option_bytes.none", &[], "option_bytes"),
+    );
+    sigs.insert(
+        "option_bytes.some".to_string(),
+        mono("option_bytes.some", &[("b", "bytes")], "option_bytes"),
+    );
+    sigs.insert(
+        "option_bytes.is_some".to_string(),
+        mono("option_bytes.is_some", &[("o", "option_bytes")], "i32"),
+    );
+    sigs.insert(
+        "option_bytes.unwrap_or".to_string(),
+        mono(
+            "option_bytes.unwrap_or",
+            &[("o", "option_bytes"), ("default", "bytes")],
+            "bytes",
+        ),
+    );
+
+    sigs.insert(
+        "option_bytes_view.none".to_string(),
+        mono("option_bytes_view.none", &[], "option_bytes_view"),
+    );
+    sigs.insert(
+        "option_bytes_view.some".to_string(),
+        mono(
+            "option_bytes_view.some",
+            &[("v", "bytes_view")],
+            "option_bytes_view",
+        ),
+    );
+    sigs.insert(
+        "option_bytes_view.is_some".to_string(),
+        mono(
+            "option_bytes_view.is_some",
+            &[("o", "option_bytes_view")],
+            "i32",
+        ),
+    );
+    sigs.insert(
+        "option_bytes_view.unwrap_or".to_string(),
+        mono(
+            "option_bytes_view.unwrap_or",
+            &[("o", "option_bytes_view"), ("default", "bytes_view")],
+            "bytes_view",
+        ),
+    );
+
+    sigs.insert(
+        "result_i32.ok".to_string(),
+        mono("result_i32.ok", &[("x", "i32")], "result_i32"),
+    );
+    sigs.insert(
+        "result_i32.err".to_string(),
+        mono("result_i32.err", &[("code", "i32")], "result_i32"),
+    );
+    sigs.insert(
+        "result_i32.is_ok".to_string(),
+        mono("result_i32.is_ok", &[("r", "result_i32")], "i32"),
+    );
+    sigs.insert(
+        "result_i32.err_code".to_string(),
+        mono("result_i32.err_code", &[("r", "result_i32")], "i32"),
+    );
+    sigs.insert(
+        "result_i32.unwrap_or".to_string(),
+        mono(
+            "result_i32.unwrap_or",
+            &[("r", "result_i32"), ("default", "i32")],
+            "i32",
+        ),
+    );
+
+    sigs.insert(
+        "result_bytes.ok".to_string(),
+        mono("result_bytes.ok", &[("b", "bytes")], "result_bytes"),
+    );
+    sigs.insert(
+        "result_bytes.err".to_string(),
+        mono("result_bytes.err", &[("code", "i32")], "result_bytes"),
+    );
+    sigs.insert(
+        "result_bytes.is_ok".to_string(),
+        mono("result_bytes.is_ok", &[("r", "result_bytes")], "i32"),
+    );
+    sigs.insert(
+        "result_bytes.err_code".to_string(),
+        mono("result_bytes.err_code", &[("r", "result_bytes")], "i32"),
+    );
+    sigs.insert(
+        "result_bytes.unwrap_or".to_string(),
+        mono(
+            "result_bytes.unwrap_or",
+            &[("r", "result_bytes"), ("default", "bytes")],
+            "bytes",
+        ),
+    );
+
+    sigs.insert(
+        "result_bytes_view.ok".to_string(),
+        mono(
+            "result_bytes_view.ok",
+            &[("v", "bytes_view")],
+            "result_bytes_view",
+        ),
+    );
+    sigs.insert(
+        "result_bytes_view.err".to_string(),
+        mono(
+            "result_bytes_view.err",
+            &[("code", "i32")],
+            "result_bytes_view",
+        ),
+    );
+    sigs.insert(
+        "result_bytes_view.is_ok".to_string(),
+        mono(
+            "result_bytes_view.is_ok",
+            &[("r", "result_bytes_view")],
+            "i32",
+        ),
+    );
+    sigs.insert(
+        "result_bytes_view.err_code".to_string(),
+        mono(
+            "result_bytes_view.err_code",
+            &[("r", "result_bytes_view")],
+            "i32",
+        ),
+    );
+    sigs.insert(
+        "result_bytes_view.unwrap_or".to_string(),
+        mono(
+            "result_bytes_view.unwrap_or",
+            &[("r", "result_bytes_view"), ("default", "bytes_view")],
+            "bytes_view",
+        ),
+    );
+
+    sigs.insert(
+        "result_result_bytes.is_ok".to_string(),
+        mono(
+            "result_result_bytes.is_ok",
+            &[("r", "result_result_bytes")],
+            "i32",
+        ),
+    );
+    sigs.insert(
+        "result_result_bytes.err_code".to_string(),
+        mono(
+            "result_result_bytes.err_code",
+            &[("r", "result_result_bytes")],
+            "i32",
+        ),
+    );
+    sigs.insert(
+        "result_result_bytes.unwrap_or".to_string(),
+        mono(
+            "result_result_bytes.unwrap_or",
+            &[("r", "result_result_bytes"), ("default", "result_bytes")],
+            "result_bytes",
+        ),
+    );
+
+    sigs.insert(
+        "os.db.sqlite.open_v1".to_string(),
+        mono(
+            "os.db.sqlite.open_v1",
+            &[("req", "bytes"), ("caps", "bytes")],
+            "bytes",
+        ),
+    );
+    sigs.insert(
+        "os.db.sqlite.query_v1".to_string(),
+        mono(
+            "os.db.sqlite.query_v1",
+            &[("req", "bytes"), ("caps", "bytes")],
+            "bytes",
+        ),
+    );
+    sigs.insert(
+        "os.db.sqlite.exec_v1".to_string(),
+        mono(
+            "os.db.sqlite.exec_v1",
+            &[("req", "bytes"), ("caps", "bytes")],
+            "bytes",
+        ),
+    );
+    sigs.insert(
+        "os.db.sqlite.close_v1".to_string(),
+        mono(
+            "os.db.sqlite.close_v1",
+            &[("req", "bytes"), ("caps", "bytes")],
+            "bytes",
+        ),
     );
 }
 

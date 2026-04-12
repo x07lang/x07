@@ -2,7 +2,7 @@
   "schema_version": "x07.project@0.5.0",
   "compat": "0.5",
   "world": "run-os",
-  "entry": "modules/demo/tests_pure.x07.json",
+  "entry": "tests/main.x07.json",
   "module_roots": [
     "modules"
   ],

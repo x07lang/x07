@@ -141,7 +141,7 @@ Every change requires a full compile and (for `x07 build` / `x07 run`) C emissio
 | Generic functions | 1 (stable_unique, blocked by runtime bug) |
 | PBT tests | 1 (100 cases, deterministic) |
 | RR tests | 2 (replay-based verification) |
-| Budget profiles | 3 (db_plan_v1, db_apply_v1, db_verify_v1) |
+| Budget profiles | 3 (db_plan_v1, db_migrate_v1, db_verify_v1) |
 | Packages used | ext-db-migrate@VERSION, ext-db-core@VERSION, ext-db-sqlite@VERSION, ext-json-rs@VERSION |
 | Hard blockers hit | 2 (ext-crypto-rs schema version, generics monomorphization) |
 | Time to first passing build | ~15 minutes of agent work |

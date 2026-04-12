@@ -66,6 +66,24 @@ Some surfaces are intentionally allowed to evolve:
 - Performance characteristics (as long as determinism and resource bounds remain intact).
 - Internal implementation details that are not part of a documented public contract.
 
+## Deprecations (policy)
+
+When a compat-critical behavior or surface is deprecated, the deprecation must be:
+
+- Documented in this file (including the migration story and the diagnostic code(s)).
+- Backed by a regression surface (compat corpus and/or fixability cases).
+- Surfaced to users as structured diagnostics with actionable notes.
+
+Timeline:
+
+- Deprecations must not be removed while they are still inside the supported window (current `stable` and N-1).
+- If removal is planned, the toolchain should first emit warnings for at least one supported release cycle before turning the deprecation into an error, unless security or correctness requires immediate failure.
+
+How warnings are emitted:
+
+- Warnings are emitted as `x07diag` diagnostics with `severity="warning"` and stable `code` identifiers.
+- `x07 check` and `x07 run` continue to succeed (exit code `0`) when only warnings are present, but they still include the warnings in the JSON report so agents can repair/migrate proactively.
+
 ## Guardrails (Milestone M0)
 
 Compatibility is enforced by CI guardrails:
@@ -74,6 +92,8 @@ Compatibility is enforced by CI guardrails:
   toolchain changes.
   - Config: `tests/compat_corpus/corpus.json`
   - Harness: `scripts/ci/check_compat_corpus.sh`
+- **Docs examples compile**: all `docs/examples/**/x07.json` projects must typecheck against the current toolchain.
+  - Harness: `scripts/ci/check_doc_examples_compile.py`
 - **Diagnostics catalog coverage**: every emitted diagnostic code must be documented and discoverable.
   (See `x07 diag coverage` and the CI gate described in this milestone.)
 

@@ -6875,6 +6875,58 @@ fn x07_fix_applies_multiple_borrow_quickfixes() {
 }
 
 #[test]
+fn x07_lint_resolves_builtin_import_sigs() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_lint_builtin_import_sigs");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    // Regression: `x07 lint` must typecheck stdlib imports, otherwise calls like
+    // `std.deque.emit_le` get an inferred return type that diverges from `x07 check`.
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": ["std.deque"],
+        "decls": [],
+        "solve": ["begin",
+            ["let", "dq", ["tapp", "std.deque.with_capacity", ["tys", "u32"], 2]],
+            ["set", "dq", ["tapp", "std.deque.push_back", ["tys", "u32"], "dq", 1]],
+            ["let", "out", ["tapp", "std.deque.emit_le", ["tys", "u32"], ["bytes.view", "dq"]]],
+            ["bytes.concat", ["bytes.lit", "a"], "out"]
+        ]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let out = run_x07(&["lint", "--input", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lint_report = parse_json_stdout(&out);
+    assert_eq!(lint_report["ok"], true);
+    assert!(
+        lint_report["diagnostics"]
+            .as_array()
+            .expect("diagnostics[]")
+            .is_empty(),
+        "expected lint to be clean, got:\n{}",
+        serde_json::to_string_pretty(&lint_report).expect("pretty report")
+    );
+}
+
+#[test]
 fn x07_fmt_accepts_positional_paths() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_fmt_positional");
@@ -7264,6 +7316,124 @@ fn x07_fix_suggest_generics_moves_contracts_to_base_and_keeps_schema() {
     );
     let lint_report = parse_json_stdout(&out);
     assert_eq!(lint_report["ok"], true);
+}
+
+#[test]
+fn x07_check_run_os_sandboxed_respects_policy_language_toggles() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_check_policy_language_toggles");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(dir.join("src")).expect("create src dir");
+    std::fs::create_dir_all(dir.join("policy")).expect("create policy dir");
+
+    let policy_doc = serde_json::json!({
+        "schema_version": "x07.run-os-policy@0.1.0",
+        "policy_id": "x07_check_policy_language_toggles",
+        "limits": {
+            "cpu_ms": 1000,
+            "wall_ms": 1000,
+            "mem_bytes": 1048576,
+            "fds": 16,
+            "procs": 8
+        },
+        "fs": {
+            "enabled": false,
+            "read_roots": [],
+            "write_roots": [],
+            "deny_hidden": true
+        },
+        "net": {
+            "enabled": false,
+            "allow_dns": false,
+            "allow_tcp": false,
+            "allow_udp": false,
+            "allow_hosts": []
+        },
+        "env": {
+            "enabled": false,
+            "allow_keys": [],
+            "deny_keys": []
+        },
+        "time": {
+            "enabled": false,
+            "allow_monotonic": false,
+            "allow_wall_clock": false,
+            "allow_sleep": false,
+            "max_sleep_ms": 0,
+            "allow_local_tzid": false
+        },
+        "language": {
+            "allow_unsafe": true,
+            "allow_ffi": true
+        },
+        "process": {
+            "enabled": false,
+            "allow_spawn": false,
+            "max_live": 0,
+            "max_spawns": 0,
+            "allow_exec": false,
+            "allow_exit": false
+        }
+    });
+    write_json(&dir.join("policy/run-os.json"), &policy_doc);
+
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "extern",
+                "abi": "C",
+                "link_name": "x07_test_dummy",
+                "name": "main._ffi.test",
+                "params": [{"name":"p","ty":"ptr_const_u8"}],
+                "result": "i32"
+            }
+        ],
+        "solve": ["bytes.lit", "ok"]
+    });
+    write_json(&dir.join("src/main.x07.json"), &program_doc);
+
+    let project_doc = serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "compat": "0.5",
+        "world": "run-os-sandboxed",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json",
+        "default_profile": "sandbox",
+        "profiles": {
+            "sandbox": {
+                "world": "run-os-sandboxed",
+                "policy": "policy/run-os.json"
+            }
+        }
+    });
+    let project_bytes = serde_json::to_vec(&project_doc).expect("serialize x07.json");
+    write_json(&dir.join("x07.json"), &project_doc);
+    write_lockfile_for_project_bytes(&dir, &project_bytes);
+
+    let out = run_x07_in_dir(&dir, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
 }
 
 #[test]

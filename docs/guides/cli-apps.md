@@ -2,6 +2,8 @@
 
 X07 is intended to make it easy for agents to build robust command-line tools.
 
+If you’re new to X07’s JSON-first source format, start with: [Syntax & x07AST](../language/syntax-x07ast.md).
+
 ## Canonical (x07 init + x07 run)
 
 1. Start from the CLI template (recommended):

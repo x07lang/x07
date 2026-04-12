@@ -5,6 +5,11 @@ use anyhow::{Context, Result};
 use clap::Args;
 use serde::Serialize;
 use walkdir::WalkDir;
+use x07_contracts::{
+    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
+};
+use x07_runner_common::os_policy;
 use x07_worlds::WorldId;
 use x07c::compile;
 use x07c::diagnostics;
@@ -14,6 +19,41 @@ use x07c::typecheck;
 use x07c::x07ast;
 
 use crate::repair::{RepairArgs, RepairMode};
+
+fn resolve_run_os_sandboxed_policy_language_toggles(
+    project_path: &Path,
+    project_base: &Path,
+) -> Result<Option<(PathBuf, bool, bool)>> {
+    let profiles_file = crate::run::load_project_profiles(project_path).context("load profiles")?;
+    let selected_profile =
+        crate::run::resolve_selected_profile(Some(project_path), Some(&profiles_file), None)
+            .context("resolve selected profile")?;
+    let Some(profile) = selected_profile else {
+        return Ok(None);
+    };
+    if profile.world != WorldId::RunOsSandboxed {
+        return Ok(None);
+    }
+    let Some(policy) = profile.policy else {
+        return Ok(None);
+    };
+    let policy_path = if policy.is_absolute() {
+        policy
+    } else {
+        project_base.join(policy)
+    };
+    let bytes = std::fs::read(&policy_path)
+        .with_context(|| format!("read policy: {}", policy_path.display()))?;
+    let pol: os_policy::Policy = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse policy JSON: {}", policy_path.display()))?;
+    pol.validate_basic()
+        .map_err(|e| anyhow::anyhow!("invalid policy: {e}"))?;
+    Ok(Some((
+        policy_path,
+        pol.language.allow_unsafe,
+        pol.language.allow_ffi,
+    )))
+}
 
 fn should_walk_dir_entry(entry: &walkdir::DirEntry) -> bool {
     let name = entry.file_name().to_string_lossy();
@@ -281,6 +321,13 @@ pub fn cmd_lint(
     let mut all_diags: Vec<diagnostics::Diagnostic> = Vec::new();
     let mut ok = true;
 
+    // `x07 lint` is file-oriented, but we still want imported stdlib modules to typecheck
+    // consistently with project checks (for example when linting docs examples).
+    //
+    // Best-effort: we only load built-in modules using an empty module_roots set. Any
+    // non-builtin imports remain unresolved and behave like pre-existing "local lint" mode.
+    let mut builtin_modules: BTreeMap<String, LoadedModuleFile> = BTreeMap::new();
+
     for input in &inputs {
         let bytes =
             std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
@@ -293,16 +340,63 @@ pub fn cmd_lint(
         };
 
         x07ast::canonicalize_x07ast_file(&mut file);
-        let report = lint::lint_file(&file, lint_options);
-        if !report.ok {
-            ok = false;
-        }
+
+        let report = lint::lint_file_no_typecheck(&file, lint_options);
         for mut d in report.diagnostics {
+            if d.severity == diagnostics::Severity::Error {
+                ok = false;
+            }
             d.data.insert(
                 "file".to_string(),
                 serde_json::Value::String(input.display().to_string()),
             );
             all_diags.push(d);
+        }
+
+        if file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+        {
+            let mut visiting: BTreeSet<String> = BTreeSet::new();
+            for module_id in &file.imports {
+                let _ = load_module_recursive(
+                    module_id,
+                    args.world,
+                    &[],
+                    &mut builtin_modules,
+                    &mut visiting,
+                );
+            }
+
+            let mut sigs = typecheck::TypecheckSigs::new();
+            sigs.add_file(&file);
+            for m in builtin_modules.values() {
+                if m.is_builtin {
+                    sigs.add_file(&m.file);
+                }
+            }
+            sigs.add_builtins();
+
+            let report = typecheck::typecheck_file_with_sigs(
+                &file,
+                &sigs,
+                &typecheck::TypecheckOptions {
+                    compat: lint_options.compat,
+                    ..Default::default()
+                },
+            );
+            for mut d in report.diagnostics {
+                if d.severity == diagnostics::Severity::Error {
+                    ok = false;
+                }
+                d.data.insert(
+                    "file".to_string(),
+                    serde_json::Value::String(input.display().to_string()),
+                );
+                all_diags.push(d);
+            }
         }
     }
 
@@ -997,6 +1091,42 @@ pub fn cmd_check(
 
     let mut lint_opts = x07c::world_config::lint_options_for_world(world);
     lint_opts.compat = compat;
+    let mut policy_path: Option<PathBuf> = None;
+    if world == WorldId::RunOsSandboxed {
+        match resolve_run_os_sandboxed_policy_language_toggles(&args.project, &base) {
+            Ok(Some((path, allow_unsafe, allow_ffi))) => {
+                policy_path = Some(path);
+                lint_opts.allow_unsafe = Some(allow_unsafe);
+                lint_opts.allow_ffi = Some(allow_ffi);
+            }
+            Ok(None) => {}
+            Err(err) => {
+                diags.push(crate::reporting::diag_error(
+                    "X07-IO-READ-0001",
+                    diagnostics::Stage::Parse,
+                    &format!("resolve run-os-sandboxed policy: {err:#}"),
+                ));
+                let mut report = diagnostics::Report::ok();
+                report.ok = false;
+                report.diagnostics = diags;
+                report.meta.insert(
+                    "inputs".to_string(),
+                    serde_json::Value::Array(vec![
+                        serde_json::Value::String(args.project.display().to_string()),
+                        serde_json::Value::String(lock_path.display().to_string()),
+                        serde_json::Value::String(program_path.display().to_string()),
+                    ]),
+                );
+                let out = serde_json::to_string(&report)? + "\n";
+                if let Some(path) = machine.out.as_deref() {
+                    crate::reporting::write_bytes(path, out.as_bytes())?;
+                } else {
+                    print!("{out}");
+                }
+                return Ok(std::process::ExitCode::from(1));
+            }
+        }
+    }
 
     let mut all_diags: Vec<diagnostics::Diagnostic> = Vec::new();
     let mut has_error = false;
@@ -1211,6 +1341,8 @@ pub fn cmd_check(
         let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
         options.compat = compat;
         options.arch_root = Some(base);
+        options.allow_unsafe = lint_opts.allow_unsafe;
+        options.allow_ffi = lint_opts.allow_ffi;
         if let Err(err) = compile::check_program(&program_bytes, &options) {
             let (fn_name, ptr) = parse_fn_and_ptr_suffix(&err.message);
             let mut code = "X07-INTERNAL-0001";
@@ -1334,6 +1466,9 @@ pub fn cmd_check(
     inputs.insert(args.project.display().to_string());
     inputs.insert(lock_path.display().to_string());
     inputs.insert(program_path.display().to_string());
+    if let Some(policy_path) = policy_path.as_ref() {
+        inputs.insert(policy_path.display().to_string());
+    }
     for m in modules.values() {
         if m.is_builtin {
             continue;

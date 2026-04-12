@@ -14,10 +14,10 @@
       "name": "appkit",
       "version": "0.1.0",
       "path": "pkgs/appkit/0.1.0",
-      "package_manifest_sha256": "0032862d4f672598c27b18a968736ffbe29a740efe05a6752bc53c35dcd9906c",
+      "package_manifest_sha256": "b12b37853e7665062e5cac5f13323f804a5851de2d18c680ccdbaa1c28062559",
       "module_root": "modules",
       "modules_sha256": {
-        "appkit.vec": "e5d7f00890a4e284f7a5a13669383d3a72abe215926f6303c36c9512de1daa0a"
+        "appkit.vec": "bb9d3018d8a8223a9039c1113a1f87b54e87b7429d845fcd55ce64b97f8cb645"
       }
     }
   ]

@@ -115,6 +115,32 @@ impl LintOptions {
     }
 }
 
+fn note_enable_unsafe(options: &LintOptions) -> String {
+    if options.world.caps().allow_unsafe {
+        if options.world == x07_worlds::WorldId::RunOsSandboxed {
+            "In run-os-sandboxed, unsafe is controlled by the sandbox policy: set policy.language.allow_unsafe=true."
+                .to_string()
+        } else {
+            "unsafe is disabled (allow_unsafe=false)".to_string()
+        }
+    } else {
+        "Compile with --world run-os or --world run-os-sandboxed for unsafe operations.".to_string()
+    }
+}
+
+fn note_enable_ffi(options: &LintOptions) -> String {
+    if options.world.caps().allow_ffi {
+        if options.world == x07_worlds::WorldId::RunOsSandboxed {
+            "In run-os-sandboxed, ffi is controlled by the sandbox policy: set policy.language.allow_ffi=true."
+                .to_string()
+        } else {
+            "ffi is disabled (allow_ffi=false)".to_string()
+        }
+    } else {
+        "Compile with --world run-os or --world run-os-sandboxed for extern C interop.".to_string()
+    }
+}
+
 pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
     lint_file_impl(file, options, true)
 }
@@ -1148,10 +1174,7 @@ fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut V
                     f.name
                 ),
                 loc: Some(Location::X07Ast { ptr }),
-                notes: vec![
-                    "Compile with --world run-os or --world run-os-sandboxed for extern C interop."
-                        .to_string(),
-                ],
+                notes: vec![note_enable_ffi(&options)],
                 related: Vec::new(),
                 data: Default::default(),
                 quickfix: None,
@@ -1177,14 +1200,11 @@ fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut V
                             loc: Some(Location::X07Ast {
                                 ptr: format!("/decls/{}/params/{}/ty", base + idx, pidx),
                             }),
-                            notes: vec![
-                                "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
-                                    .to_string(),
-                            ],
+                            notes: vec![note_enable_unsafe(&options)],
                             related: Vec::new(),
                             data: Default::default(),
                             quickfix: None,
-                        });
+                            });
                         }
                     }
                 }
@@ -1201,10 +1221,7 @@ fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut V
                             loc: Some(Location::X07Ast {
                                 ptr: format!("/decls/{}/result", base + idx),
                             }),
-                            notes: vec![
-                                "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
-                                    .to_string(),
-                            ],
+                            notes: vec![note_enable_unsafe(&options)],
                             related: Vec::new(),
                             data: Default::default(),
                             quickfix: None,
@@ -2456,10 +2473,7 @@ fn lint_world_heads(
             loc: Some(Location::X07Ast {
                 ptr: ptr.to_string(),
             }),
-            notes: vec![
-                "Compile with --world run-os or --world run-os-sandboxed for unsafe operations."
-                    .to_string(),
-            ],
+            notes: vec![note_enable_unsafe(&options)],
             related: Vec::new(),
             data: Default::default(),
             quickfix: None,

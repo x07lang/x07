@@ -72,7 +72,7 @@ arch/
   manifest.x07arch.json     # architecture manifest
   db/                        # migration plans
   rr/                        # record/replay policies
-  budgets/                   # budget profiles (db_plan_v1, db_apply_v1, db_verify_v1)
+  budgets/                   # budget profiles (db_plan_v1, db_migrate_v1, db_verify_v1)
 tests/
   tests.json                # test manifest
   unit.x07.json             # unit tests (solve-pure)
