@@ -1,0 +1,17 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "id": "smoke/stdlib_ergonomics_ok",
+      "world": "run-os",
+      "entry": "smoke.stdlib_ergonomics_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stdlib_ergonomics_unsafe_rel",
+      "world": "run-os",
+      "entry": "smoke.stdlib_ergonomics_unsafe_rel",
+      "expect": "pass"
+    }
+  ]
+}

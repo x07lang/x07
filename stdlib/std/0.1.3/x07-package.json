@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "std",
+  "version": "0.1.3",
+  "module_root": "modules",
+  "modules": [
+    "std.prng",
+    "std.pbt.case_v1",
+    "std.pbt.gen_v1",
+    "std.pbt.shrink_v1",
+    "std.text.ascii",
+    "std.text.slices",
+    "std.text.utf8",
+    "std.test",
+    "std.regex-lite",
+    "std.http.envelope",
+    "std.csv",
+    "std.io",
+    "std.io.bufread",
+    "std.world.fs",
+    "std.fs",
+    "std.rr",
+    "std.kv",
+    "std.path",
+    "std.process"
+  ],
+  "meta": {
+    "requires_packages": ["std-core@0.1.3"]
+  }
+}

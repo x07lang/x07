@@ -2,14 +2,14 @@
 
 IMPORTANT:
 - Output ONLY one JSON object (no preamble).
-- Do NOT use Markdown code fences.
+- Do NOT wrap the JSON in Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.5.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.8.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.5.0`
+- `schema_version`: `x07.x07ast@0.8.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -20,6 +20,7 @@ Entry program object fields:
 
 - i32: JSON numbers in range -2147483648..2147483647
 - atom: JSON strings with no whitespace
+- text: JSON strings (whitespace allowed; JSON escapes apply)
 - list: JSON arrays: `["head", arg1, arg2, ...]` (head is an atom string; list must be non-empty)
 
 ## Types
@@ -30,17 +31,21 @@ Entry program object fields:
 - `vec_u8` for mutable byte vectors (move-only; capacity-planned builders)
 - `option_i32`, `option_bytes`, `option_bytes_view` for typed optional values
 - `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes` for typed results with deterministic error codes
-- Signature types use `type_ref`:
-  - legacy concrete type tokens (strings), like `"i32"`
-  - structured type expressions (arrays), like `["t","A"]` and `["option",["t","A"]]`
+- Bytes-like types may carry an optional compile-time brand (see `params[].brand` and `result_brand`)
+  - Brand builtins (`std.brand.*`):
+    - `std.brand.cast_bytes_v1(brand_id, validator_id, b: bytes) -> result_bytes@brand_id`
+    - `std.brand.cast_view_v1(brand_id, validator_id, v: bytes_view) -> result_bytes_view@brand_id`
+    - `std.brand.cast_view_copy_v1(brand_id, validator_id, v: bytes_view) -> result_bytes@brand_id`
+    - `std.brand.assume_bytes_v1(brand_id, b: bytes) -> bytes@brand_id` (unsafe)
+    - `std.brand.erase_bytes_v1(b: bytes@B) -> bytes`, `std.brand.erase_view_v1(v: bytes_view@B) -> bytes_view`
+    - `std.brand.view_v1(b: bytes@B) -> bytes_view@B`
+    - `std.brand.to_bytes_preserve_if_full_v1(v: bytes_view@B) -> bytes`
 - `iface` for interface records (used for streaming readers)
 - Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`
 
-Bytes-like types may also carry an optional compile-time brand (for example via `params[].brand` and `result_brand`).
-
 Move rules (critical):
 - Passing `bytes` / `vec_u8` to a function that expects `bytes` / `vec_u8` **moves** (consumes) the value.
-- `result_i32` / `result_bytes` values are also move-only; consume them once (use `*_err_code`, `*_unwrap_or`, or `try`).
+- `result_i32` / `result_bytes` / `result_result_bytes` values are also move-only; consume them once (use `*_err_code`, `*_unwrap_or`, or `try`).
 - Mutating APIs return the updated value; always bind it with `let`/`set` (example: `["set","b",["bytes.set_u8","b",0,65]]`).
 
 ## Builtins
@@ -54,20 +59,27 @@ Move rules (critical):
 - `unsafe`: `["unsafe", e1, e2, ...]` evaluates sequentially and returns the last expression; inside it, unsafe-only operations are allowed (standalone-only)
 - `let`: `["let", name, expr]` binds `name` in the current scope
 - `set`: `["set", name, expr]` assigns an existing binding
+- `set0`: `["set0", name, expr]` assigns an existing binding and returns `0` (i32)
+  - Example: `["if", cond, ["set0","buf",["vec_u8.extend_bytes","buf",v]], 0]` unifies as `i32`.
 - `if`: `["if", cond, then, else]` branches on non-zero `cond`
 - `for`: `["for", i, start, end, body]` declares `i` (i32) and runs it from `start` to `end-1`
   - `body` is a single expression; use `begin` for multiple steps.
+- `while`: `["while", cond, body]` runs `body` while `cond` evaluates to non-zero
+  - `cond` must typecheck to `i32`; `body` is a single expression; use `begin` for multiple steps.
 - `return`: `["return", expr]` returns early from the current function
   - In `solve`, the return value must be `bytes`.
 
 ## Examples
 
 Echo (returns input):
-{"schema_version":"x07.x07ast@0.5.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+```json
+{"schema_version":"x07.x07ast@0.8.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+```
 
 Arity reminder:
 - `if` is `["if", cond, then, else]`
 - `for` is `["for", i, start, end, body]`
+- `while` is `["while", cond, body]`
 - `begin` is `["begin", e1, e2, ...]`
 
 ## Modules
@@ -80,7 +92,7 @@ Top-level fields:
 
 Declaration objects:
 
-- `{"kind":"defn","name":"main.f","type_params":[{"name":"A","bound":"num_like"}],"params":[{"name":"x","ty":["t","A"]}],"result":["t","A"],"body":<expr>}` (generic; `type_params` optional)
+- `{"kind":"defn","name":"main.f","params":[{"name":"x","ty":"bytes"}],"result":"bytes","body":<expr>}`
 - `{"kind":"defasync",...}` (returns awaited type; calling returns a task handle i32)
 - `{"kind":"extern","abi":"C","name":"main.c_fn","link_name":"c_fn","params":[{"name":"x","ty":"i32"}],"result":"i32"}` (standalone-only; `result` may also be `"void"`)
 - `{"kind":"export","names":["std.foo.bar", ...]}` (module files only)
@@ -105,8 +117,8 @@ Module IDs are dot-separated identifiers like `app.rle` or `std.bytes`.
 
 Module resolution is deterministic:
 
-- Built-in modules: `std.vec`, `std.vec_value`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_map_value`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque`, `std.deque_u32`, `std.heap`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.rr`, `std.kv`, `std.path`
-- Filesystem modules (standalone): `x07c compile --module-root <dir>` resolves `a.b` to `<dir>/a/b.x07.json`
+- Built-in modules: `std.vec`, `std.vec_value`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_map_value`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.kv`, `std.rr`, `std.world.fs`, `std.path`, `std.os.env`, `std.os.fs`, `std.os.net`, `std.os.process`, `std.os.process.req_v1`, `std.os.process.caps_v1`, `std.os.process_pool`, `std.os.time`
+- Filesystem modules (standalone): `x07 run --program <prog.x07.json> --module-root <dir>` resolves `a.b` to `<dir>/a/b.x07.json`
 
 Standalone binding override:
 
@@ -115,11 +127,12 @@ Standalone binding override:
 
 Standalone OS builtins:
 
-- These heads are only available when compiling with `--world run-os` or `--world run-os-sandboxed`:
+- These heads are only available in OS worlds (`run-os`, `run-os-sandboxed`):
   - `os.fs.read_file(path: bytes) -> bytes`
   - `os.fs.write_file(path: bytes, data: bytes) -> i32`
   - `os.fs.read_all_v1(path: bytes, caps: bytes) -> result_bytes`
   - `os.fs.write_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`
+  - `os.fs.append_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`
   - `os.fs.mkdirs_v1(path: bytes, caps: bytes) -> result_i32`
   - `os.fs.remove_file_v1(path: bytes, caps: bytes) -> result_i32`
   - `os.fs.remove_dir_all_v1(path: bytes, caps: bytes) -> result_i32`
@@ -162,7 +175,7 @@ Standalone unsafe + FFI:
 
 - Define with a `decls[]` entry of kind `defn`.
   - `body` is a single expression; wrap multi-step bodies in `begin`.
-  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.
+  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `option_bytes_view`, `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.
   - Function names must be namespaced and start with the current module ID.
     - In the entry file, use module `main` (example: `main.helper`).
   - `input` (bytes_view) is available in all function bodies.
@@ -248,8 +261,8 @@ Channels (bytes payloads):
 Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b"]`).
 
 - `std.bytes`
-  - `["std.bytes.len","b"]` -> i32
-  - `["std.bytes.get_u8","b","i"]` -> i32 (0..255)
+  - `["std.bytes.len","b"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)
+  - `["std.bytes.get_u8","b","i"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)
   - `["std.bytes.set_u8","b","i","v"]` -> bytes (returns `b`)
   - `["std.bytes.alloc","n"]` -> bytes (length `n`)
   - `["std.bytes.eq","a","b"]` -> i32 (1 if equal else 0)
@@ -260,6 +273,9 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.bytes.count_u8","v","target"]` -> i32 (`v` is bytes_view)
   - `["std.bytes.starts_with","a","prefix"]` -> i32 (both bytes_view)
   - `["std.bytes.ends_with","a","suffix"]` -> i32 (both bytes_view)
+  - `["std.bytes.strip_prefix_view","a","prefix"]` -> bytes_view
+  - `["std.bytes.strip_suffix_view","a","suffix"]` -> bytes_view
+  - `["std.bytes.trim_ascii_view","b"]` -> bytes_view
   - `["std.bytes.reverse","b"]` -> bytes
   - `["std.bytes.concat","a","b"]` -> bytes
   - `["std.bytes.take","b","n"]` -> bytes
@@ -277,26 +293,24 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.vec.reserve_exact","v","additional"]` -> vec_u8
   - `["std.vec.extend_bytes","v","b"]` -> vec_u8
   - `["std.vec.as_bytes","v"]` -> bytes
-- `std.vec_value` (generic; `T: value`)
-  - `["tapp","std.vec_value.with_capacity","bytes","cap"]` -> i32
+- `std.vec_value` (generic; `bytes` convenience wrappers)
+  - `["std.vec_value.with_capacity_bytes","cap"]` -> i32
   - `["std.vec_value.len","v"]` -> i32
   - `["std.vec_value.reserve_exact","v","additional"]` -> i32
-  - `["tapp","std.vec_value.push","bytes","v","x"]` -> i32
-  - `["tapp","std.vec_value.get_or","bytes","v","idx","default"]` -> bytes
-  - `["tapp","std.vec_value.set","bytes","v","idx","x"]` -> i32
+  - `["std.vec_value.push_bytes","v","x"]` -> i32
+  - `["std.vec_value.get_bytes_or","v","idx","default"]` -> bytes
+  - `["std.vec_value.set_bytes","v","idx","x"]` -> i32
   - `["std.vec_value.pop","v"]` -> i32
   - `["std.vec_value.clear","v"]` -> i32
-  - wrappers (bytes):
-    - `["std.vec_value.with_capacity_bytes","cap"]` -> i32
-    - `["std.vec_value.push_bytes","v","x"]` -> i32
-    - `["std.vec_value.get_bytes_or","v","idx","default"]` -> bytes
-    - `["std.vec_value.set_bytes","v","idx","x"]` -> i32
 - `std.slice`
   - `["std.slice.clamp","b","start","len"]` -> bytes
   - `["std.slice.cmp_bytes","a","b"]` -> i32 (-1/0/1)
 - `std.parse`
-  - `["std.parse.u32_dec","b"]` -> i32
+  - `["std.parse.u32_dec","b"]` -> result_i32
+  - `["std.parse.i32_dec","b"]` -> result_i32
   - `["std.parse.u32_dec_at","b","off"]` -> i32
+  - `["std.parse.u32_status_le","b"]` -> bytes (tag byte 1 + u32_le, or tag byte 0)
+  - `["std.parse.u32_status_le_at","b","off"]` -> bytes (tag byte 1 + u32_le + next_off_u32_le, or tag byte 0)
   - `["std.parse.i32_status_le","b"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)
   - `["std.parse.i32_status_le_at","b","off"]` -> bytes (tag byte 1 + i32_le + next_off_u32_le, or tag byte 0)
 - `std.fmt`
@@ -331,6 +345,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 - `std.json`
   - `["std.json.canonicalize_small","json_bytes"]` -> bytes (or `ERR`)
   - `["std.json.extract_path_canon_or_err","b"]` -> bytes
+  - `["std.json.encode","doc","opts"]` -> bytes (doc envelope)
+  - `["std.json.pretty_encode","doc"]` -> bytes (doc envelope)
 - `std.csv`
   - `["std.csv.sum_second_col_i32_status_le","csv_bytes"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)
   - `["std.csv.sum_second_col_i32le_or_err","csv_bytes"]` -> bytes (i32_le, or `ERR`)
@@ -343,115 +359,50 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.u32.write_le_at","b","off","x"]` -> bytes
   - `["std.u32.push_le","v","x"]` -> vec_u8
   - `["std.u32.pow2_ceil","x"]` -> i32
-- `std.small_map` (generic; key is bytes_view, value is `V: num_like`)
-  - `["std.small_map.empty"]` -> bytes
-  - `["tapp","std.small_map.len","u32","m"]` -> i32
-  - `["tapp","std.small_map.get_or","u32","m","key","default"]` -> i32
-  - `["tapp","std.small_map.put","u32","m","key","val"]` -> bytes
-  - `["tapp","std.small_map.remove","u32","m","key"]` -> bytes
-  - `["tapp","std.small_map.inc1","u32","m","key"]` -> bytes
-  - wrappers (bytes_view -> u32):
-    - `["std.small_map.empty_bytes_u32"]` -> bytes
-    - `["std.small_map.len_bytes_u32","m"]` -> i32
-    - `["std.small_map.get_bytes_u32","m","key"]` -> i32 (0 if missing)
-    - `["std.small_map.get_bytes_u32_or","m","key","default"]` -> i32
-    - `["std.small_map.put_bytes_u32","m","key","val"]` -> bytes
-    - `["std.small_map.remove_bytes_u32","m","key"]` -> bytes
-    - `["std.small_map.inc1_bytes_u32","m","key"]` -> bytes
-- `std.small_set` (generic; key is `K: bytes_like`)
-  - `["std.small_set.empty"]` -> bytes
-  - `["std.small_set.len","s"]` -> i32
-  - `["tapp","std.small_set.contains","bytes","s","key"]` -> i32
-  - `["tapp","std.small_set.insert","bytes","s","key"]` -> bytes
-  - wrappers (bytes_view key):
-    - `["std.small_set.empty_bytes"]` -> bytes
-    - `["std.small_set.len_bytes","s"]` -> i32
-    - `["std.small_set.contains_bytes","s","key"]` -> i32
-    - `["std.small_set.insert_bytes","s","key"]` -> bytes
+- `std.small_map`
+  - `["std.small_map.empty_bytes_u32"]` -> bytes
+  - `["std.small_map.len_bytes_u32","m"]` -> i32
+  - `["std.small_map.get_bytes_u32","m","key"]` -> i32 (0 if missing)
+  - `["std.small_map.put_bytes_u32","m","key","val"]` -> bytes
+  - `["std.small_map.remove_bytes_u32","m","key"]` -> bytes
+- `std.small_set`
+  - `["std.small_set.empty_bytes"]` -> bytes
+  - `["std.small_set.len_bytes","s"]` -> i32
+  - `["std.small_set.contains_bytes","s","key"]` -> i32
+  - `["std.small_set.insert_bytes","s","key"]` -> bytes
 - `std.hash`
   - `["std.hash.fnv1a32_bytes","b"]` -> i32
   - `["std.hash.fnv1a32_range","b","start","len"]` -> i32
   - `["std.hash.fnv1a32_view","v"]` -> i32
   - `["std.hash.mix32","x"]` -> i32
-- `std.hash_map` (generic; `K: hashable`, `V: num_like`)
-  - `["std.hash_map.with_capacity","expected_len"]` -> i32
-  - `["std.hash_map.len","m"]` -> i32
-  - `["tapp","std.hash_map.contains","u32","m","key"]` -> i32
-  - `["tapp","std.hash_map.get_or","u32","u32","m","key","default"]` -> i32
-  - `["tapp","std.hash_map.set","u32","u32","m","key","val"]` -> i32
-  - `["tapp","std.hash_map.emit_kv_le","u32","u32","m"]` -> bytes
-  - wrappers (u32 keys/values):
-    - `["std.hash_map.with_capacity_u32","expected_len"]` -> i32
-    - `["std.hash_map.len_u32","m"]` -> i32
-    - `["std.hash_map.contains_u32","m","key"]` -> i32
-    - `["std.hash_map.get_u32_or","m","key","default"]` -> i32
-    - `["std.hash_map.set_u32","m","key","val"]` -> i32
-    - `["std.hash_map.emit_kv_u32le_u32le","m"]` -> bytes
-- `std.hash_map_value` (generic; `K: hashable`, `V: value`)
-  - `["tapp","std.hash_map_value.new","bytes","bytes","cap_pow2"]` -> i32
-  - `["tapp","std.hash_map_value.with_capacity","bytes","bytes","expected_len"]` -> i32
+- `std.hash_map` (u32 keys/values)
+  - `["std.hash_map.with_capacity_u32","expected_len"]` -> i32
+  - `["std.hash_map.len_u32","m"]` -> i32
+  - `["std.hash_map.contains_u32","m","key"]` -> i32
+  - `["std.hash_map.get_u32_or","m","key","default"]` -> i32
+  - `["std.hash_map.set_u32","m","key","val"]` -> i32
+- `std.hash_map_value` (generic; `bytes`/`bytes` convenience wrappers)
+  - `["std.hash_map_value.new_bytes_bytes","cap_pow2"]` -> i32
+  - `["std.hash_map_value.with_capacity_bytes_bytes","expected_len"]` -> i32
   - `["std.hash_map_value.len","m"]` -> i32
-  - `["tapp","std.hash_map_value.contains","bytes","m","key"]` -> i32
-  - `["tapp","std.hash_map_value.get_or","bytes","bytes","m","key","default"]` -> bytes
-  - `["tapp","std.hash_map_value.set","bytes","bytes","m","key","val"]` -> i32
-  - `["tapp","std.hash_map_value.remove","bytes","m","key"]` -> i32
+  - `["std.hash_map_value.contains_bytes","m","key"]` -> i32
+  - `["std.hash_map_value.get_bytes_bytes_or","m","key","default"]` -> bytes
+  - `["std.hash_map_value.set_bytes_bytes","m","key","val"]` -> i32
+  - `["std.hash_map_value.remove_bytes","m","key"]` -> i32
   - `["std.hash_map_value.clear","m"]` -> i32
-  - wrappers (bytes keys/values):
-    - `["std.hash_map_value.new_bytes_bytes","cap_pow2"]` -> i32
-    - `["std.hash_map_value.with_capacity_bytes_bytes","expected_len"]` -> i32
-    - `["std.hash_map_value.contains_bytes","m","key"]` -> i32
-    - `["std.hash_map_value.get_bytes_bytes_or","m","key","default"]` -> bytes
-    - `["std.hash_map_value.set_bytes_bytes","m","key","val"]` -> i32
-    - `["std.hash_map_value.remove_bytes","m","key"]` -> i32
-- `std.hash_set` (generic; `A: hashable`)
-  - `["std.hash_set.new","cap_pow2"]` -> i32
-  - `["std.hash_set.len","s"]` -> i32
-  - `["tapp","std.hash_set.add","u32","s","key"]` -> i32
-  - `["tapp","std.hash_set.contains","u32","s","key"]` -> i32
-  - `["tapp","std.hash_set.emit_le","u32","s"]` -> bytes (`A: orderable`)
-  - wrappers (u32 key):
-    - `["std.hash_set.new_u32","cap_pow2"]` -> i32
-    - `["std.hash_set.len_u32","s"]` -> i32
-    - `["std.hash_set.add_u32","s","key"]` -> i32
-    - `["std.hash_set.contains_u32","s","key"]` -> i32
-    - `["std.hash_set.emit_u32le","s"]` -> bytes
-  - view-key set:
-    - `["std.hash_set.view_new","expected_len"]` -> vec_u8
-    - `["std.hash_set.view_len","set"]` -> i32
-    - `["std.hash_set.view_contains","set","base","start","len"]` -> i32
-    - `["std.hash_set.view_insert","set","base","start","len"]` -> vec_u8
-- `std.btree_map` (generic; `K: orderable`, `V: num_like`)
-  - `["std.btree_map.empty"]` -> bytes
-  - `["tapp","std.btree_map.len","u32","u32","m"]` -> i32
-  - `["tapp","std.btree_map.contains","u32","u32","m","key"]` -> i32
-  - `["tapp","std.btree_map.get_or","u32","u32","m","key","default"]` -> i32
-  - `["tapp","std.btree_map.put","u32","u32","m","key","val"]` -> bytes
-  - `["tapp","std.btree_map.emit_kv_le","u32","u32","m"]` -> bytes
-  - wrappers (ordered u32->u32):
-    - `["std.btree_map.empty_u32_u32"]` -> bytes
-    - `["std.btree_map.len_u32_u32","m"]` -> i32
-    - `["std.btree_map.get_u32_u32_or","m","key","default"]` -> i32
-    - `["std.btree_map.put_u32_u32","m","key","val"]` -> bytes
-    - `["std.btree_map.emit_kv_u32le_u32le","m"]` -> bytes
-- `std.btree_set` (generic; `A: orderable`)
-  - `["std.btree_set.empty"]` -> bytes
-  - `["tapp","std.btree_set.len","u32","s"]` -> i32
-  - `["tapp","std.btree_set.contains","u32","s","key"]` -> i32
-  - `["tapp","std.btree_set.insert","u32","s","key"]` -> bytes
-  - `["tapp","std.btree_set.emit_le","u32","s"]` -> bytes
-  - wrappers (ordered u32):
-    - `["std.btree_set.empty_u32"]` -> bytes
-    - `["std.btree_set.len_u32","s"]` -> i32
-    - `["std.btree_set.contains_u32","s","key"]` -> i32
-    - `["std.btree_set.insert_u32","s","key"]` -> bytes
-    - `["std.btree_set.emit_u32le","s"]` -> bytes
-- `std.deque` (generic; `A: num_like`)
-  - `["tapp","std.deque.with_capacity","u32","cap"]` -> bytes
-  - `["std.deque.len","dq"]` -> i32
-  - `["tapp","std.deque.push_back","u32","dq","x"]` -> bytes
-  - `["tapp","std.deque.front_or","u32","dq","default"]` -> i32
-  - `["std.deque.pop_front","dq"]` -> bytes
-  - `["tapp","std.deque.emit_le","u32","dq"]` -> bytes
+- `std.hash_set`
+  - u32 set: `["std.hash_set.new_u32","cap_pow2"]` -> i32, `["std.hash_set.add_u32","s","key"]` -> i32
+  - view-key set: `["std.hash_set.view_new","expected_len"]` -> vec_u8, `["std.hash_set.view_insert","set","base","start","len"]` -> vec_u8
+- `std.btree_map` (ordered u32->u32)
+  - `["std.btree_map.empty_u32_u32"]` -> bytes
+  - `["std.btree_map.len_u32_u32","m"]` -> i32
+  - `["std.btree_map.get_u32_u32_or","m","key","default"]` -> i32
+  - `["std.btree_map.put_u32_u32","m","key","val"]` -> bytes
+- `std.btree_set` (ordered u32)
+  - `["std.btree_set.empty_u32"]` -> bytes
+  - `["std.btree_set.len_u32","s"]` -> i32
+  - `["std.btree_set.contains_u32","s","key"]` -> i32
+  - `["std.btree_set.insert_u32","s","key"]` -> bytes
 - `std.deque_u32`
   - `["std.deque_u32.with_capacity","cap"]` -> bytes
   - `["std.deque_u32.len","dq"]` -> i32
@@ -459,13 +410,6 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.deque_u32.front_or","dq","default"]` -> i32
   - `["std.deque_u32.pop_front","dq"]` -> bytes
   - `["std.deque_u32.emit_u32le","dq"]` -> bytes
-- `std.heap` (generic; `A: orderable`)
-  - `["tapp","std.heap.with_capacity","u32","cap"]` -> bytes
-  - `["std.heap.len","h"]` -> i32
-  - `["tapp","std.heap.push","u32","h","x"]` -> bytes
-  - `["tapp","std.heap.min_or","u32","h","default"]` -> i32
-  - `["tapp","std.heap.pop_min","u32","h"]` -> bytes
-  - `["tapp","std.heap.emit_le","u32","h"]` -> bytes
 - `std.heap_u32`
   - `["std.heap_u32.with_capacity","cap"]` -> bytes
   - `["std.heap_u32.len","h"]` -> i32
@@ -478,34 +422,20 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.bitset.set","bs","bit"]` -> bytes
   - `["std.bitset.test","bs","bit"]` -> i32
   - `["std.bitset.intersection_count","a","b"]` -> i32
-- `std.slab` (generic; `V: num_like`)
-  - `["tapp","std.slab.new","u32","cap"]` -> bytes
-  - `["std.slab.free_head","slab"]` -> i32 (-1 if none)
-  - `["std.slab.alloc","slab"]` -> bytes
-  - `["std.slab.free","slab","handle"]` -> bytes
-  - `["tapp","std.slab.get_or","u32","slab","handle","default"]` -> i32
-  - `["tapp","std.slab.set","u32","slab","handle","val"]` -> bytes
-  - wrappers (u32 values):
-    - `["std.slab.new_u32","cap"]` -> bytes
-    - `["std.slab.free_head_u32","slab"]` -> i32 (-1 if none)
-    - `["std.slab.alloc_u32","slab"]` -> bytes
-    - `["std.slab.free_u32","slab","handle"]` -> bytes
-    - `["std.slab.get_u32","slab","handle","default"]` -> i32
-    - `["std.slab.set_u32","slab","handle","val"]` -> bytes
-- `std.lru_cache` (generic; `K: hashable`, `V: num_like`)
-  - `["std.lru_cache.new","cap"]` -> bytes
-  - `["std.lru_cache.len","cache"]` -> i32
-  - `["tapp","std.lru_cache.peek_opt","u32","u32","cache","key"]` -> option_i32
-  - `["tapp","std.lru_cache.peek_or","u32","u32","cache","key","default"]` -> i32
-  - `["tapp","std.lru_cache.touch","u32","cache","key"]` -> bytes
-  - `["tapp","std.lru_cache.put","u32","u32","cache","key","val"]` -> bytes
-  - wrappers (u32 keys/values):
-    - `["std.lru_cache.new_u32","cap"]` -> bytes
-    - `["std.lru_cache.len_u32","cache"]` -> i32
-    - `["std.lru_cache.peek_u32_opt","cache","key"]` -> option_i32
-    - `["std.lru_cache.peek_u32_or","cache","key","default"]` -> i32
-    - `["std.lru_cache.touch_u32","cache","key"]` -> bytes
-    - `["std.lru_cache.put_u32","cache","key","val"]` -> bytes
+- `std.slab` (u32 values)
+  - `["std.slab.new_u32","cap"]` -> bytes
+  - `["std.slab.free_head_u32","slab"]` -> i32 (-1 if none)
+  - `["std.slab.alloc_u32","slab"]` -> bytes
+  - `["std.slab.free_u32","slab","handle"]` -> bytes
+  - `["std.slab.get_u32","slab","handle","default"]` -> i32
+  - `["std.slab.set_u32","slab","handle","val"]` -> bytes
+- `std.lru_cache` (u32 keys/values)
+  - `["std.lru_cache.new_u32","cap"]` -> bytes
+  - `["std.lru_cache.len_u32","cache"]` -> i32
+  - `["std.lru_cache.peek_u32_opt","cache","key"]` -> option_i32
+  - `["std.lru_cache.peek_u32_or","cache","key","default"]` -> i32
+  - `["std.lru_cache.touch_u32","cache","key"]` -> bytes
+  - `["std.lru_cache.put_u32","cache","key","val"]` -> bytes
 - `std.test`
   - `["std.test.pass"]` -> result_i32
   - `["std.test.fail","code"]` -> result_i32
@@ -536,39 +466,62 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.fs.list_dir","path_bytes"]` -> bytes
   - `["std.fs.list_dir_sorted","path_bytes"]` -> bytes
 
+- `std.kv` (world-bound)
+  - `["std.kv.get","key"]` -> bytes (`key` is bytes_view)
+  - `["std.kv.get_async","key"]` -> bytes (`key` is bytes_view)
+  - `["std.kv.get_stream","key"]` -> iface (`key` is bytes_view)
+  - `["std.kv.get_task","key"]` -> i32 task handle (`key` is bytes; await returns bytes)
+  - `["std.kv.set","key","val"]` -> i32 (`key`/`val` are bytes)
+
+- `std.rr` (solve-rr)
+  - `["std.rr.open_v1","cfg"]` -> result_i32 (`cfg` is bytes_view)
+  - `["std.rr.close_v1","h"]` -> i32
+  - `["std.rr.stats_v1","h"]` -> bytes
+  - `["std.rr.next_v1","h","kind","op","key"]` -> result_bytes (all bytes_view)
+  - `["std.rr.append_v1","h","entry"]` -> result_i32 (`entry` is bytes_view)
+  - `["std.rr.entry_resp_v1","entry"]` -> bytes (`entry` is bytes_view)
+  - `["std.rr.entry_err_v1","entry"]` -> i32 (`entry` is bytes_view)
+  - `["std.rr.current_v1"]` -> i32
+
 - `std.world.fs` (adapter module; world-selected)
   - `["std.world.fs.read_file","path_bytes"]` -> bytes
   - `["std.world.fs.read_file_async","path_bytes"]` -> bytes
 
-- `std.rr` (solve-rr only)
-  - `["std.rr.open_v1","cfg"]` -> result_i32
-  - `["std.rr.close_v1","h"]` -> i32
-  - `["std.rr.stats_v1","h"]` -> bytes
-  - `["std.rr.next_v1","h","kind","op","key"]` -> result_bytes
-  - `["std.rr.append_v1","h","entry"]` -> result_i32
-  - `["std.rr.entry_resp_v1","entry"]` -> bytes
-  - `["std.rr.entry_err_v1","entry"]` -> i32
-  - `["std.rr.current_v1"]` -> i32
+  - `["std.world.fs.write_file","path_bytes","data_bytes"]` -> i32
 
-- `std.kv` (solve-kv only)
-  - `["std.kv.get","key_bytes"]` -> bytes
-  - `["std.kv.get_async","key_bytes"]` -> bytes
-  - `["std.kv.set","key_bytes","val_bytes"]` -> i32
-  - `["std.kv.get_stream","key_bytes"]` -> iface
+- `std.os.env` (OS worlds)
+  - `["std.os.env.get","key_bytes"]` -> bytes
+
+- `std.os.fs` (OS worlds)
+  - `["std.os.fs.read_file","path_bytes"]` -> bytes
+  - `["std.os.fs.write_file","path_bytes","data_bytes"]` -> i32
+
+- `std.os.net` (OS worlds)
+  - `["std.os.net.http_request","req_bytes"]` -> bytes
+
+- `std.os.time` (OS worlds)
+  - `["std.os.time.now_unix_ms"]` -> i32
 
 - `std.path`
   - `["std.path.join","a","b"]` -> bytes
   - `["std.path.basename","p"]` -> bytes
   - `["std.path.extname","p"]` -> bytes
 
+  - `["std.path.normalize_posix","p"]` -> bytes
+  - `["std.path.is_safe_relative","p"]` -> i32
+  - `["std.path.parent","p"]` -> bytes
+  - `["std.path.join_checked","out_root","rel"]` -> result_bytes
+
 ## Operators (i32)
 
 - `["+","a","b"]` `["-","a","b"]` `["*","a","b"]` `["/","a","b"]` `["%","a","b"]`
 - `["=","a","b"]` `["!=","a","b"]`
 - Signed comparisons (two’s complement): `["<","a","b"]` `["<=","a","b"]` `[">","a","b"]` `[">=","a","b"]`
-- Unsigned comparisons: `["<u","a","b"]` `[">=u","a","b"]`
+- Unsigned comparisons: `["<u","a","b"]` `["<=u","a","b"]` `[">u","a","b"]` `[">=u","a","b"]`
+- Short-circuit boolean: `["&&","a","b"]` `["||","a","b"]` (treats non-zero as true)
 - Shifts: `["<<u","a","b"]` `[">>u","a","b"]` (shift amount masked by 31)
 - Bitwise: `["&","a","b"]` `["|","a","b"]` `["^","a","b"]`
+  - Note: `&` and `|` are eager. Use `&&`/`||` for guards.
 
 ## Integer Semantics
 
@@ -583,8 +536,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 
 Use `std.bytes.*` functions (import `std.bytes`):
 
-- `["std.bytes.len","b"]` -> i32
-- `["std.bytes.get_u8","b","i"]` -> i32 (0..255)
+- `["std.bytes.len","b"]` -> i32 (`b` is bytes_view; bytes is accepted at call sites)
+- `["std.bytes.get_u8","b","i"]` -> i32 (0..255; `b` is bytes_view; bytes is accepted at call sites)
 - `["std.bytes.set_u8","b","i","v"]` -> bytes (returns `b`)
 - `["std.bytes.alloc","n"]` -> bytes (length `n`)
 
@@ -604,8 +557,10 @@ For copy/slice/concat/reverse/take/drop helpers, use `std.bytes.*` module functi
 
 Bytes literals:
 
-- `["bytes.lit","token"]` -> bytes (UTF-8 of the atom string; no whitespace)
+- `["bytes.lit","text"]` -> bytes (UTF-8 of the JSON string; whitespace allowed)
   - Example: `["bytes.lit","config.bin"]` produces `b"config.bin"`.
+  - JSON escapes apply (e.g. `\n`, `\t`, `\uXXXX`).
+  - For arbitrary (non-UTF-8) bytes, build a `vec_u8` and convert with `std.vec.as_bytes`.
 
 ## Views
 
@@ -620,44 +575,28 @@ Views are explicit, borrowed slices used for scan/trim/split without copying.
 - `["view.eq","a","b"]` -> i32 (1 if equal else 0)
 - `["view.cmp_range","a","a_off","a_len","b","b_off","b_len"]` -> i32 (-1/0/1)
 
-## Filesystem (solve-fs only)
+Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).
 
-- `["fs.read","path_bytes"]` -> bytes
-- `["fs.read_async","path_bytes"]` -> bytes
-- `["fs.open_read","path_bytes"]` -> iface
-  - Returns an `iface` reader for streaming reads.
-- `["fs.list_dir","path_bytes"]` -> bytes (newline-separated names, sorted, trailing `\n`)
-  - `path_bytes` must be a safe relative path (no absolute paths, no `..`, no empty segments).
-  - The fixture directory is the current working directory (`.`).
+For clamped slicing (never traps), prefer `std.view.slice_v1` (see Modules).
 
-## Request/Response (solve-rr only)
+Call-argument coercion: some functions typed as `bytes_view` accept `bytes` (and sometimes `vec_u8`) directly at call sites; the compiler implicitly borrows a view for the call.
 
-Deterministic replay/record from cassette files under `./.x07_rr/`.
+## OS Worlds (run-os / run-os-sandboxed)
 
-Core builtins:
+OS effects are accessed through `std.os.*` modules, which call `os.*` builtins (listed above).
+In sandboxed execution, these calls are gated by policy.
 
-- `["rr.open_v1","cfg"]` -> result_i32
-- `["rr.close_v1","h"]` -> i32
-- `["rr.stats_v1","h"]` -> bytes
-- `["rr.next_v1","h","kind","op","key"]` -> result_bytes
-- `["rr.append_v1","h","entry"]` -> result_i32
+## Record/replay (rr)
 
-Entry helpers:
+In rr-enabled worlds, X07 can replay (and optionally record) external interactions from a cassette file.
 
-- `["rr.entry_resp_v1","entry"]` -> bytes
-- `["rr.entry_err_v1","entry"]` -> i32
+Structured scope forms:
 
-## Key/Value (solve-kv only)
+- `["std.rr.with_v1", cfg_bytes_view_expr, body_expr]` -> type of `body_expr`
+- `["std.rr.with_policy_v1", ["bytes.lit","POLICY_ID"], ["bytes.lit","CASSETTE_PATH"], ["i32.lit",mode], body_expr]` -> type of `body_expr`
+  - mode: 0=off, 1=record, 2=replay, 3=record_missing, 4=rewrite
 
-- `["kv.get","key_bytes"]` -> bytes
-  - Returns empty bytes if missing.
-- `["kv.get_async","key_bytes"]` -> bytes
-  - Same as `kv.get` but explicitly uses the async/latency-aware path.
-- `["kv.get_stream","key_bytes"]` -> iface
-  - Returns an `iface` reader for streaming reads.
-- `["kv.set","key_bytes","val_bytes"]` -> i32
-  - Returns 1 if inserted, 0 if updated.
-  - Store is seeded per case from `./.x07_kv/seed.evkv` and reset per case.
+Low-level APIs live in the built-in `std.rr` module (see built-in modules below).
 
 ## Streaming I/O
 
@@ -668,6 +607,16 @@ Readers are `iface` values returned by world adapters.
 - `["bufread.new","reader_iface","cap_i32"]` -> i32
 - `["bufread.fill","br"]` -> bytes_view
 - `["bufread.consume","br","n_i32"]` -> i32
+
+For deterministic, budgeted streaming composition, prefer `std.stream.pipe_v1` (see end-user docs).
+
+Pipe shape:
+
+- `["std.stream.pipe_v1", cfg_v1, src_v1, chain_v1, sink_v1]` -> bytes (a stream doc)
+- `cfg_v1`: `["std.stream.cfg_v1", ...]`
+- `src_v1`: `std.stream.src.*_v1` descriptor
+- `chain_v1`: `["std.stream.chain_v1", ...]`
+- `sink_v1`: `std.stream.sink.*_v1` descriptor
 
 ## Vectors
 
@@ -718,6 +667,21 @@ Propagation sugar:
 
 - `["try","r"]` -> `i32` or `bytes` (requires the current `defn` return type is `result_i32` or `result_bytes`)
 
+- `["try_doc","doc"]` -> bytes (requires the current `defn` return type is bytes; doc envelope yields payload on ok and returns the original doc on err)
+
+## Budget scopes
+
+Budget scopes are special forms that enforce local resource limits (alloc/memcpy/scheduler ticks/fuel).
+
+- `["budget.scope_v1", ["budget.cfg_v1", ...], body_expr]` -> type of `body_expr` (or a `result_*` in `mode=result_err_v1`)
+- `["budget.scope_from_arch_v1", ["bytes.lit","PROFILE_ID"], body_expr]` -> loads a pinned cfg from `arch/budgets/profiles/PROFILE_ID.budget.json`
+
+`budget.cfg_v1` fields:
+
+- `mode`: `trap_v1` | `result_err_v1` | `stats_only_v1` | `yield_v1`
+- `label`: bytes literal (for diagnostics)
+- Optional caps: `alloc_bytes`, `alloc_calls`, `realloc_calls`, `memcpy_bytes`, `sched_ticks`, `fuel`
+
 ## Memory / Performance Tips
 
 - Deterministic suite gates may enforce `mem_stats`: reduce `realloc_calls`, `memcpy_bytes`, and `peak_live_bytes`.
@@ -761,8 +725,8 @@ Use `emit_*` stdlib functions to produce canonical deterministic encodings:
 
 Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):
 
-- `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`
-- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.i32_status_le","b"]`
+- `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`, `["std.codec.base64_encode_v1","b"]`, `["std.codec.base64_decode_v1","s"]` (doc), `["std.codec.hex_encode_v1","b"]`, `["std.codec.hex_decode_v1","s"]` (doc)
+- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.i32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.u32_status_le","b"]`, `["std.parse.u32_status_le_at","b","off"]`, `["std.parse.i32_status_le","b"]`, `["std.parse.i32_status_le_at","b","off"]`
 - `std.fmt`: `["std.fmt.u32_to_dec","x"]`, `["std.fmt.s32_to_dec","x"]`
 - `std.prng`: `["std.prng.lcg_next_u32","state"]`
 
@@ -772,7 +736,7 @@ Prefer calling stdlib helpers through their module namespaces (and include the m
 
 - 1-byte output: `["begin",["let","out",["bytes.alloc",1]],["set","out",["bytes.set_u8","out",0,"x"]],"out"]`
 - Empty output: `["bytes.alloc",0]`
-- Looping: use `bytes.len` once, then `["for","i",0,"n",body]`.
+- Looping: use `for` for counted loops (`["for","i",0,"n",body]`) and `while` for open-ended loops (`["while",cond,body]`).
 
 ### Header + tail pattern
 
@@ -781,3 +745,5 @@ Many tasks use `input[0..k]` as parameters and the remaining bytes as data.
 Example (k=1):
 
 - `["begin",["let","x",["std.bytes.get_u8","input",0]],["let","n",["std.bytes.len","input"]],["let","v",["std.vec.with_capacity",["-","n",1]]],["for","i",1,"n",["std.vec.push","v",["std.bytes.get_u8","input","i"]]],["std.vec.as_bytes","v"]]`
+
+

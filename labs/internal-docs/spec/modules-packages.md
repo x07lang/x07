@@ -119,22 +119,22 @@ Lockfile metadata (schema `x07.lock@0.4.0`):
 
 The compiler ships versioned stdlib packages under:
 
-- `stdlib/std-core/0.1.2/` (foundational, pure modules)
-- `stdlib/std/0.1.2/` (extended modules; depends on `std-core` via `meta.requires_packages`)
+- `stdlib/std-core/0.1.3/` (foundational, pure modules)
+- `stdlib/std/0.1.3/` (extended modules; depends on `std-core` via `meta.requires_packages`)
 
 - Module IDs are declared in:
-  - `stdlib/std-core/0.1.2/x07-package.json`
-  - `stdlib/std/0.1.2/x07-package.json`
+  - `stdlib/std-core/0.1.3/x07-package.json`
+  - `stdlib/std/0.1.3/x07-package.json`
   and embedded in the compiler in `crates/x07c/src/builtin_modules.rs`.
   Keep these in sync with the on-disk module files and lock manifests (`stdlib.lock`, `stdlib.std-core.lock`, `stdlib.os.lock`) (CI: `./scripts/ci/check_stdlib_lock.sh`).
 
 - `std.vec`: wrappers around `vec_u8` (`with_capacity`, `push`, `extend_bytes`, `as_bytes`, ...)
 - `std.slice`: `clamp`, `cmp_bytes`
-- `std.bytes`: `reverse`, `concat`, `take`, `drop`, `copy`, `slice`, plus bytes_view helpers (`max_u8`, `sum_u8`, `count_u8`, `starts_with`, `ends_with`)
+- `std.bytes`: `reverse`, `concat`, `take`, `drop`, `copy`, `slice`, plus bytes_view helpers (`max_u8`, `sum_u8`, `count_u8`, `starts_with`, `ends_with`, `strip_prefix_view`, `strip_suffix_view`, `trim_ascii_view`)
 - `std.view`: clamped view slicing (`slice_v1`)
 - `std.codec`: `read_u32_le`, `write_u32_le`, plus stable encodings (`base64_*_v1`, `hex_*_v1`)
 - `std.doc`: doc envelope helpers (`ok_v1`, `err_*_v1`, `payload_v1`, `error_code_v1`, ...)
-- `std.parse`: `u32_dec`, `u32_dec_at`, `i32_status_le`, `i32_status_le_at`
+- `std.parse`: `u32_dec`/`i32_dec` (result), `u32_dec_at`, plus status helpers (`u32_status_le`, `u32_status_le_at`, `i32_status_le`, `i32_status_le_at`)
 - `std.fmt`: `u32_to_dec`, `s32_to_dec`
 - `std.prng`: `lcg_next_u32`, `x07rand32_v1_stream`
 - `std.bit`: `popcount_u32`
@@ -143,7 +143,7 @@ The compiler ships versioned stdlib packages under:
 - `std.text.utf8`: `validate_or_empty`
 - `std.test`: deterministic assertions + X7TEST status encoder (toolchain test harness)
 - `std.regex-lite`: `find_literal`, `is_match_literal`, `count_matches_u32le` (letters + `.` + `*` subset)
-- `std.json`: `canonicalize_small`, `extract_path_canon_or_err`
+- `std.json`: `canonicalize_small`, `extract_path_canon_or_err`, `encode`, `pretty_encode`
 - `std.csv`: `sum_second_col_i32_status_le`, `sum_second_col_i32le_or_err`
 - `std.map`: `word_freq_sorted_ascii`
 - `std.set`: `unique_lines_sorted`
@@ -168,7 +168,7 @@ The compiler ships versioned stdlib packages under:
 - `std.world.fs`: fixture-backed adapter used by `std.fs.read` in deterministic worlds
 - `std.rr`: `send_request`, `fetch`, `send` (solve-rr only)
 - `std.kv`: `get`, `get_async`, `set`, `get_stream` (solve-kv only)
-- `std.path`: `join`, `basename`, `extname`
+- `std.path`: `join`, `basename`, `extname`, `normalize_posix`, `is_safe_relative`, `parent`, `join_checked`
 
 ## Standalone stdlib packages
 

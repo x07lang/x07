@@ -13,6 +13,16 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - `X07-ARITY-BINOP-0001` for n-ary uses of binary operators (for example `["+", 1, 2, 3]`).
   - `X07-FOR-0001` when the `for` loop variable is not an identifier.
 - Guide + runnable example: `docs/guides/ast-authoring-best-practices.md` and `docs/examples/ast-authoring-best-practices/`.
+- Stdlib ergonomics helpers:
+  - Decimal parsing: `std.parse.u32_dec` and `std.parse.i32_dec` (both return `result_i32`).
+  - Bytes views: `std.bytes.trim_ascii_view`, `std.bytes.strip_prefix_view`, `std.bytes.strip_suffix_view`.
+  - JSON: `std.json.encode(json, opts)` (with canonical key ordering via `opts & 1`) and `std.json.pretty_encode(json)`.
+  - Paths: `std.path.normalize_posix`, `std.path.is_safe_relative`, `std.path.parent`, `std.path.join_checked`.
+- Guide + runnable example: `docs/guides/stdlib-ergonomics.md` and `docs/examples/agent-gate/stdlib-ergonomics/`.
+
+### Changed
+
+- Built-in stdlib packages bumped to `stdlib/std-core/0.1.3` and `stdlib/std/0.1.3`.
 
 ### Fixed
 

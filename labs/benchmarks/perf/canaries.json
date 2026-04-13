@@ -12,10 +12,10 @@
               "name": "AABA"
             }
           ],
-          "compile_fuel_used": 1270
+          "compile_fuel_used": 1474
         },
         "full/mini_app_report_v1": {
-          "c_source_size": 464768,
+          "c_source_size": 464771,
           "cases": [
             {
               "fuel_used": 25381,
@@ -23,7 +23,7 @@
               "name": "full_app"
             }
           ],
-          "compile_fuel_used": 12789
+          "compile_fuel_used": 14368
         }
       }
     },
@@ -59,7 +59,7 @@
               "name": "ws_obj_sort1"
             }
           ],
-          "compile_fuel_used": 7718
+          "compile_fuel_used": 8780
         },
         "canary/std_prng_x07rand32_v1_stream": {
           "c_source_size": 211826,

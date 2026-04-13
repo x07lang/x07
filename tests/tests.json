@@ -20,6 +20,30 @@
       "expect": "fail"
     },
     {
+      "id": "smoke/stdlib_parse_dec",
+      "world": "solve-pure",
+      "entry": "smoke_stdlib_ergonomics.parse_dec",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stdlib_bytes_views",
+      "world": "solve-pure",
+      "entry": "smoke_stdlib_ergonomics.bytes_views",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stdlib_json_encode",
+      "world": "solve-pure",
+      "entry": "smoke_stdlib_ergonomics.json_encode",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stdlib_path_helpers",
+      "world": "solve-pure",
+      "entry": "smoke_stdlib_ergonomics.path_helpers",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/value_containers_vec_bytes_basic",
       "world": "solve-pure",
       "entry": "smoke_value_containers.vec_bytes_basic_v1",

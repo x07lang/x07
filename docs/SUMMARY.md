@@ -141,6 +141,7 @@
 
 ## Guides
 - [CLI apps](guides/cli-apps.md)
+- [Stdlib ergonomics](guides/stdlib-ergonomics.md)
 - [AST authoring best practices](guides/ast-authoring-best-practices.md)
 - [Data interoperability](guides/data-interop.md)
 - [Kernel/shell in production](guides/kernel-shell-production.md)

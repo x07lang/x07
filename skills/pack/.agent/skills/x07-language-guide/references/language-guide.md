@@ -273,6 +273,9 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.bytes.count_u8","v","target"]` -> i32 (`v` is bytes_view)
   - `["std.bytes.starts_with","a","prefix"]` -> i32 (both bytes_view)
   - `["std.bytes.ends_with","a","suffix"]` -> i32 (both bytes_view)
+  - `["std.bytes.strip_prefix_view","a","prefix"]` -> bytes_view
+  - `["std.bytes.strip_suffix_view","a","suffix"]` -> bytes_view
+  - `["std.bytes.trim_ascii_view","b"]` -> bytes_view
   - `["std.bytes.reverse","b"]` -> bytes
   - `["std.bytes.concat","a","b"]` -> bytes
   - `["std.bytes.take","b","n"]` -> bytes
@@ -303,7 +306,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.slice.clamp","b","start","len"]` -> bytes
   - `["std.slice.cmp_bytes","a","b"]` -> i32 (-1/0/1)
 - `std.parse`
-  - `["std.parse.u32_dec","b"]` -> i32
+  - `["std.parse.u32_dec","b"]` -> result_i32
+  - `["std.parse.i32_dec","b"]` -> result_i32
   - `["std.parse.u32_dec_at","b","off"]` -> i32
   - `["std.parse.u32_status_le","b"]` -> bytes (tag byte 1 + u32_le, or tag byte 0)
   - `["std.parse.u32_status_le_at","b","off"]` -> bytes (tag byte 1 + u32_le + next_off_u32_le, or tag byte 0)
@@ -341,6 +345,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 - `std.json`
   - `["std.json.canonicalize_small","json_bytes"]` -> bytes (or `ERR`)
   - `["std.json.extract_path_canon_or_err","b"]` -> bytes
+  - `["std.json.encode","json_bytes","opts"]` -> bytes (or `ERR`)
+  - `["std.json.pretty_encode","json_bytes"]` -> bytes (or `ERR`)
 - `std.csv`
   - `["std.csv.sum_second_col_i32_status_le","csv_bytes"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)
   - `["std.csv.sum_second_col_i32le_or_err","csv_bytes"]` -> bytes (i32_le, or `ERR`)
@@ -500,6 +506,11 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.path.join","a","b"]` -> bytes
   - `["std.path.basename","p"]` -> bytes
   - `["std.path.extname","p"]` -> bytes
+
+  - `["std.path.normalize_posix","p"]` -> bytes
+  - `["std.path.is_safe_relative","p"]` -> i32
+  - `["std.path.parent","p"]` -> bytes
+  - `["std.path.join_checked","out_root","rel"]` -> result_bytes
 
 ## Operators (i32)
 
@@ -715,7 +726,7 @@ Use `emit_*` stdlib functions to produce canonical deterministic encodings:
 Prefer calling stdlib helpers through their module namespaces (and include the module in `imports`):
 
 - `std.codec`: `["std.codec.read_u32_le","b","off"]` (`b` is bytes_view), `["std.codec.write_u32_le","x"]`, `["std.codec.base64_encode_v1","b"]`, `["std.codec.base64_decode_v1","s"]` (doc), `["std.codec.hex_encode_v1","b"]`, `["std.codec.hex_decode_v1","s"]` (doc)
-- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.u32_status_le","b"]`, `["std.parse.u32_status_le_at","b","off"]`, `["std.parse.i32_status_le","b"]`, `["std.parse.i32_status_le_at","b","off"]`
+- `std.parse`: `["std.parse.u32_dec","b"]`, `["std.parse.i32_dec","b"]`, `["std.parse.u32_dec_at","b","off"]`, `["std.parse.u32_status_le","b"]`, `["std.parse.u32_status_le_at","b","off"]`, `["std.parse.i32_status_le","b"]`, `["std.parse.i32_status_le_at","b","off"]`
 - `std.fmt`: `["std.fmt.u32_to_dec","x"]`, `["std.fmt.s32_to_dec","x"]`
 - `std.prng`: `["std.prng.lcg_next_u32","state"]`
 

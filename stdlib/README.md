@@ -4,9 +4,9 @@ This directory contains versioned, composable stdlib packages used by projects a
 
 Built-in package shipped with the compiler:
 
-- `stdlib/std-core/0.1.2/` (modules under `modules/`)
+- `stdlib/std-core/0.1.3/` (modules under `modules/`)
   - foundational, pure modules that define stable primitives (`std.bytes`, `std.view`, `std.codec`, `std.vec`, `std.json`, `std.small_set`, `std.small_map`, `std.doc`, ...)
-- `stdlib/std/0.1.2/` (modules under `modules/`)
+- `stdlib/std/0.1.3/` (modules under `modules/`)
   - extended modules (text helpers, tests, and world-scoped I/O such as `std.io`, `std.fs`, `std.rr`, `std.kv`)
   - depends on `std-core` via `meta.requires_packages`
 

@@ -35,7 +35,7 @@
 ## Surface facts that matter when editing programs
 
 - Canonical solver format: x07AST JSON (`*.x07.json`, `x07.x07ast@0.8.0`) with json-sexpr expressions (`["head", ...]`).
-- Built-in stdlib versions: `stdlib/std-core/0.1.2/` (core) and `stdlib/std/0.1.2/` (extended).
+- Built-in stdlib versions: `stdlib/std-core/0.1.3/` (core) and `stdlib/std/0.1.3/` (extended).
 - Systems-only surface is world-gated: `unsafe`, raw pointers, and `extern "C"` are available only in `run-os*` worlds (not in `solve-*` worlds).
 
 ## Package publishing (registry)
