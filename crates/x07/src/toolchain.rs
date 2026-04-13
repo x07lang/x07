@@ -250,6 +250,10 @@ pub struct CheckArgs {
     /// Override the language/toolchain compatibility mode.
     #[arg(long, value_name = "COMPAT")]
     pub compat: Option<String>,
+
+    /// Only validate x07AST schema/shape and lint rules (no typecheck or backend-check).
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    pub ast: bool,
 }
 
 pub fn cmd_fmt(
@@ -1304,132 +1308,159 @@ pub fn cmd_check(
         }
     }
 
-    let mut sigs = typecheck::TypecheckSigs::new();
-    for item in &file_set {
-        sigs.add_file(&item.file);
-    }
-    for m in modules.values() {
-        if m.is_builtin {
-            sigs.add_file(&m.file);
+    if !args.ast {
+        let mut sigs = typecheck::TypecheckSigs::new();
+        for item in &file_set {
+            sigs.add_file(&item.file);
         }
-    }
-    sigs.add_builtins();
-
-    for item in &file_set {
-        let report = typecheck::typecheck_file_with_sigs(
-            &item.file,
-            &sigs,
-            &typecheck::TypecheckOptions {
-                compat,
-                ..Default::default()
-            },
-        );
-        for mut d in report.diagnostics {
-            if d.severity == diagnostics::Severity::Error {
-                has_error = true;
+        for m in modules.values() {
+            if m.is_builtin {
+                sigs.add_file(&m.file);
             }
-            d.data.insert(
-                "file".to_string(),
-                serde_json::Value::String(item.path.display().to_string()),
-            );
-            enrich_diag(&mut d, &item.module_id);
-            all_diags.push(d);
         }
-    }
+        sigs.add_builtins();
 
-    if !has_error {
-        let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
-        options.compat = compat;
-        options.arch_root = Some(base);
-        options.allow_unsafe = lint_opts.allow_unsafe;
-        options.allow_ffi = lint_opts.allow_ffi;
-        if let Err(err) = compile::check_program(&program_bytes, &options) {
-            let (fn_name, ptr) = parse_fn_and_ptr_suffix(&err.message);
-            let mut code = "X07-INTERNAL-0001";
-            if err.message.contains("use after move") {
-                code = "X07-MOVE-0901";
-            } else if err.message.contains("borrow") {
-                code = "X07-MOVE-0902";
-            }
-            let mut d = diagnostics::Diagnostic {
-                code: code.to_string(),
-                severity: diagnostics::Severity::Error,
-                stage: diagnostics::Stage::Codegen,
-                message: err.message.to_string(),
-                loc: ptr
-                    .as_ref()
-                    .map(|p| diagnostics::Location::X07Ast { ptr: p.clone() }),
-                notes: Vec::new(),
-                related: Vec::new(),
-                data: Default::default(),
-                quickfix: None,
-            };
-            d.data.insert(
-                "compiler_error_kind".to_string(),
-                serde_json::Value::String(format!("{:?}", err.kind)),
+        for item in &file_set {
+            let report = typecheck::typecheck_file_with_sigs(
+                &item.file,
+                &sigs,
+                &typecheck::TypecheckOptions {
+                    compat,
+                    ..Default::default()
+                },
             );
-            let mut diag_path: Option<PathBuf> = None;
-            let mut diag_module_id: Option<String> = None;
-            if let Some(fn_name) = fn_name.as_deref() {
+            for mut d in report.diagnostics {
+                if d.severity == diagnostics::Severity::Error {
+                    has_error = true;
+                }
                 d.data.insert(
-                    "fn".to_string(),
-                    serde_json::Value::String(fn_name.to_string()),
+                    "file".to_string(),
+                    serde_json::Value::String(item.path.display().to_string()),
                 );
-                if fn_name == "solve" || fn_name.starts_with("main.") {
-                    diag_module_id = Some("main".to_string());
+                enrich_diag(&mut d, &item.module_id);
+                all_diags.push(d);
+            }
+        }
+
+        if !has_error {
+            let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
+            options.compat = compat;
+            options.arch_root = Some(base);
+            options.allow_unsafe = lint_opts.allow_unsafe;
+            options.allow_ffi = lint_opts.allow_ffi;
+            if let Err(err) = compile::check_program(&program_bytes, &options) {
+                let (fn_name, ptr) = parse_fn_and_ptr_suffix(&err.message);
+                let mut code = "X07-INTERNAL-0001";
+                if err.message.contains("use after move") {
+                    code = "X07-MOVE-0901";
+                } else if err.message.contains("borrow") {
+                    code = "X07-MOVE-0902";
+                }
+                let mut d = diagnostics::Diagnostic {
+                    code: code.to_string(),
+                    severity: diagnostics::Severity::Error,
+                    stage: diagnostics::Stage::Codegen,
+                    message: err.message.to_string(),
+                    loc: ptr
+                        .as_ref()
+                        .map(|p| diagnostics::Location::X07Ast { ptr: p.clone() }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                };
+                match code {
+                    "X07-MOVE-0901" => {
+                        d.notes.push(
+                            "Valid form: avoid using a moved `bytes` value; either keep using the moved-to binding, or copy before move."
+                                .to_string(),
+                        );
+                        d.notes.push(
+                            "Suggested fix: when moving an identifier `x`, replace the moved occurrence with [\"view.to_bytes\", [\"bytes.view\", \"x\"]]."
+                                .to_string(),
+                        );
+                    }
+                    "X07-MOVE-0902" => {
+                        d.notes.push(
+                            "Valid form: a `bytes_view` borrow must not outlive its owner."
+                                .to_string(),
+                        );
+                        d.notes.push(
+                            "Suggested fix: copy the view to owned bytes (for example via `view.to_bytes`) or restructure so the owner is not moved/dropped while the borrow is live."
+                                .to_string(),
+                        );
+                    }
+                    _ => {}
+                }
+                d.data.insert(
+                    "compiler_error_kind".to_string(),
+                    serde_json::Value::String(format!("{:?}", err.kind)),
+                );
+                let mut diag_path: Option<PathBuf> = None;
+                let mut diag_module_id: Option<String> = None;
+                if let Some(fn_name) = fn_name.as_deref() {
+                    d.data.insert(
+                        "fn".to_string(),
+                        serde_json::Value::String(fn_name.to_string()),
+                    );
+                    if fn_name == "solve" || fn_name.starts_with("main.") {
+                        diag_module_id = Some("main".to_string());
+                        d.data.insert(
+                            "file".to_string(),
+                            serde_json::Value::String(program_path.display().to_string()),
+                        );
+                        diag_path = Some(program_path.clone());
+                    } else if let Some((mod_id, _)) = fn_name.rsplit_once('.') {
+                        diag_module_id = Some(mod_id.to_string());
+                        if let Some(m) = modules.get(mod_id) {
+                            if let Some(p) = m.path.as_ref() {
+                                d.data.insert(
+                                    "file".to_string(),
+                                    serde_json::Value::String(p.display().to_string()),
+                                );
+                                diag_path = Some(p.clone());
+                            }
+                        }
+                    }
+                }
+                if !d.data.contains_key("file") {
                     d.data.insert(
                         "file".to_string(),
                         serde_json::Value::String(program_path.display().to_string()),
                     );
                     diag_path = Some(program_path.clone());
-                } else if let Some((mod_id, _)) = fn_name.rsplit_once('.') {
-                    diag_module_id = Some(mod_id.to_string());
-                    if let Some(m) = modules.get(mod_id) {
-                        if let Some(p) = m.path.as_ref() {
-                            d.data.insert(
-                                "file".to_string(),
-                                serde_json::Value::String(p.display().to_string()),
-                            );
-                            diag_path = Some(p.clone());
-                        }
-                    }
                 }
-            }
-            if !d.data.contains_key("file") {
-                d.data.insert(
-                    "file".to_string(),
-                    serde_json::Value::String(program_path.display().to_string()),
-                );
-                diag_path = Some(program_path.clone());
-            }
 
-            enrich_diag(&mut d, diag_module_id.as_deref().unwrap_or("main"));
+                enrich_diag(&mut d, diag_module_id.as_deref().unwrap_or("main"));
 
-            if d.code == "X07-MOVE-0901" {
-                if let (Some(path), Some(moved_ptr)) = (
-                    diag_path.as_ref(),
-                    crate::run::first_pointer_for_compile_error(&d.message, "moved_ptr="),
-                ) {
-                    if let Ok(bytes) = std::fs::read(path) {
-                        if let Ok(doc) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                            if let Some(serde_json::Value::String(name)) = doc.pointer(&moved_ptr) {
-                                d.quickfix = Some(diagnostics::Quickfix {
-                                    kind: diagnostics::QuickfixKind::JsonPatch,
-                                    patch: vec![diagnostics::PatchOp::Replace {
-                                        path: moved_ptr,
-                                        value: serde_json::json!([
-                                            "view.to_bytes",
-                                            ["bytes.view", name]
-                                        ]),
-                                    }],
-                                    note: Some("Copy before move".to_string()),
-                                });
+                if d.code == "X07-MOVE-0901" {
+                    if let (Some(path), Some(moved_ptr)) = (
+                        diag_path.as_ref(),
+                        crate::run::first_pointer_for_compile_error(&d.message, "moved_ptr="),
+                    ) {
+                        if let Ok(bytes) = std::fs::read(path) {
+                            if let Ok(doc) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                                if let Some(serde_json::Value::String(name)) =
+                                    doc.pointer(&moved_ptr)
+                                {
+                                    d.quickfix = Some(diagnostics::Quickfix {
+                                        kind: diagnostics::QuickfixKind::JsonPatch,
+                                        patch: vec![diagnostics::PatchOp::Replace {
+                                            path: moved_ptr,
+                                            value: serde_json::json!([
+                                                "view.to_bytes",
+                                                ["bytes.view", name]
+                                            ]),
+                                        }],
+                                        note: Some("Copy before move".to_string()),
+                                    });
+                                }
                             }
                         }
                     }
                 }
+                all_diags.push(d);
             }
-            all_diags.push(d);
         }
     }
 

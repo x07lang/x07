@@ -184,6 +184,7 @@ fn cmd_repro_compile(args: ReproCompileArgs) -> Result<std::process::ExitCode> {
         crate::toolchain::CheckArgs {
             project: bundle_project_path.clone(),
             compat: args.compat.clone(),
+            ast: false,
         },
     )
     .context("run x07 check on repro bundle")?;

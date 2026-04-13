@@ -1,0 +1,73 @@
+# AST Authoring Best Practices
+
+This guide covers writing and mechanically editing `*.x07.json` (`x07AST`) and using the toolchain to catch common AST-shape mistakes early.
+
+## Canonical Workflow
+
+1. Keep AST JSON canonical while editing:
+
+```bash
+x07 fmt --input program.x07.json --write
+x07 lint --input program.x07.json
+x07 fix --input program.x07.json --write
+```
+
+2. Use `x07 check` in two modes:
+
+```bash
+# Fast feedback for AST authoring: schema/shape + lint only.
+x07 check --project x07.json --ast
+
+# Full check: lint + typecheck + backend-check.
+x07 check --project x07.json
+```
+
+Notes:
+
+- `x07 check --ast` runs schema validation + shape validation + lint and emits an `x07diag` report.
+- `x07 check` also runs project-wide typecheck and backend-check, and surfaces codegen errors in *unreachable* declarations (fail-fast).
+
+3. Try it on the runnable example project:
+
+- `docs/examples/ast-authoring-best-practices/`
+
+```bash
+x07 check --project docs/examples/ast-authoring-best-practices/x07.json --ast
+x07 check --project docs/examples/ast-authoring-best-practices/x07.json
+printf 'hello' | x07 run --repair=off --project docs/examples/ast-authoring-best-practices/x07.json --stdin
+```
+
+## Common Shape Errors
+
+### Binary operators are binary
+
+Operators like `+` are binary in x07AST:
+
+- Valid form: `["+", <a>, <b>]`
+- Suggested fix for n-ary uses: nest left-associatively (for example `["+", ["+", a, b], c]`)
+
+`x07 check --ast` reports this as `X07-ARITY-BINOP-0001`, and a quickfix may be available for some cases.
+
+### `for` loops have a strict shape
+
+Valid form:
+
+`["for", "i", <start:i32>, <end:i32>, <body:any>]`
+
+If you need multiple body expressions, wrap them in `begin`:
+
+`["for", "i", start, end, ["begin", ...]]`
+
+### `bytes` vs `bytes_view`: move vs borrow
+
+- `bytes` is an owned buffer (move-only).
+- `bytes_view` is a borrowed view into an owned buffer.
+
+A common fix for move errors is to copy before moving a value you still need:
+
+`["view.to_bytes", ["bytes.view", "x"]]`
+
+## Expert Notes
+
+- Diagnostic codes are documented in `docs/toolchain/diagnostic-codes.md` and searchable via `x07 diag explain <CODE>`.
+- For project-level check behavior and report outputs, see `docs/toolchain/cli.md` (`x07 check`).

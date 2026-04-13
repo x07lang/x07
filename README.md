@@ -64,6 +64,8 @@ For offline-first workflows, forbid network access during dependency hydration w
 x07 fmt --input program.x07.json --write
 x07 lint --input program.x07.json
 x07 fix --input program.x07.json --write
+x07 check --project x07.json --ast
+x07 check --project x07.json
 x07 ast apply-patch --in program.x07.json --patch patch.json --out program.x07.json --validate
 ```
 

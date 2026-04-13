@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 477
-- quickfix support (`sometimes` or `always`): 436
-- quickfix coverage: 91.40%
+- total codes: 479
+- quickfix support (`sometimes` or `always`): 437
+- quickfix coverage: 91.23%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -178,6 +178,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | sometimes | Diagnostic code `W_DEPS_CAP_POLICY_MISSING`. |
 | `X07-ARITY-0000` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-0000`. |
 | `X07-ARITY-BEGIN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-BEGIN-0001`. |
+| `X07-ARITY-BINOP-0001` | x07c / lint / error | sometimes | Binary operator has invalid arity. |
 | `X07-ARITY-FOR-0001` | x07c / lint / error | sometimes | `for` has invalid arity. |
 | `X07-ARITY-IF-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-IF-0001`. |
 | `X07-ARITY-LET-0001` | x07c / lint / error | sometimes | `let`/`set` has invalid arity. |
@@ -203,6 +204,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-CONTRACT-0011` | x07c / lint / error | sometimes | Recursive self-call is missing decreases evidence. |
 | `X07-FIX-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FIX-0003`. |
 | `X07-FMT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FMT-0001`. |
+| `X07-FOR-0001` | x07c / lint / error | never | `for` loop variable must be an identifier. |
 | `X07-GENERICS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0001`. |
 | `X07-GENERICS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0002`. |
 | `X07-INTERNAL-0001` | x07 / lint / error | sometimes | Internal toolchain/compiler error. |
@@ -3886,6 +3888,34 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07-ARITY-BINOP-0001`
+
+Summary: Binary operator has invalid arity.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Binary operators in x07AST take exactly two arguments.
+
+Valid form: ["<op>", <a>, <b>].
+
+If you need more than two operands, nest the operator (left-associative), for example: ["+", ["+", a, b], c].
+
+A quickfix may be emitted for some cases (for example n-ary `+`).
+
+Agent strategy:
+
+- Rewrite to the binary form: ["<op>", <a>, <b>].
+- For n-ary uses, nest left-associatively: ["<op>", ["<op>", a, b], c].
+- If quickfix is present, apply it (for example via `x07 fix --write --input <PATH>`).
+- Re-run lint.
+
+
 ## `X07-ARITY-FOR-0001`
 
 Summary: `for` has invalid arity.
@@ -3902,8 +3932,9 @@ A quickfix is emitted when extra trailing expressions are present: they are wrap
 
 Agent strategy:
 
-- If quickfix is present, apply it to wrap extra body expressions.
-- Otherwise rewrite to `for <id> <iter> <init> <body>` manually.
+- Valid form: ["for", "i", <start:i32>, <end:i32>, <body:any>].
+- If quickfix is present, apply it to wrap extra body expressions in `begin` (or run `x07 fix --write --input <PATH>`).
+- Otherwise rewrite the loop to canonical arity; if you need multiple body expressions, wrap them in `begin`.
 - Re-run lint.
 
 
@@ -4390,6 +4421,28 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-FOR-0001`
+
+Summary: `for` loop variable must be an identifier.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires semantic intent (choosing a loop variable name).
+
+Details:
+
+The `for` form expects an identifier as its first argument after the head.
+
+Valid form: ["for", "i", <start:i32>, <end:i32>, <body:any>].
+
+Agent strategy:
+
+- Replace the loop variable with an identifier string (for example "i").
+- Re-run lint.
 
 
 ## `X07-GENERICS-0001`

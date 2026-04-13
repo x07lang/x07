@@ -175,7 +175,7 @@ pub fn compile_program_to_program_with_meta(
         mono_map,
         module_infos,
         mut fuel_used,
-    } = compile_frontend(program, options)?;
+    } = compile_frontend(program, options, true)?;
 
     if options.optimize {
         optimize::inline_called_once_i32_pure(&mut parsed_program);
@@ -305,7 +305,7 @@ pub fn compile_program_to_wasm_v1(
 }
 
 pub fn check_program(program: &[u8], options: &CompileOptions) -> Result<(), CompilerError> {
-    let _ = compile_frontend(program, options)?;
+    let _ = compile_frontend(program, options, false)?;
     Ok(())
 }
 
@@ -320,6 +320,7 @@ struct FrontendOutput {
 fn compile_frontend(
     program: &[u8],
     options: &CompileOptions,
+    do_dead_code_elim: bool,
 ) -> Result<FrontendOutput, CompilerError> {
     if options.freestanding {
         if options.emit_main {
@@ -455,7 +456,9 @@ fn compile_frontend(
         .extern_functions
         .sort_by(|a, b| a.name.cmp(&b.name));
 
-    dead_code_eliminate(&mut parsed_program);
+    if do_dead_code_elim {
+        dead_code_eliminate(&mut parsed_program);
+    }
     validate_program_world_caps(&parsed_program, options)?;
     c_emit::check_c_program(&parsed_program, options)?;
 

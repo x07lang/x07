@@ -431,9 +431,15 @@ Notes:
 
 ### Project check (no emit)
 
+- `x07 check --project x07.json --ast`
+  - Reads `x07.json` + `x07.lock.json` and resolves the full module import graph (including locked dependencies).
+  - Runs schema validation + shape validation + best-practice lint rules (no typecheck or backend-check).
+  - Non-mutating: does not run the repair loop and does not write source files.
+  - Emits an `x07diag` JSON report to stdout (or writes it with global `--out`).
+
 - `x07 check --project x07.json`
   - Reads `x07.json` + `x07.lock.json` and resolves the full module import graph (including locked dependencies).
-  - Runs schema validation + lint + project-wide typecheck + backend-check.
+  - Runs schema validation + lint + project-wide typecheck + backend-check (validates all declarations, including unreachable ones).
   - Non-mutating: does not run the repair loop and does not write source files.
   - Does not emit C and does not invoke any native compiler.
   - Emits an `x07diag` JSON report to stdout (or writes it with global `--out`).

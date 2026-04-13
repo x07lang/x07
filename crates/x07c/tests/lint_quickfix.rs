@@ -58,6 +58,101 @@ fn lint_quickfix_wraps_for_varargs_body_in_begin() {
 }
 
 #[test]
+fn lint_quickfix_rewrites_nary_plus_as_nested_binary_ops() {
+    let mut doc = parse_doc(
+        r#"
+        {
+          "kind":"entry",
+          "module_id":"main",
+          "imports":[],
+          "decls":[],
+          "solve":["+",1,2,3,4]
+        }
+        "#,
+    );
+
+    let doc_bytes = serde_json::to_vec(&doc).expect("serialize doc");
+    let mut file = x07ast::parse_x07ast_json(&doc_bytes).expect("parse x07ast");
+    x07ast::canonicalize_x07ast_file(&mut file);
+    let report = lint::lint_file(&file, lint::LintOptions::default());
+    assert!(!report.ok, "expected lint errors");
+
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-ARITY-BINOP-0001")
+        .expect("expected binop arity diagnostic");
+    let q = d.quickfix.as_ref().expect("expected quickfix");
+    assert_eq!(q.kind, QuickfixKind::JsonPatch);
+
+    json_patch::apply_patch(&mut doc, &q.patch).expect("apply quickfix patch");
+
+    let patched_bytes = serde_json::to_vec(&doc).expect("serialize patched");
+    let mut file = x07ast::parse_x07ast_json(&patched_bytes).expect("reparse patched");
+    x07ast::canonicalize_x07ast_file(&mut file);
+    let solve = file.solve.as_ref().expect("solve present");
+    let x07c::ast::Expr::List { items, .. } = solve else {
+        panic!("solve must be a list after patch");
+    };
+    assert_eq!(items[0].as_ident(), Some("+"));
+    assert_eq!(items.len(), 3, "binary operator must have 3 items total");
+    let first_arg = items.get(1).expect("binary op has first arg");
+    match first_arg {
+        x07c::ast::Expr::List { items, .. } => {
+            assert_eq!(
+                items.first().and_then(x07c::ast::Expr::as_ident),
+                Some("+"),
+                "expected nested + in first arg, got: {:?}",
+                first_arg
+            );
+        }
+        other => panic!("expected nested + in first arg, got: {other:?}"),
+    }
+
+    let report2 = lint::lint_file(&file, lint::LintOptions::default());
+    assert!(
+        report2
+            .diagnostics
+            .iter()
+            .all(|d| d.code != "X07-ARITY-BINOP-0001"),
+        "unexpected binop arity diagnostic after patch: {:?}",
+        report2.diagnostics
+    );
+}
+
+#[test]
+fn lint_reports_for_variable_not_identifier() {
+    let doc = parse_doc(
+        r#"
+        {
+          "kind":"entry",
+          "module_id":"main",
+          "imports":[],
+          "decls":[],
+          "solve":["for",0,0,1,0]
+        }
+        "#,
+    );
+
+    let doc_bytes = serde_json::to_vec(&doc).expect("serialize doc");
+    let mut file = x07ast::parse_x07ast_json(&doc_bytes).expect("parse x07ast");
+    x07ast::canonicalize_x07ast_file(&mut file);
+    let report = lint::lint_file(&file, lint::LintOptions::default());
+    assert!(!report.ok, "expected lint errors");
+
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-FOR-0001")
+        .expect("expected for variable diagnostic");
+    assert!(
+        matches!(&d.loc, Some(x07c::diagnostics::Location::X07Ast { ptr }) if ptr == "/solve/1"),
+        "expected location /solve/1, got: {:?}",
+        d.loc
+    );
+}
+
+#[test]
 fn lint_quickfix_rewrites_let_with_body_into_begin() {
     let mut doc = parse_doc(
         r#"

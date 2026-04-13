@@ -1753,6 +1753,57 @@ fn lint_core_borrow_escape_rules(
 
 fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<Diagnostic>) {
     match head {
+        "+" | "-" | "*" | "/" | "%" | "=" | "!=" | "<" | "<=" | ">" | ">=" | "<u" | ">=u"
+        | ">u" | "<=u" | "<<u" | ">>u" | "&" | "|" | "^" | "&&" | "||" => {
+            if items.len() != 3 {
+                let got = items.len().saturating_sub(1);
+                let mut diag = Diagnostic {
+                    code: "X07-ARITY-BINOP-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: format!("operator {head:?} expects 2 args; got {got}"),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: vec![
+                        format!("Valid form: [\"{head}\", <a>, <b>]"),
+                        format!(
+                            "Suggested fix: rewrite n-ary uses as nested binary ops (left-associative), e.g. [\"{head}\", [\"{head}\", a, b], c]."
+                        ),
+                    ],
+                    related: Vec::new(),
+                    data: std::collections::BTreeMap::from([
+                        ("op".to_string(), serde_json::Value::String(head.to_string())),
+                        ("want".to_string(), serde_json::Value::Number(2u64.into())),
+                        (
+                            "got".to_string(),
+                            serde_json::Value::Number((got as u64).into()),
+                        ),
+                    ]),
+                    quickfix: None,
+                };
+
+                if head == "+" && items.len() > 3 {
+                    let mut it = items.iter().skip(1);
+                    let a = it.next().expect("len > 3");
+                    let b = it.next().expect("len > 3");
+                    let mut nested = expr_list(vec![expr_ident(head), a.clone(), b.clone()]);
+                    for extra in it {
+                        nested = expr_list(vec![expr_ident(head), nested, extra.clone()]);
+                    }
+                    diag.quickfix = Some(Quickfix {
+                        kind: QuickfixKind::JsonPatch,
+                        patch: vec![PatchOp::Replace {
+                            path: ptr.to_string(),
+                            value: x07ast::expr_to_value(&nested),
+                        }],
+                        note: Some("Rewrite n-ary + as nested binary ops".to_string()),
+                    });
+                }
+
+                diagnostics.push(diag);
+            }
+        }
         "if" => {
             if items.len() != 4 {
                 diagnostics.push(Diagnostic {
@@ -1780,7 +1831,10 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
                     loc: Some(Location::X07Ast {
                         ptr: ptr.to_string(),
                     }),
-                    notes: Vec::new(),
+                    notes: vec![
+                        "Valid form: [\"for\", \"i\", <start:i32>, <end:i32>, <body:any>]".to_string(),
+                        "Suggested fix: if you need multiple body expressions, wrap them in begin: [\"for\", \"i\", start, end, [\"begin\", ...]]".to_string(),
+                    ],
                     related: Vec::new(),
                     data: Default::default(),
                     quickfix: None,
@@ -1803,6 +1857,22 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
                     });
                 }
                 diagnostics.push(diag);
+            } else if items.get(1).and_then(Expr::as_ident).is_none() {
+                diagnostics.push(Diagnostic {
+                    code: "X07-FOR-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: "for variable must be an identifier".to_string(),
+                    loc: Some(Location::X07Ast {
+                        ptr: format!("{ptr}/1"),
+                    }),
+                    notes: vec![format!(
+                        "Valid form: [\"for\", \"i\", <start:i32>, <end:i32>, <body:any>]"
+                    ), "Suggested fix: replace the loop variable with an identifier string (for example \"i\").".to_string()],
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
             }
         }
         "while" => {

@@ -8,11 +8,17 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 - `x07 run --offline` (and `X07_OFFLINE=1`) to forbid network access during dependency hydration (the implicit `x07 pkg lock` step).
 - `x07 pkg tree` for a deterministic dependency-closure graph from `x07.json` + `x07.lock.json`, including declared and resolved module roots.
+- `x07 check --ast` for schema/shape validation + lint only (no typecheck or backend-check), intended for fast x07AST authoring feedback.
+- Lint diagnostics for common x07AST authoring mistakes:
+  - `X07-ARITY-BINOP-0001` for n-ary uses of binary operators (for example `["+", 1, 2, 3]`).
+  - `X07-FOR-0001` when the `for` loop variable is not an identifier.
+- Guide + runnable example: `docs/guides/ast-authoring-best-practices.md` and `docs/examples/ast-authoring-best-practices/`.
 
 ### Fixed
 
 - Dependency hydration and packaging errors now include more actionable next steps (including `--offline` / `X07_OFFLINE=1` guidance when the index would otherwise be consulted).
 - Tool wrapper scope detection now recognizes `pkg tree` as `pkg.tree` (schema discovery and nondeterminism inference).
+- `x07 check` backend-check now validates all declarations (including unreachable ones), surfacing latent codegen errors earlier.
 
 ## v0.2.2
 
