@@ -19,6 +19,11 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - JSON: `std.json.encode(json, opts)` (with canonical key ordering via `opts & 1`) and `std.json.pretty_encode(json)`.
   - Paths: `std.path.normalize_posix`, `std.path.is_safe_relative`, `std.path.parent`, `std.path.join_checked`.
 - Guide + runnable example: `docs/guides/stdlib-ergonomics.md` and `docs/examples/agent-gate/stdlib-ergonomics/`.
+- Safe archive processing via `ext-archive-c@0.1.5`:
+  - `std.archive.safe_extract_v1` (tar/tgz/zip) with strict path policies, explicit caps, and structured issues (`x07.archive.issue@0.1.0`).
+  - Pinned archive profiles under `arch/archive/profiles/` (`*_extract_safe_v1.archive.json`).
+- Archive security corpus + CI gate: `tests/corpora/archive/` and `scripts/ci/check_archive_corpus.sh`.
+- Guide + API docs + runnable example: `docs/guides/safe-archives.md`, `docs/archive/archive-v1.md`, and `docs/examples/agent-gate/archive-safe-extract/zip-hello/`.
 
 ### Changed
 

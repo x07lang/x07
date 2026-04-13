@@ -104,6 +104,8 @@
 - Networking
   - [Networking bytes ABIs v1](net/net-v1.md)
   - [Networking error docs v1](net/errors-v1.md)
+- Archive
+  - [Archive v1](archive/archive-v1.md)
 - Databases
   - [DB v1](db/db-v1.md)
   - [SQLite v1](db/sqlite-v1.md)
@@ -142,6 +144,7 @@
 ## Guides
 - [CLI apps](guides/cli-apps.md)
 - [Stdlib ergonomics](guides/stdlib-ergonomics.md)
+- [Safe archives](guides/safe-archives.md)
 - [AST authoring best practices](guides/ast-authoring-best-practices.md)
 - [Data interoperability](guides/data-interop.md)
 - [Kernel/shell in production](guides/kernel-shell-production.md)

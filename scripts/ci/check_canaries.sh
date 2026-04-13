@@ -93,6 +93,7 @@ run_quiet "check_doc_version_pins" "$python_bin" scripts/ci/check_doc_version_pi
 run_quiet "check_doc_examples" ./scripts/ci/check_doc_examples.sh
 run_quiet "check_policy_templates" ./scripts/ci/check_policy_templates.sh
 run_quiet "check_repair_corpus" "$python_bin" scripts/ci/check_repair_corpus.py
+run_quiet "check_archive_corpus" ./scripts/ci/check_archive_corpus.sh
 run_quiet "check_agent_scenarios" ./scripts/ci/check_agent_scenarios.sh
 run_quiet "check_agent_examples" ./scripts/ci/check_agent_examples.sh
 run_quiet "check_readme_commands" ./scripts/ci/check_readme_commands.sh

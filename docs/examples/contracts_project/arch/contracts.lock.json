@@ -6,6 +6,9 @@
     "arch/archive/profiles/tgz_extract_safe_v1.archive.json": {
       "jcs_sha256_hex": "c5c9a649b10b7b610a6cd39938163f51a6da9094823371c2f69d468bf4a43176"
     },
+    "arch/archive/profiles/zip_extract_safe_v1.archive.json": {
+      "jcs_sha256_hex": "44c351707ef488a8e7628cf6a7f38664d8d6183bf0baf0c7641b6297842bef79"
+    },
     "arch/budgets/profiles/archive_extract_safe_v1.budget.json": {
       "jcs_sha256_hex": "0a3228f9c281f117b84b1075364989f0713d854a16a13699c479f90125ddd774"
     },
@@ -33,10 +36,10 @@
   },
   "indexes": {
     "arch/archive/index.x07archive.json": {
-      "jcs_sha256_hex": "e87e2b1cc23b456921265d56cfcb009a8a0a6b8172beef0c76812b1308e82bc3"
+      "jcs_sha256_hex": "6ad1b59608da32aaa6d4def75583020b2997d7b73dcca455b38c7d2a73bd4928"
     },
     "arch/budgets/index.x07budgets.json": {
-      "jcs_sha256_hex": "6341b85f2d6153f693c582c7cf146043f4491e44ee0da10be63a6653adb973cb"
+      "jcs_sha256_hex": "591c987d525e5e6ce8992770289925b043b3d1bfb56377dd9d5d20ac3fa07c7a"
     },
     "arch/crypto/index.x07crypto.json": {
       "jcs_sha256_hex": "d608e9b4e6e11f60a6c08900ab57ce7bd702f70d9339296b330e75465a96cba8"

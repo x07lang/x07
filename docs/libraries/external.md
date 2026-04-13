@@ -31,7 +31,7 @@ Examples include:
 - fast checksums: CRC32C / xxhash64 (`ext-checksum-rs`)
 - deterministic diff + patch (`ext-diff-rs`)
 - compression helpers: zstd framing (`ext-compress-rs`)
-- archives (tar/tgz) + pinned extraction policies (`ext-archive-c`)
+- archives (tar/tgz/zip) + pinned extraction policies (`ext-archive-c`)
 - OS-world glob + walk + ignore (`ext-path-glob-rs`)
 - web routing + middleware + OpenAPI 3.1 (`ext-web-kit`)
 - web crawling helpers (robots/sitemaps/urlnorm/scheduling + RR-friendly fetch) (`ext-web-crawl`)

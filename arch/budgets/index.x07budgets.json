@@ -41,7 +41,8 @@
       "enforce": "error",
       "selectors": [
         { "module_prefix": "std.archive.tar", "fn": "extract_tree_from_arch_v1" },
-        { "module_prefix": "std.archive.tgz", "fn": "extract_tree_from_arch_v1" }
+        { "module_prefix": "std.archive.tgz", "fn": "extract_tree_from_arch_v1" },
+        { "module_prefix": "std.archive.zip", "fn": "extract_tree_from_arch_v1" }
       ],
       "worlds_allowed": [
         "solve-pure",

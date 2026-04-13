@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "archive_extract_safe_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "archive.extract.safe.v1",
+    "alloc_bytes": 134217728,
+    "alloc_calls": 200000,
+    "realloc_calls": 50000,
+    "memcpy_bytes": 536870912,
+    "sched_ticks": 2000000,
+    "fuel": 0
+  }
+}

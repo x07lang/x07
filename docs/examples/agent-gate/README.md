@@ -18,6 +18,7 @@ They are intentionally small and deterministic.
 
 - `cli-newline`: newline input payload parsing (has `tests/`)
 - `cli-ext-cli`: `ext-cli` parsing + lockfile deps (has `tests/`)
+- `archive-safe-extract/zip-hello`: safe ZIP extraction (pure, hardened defaults) via `ext-archive-c`
 - `web-crawler-local`: `run-os-sandboxed` HTTP crawl against a local fixture site (policy-gated)
 
 ## Run the gate locally

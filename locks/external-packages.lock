@@ -298,6 +298,64 @@
       "version": "0.1.4"
     },
     {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.archive.issue",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive/issue.x07.json",
+          "sha256": "91beb420db2890832d77cfa3fd28d33aeaba66c941d09e0e8eab3723d02605f3",
+          "size_bytes": 5806
+        },
+        {
+          "module_id": "std.archive.json_doc",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive/json_doc.x07.json",
+          "sha256": "5a2feeb73efd668c65b9247029199eab9c5259ab6cf42b6df326b00d71b0dfca",
+          "size_bytes": 1301
+        },
+        {
+          "module_id": "std.archive.policy",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive/policy.x07.json",
+          "sha256": "3d2783f5c97d582c287ab23f398ad0d59d970f0211a4a24dbc5239064d0a371e",
+          "size_bytes": 4917
+        },
+        {
+          "module_id": "std.archive.tar",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive/tar.x07.json",
+          "sha256": "d9d2626be34a5065a5416a7375279ad2b33d8712200a1ffbd19c6a32d2e1286f",
+          "size_bytes": 16429
+        },
+        {
+          "module_id": "std.archive.tests",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive/tests.x07.json",
+          "sha256": "c171b9716480101c69a031e9e7c06a201e88c635c526aaaee1149c9914899271",
+          "size_bytes": 11252
+        },
+        {
+          "module_id": "std.archive.tgz",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive/tgz.x07.json",
+          "sha256": "9d5096bcfa3982e1b9806b0a305443dfe2a4cffc971fc56235626126d80bea1a",
+          "size_bytes": 4978
+        },
+        {
+          "module_id": "std.archive.zip",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive/zip.x07.json",
+          "sha256": "6876939b3bacd399219c830345d7d02129a00bb087cd24bad33d2399aa28cc3a",
+          "size_bytes": 12129
+        },
+        {
+          "module_id": "std.archive",
+          "path": "packages/ext/x07-ext-archive-c/0.1.5/modules/std/archive.x07.json",
+          "sha256": "0e4261fe45e3fece30cbc28d75ba1d669dc43d8e06b4a1d79906614548236bff",
+          "size_bytes": 1652
+        }
+      ],
+      "name": "ext-archive-c",
+      "package_manifest_sha256": "2b6bdfdebd36ce93775a720d3cf08d94ffc637969c654ad0033f94cd6592a573",
+      "path": "packages/ext/x07-ext-archive-c/0.1.5",
+      "version": "0.1.5"
+    },
+    {
       "determinism_tier": "os-world-only",
       "import_mode": "handwritten",
       "modules": [
@@ -14353,6 +14411,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "fed6e44c01fedc141b4ec820cdc95dfeb79f5d04388305de124001815629c6b4",
+  "packages_hash": "c35a2217550f543a91cbaacae2a8041ce15162673308af396e5d15cb086caec5",
   "packages_root": "packages/ext"
 }

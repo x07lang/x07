@@ -18,6 +18,15 @@
       "ops_allowed": ["std.archive.tgz.extract_tree_v1", "std.archive.tgz.list_v1"],
       "budget_profile_id": "archive_extract_safe_v1",
       "description": "tar + gzip; bounded inflate and extraction."
+    },
+    {
+      "id": "zip_extract_safe_v1",
+      "profile_path": "arch/archive/profiles/zip_extract_safe_v1.archive.json",
+      "worlds_allowed": ["run-os", "run-os-sandboxed", "solve-fs"],
+      "kinds_allowed": ["zip_v1"],
+      "ops_allowed": ["std.archive.zip.extract_tree_v1", "std.archive.zip.list_v1"],
+      "budget_profile_id": "archive_extract_safe_v1",
+      "description": "zip; strict path policy; bounded output; deterministic failure codes."
     }
   ],
   "defaults": { "default_profile_id": "tar_extract_safe_v1" }

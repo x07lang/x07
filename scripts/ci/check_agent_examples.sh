@@ -732,5 +732,27 @@ diff -u "$expected_text" "$crawler_work/$out_13.text" >/dev/null
 
 echo "ok: web-crawler-local"
 
+# ----------------------------
+# Example 15: Safe archive extraction (run-os + ext-archive-c)
+# ----------------------------
+
+echo "==> agent example: archive-safe-extract (run-os + ext-archive-c)"
+
+archive_work="$tmp_dir/archive-safe-extract"
+copy_project "docs/examples/agent-gate/archive-safe-extract/zip-hello" "$archive_work"
+
+seed_official_deps "$archive_work"
+pkg_lock_check "$archive_work"
+fmt_check_all "$archive_work"
+lint_check_one "$archive_work" "run-os" "src/main.x07.json"
+
+wrapped_15="$(run_x07_run "archive-safe-extract" "$archive_work" --profile os)"
+unwrap_and_check_wrapped_report "archive-safe-extract" "$wrapped_15" "$archive_work/tmp/runner.json" "os" "run-os" "true"
+
+expected_15='{"entries":[{"data_b64":"aGVsbG8=","path":"hello.txt","size":5}]}'$'\n'
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "archive-safe-extract" --path "$archive_work/tmp/runner.json" --expect "$expected_15" >/dev/null
+
+echo "ok: archive-safe-extract"
+
 echo
 echo "ok: agent examples gate passed"
