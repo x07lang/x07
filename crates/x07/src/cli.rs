@@ -11,10 +11,10 @@ use x07c::project;
 
 use crate::util;
 
+mod specrows_semantic;
+
 const X07CLI_SPECROWS_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07cli.specrows.schema.json");
-const X07CLI_SPECROWS_CANON_ENTRY_BYTES: &[u8] =
-    include_bytes!("assets/x07cli_specrows_canon_v1.x07.json");
 const X07CLI_SPECROWS_COMPILE_ENTRY_BYTES: &[u8] =
     include_bytes!("assets/x07cli_specrows_compile_v1.x07.json");
 
@@ -41,6 +41,7 @@ pub struct CliArgs {
 #[derive(clap::Subcommand, Debug)]
 pub enum CliCommand {
     /// Work with the CLI specrows schema format.
+    #[command(visible_alias = "specrows")]
     Spec(SpecArgs),
 }
 
@@ -159,27 +160,17 @@ fn cmd_cli_spec_check(args: SpecCheckArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::from(20));
     }
 
-    let module_roots = infer_cli_module_roots_for_spec(&in_path)?;
-    let mut diagnostics: Vec<X07CliDiagnostic> = Vec::new();
-    let ok = match canon_specrows_v1(&module_roots, &bytes)? {
-        SpecrowsCanonOutput::Ok(_) => true,
-        SpecrowsCanonOutput::ErrCode(code) => {
-            diagnostics.push(X07CliDiagnostic {
-                severity: "error".to_string(),
-                code: "ECLI_SEMANTIC".to_string(),
-                scope: String::new(),
-                row_index: -1,
-                message: format!("ext.cli.specrows.compile failed (code={code})"),
-            });
-            false
-        }
-    };
+    let semantic = specrows_semantic::validate_and_canon(&doc);
+    let ok = !semantic
+        .diagnostics
+        .iter()
+        .any(|d| d.severity.as_str() == "error");
     let report = SpecCheckReport {
         ok,
         r#in: in_path.display().to_string(),
         diag_out: args.diag_out.as_ref().map(|p| p.display().to_string()),
-        diagnostics_count: diagnostics.len(),
-        diagnostics,
+        diagnostics_count: semantic.diagnostics.len(),
+        diagnostics: semantic.diagnostics,
     };
     write_diagnostics_if_requested(args.diag_out.as_ref(), &report.diagnostics)?;
     println!("{}", serde_json::to_string(&report)?);
@@ -242,34 +233,12 @@ fn cmd_cli_spec_fmt(
         return Ok(std::process::ExitCode::from(20));
     }
 
-    let module_roots = match infer_cli_module_roots_for_spec(&in_path) {
-        Ok(r) => r,
-        Err(err) => {
-            let diags = vec![X07CliDiagnostic {
-                severity: "error".to_string(),
-                code: "ECLI_TOOL".to_string(),
-                scope: String::new(),
-                row_index: -1,
-                message: err.to_string(),
-            }];
-            write_diags_stderr(&diags)?;
-            return Ok(std::process::ExitCode::from(1));
-        }
-    };
-    let canon_json = match canon_specrows_v1(&module_roots, &bytes)? {
-        SpecrowsCanonOutput::Ok(b) => b,
-        SpecrowsCanonOutput::ErrCode(code) => {
-            let diags = vec![X07CliDiagnostic {
-                severity: "error".to_string(),
-                code: "ECLI_SEMANTIC".to_string(),
-                scope: String::new(),
-                row_index: -1,
-                message: format!("ext.cli.specrows.compile failed (code={code})"),
-            }];
-            write_diags_stderr(&diags)?;
-            return Ok(std::process::ExitCode::from(20));
-        }
-    };
+    let semantic = specrows_semantic::validate_and_canon(&doc);
+    if !semantic.diagnostics.is_empty() {
+        write_diags_stderr(&semantic.diagnostics)?;
+        return Ok(std::process::ExitCode::from(20));
+    }
+    let canon_json = util::canonical_jcs_bytes(&semantic.canon)?;
 
     match (args.write, machine.out.as_ref()) {
         (true, _) => write_bytes(&in_path, &canon_json)?,
@@ -348,6 +317,37 @@ fn cmd_cli_spec_compile(
         return Ok(std::process::ExitCode::from(20));
     }
 
+    let semantic = specrows_semantic::validate_and_canon(&doc);
+    if !semantic.diagnostics.is_empty() {
+        let report = SpecCompileReport {
+            ok: false,
+            r#in: in_path.display().to_string(),
+            out: out_path.display().to_string(),
+            sha256: String::new(),
+            diagnostics_count: semantic.diagnostics.len(),
+            diagnostics: semantic.diagnostics,
+            tool_error: None,
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let canon_json = util::canonical_jcs_bytes(&semantic.canon)?;
+
+    if canon_json.is_empty() {
+        let report = SpecCompileReport {
+            ok: false,
+            r#in: in_path.display().to_string(),
+            out: out_path.display().to_string(),
+            sha256: String::new(),
+            diagnostics_count: 0,
+            diagnostics: Vec::new(),
+            tool_error: None,
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
     let module_roots = match infer_cli_module_roots_for_spec(&in_path) {
         Ok(r) => r,
         Err(err) => {
@@ -364,44 +364,6 @@ fn cmd_cli_spec_compile(
             return Ok(std::process::ExitCode::from(1));
         }
     };
-
-    let canon_json = match canon_specrows_v1(&module_roots, &bytes)? {
-        SpecrowsCanonOutput::Ok(b) => b,
-        SpecrowsCanonOutput::ErrCode(code) => {
-            let diagnostics = vec![X07CliDiagnostic {
-                severity: "error".to_string(),
-                code: "ECLI_SEMANTIC".to_string(),
-                scope: String::new(),
-                row_index: -1,
-                message: format!("ext.cli.specrows.compile failed (code={code})"),
-            }];
-            let report = SpecCompileReport {
-                ok: false,
-                r#in: in_path.display().to_string(),
-                out: out_path.display().to_string(),
-                sha256: String::new(),
-                diagnostics_count: diagnostics.len(),
-                diagnostics,
-                tool_error: None,
-            };
-            println!("{}", serde_json::to_string(&report)?);
-            return Ok(std::process::ExitCode::from(20));
-        }
-    };
-
-    if canon_json.is_empty() {
-        let report = SpecCompileReport {
-            ok: false,
-            r#in: in_path.display().to_string(),
-            out: out_path.display().to_string(),
-            sha256: String::new(),
-            diagnostics_count: 0,
-            diagnostics: Vec::new(),
-            tool_error: None,
-        };
-        println!("{}", serde_json::to_string(&report)?);
-        return Ok(std::process::ExitCode::from(20));
-    }
 
     let compiled = match compile_specrows_v1(&module_roots, &canon_json) {
         Ok(SpecrowsCompileOutput::Ok(b)) => b,
@@ -795,78 +757,4 @@ fn parse_semver3(s: &str) -> Option<(u64, u64, u64)> {
         return None;
     }
     Some((major, minor, patch))
-}
-
-enum SpecrowsCanonOutput {
-    Ok(Vec<u8>),
-    ErrCode(i32),
-}
-
-fn canon_specrows_v1(module_roots: &[PathBuf], spec_json: &[u8]) -> Result<SpecrowsCanonOutput> {
-    let config = x07_host_runner::RunnerConfig {
-        world: x07_worlds::WorldId::SolvePure,
-        fixture_fs_dir: None,
-        fixture_fs_root: None,
-        fixture_fs_latency_index: None,
-        fixture_rr_dir: None,
-        fixture_kv_dir: None,
-        fixture_kv_seed: None,
-        solve_fuel: 50_000_000,
-        max_memory_bytes: 64 * 1024 * 1024,
-        max_output_bytes: 64 * 1024 * 1024,
-        cpu_time_limit_seconds: 30,
-        debug_borrow_checks: false,
-    };
-
-    let compile_options = x07_host_runner::compile_options_for_world(
-        x07_worlds::WorldId::SolvePure,
-        module_roots.to_vec(),
-    )?;
-    let result = x07_host_runner::compile_and_run_with_options(
-        X07CLI_SPECROWS_CANON_ENTRY_BYTES,
-        &config,
-        spec_json,
-        None,
-        &compile_options,
-    )?;
-
-    if !result.compile.ok {
-        let msg = result
-            .compile
-            .compile_error
-            .as_deref()
-            .unwrap_or("compile failed");
-        anyhow::bail!("{msg}");
-    }
-
-    let Some(run) = result.solve else {
-        anyhow::bail!("internal error: compile succeeded but solve did not run");
-    };
-    if !run.ok || run.exit_status != 0 {
-        anyhow::bail!(
-            "internal error: canon helper failed (ok={} exit_status={})",
-            run.ok,
-            run.exit_status
-        );
-    }
-
-    parse_canon_helper_output(&run.solve_output)
-}
-
-fn parse_canon_helper_output(output: &[u8]) -> Result<SpecrowsCanonOutput> {
-    let Some((&tag, payload)) = output.split_first() else {
-        anyhow::bail!("internal error: empty canon helper output");
-    };
-
-    match tag {
-        1 => Ok(SpecrowsCanonOutput::Ok(payload.to_vec())),
-        0 => {
-            if payload.len() < 4 {
-                anyhow::bail!("internal error: truncated canon error output");
-            }
-            let code = u32::from_le_bytes(payload[0..4].try_into().unwrap()) as i32;
-            Ok(SpecrowsCanonOutput::ErrCode(code))
-        }
-        _ => anyhow::bail!("internal error: unknown canon helper tag={tag}"),
-    }
 }

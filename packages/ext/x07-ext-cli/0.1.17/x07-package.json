@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-cli",
+  "description": "Command-line argument parsing, help, and shell completion.",
+  "docs": "Specrows-based CLI parsing.\n\n- Compile a specrows JSON command spec with ext.cli.specrows.compile.\n- Render help with ext.cli.render_help(spec_json_or_specbin, scope_bytes) (empty scope = root).\n- Parse argv bytes with ext.cli.parse_specrows(spec_json_bytes, argv_v1_bytes).\n- Parse argv bytes with env defaults using ext.cli.parse_specrows_v2(spec_json_bytes, argv_v1_bytes, env_v1_bytes).\n- On error, use ext.cli.err_msg / ext.cli.err_hint / ext.cli.err_usage (or ext.cli.err_doc_v2 for a canonical map).\n- On success, use ext.cli.matches_cmd and ext.cli.matches_get.\n\nTyped option value kinds:\n- STR, PATH, U32, I32, BOOL, ENUM, BYTES, BYTES_HEX\n\nTyped opt encodings (matches_get kind=2):\n- STR|PATH|ENUM|BYTES: raw token bytes\n- U32|I32: 4-byte little-endian\n- BOOL: 1 byte (0 or 1)\n- BYTES_HEX: decoded bytes\n\nError schema (via ext.cli.err_doc_v2):\n- { code, message, hint, usage, arg?, scope? }\n",
+  "version": "0.1.17",
+  "module_root": "modules",
+  "modules": [
+    "ext.cli",
+    "ext.cli.specrows",
+    "ext.cli.help",
+    "ext.cli.complete",
+    "ext.cli.tests"
+  ],
+  "meta": {
+    "x07c_compat": ">=0.1.111 <0.3.0",
+    "determinism_tier": "pure",
+    "requires_packages": [
+      "ext-data-model@0.1.11",
+      "ext-json-rs@0.1.7"
+    ],
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

@@ -14,7 +14,7 @@
         "spec",
         [
           "bytes.lit",
-          "{\"schema_version\":\"x07cli.specrows@0.1.0\",\"app\":{\"name\":\"tool\",\"version\":\"0.1.0\"},\"rows\":[[\"root\",\"opt\",\"\",\"--name\",\"name\",\"NAME\",\"\",{\"required\":true}]]}"
+          "{\"schema_version\":\"x07cli.specrows@0.1.0\",\"app\":{\"name\":\"tool\",\"version\":\"0.1.0\"},\"rows\":[[\"root\",\"opt\",\"\",\"--name\",\"name\",\"STR\",\"\",{\"required\":true}]]}"
         ]
       ],
       [

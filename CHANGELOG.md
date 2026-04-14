@@ -24,6 +24,14 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - Pinned archive profiles under `arch/archive/profiles/` (`*_extract_safe_v1.archive.json`).
 - Archive security corpus + CI gate: `tests/corpora/archive/` and `scripts/ci/check_archive_corpus.sh`.
 - Guide + API docs + runnable example: `docs/guides/safe-archives.md`, `docs/archive/archive-v1.md`, and `docs/examples/agent-gate/archive-safe-extract/zip-hello/`.
+- CLI specrows tooling:
+  - `x07 cli specrows check` and `x07 cli specrows fmt` (alias: `x07 cli spec`) for semantic validation and canonical formatting.
+  - `x07 cli specrows compile` for emitting specbin for `ext.cli.parse_compiled*`.
+- CLI v2 (`ext-cli`) features:
+  - typed options (`U32`, `I32`, `PATH`, `BOOL`, `ENUM`, `BYTES_HEX`)
+  - built-in help renderer (`ext.cli.render_help`)
+  - stable machine-readable error map (`ext.cli.err_doc_v2`)
+- Guide + API docs + runnable example: `docs/guides/cli-patterns.md`, `docs/libraries/ext-cli.md`, and `docs/examples/agent-gate/cli-ext-cli/`.
 
 ### Changed
 

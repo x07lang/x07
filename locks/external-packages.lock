@@ -1771,6 +1771,46 @@
       "modules": [
         {
           "module_id": "ext.cli.complete",
+          "path": "packages/ext/x07-ext-cli/0.1.17/modules/ext/cli/complete.x07.json",
+          "sha256": "10b0df962057c9d4b554334e02282c02e6ab3e324d469ca0e820a6ae44f12419",
+          "size_bytes": 559
+        },
+        {
+          "module_id": "ext.cli.help",
+          "path": "packages/ext/x07-ext-cli/0.1.17/modules/ext/cli/help.x07.json",
+          "sha256": "0dad746cd88e63ead0148bfe43aae6ff7b4b2f05e0bd9d8726ec60c9f61faef2",
+          "size_bytes": 781
+        },
+        {
+          "module_id": "ext.cli.specrows",
+          "path": "packages/ext/x07-ext-cli/0.1.17/modules/ext/cli/specrows.x07.json",
+          "sha256": "ff337f4a98ff9bc33d39a58f4e43b14728d1128b1dbac8c6b2873da17a887901",
+          "size_bytes": 11670
+        },
+        {
+          "module_id": "ext.cli.tests",
+          "path": "packages/ext/x07-ext-cli/0.1.17/modules/ext/cli/tests.x07.json",
+          "sha256": "fd72842575f868a89e49814c37182fa4fe608112f5a1797dcb5a23d41ee6e076",
+          "size_bytes": 120251
+        },
+        {
+          "module_id": "ext.cli",
+          "path": "packages/ext/x07-ext-cli/0.1.17/modules/ext/cli.x07.json",
+          "sha256": "cbc4e95df3c58a15215242772a9ae93d4235f4f620a1ade3e6f52b6e91598a38",
+          "size_bytes": 88196
+        }
+      ],
+      "name": "ext-cli",
+      "package_manifest_sha256": "ea0e091fa833cfee909d01ca4dbc7d2990de6d68f2bd9e770e6f735778e78ac4",
+      "path": "packages/ext/x07-ext-cli/0.1.17",
+      "version": "0.1.17"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli/complete.x07.json",
           "sha256": "e2019240ef981c4ec0653ba231e004b025f745b978a6f37d6c3aad7111716ec0",
           "size_bytes": 558
@@ -14411,6 +14451,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "c35a2217550f543a91cbaacae2a8041ce15162673308af396e5d15cb086caec5",
+  "packages_hash": "4c0f4afb875fd58992236508dc2c6499ddf76403879d69860b6ee031f5117b52",
   "packages_root": "packages/ext"
 }

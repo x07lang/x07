@@ -103,7 +103,7 @@ x07 pkg add NAME@VERSION --sync
 cat > /tmp/x07-ext-cli-name.patch.json <<'JSON'
 [
   {"op":"add","path":"/imports/0","value":"ext.cli"},
-  {"op":"replace","path":"/decls/1/body","value":["begin",["let","spec",["bytes.lit","{\\\"schema_version\\\":\\\"x07cli.specrows@0.1.0\\\",\\\"app\\\":{\\\"name\\\":\\\"tool\\\",\\\"version\\\":\\\"0.1.0\\\"},\\\"rows\\\":[[\\\"root\\\",\\\"opt\\\",\\\"\\\",\\\"--name\\\",\\\"name\\\",\\\"NAME\\\",\\\"\\\",{\\\"required\\\":true}]]}"]],["let","argv_v1",["view.to_bytes","b"]],["let","doc",["ext.cli.parse_specrows","spec","argv_v1"]],["if",["=",["ext.cli.is_ok",["bytes.view","doc"]],0],["return",["ext.cli.err_usage",["bytes.view","doc"]]],0],["let","name",["option_bytes.unwrap_or",["ext.cli.matches_get",["bytes.view","doc"],["bytes.view",["bytes.lit","name"]],2],["bytes.alloc",0]]],["bytes.concat",["bytes.lit","name="],"name"]]}
+  {"op":"replace","path":"/decls/1/body","value":["begin",["let","spec",["bytes.lit","{\\\"schema_version\\\":\\\"x07cli.specrows@0.1.0\\\",\\\"app\\\":{\\\"name\\\":\\\"tool\\\",\\\"version\\\":\\\"0.1.0\\\"},\\\"rows\\\":[[\\\"root\\\",\\\"opt\\\",\\\"\\\",\\\"--name\\\",\\\"name\\\",\\\"STR\\\",\\\"\\\",{\\\"required\\\":true}]]}"]],["let","argv_v1",["view.to_bytes","b"]],["let","doc",["ext.cli.parse_specrows","spec","argv_v1"]],["if",["=",["ext.cli.is_ok",["bytes.view","doc"]],0],["return",["ext.cli.err_usage",["bytes.view","doc"]]],0],["let","name",["option_bytes.unwrap_or",["ext.cli.matches_get",["bytes.view","doc"],["bytes.view",["bytes.lit","name"]],2],["bytes.alloc",0]]],["bytes.concat",["bytes.lit","name="],"name"]]}
 ]
 JSON
 

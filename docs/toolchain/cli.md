@@ -557,6 +557,19 @@ Each row is a small tuple. Examples:
 
 Schema: `spec/x07cli.specrows.schema.json`.
 
+## Specrows tooling (`x07 cli specrows`)
+
+For authoring and maintaining `x07cli.specrows@0.1.0` documents, use:
+
+- `x07 cli specrows check --in <PATH>` (schema + semantic validation)
+- `x07 cli specrows fmt --in <PATH> --write` (canonicalize rows; inserts implied help/version rows when missing)
+- `x07 cli specrows compile --in <PATH> --out <PATH>` (emit specbin for `ext.cli.parse_compiled*`)
+
+Notes:
+
+- `x07 cli spec` is the same command surface; `specrows` is an alias.
+- `fmt` prints canonical JSON to stdout when `--write` is not set.
+
 ## Legacy alias (`--report-json`)
 
 Compatibility mode is still available for existing automation:

@@ -40,6 +40,11 @@ If you’re new to X07’s JSON-first source format, start with: [Syntax & x07AS
 
 `ext-cli` parses a declarative CLI spec plus an `argv_v1` byte encoding.
 
+For typed options, built-in help output, repeated options, and canonical error handling, see:
+
+- [CLI patterns (ext-cli v2)](cli-patterns.md)
+- [ext-cli API](../libraries/ext-cli.md)
+
 If you didn’t start from `x07 init --template cli`, add the canonical CLI packages from the capability map (see [Agent contracts](../agent/contract.md)) and then sync the lockfile:
 
 ```bash

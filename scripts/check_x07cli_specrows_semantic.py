@@ -220,7 +220,7 @@ def validate_and_canon(spec: Dict[str, Any]) -> CanonResult:
                 diags.append(diag("ECLI_META_KEY_MISMATCH", f"meta.key {meta['key']!r} does not match key {key!r}", scope=scope, row_index=row_index))
 
         # opts: [scope,"opt",short,long,key,value_kind,desc,(meta?)]
-        allowed_value_kinds = {"STR","PATH","U32","I32","BYTES","BYTES_HEX"}
+        allowed_value_kinds = {"STR", "PATH", "U32", "I32", "BOOL", "ENUM", "BYTES", "BYTES_HEX"}
         for (row_index, row) in opt_rows:
             short_opt = str(_row_get(row, 2, ""))
             long_opt = str(_row_get(row, 3, ""))
@@ -241,6 +241,28 @@ def validate_and_canon(spec: Dict[str, Any]) -> CanonResult:
             if isinstance(meta, dict):
                 if "key" in meta and str(meta["key"]) != key:
                     diags.append(diag("ECLI_META_KEY_MISMATCH", f"meta.key {meta['key']!r} does not match key {key!r}", scope=scope, row_index=row_index))
+
+                if value_kind == "ENUM":
+                    if "enum" not in meta:
+                        diags.append(
+                            diag(
+                                "ECLI_ENUM_MISSING",
+                                "ENUM options must provide meta.enum (list of allowed values)",
+                                scope=scope,
+                                row_index=row_index,
+                            )
+                        )
+                    elif isinstance(meta.get("enum"), list) and "default" in meta:
+                        default_val = meta.get("default")
+                        if isinstance(default_val, str) and default_val not in set(meta.get("enum") or []):
+                            diags.append(
+                                diag(
+                                    "ECLI_ENUM_DEFAULT_INVALID",
+                                    "default is not one of meta.enum values",
+                                    scope=scope,
+                                    row_index=row_index,
+                                )
+                            )
 
                 # default validation (minimal, deterministic)
                 if "default" in meta and value_kind in allowed_value_kinds:
@@ -358,8 +380,14 @@ def _default_parse_ok(value_kind: str, default_val: Any) -> bool:
     if default_val is None:
         return False
 
-    if value_kind in ("STR","PATH","BYTES"):
+    if value_kind in ("STR", "PATH", "BYTES", "ENUM"):
         return isinstance(default_val, str)
+    if value_kind == "BOOL":
+        if isinstance(default_val, bool):
+            return True
+        if not isinstance(default_val, str):
+            return False
+        return default_val in ("0", "1", "true", "false", "yes", "no", "on", "off")
     if value_kind == "BYTES_HEX":
         if not isinstance(default_val, str):
             return False
@@ -371,19 +399,32 @@ def _default_parse_ok(value_kind: str, default_val: Any) -> bool:
                 return False
         return True
     if value_kind == "U32":
+        if isinstance(default_val, int):
+            return 0 <= default_val <= 2**32 - 1
         if not isinstance(default_val, str):
             return False
         if not default_val.isdigit():
             return False
-        # bounds are not enforced here (language is modulo 2^32 anyway)
-        return True
+        try:
+            n = int(default_val, 10)
+        except ValueError:
+            return False
+        return 0 <= n <= 2**32 - 1
     if value_kind == "I32":
+        if isinstance(default_val, int):
+            return -(2**31) <= default_val <= 2**31 - 1
         if not isinstance(default_val, str):
             return False
         s = default_val
         if s.startswith("-"):
             s = s[1:]
-        return s.isdigit()
+        if not s.isdigit():
+            return False
+        try:
+            n = int(default_val, 10)
+        except ValueError:
+            return False
+        return -(2**31) <= n <= 2**31 - 1
     return False
 
 

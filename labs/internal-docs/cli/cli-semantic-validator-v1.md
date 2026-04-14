@@ -16,9 +16,9 @@ The intent is **LLM-first** authoring: an agent should be able to generate a `cl
 
 - **SpecRows**: the JSON representation of CLI specs. Primary authoring format.
 - **Row**: one entry in `rows`, represented as a JSON array.
-- **Scope**: `"root"` or `"root.<subcmd>.<subcmd>"` (dot-separated).
-- **Short option**: `"-x"` (exactly 2 bytes: `-` and 1 ASCII letter).
-- **Long option**: `"--name"` (ASCII `[a-z][a-z0-9-]*`).
+- **Scope**: `"root"` or a dot-separated subcommand path (for example `"pkg.add"`).
+- **Short option**: `"-x"` (exactly 2 bytes: `-` and 1 ASCII alphanumeric).
+- **Long option**: `"--name"` (ASCII `[A-Za-z][A-Za-z0-9-]*`).
 
 ---
 
@@ -97,15 +97,20 @@ Diagnostics:
 For `opt` rows:
 
 - `value_kind` MUST be one of:
-  - `"STR"`, `"PATH"`, `"U32"`, `"I32"`, `"BYTES"`, `"BYTES_HEX"`
+  - `"STR"`, `"PATH"`, `"U32"`, `"I32"`, `"BOOL"`, `"ENUM"`, `"BYTES"`, `"BYTES_HEX"`
 - If `metaOpt.default` is present, it MUST be parseable for the `value_kind`:
-  - `U32` => ASCII decimal digits, value fits 0..2^32-1 (stored mod 2^32)
-  - `I32` => optional leading `-`, digits, fits i32 range
-  - `BYTES_HEX` => even-length hex; decoded bytes length <= metaOpt.max_len (if set)
+  - `U32` => integer or ASCII decimal digits, value fits 0..2^32-1
+  - `I32` => integer or ASCII decimal digits (optional leading `-`), fits i32 range
+  - `BOOL` => boolean or one of: `0`, `1`, `true`, `false`, `yes`, `no`, `on`, `off`
+  - `ENUM` => string and one of the `metaOpt.enum[]` values
+  - `BYTES_HEX` => even-length hex
+- If `value_kind == "ENUM"`, `metaOpt.enum` MUST be present and define the allowed values.
 
 Diagnostics:
 - `ECLI_OPT_VALUE_KIND_UNKNOWN`
 - `ECLI_OPT_DEFAULT_INVALID`
+- `ECLI_ENUM_MISSING`
+- `ECLI_ENUM_DEFAULT_INVALID`
 
 ---
 
@@ -204,4 +209,3 @@ Diagnostics:
 
 - For parse failures in OS worlds, prefer a stable “usage error” exit code (many conventions use 2 or EX_USAGE=64).
   The pure-world parser should not exit; it should return a deterministic error record and let the OS adapter decide.
-

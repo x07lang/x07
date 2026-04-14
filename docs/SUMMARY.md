@@ -98,6 +98,7 @@
 ## Libraries
 - [Stdlib](libraries/stdlib.md)
 - [External packages](libraries/external.md)
+- [ext-cli](libraries/ext-cli.md)
 - [Agentic design](libraries/agentic-design.md)
 
 ## Contracts
@@ -143,6 +144,7 @@
 
 ## Guides
 - [CLI apps](guides/cli-apps.md)
+- [CLI patterns (ext-cli v2)](guides/cli-patterns.md)
 - [Stdlib ergonomics](guides/stdlib-ergonomics.md)
 - [Safe archives](guides/safe-archives.md)
 - [AST authoring best practices](guides/ast-authoring-best-practices.md)
