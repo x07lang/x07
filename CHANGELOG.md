@@ -39,6 +39,10 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - built-in help renderer (`ext.cli.render_help`)
   - stable machine-readable error map (`ext.cli.err_doc_v2`)
 - Guide + API docs + runnable example: `docs/guides/cli-patterns.md`, `docs/libraries/ext-cli.md`, and `docs/examples/agent-gate/cli-ext-cli/`.
+- JSON reporting reference implementation:
+  - Guide + API docs: `docs/guides/json-reporting.md`, `docs/libraries/ext-data-model.md`, `docs/libraries/ext-json-rs.md`
+  - Runnable example: `docs/examples/agent-gate/json-report/`
+  - Template: `x07 init --template json-report`
 - Packaging integrity tooling:
   - `x07 pkg verify` to validate sparse-index signatures (ed25519) and clearly report unsigned indices/packages.
   - `x07 pkg check-semver` to detect breaking export changes (removed exports or signature changes) between two package directories.
@@ -57,6 +61,8 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - Dependency hydration and packaging errors now include more actionable next steps (including `--offline` / `X07_OFFLINE=1` guidance when the index would otherwise be consulted).
 - Tool wrapper scope detection now recognizes `pkg tree` as `pkg.tree` (schema discovery and nondeterminism inference).
 - `x07 check` backend-check now validates all declarations (including unreachable ones), surfacing latent codegen errors earlier.
+- `x07 init --template fs-tool` now exercises sandboxed filesystem caps (read from `src/`, write to `out/`) instead of only echoing input bytes.
+- Agent-gate CI now runs `x07 test` for example projects that include `tests/tests.json` and adds the `json-report` example to the gate.
 
 ## v0.2.2
 

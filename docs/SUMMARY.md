@@ -100,6 +100,8 @@
 - [Stdlib](libraries/stdlib.md)
 - [External packages](libraries/external.md)
 - [ext-cli](libraries/ext-cli.md)
+- [ext-data-model](libraries/ext-data-model.md)
+- [ext-json-rs](libraries/ext-json-rs.md)
 - [Agentic design](libraries/agentic-design.md)
 
 ## Contracts
@@ -151,6 +153,7 @@
 - [Streaming IO](guides/streaming-io.md)
 - [AST authoring best practices](guides/ast-authoring-best-practices.md)
 - [Data interoperability](guides/data-interop.md)
+- [JSON reporting](guides/json-reporting.md)
 - [Kernel/shell in production](guides/kernel-shell-production.md)
 - [Offline workflows](guides/offline.md)
 - [Packaging integrity](guides/packaging-integrity.md)

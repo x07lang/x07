@@ -36,6 +36,7 @@ pub struct InitArgs {
 #[clap(rename_all = "kebab_case")]
 pub enum InitTemplate {
     Cli,
+    JsonReport,
     HttpClient,
     WebService,
     FsTool,
@@ -121,6 +122,15 @@ const TEMPLATE_CLI_APP: &[u8] = include_bytes!(concat!(
 const TEMPLATE_CLI_MAIN: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../docs/examples/agent-gate/cli-ext-cli/src/main.x07.json"
+));
+
+const TEMPLATE_JSON_REPORT_APP: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/json-report/src/app.x07.json"
+));
+const TEMPLATE_JSON_REPORT_MAIN: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/json-report/src/main.x07.json"
 ));
 
 const TEMPLATE_HTTP_CLIENT_APP: &[u8] = include_bytes!(concat!(
@@ -218,6 +228,7 @@ fn canonical_pkg_for_capability(cat: &CapabilitiesCatalog, id_or_alias: &str) ->
 fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str] {
     match template {
         InitTemplate::Cli => &["cli", "data.model", "data.json"],
+        InitTemplate::JsonReport => &["cli", "data.model", "data.json"],
         InitTemplate::HttpClient => &["http-client", "net.curl", "net.sockets", "url.parse"],
         InitTemplate::WebService => &["net.http", "net.sockets", "url.parse"],
         InitTemplate::FsTool => &["fs.io"],
@@ -263,6 +274,7 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
 fn template_default_profile(template: InitTemplate) -> &'static str {
     match template {
         InitTemplate::Cli => "os",
+        InitTemplate::JsonReport => "os",
         InitTemplate::HttpClient
         | InitTemplate::WebService
         | InitTemplate::FsTool
@@ -289,6 +301,7 @@ fn template_default_profile(template: InitTemplate) -> &'static str {
 fn init_template_policy_template(template: InitTemplate) -> crate::policy::PolicyTemplate {
     match template {
         InitTemplate::Cli => crate::policy::PolicyTemplate::Cli,
+        InitTemplate::JsonReport => crate::policy::PolicyTemplate::Cli,
         InitTemplate::HttpClient => crate::policy::PolicyTemplate::HttpClient,
         InitTemplate::WebService => crate::policy::PolicyTemplate::WebService,
         InitTemplate::FsTool => crate::policy::PolicyTemplate::FsTool,
@@ -318,13 +331,17 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
             ensure_trailing_newline(TEMPLATE_CLI_APP),
             ensure_trailing_newline(TEMPLATE_CLI_MAIN),
         )),
+        InitTemplate::JsonReport => Ok((
+            ensure_trailing_newline(TEMPLATE_JSON_REPORT_APP),
+            ensure_trailing_newline(TEMPLATE_JSON_REPORT_MAIN),
+        )),
         InitTemplate::HttpClient => Ok((
             ensure_trailing_newline(TEMPLATE_HTTP_CLIENT_APP),
             ensure_trailing_newline(TEMPLATE_HTTP_CLIENT_MAIN),
         )),
         InitTemplate::WebService => Ok((app_module_web_service_bytes()?, main_entry_bytes()?)),
-        InitTemplate::FsTool
-        | InitTemplate::SqliteApp
+        InitTemplate::FsTool => Ok((app_module_fs_tool_bytes()?, main_entry_bytes()?)),
+        InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
         | InitTemplate::Worker
         | InitTemplate::ApiCell
@@ -3049,6 +3066,144 @@ fn app_module_bytes() -> Result<Vec<u8>> {
                                     Value::String("b".to_string()),
                                 ]),
                             ),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                ]),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    x07c::x07ast::canon_value_jcs(&mut v);
+    let mut out = serde_json::to_string(&v)?.into_bytes();
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
+fn app_module_fs_tool_bytes() -> Result<Vec<u8>> {
+    let body = serde_json::json!([
+        "begin",
+        ["let", "caps", ["std.os.fs.spec.caps_default_v1"]],
+        ["let", "out_dir", ["bytes.lit", "out"]],
+        [
+            "let",
+            "mk_out",
+            [
+                "std.os.fs.mkdirs_v1",
+                ["std.bytes.copy", ["bytes.view", "out_dir"]],
+                ["std.bytes.copy", "caps"]
+            ]
+        ],
+        [
+            "if",
+            ["!=", ["result_i32.err_code", "mk_out"], 0],
+            ["return", ["bytes.lit", "FAIL_mkdir_out\n"]],
+            0
+        ],
+        ["let", "in_path", ["bytes.lit", "src/input.txt"]],
+        [
+            "let",
+            "r",
+            [
+                "std.os.fs.read_all_v1",
+                ["std.bytes.copy", ["bytes.view", "in_path"]],
+                ["std.bytes.copy", "caps"]
+            ]
+        ],
+        ["let", "err", ["result_bytes.err_code", "r"]],
+        ["let", "not_found", ["std.os.fs.spec.err_not_found_v1"]],
+        [
+            "if",
+            ["!=", "err", 0],
+            [
+                "if",
+                ["!=", "err", "not_found"],
+                ["return", ["bytes.lit", "FAIL_read\n"]],
+                0
+            ],
+            0
+        ],
+        [
+            "let",
+            "data",
+            [
+                "if",
+                ["=", "err", 0],
+                ["result_bytes.unwrap_or", "r", ["bytes.alloc", 0]],
+                ["bytes.lit", "hello"]
+            ]
+        ],
+        ["let", "out_path", ["bytes.lit", "out/output.txt"]],
+        [
+            "let",
+            "w",
+            [
+                "std.os.fs.write_all_v1",
+                ["std.bytes.copy", ["bytes.view", "out_path"]],
+                "data",
+                ["std.bytes.copy", "caps"]
+            ]
+        ],
+        [
+            "if",
+            ["!=", ["result_i32.err_code", "w"], 0],
+            ["return", ["bytes.lit", "FAIL_write\n"]],
+            0
+        ],
+        ["bytes.lit", "ok\n"]
+    ]);
+
+    let mut v = Value::Object(
+        [
+            (
+                "schema_version".to_string(),
+                Value::String(X07AST_SCHEMA_VERSION.to_string()),
+            ),
+            ("kind".to_string(), Value::String("module".to_string())),
+            ("module_id".to_string(), Value::String("app".to_string())),
+            (
+                "imports".to_string(),
+                Value::Array(vec![
+                    Value::String("std.bytes".to_string()),
+                    Value::String("std.os.fs".to_string()),
+                    Value::String("std.os.fs.spec".to_string()),
+                ]),
+            ),
+            (
+                "decls".to_string(),
+                Value::Array(vec![
+                    Value::Object(
+                        [
+                            ("kind".to_string(), Value::String("export".to_string())),
+                            (
+                                "names".to_string(),
+                                Value::Array(vec![Value::String("app.solve".to_string())]),
+                            ),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    Value::Object(
+                        [
+                            ("kind".to_string(), Value::String("defn".to_string())),
+                            ("name".to_string(), Value::String("app.solve".to_string())),
+                            (
+                                "params".to_string(),
+                                Value::Array(vec![Value::Object(
+                                    [
+                                        ("name".to_string(), Value::String("b".to_string())),
+                                        ("ty".to_string(), Value::String("bytes_view".to_string())),
+                                    ]
+                                    .into_iter()
+                                    .collect(),
+                                )]),
+                            ),
+                            ("result".to_string(), Value::String("bytes".to_string())),
+                            ("body".to_string(), body),
                         ]
                         .into_iter()
                         .collect(),

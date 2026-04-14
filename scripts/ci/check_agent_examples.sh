@@ -181,9 +181,17 @@ PY
 
 fmt_check_all() {
   local work="$1"
-  (cd "$work" && find src -name '*.x07.json' -print0 | while IFS= read -r -d '' f; do
-    "$x07_bin" fmt --input "$f" --check >/dev/null
-  done)
+  (
+    cd "$work" &&
+      for d in src tests; do
+        if [[ ! -d "$d" ]]; then
+          continue
+        fi
+        find "$d" -name '*.x07.json' -print0 | while IFS= read -r -d '' f; do
+          "$x07_bin" fmt --input "$f" --check >/dev/null
+        done
+      done
+  )
 }
 
 lint_check_one() {
@@ -191,6 +199,37 @@ lint_check_one() {
   local world="$2"
   local file_rel="$3"
   (cd "$work" && "$x07_bin" lint --input "$file_rel" --world "$world" >/dev/null)
+}
+
+run_x07_test() {
+  local name="$1"
+  local work="$2"
+
+  if [[ ! -f "$work/tests/tests.json" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$work/tmp"
+  local report_path="$work/tmp/x07test.report.json"
+  local stderr_log="$work/tmp/x07test.stderr"
+
+  set +e
+  (cd "$work" && "$x07_bin" test --manifest tests/tests.json >"$report_path" 2>"$stderr_log")
+  local code="$?"
+  set -e
+
+  if [[ "$code" -ne 0 ]]; then
+    echo "ERROR: $name: x07 test failed (exit $code)" >&2
+    if [[ -s "$stderr_log" ]]; then
+      echo "--- stderr ($stderr_log) ---" >&2
+      cat "$stderr_log" >&2 || true
+    fi
+    if [[ -s "$report_path" ]]; then
+      echo "--- report ($report_path) ---" >&2
+      cat "$report_path" >&2 || true
+    fi
+    exit 1
+  fi
 }
 
 pkg_lock_check() {
@@ -299,6 +338,7 @@ seed_official_deps "$cli1_work"
 pkg_lock_check "$cli1_work"
 fmt_check_all "$cli1_work"
 lint_check_one "$cli1_work" "run-os" "src/main.x07.json"
+run_x07_test "cli-newline" "$cli1_work"
 
 url_1="https://example.invalid/"
 depth_1="2"
@@ -328,6 +368,7 @@ seed_official_deps "$cli2_work"
 pkg_lock_check "$cli2_work"
 fmt_check_all "$cli2_work"
 lint_check_one "$cli2_work" "run-os" "src/main.x07.json"
+run_x07_test "cli-ext-cli" "$cli2_work"
 
 url_2="https://example.invalid/"
 depth_2="3"
@@ -569,6 +610,7 @@ pkg_lock_check "$proto_work"
 "$x07_bin" policy init --template web-service --project "$proto_work/x07.json" --mkdir-out >/dev/null
 fmt_check_all "$proto_work"
 lint_check_one "$proto_work" "run-os-sandboxed" "src/main.x07.json"
+run_x07_test "protos-framing-loopback" "$proto_work"
 
 	wrapped_13="$(run_x07_run "protos-framing-loopback" "$proto_work" \
 	  --profile sandbox \
@@ -776,6 +818,29 @@ expected_16='{"entries":[{"path":"hello.txt","size":5}]}'$'\n'
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "archive-extract-to-fs" --path "$archive_fs_work/tmp/runner.json" --expect "$expected_16" >/dev/null
 
 echo "ok: archive-extract-to-fs"
+
+# ----------------------------
+# Example 17: JSON reporting (run-os + ext-cli + ext-data-model/json)
+# ----------------------------
+
+echo "==> agent example: json-report (run-os + ext-cli + ext-data-model/json)"
+
+json_report_work="$tmp_dir/json-report"
+copy_project "docs/examples/agent-gate/json-report" "$json_report_work"
+
+seed_official_deps "$json_report_work"
+pkg_lock_check "$json_report_work"
+fmt_check_all "$json_report_work"
+lint_check_one "$json_report_work" "run-os" "src/main.x07.json"
+run_x07_test "json-report" "$json_report_work"
+
+wrapped_17="$(run_x07_run "json-report" "$json_report_work" --profile os -- tool --count 3 --label hello --pretty false)"
+unwrap_and_check_wrapped_report "json-report" "$wrapped_17" "$json_report_work/tmp/runner.json" "os" "run-os" "true"
+
+expected_17='{"count":3,"label":"hello","pretty":false,"schema_version":"x07.example.json_report@0.1.0"}'$'\n'
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "json-report" --path "$json_report_work/tmp/runner.json" --expect "$expected_17" >/dev/null
+
+echo "ok: json-report"
 
 echo
 echo "ok: agent examples gate passed"

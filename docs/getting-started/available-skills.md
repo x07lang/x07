@@ -15,6 +15,16 @@ Verify installation:
 
 - `x07up skills status --json`
 
+## How to use a skill (agent/human)
+
+Skills are meant to eliminate guesswork. The canonical workflow is:
+
+1. Open the skill’s `SKILL.md`.
+2. Follow the exact command forms it provides (especially `--project`, `--manifest`, and `--offline` usage).
+3. Prefer skill-backed recovery steps over inventing new flows.
+
+In the `x07` repo, the source of truth for the shipped skills pack is under `skills/pack/.agent/skills/`.
+
 ## Skills included
 
 All skills live under `.agent/skills/<skill-name>/SKILL.md`.

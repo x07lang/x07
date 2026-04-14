@@ -1,0 +1,63 @@
+{
+  "default_profile": "os",
+  "dependencies": [
+    {
+      "name": "ext-cli",
+      "path": ".x07/deps/ext-cli/0.1.17",
+      "version": "0.1.17"
+    },
+    {
+      "name": "ext-csv-rs",
+      "path": ".x07/deps/ext-csv-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-data-model",
+      "path": ".x07/deps/ext-data-model/0.1.11",
+      "version": "0.1.11"
+    },
+    {
+      "name": "ext-ini-rs",
+      "path": ".x07/deps/ext-ini-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-json-rs",
+      "path": ".x07/deps/ext-json-rs/0.1.7",
+      "version": "0.1.7"
+    },
+    {
+      "name": "ext-toml-rs",
+      "path": ".x07/deps/ext-toml-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-unicode-rs",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-xml-rs",
+      "path": ".x07/deps/ext-xml-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-yaml-rs",
+      "path": ".x07/deps/ext-yaml-rs/0.1.4",
+      "version": "0.1.4"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src"
+  ],
+  "profiles": {
+    "os": {
+      "world": "run-os"
+    }
+  },
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
+  "world": "run-os"
+}

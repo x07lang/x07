@@ -45,11 +45,19 @@ See: [Compatibility contract](../reference/compat.md) and `x07 migrate` in [Tool
 
 ## 0.6) Canonical patterns (loops, bytes/view, errors)
 
-- Loops: use `for` for counted loops and `while` for scanning loops; reserve recursion for contract/verified code.
-- Bytes/view: call-argument coercion exists, but prefer explicit `bytes.view` at library boundaries.
+- Loops: use `for` for counted loops and `while` for scanning loops; reserve recursion for contract/verified code. `for` is strict-form x07AST; see [AST authoring best practices](../guides/ast-authoring-best-practices.md) (`X07-FOR-0001`).
+- Bytes/view: call-argument coercion exists, but prefer explicit `bytes.view` at library boundaries. `bytes.view` requires an identifier owner; for literals prefer `bytes.view_lit` (`X07-BORROW-0001` + auto-fix via `x07 fix`).
+- Dependency roots: when imports fail, check `x07.json.module_roots` + `x07.lock.json` and inspect closure with `x07 pkg tree`.
 - Error propagation:
   - typed results (`result_i32`, `result_bytes`) use `try`
   - doc envelopes use `try_doc` (see [Doc envelope](../reference/doc-envelope.md))
+
+## 0.7) Agent pitfalls (common failure modes)
+
+- **Loop forms (`for`)**: valid form is `["for","i",<start:i32>,<end:i32>,<body:any>]` (`X07-FOR-0001`). Wrap multi-statement bodies in `begin`.
+- **`bytes.view` literals/temporaries**: `bytes.view` requires an identifier owner; use `bytes.view_lit` for literals and `let tmp = <expr>` for temporaries (`X07-BORROW-0001`, often auto-fixable via `x07 fix`).
+- **Borrow-union returns**: returning `bytes_view` from `if`/option/result branches that borrow from different owners is usually rejected; return owned `bytes` (copy) instead.
+- **Dependency roots**: module-not-found errors are usually missing `module_roots` or missing/stale locks; use `x07 pkg tree` / `x07 pkg provides` and re-run `x07 pkg lock --check --offline`.
 
 ## 1) Install and verify the toolchain
 
@@ -152,6 +160,21 @@ x07 init
 - `.agent/skills/` (skills pack; linked to the installed toolchain when available)
 - `src/` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)
+
+### Templates (agentic starting points)
+
+Use templates when the shape matches your project: they include pinned local deps + lockfiles, so you can iterate offline without guessing.
+
+- Typed CLI (`ext-cli` + specrows): `x07 init --template cli`
+- File I/O with explicit caps (`run-os-sandboxed`): `x07 init --template fs-tool` (defaults to the `sandbox` profile)
+- JSON reporting (DataModel → canonical JSON): `x07 init --template json-report` (see [JSON reporting](../guides/json-reporting.md))
+
+Offline sanity check (for dependency hydration):
+
+```bash
+x07 run --offline
+x07 pkg lock --check --offline
+```
 
 ### `x07.json` notes (common failure mode)
 
@@ -299,6 +322,16 @@ x07 pkg add NAME@VERSION --sync
 x07 pkg remove NAME --sync
 ```
 
+Local path deps (offline-first):
+
+```bash
+# Add a dependency, but keep it as a local path (no registry fetch needed):
+x07 pkg add ext-cli@VERSION --path .x07/deps/ext-cli/VERSION --sync
+
+# Forbid any network during lock checks / hydration:
+x07 pkg lock --check --offline
+```
+
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
@@ -364,6 +397,9 @@ The `x07` repo ships CI-gated example projects under `docs/examples/agent-gate/`
 
 - `cli-newline` (pure CLI payload parsing)
 - `cli-ext-cli` (CLI args via `ext-cli` + `argv_v1`)
+- `json-report` (typed CLI → DataModel → canonical JSON report)
+- `archive-safe-extract/zip-hello` (safe ZIP extraction; hardened defaults)
+- `archive-extract-to-fs/zip-hello` (streamed extraction to filesystem)
 - `web-crawler-local` (sandboxed OS networking + `--allow-host`, against a local fixture site)
 
 For the canonical package-focused set (examples + scenarios), see: [Agent workflow](agent-workflow.md).

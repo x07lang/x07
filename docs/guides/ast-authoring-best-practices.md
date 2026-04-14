@@ -63,9 +63,44 @@ If you need multiple body expressions, wrap them in `begin`:
 - `bytes` is an owned buffer (move-only).
 - `bytes_view` is a borrowed view into an owned buffer.
 
+Common pitfalls (and fixes):
+
+- **Borrowing a view from a temporary** triggers `X07-BORROW-0001`.
+
+  - Bad: `["bytes.view", <expr>]` where `<expr>` is not an identifier.
+  - Fix: bind the owner with `let` first (or run `x07 fix` if a quickfix is offered).
+
+- **Borrowing a view from a literal**: prefer `bytes.view_lit`.
+
+  - Bad: `["bytes.view", ["bytes.lit", "..."]]`
+  - Good: `["bytes.view_lit", "..."]`
+
+- **Asserts that consume inputs**: `std.test.assert_bytes_eq(a: bytes, b: bytes, ...)` moves both values.
+
+  - If you need to reuse values after the assert, use `std.test.assert_view_eq(["bytes.view", "a"], ["bytes.view", "b"], ...)`.
+
+- **Borrow-union returns**: returning a `bytes_view` from a conditional where branches borrow from different owners is often rejected.
+
+  - Fix: return an owned `bytes` instead (copy in each branch with `view.to_bytes`) or restructure so the view always borrows from the same owner.
+
 A common fix for move errors is to copy before moving a value you still need:
 
 `["view.to_bytes", ["bytes.view", "x"]]`
+
+### Dependency roots (imports)
+
+If `x07 check` fails with an import error (“module not found”), the usual causes are:
+
+- missing `x07.json.module_roots` entry for the directory that contains the module
+- missing or stale `x07.lock.json` (or a dependency path that doesn’t exist on disk)
+
+Canonical debugging loop:
+
+```bash
+x07 pkg tree --project x07.json
+x07 pkg provides <module-id> --project x07.json
+x07 pkg lock --project x07.json --check --offline
+```
 
 ## Expert Notes
 
