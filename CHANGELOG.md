@@ -6,6 +6,14 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## v0.2.3
+
+### Added
+
 - `x07 run --offline` (and `X07_OFFLINE=1`) to forbid network access during dependency hydration (the implicit `x07 pkg lock` step).
 - `x07 pkg tree` for a deterministic dependency-closure graph from `x07.json` + `x07.lock.json`, including declared and resolved module roots.
 - `x07 check --ast` for schema/shape validation + lint only (no typecheck or backend-check), intended for fast x07AST authoring feedback.

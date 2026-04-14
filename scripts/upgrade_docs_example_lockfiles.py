@@ -48,23 +48,52 @@ def load_versions(root: Path) -> dict[str, str]:
         "x07_version": get_obj(toolchain, "x07"),
         "x07c_version": get_obj(toolchain, "x07c"),
         "lang_id": get_obj(toolchain, "lang_id"),
-        "compat": get_obj(toolchain, "compat_current"),
+        "compat_current": get_obj(toolchain, "compat_current"),
         "index_url": get_obj(pkg, "default_index_url"),
     }
 
 
-def upgrade_lockfile(doc: Any, *, versions: dict[str, str]) -> Any:
+def load_project_compat(lockfile_path: Path) -> str:
+    project_path = lockfile_path.parent / "x07.json"
+    if not project_path.is_file():
+        return "current"
+    doc = load_json(project_path)
+    if not isinstance(doc, dict):
+        raise SystemExit(f"{project_path}: expected JSON object")
+    compat = doc.get("compat")
+    if isinstance(compat, str) and compat.strip():
+        return compat.strip()
+    return "current"
+
+
+def upgrade_lockfile(doc: Any, *, versions: dict[str, str], compat: str) -> Any:
     if not isinstance(doc, dict):
         raise SystemExit("lockfile must be a JSON object")
+    if not compat.strip():
+        raise SystemExit("compat must be non-empty")
     sv = doc.get("schema_version")
-    if sv == versions["lock_schema"]:
-        return doc
-    if sv != "x07.lock@0.3.0":
-        raise SystemExit(f"unsupported lockfile schema_version: {sv!r} (expected x07.lock@0.3.0)")
 
     deps = doc.get("dependencies")
     if not isinstance(deps, list):
         raise SystemExit("lockfile.dependencies must be an array")
+
+    if sv == versions["lock_schema"]:
+        return {
+            "schema_version": versions["lock_schema"],
+            "toolchain": {
+                "x07_version": versions["x07_version"],
+                "x07c_version": versions["x07c_version"],
+                "lang_id": versions["lang_id"],
+                "compat": compat,
+            },
+            "registry": {"index_url": versions["index_url"]},
+            "dependencies": deps,
+        }
+
+    if sv != "x07.lock@0.3.0":
+        raise SystemExit(
+            f"unsupported lockfile schema_version: {sv!r} (expected x07.lock@0.3.0 or {versions['lock_schema']})"
+        )
 
     return {
         "schema_version": versions["lock_schema"],
@@ -72,7 +101,7 @@ def upgrade_lockfile(doc: Any, *, versions: dict[str, str]) -> Any:
             "x07_version": versions["x07_version"],
             "x07c_version": versions["x07c_version"],
             "lang_id": versions["lang_id"],
-            "compat": versions["compat"],
+            "compat": compat,
         },
         "registry": {"index_url": versions["index_url"]},
         "dependencies": deps,
@@ -114,7 +143,8 @@ def main(argv: list[str]) -> int:
         except Exception as ex:
             raise SystemExit(f"ERROR: {path.relative_to(root)}: invalid JSON: {ex}") from ex
 
-        upgraded = upgrade_lockfile(doc, versions=versions)
+        compat = load_project_compat(path)
+        upgraded = upgrade_lockfile(doc, versions=versions, compat=compat)
         upgraded_bytes = dump_pretty(upgraded)
         existing_bytes = path.read_bytes()
         if upgraded_bytes != existing_bytes:
@@ -139,4 +169,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-
