@@ -2363,7 +2363,8 @@ fn init_package_notes() -> Vec<String> {
 
 fn init_package_next_steps(name: &str, version: &str) -> Vec<String> {
     vec![
-        "Edit x07-package.json: set description/docs; bump version".to_string(),
+        "Edit x07-package.json: set description/docs/license; verify meta.x07c_compat; bump version"
+            .to_string(),
         "x07 test --manifest tests/tests.json".to_string(),
         format!("x07 pkg pack --package . --out dist/{name}-{version}.x07pkg"),
         format!("x07 pkg login --index {}", crate::pkg::DEFAULT_INDEX_URL),
@@ -2853,6 +2854,10 @@ fn package_json_bytes(name: &str, ids: &PackageIds) -> Result<Vec<u8>> {
                     ids.hello_fn
                 )),
             ),
+            (
+                "license".to_string(),
+                Value::String("MIT OR Apache-2.0".to_string()),
+            ),
             ("docs".to_string(), Value::String(docs)),
             ("version".to_string(), Value::String(version.to_string())),
             (
@@ -2873,6 +2878,10 @@ fn package_json_bytes(name: &str, ids: &PackageIds) -> Result<Vec<u8>> {
                         (
                             "determinism_tier".to_string(),
                             Value::String("pure".to_string()),
+                        ),
+                        (
+                            "x07c_compat".to_string(),
+                            Value::String(format!(">={}, <0.3.0", x07c::X07C_VERSION)),
                         ),
                         (
                             "worlds_allowed".to_string(),

@@ -407,6 +407,10 @@ See: [State machines](state-machines.md).
 - `x07 pkg remove <name> --sync`
 - `x07 pkg versions <name>`
 - `x07 pkg versions <name> --refresh`
+- `x07 pkg info <name>[@<version>]`
+- `x07 info <name>[@<version>]`
+- `x07 pkg verify <name>[@<version>]`
+- `x07 pkg check-semver --old <dir> --new <dir>`
 - `x07 pkg lock --project x07.json`
 - `x07 pkg tree --project x07.json`
 - `x07 pkg attest-closure --project x07.json --out <path>`
@@ -426,6 +430,8 @@ Notes:
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `x07 pkg versions --refresh <name>` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
+- `x07 pkg verify` validates registry index signatures (or reports when a package/index is unsigned).
+- `x07 pkg check-semver` compares exported symbols + signatures between two package directories and fails on breaking changes.
 - For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.5.0`; `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are accepted for legacy manifests, but the current certification surfaces use `project.operational_entry_symbol` and related `0.4.0` fields which remain present in `0.5.0`).
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 

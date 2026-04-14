@@ -617,6 +617,21 @@ pub fn compute_lockfile(project_path: &Path, manifest: &ProjectManifest) -> Resu
         });
     }
 
+    locked_deps.sort_by(|a, b| {
+        (
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+            a.module_root.as_str(),
+        )
+            .cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+                b.module_root.as_str(),
+            ))
+    });
+
     Ok(Lockfile {
         schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
         toolchain: Some(default_lockfile_toolchain(manifest)),
@@ -686,7 +701,42 @@ pub fn verify_lockfile(
         anyhow::bail!("lockfile dependency list does not match project{hint}");
     }
 
-    for (a, b) in lock.dependencies.iter().zip(expected.dependencies.iter()) {
+    let mut actual_deps: Vec<&LockedDependency> = lock.dependencies.iter().collect();
+    let mut expected_deps: Vec<&LockedDependency> = expected.dependencies.iter().collect();
+    actual_deps.sort_by(|a, b| {
+        (
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+            a.module_root.as_str(),
+            a.package_manifest_sha256.as_str(),
+        )
+            .cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+                b.module_root.as_str(),
+                b.package_manifest_sha256.as_str(),
+            ))
+    });
+    expected_deps.sort_by(|a, b| {
+        (
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+            a.module_root.as_str(),
+            a.package_manifest_sha256.as_str(),
+        )
+            .cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+                b.module_root.as_str(),
+                b.package_manifest_sha256.as_str(),
+            ))
+    });
+
+    for (a, b) in actual_deps.iter().zip(expected_deps.iter()) {
         if a.name != b.name || a.version != b.version || a.path != b.path {
             anyhow::bail!("lockfile dependencies do not match project manifest{hint}");
         }

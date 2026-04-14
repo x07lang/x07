@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["integrity.demo.answer_v1"]},{"body":7,"kind":"defn","name":"integrity.demo.answer_v1","params":[],"result":"i32"}],"imports":[],"kind":"module","module_id":"integrity.demo","schema_version":"x07.x07ast@0.8.0"}

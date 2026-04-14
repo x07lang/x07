@@ -14,6 +14,27 @@ pub struct IndexConfig {
     pub api: String,
     #[serde(default, rename = "auth-required")]
     pub auth_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signing: Option<IndexSigning>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IndexSigningPublicKey {
+    pub id: String,
+    pub ed25519_pub: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IndexSigning {
+    pub kind: String,
+    pub public_keys: Vec<IndexSigningPublicKey>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IndexSignature {
+    pub kind: String,
+    pub key_id: String,
+    pub ed25519_sig: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -23,6 +44,8 @@ pub struct IndexEntry {
     pub version: String,
     pub cksum: String,
     pub yanked: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<IndexSignature>,
     #[serde(default)]
     pub advisories: Vec<PkgAdvisory>,
 }
@@ -52,6 +75,7 @@ pub struct SparseIndexClient {
     api_root: Url,
     auth_required: bool,
     token: Option<String>,
+    signing: Option<IndexSigning>,
 }
 
 impl SparseIndexClient {
@@ -95,11 +119,16 @@ impl SparseIndexClient {
             api_root,
             auth_required: config.auth_required,
             token,
+            signing: config.signing,
         })
     }
 
     pub fn auth_required(&self) -> bool {
         self.auth_required
+    }
+
+    pub fn signing(&self) -> Option<&IndexSigning> {
+        self.signing.as_ref()
     }
 
     pub fn canonical_index_url(index_url: &str) -> Result<String> {
@@ -179,6 +208,46 @@ impl SparseIndexClient {
     fn token_for_fetch(&self) -> Option<&str> {
         self.token.as_deref()
     }
+}
+
+pub fn pkg_sig_message_v1(name: &str, version: &str, sha256_hex: &str) -> Vec<u8> {
+    format!(
+        "x07.pkg.sig.v1\nname={}\nversion={}\nsha256={}\n",
+        name.trim(),
+        version.trim(),
+        sha256_hex.trim()
+    )
+    .into_bytes()
+}
+
+pub fn verify_ed25519_signature_b64(
+    public_key_b64: &str,
+    message: &[u8],
+    signature_b64: &str,
+) -> Result<()> {
+    use base64::Engine as _;
+    use ed25519_dalek::Verifier as _;
+
+    let pub_bytes = base64::engine::general_purpose::STANDARD
+        .decode(public_key_b64.trim())
+        .context("base64 decode ed25519 public key")?;
+    let pub_bytes: [u8; 32] = pub_bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("invalid ed25519 public key length (expected 32 bytes)"))?;
+    let vk =
+        ed25519_dalek::VerifyingKey::from_bytes(&pub_bytes).context("parse ed25519 public key")?;
+
+    let sig_bytes = base64::engine::general_purpose::STANDARD
+        .decode(signature_b64.trim())
+        .context("base64 decode ed25519 signature")?;
+    let sig_bytes: [u8; 64] = sig_bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("invalid ed25519 signature length (expected 64 bytes)"))?;
+    let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+
+    vk.verify(message, &sig)
+        .context("verify ed25519 signature")?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]

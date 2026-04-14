@@ -131,6 +131,8 @@ enum Command {
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
     Pkg(pkg::PkgArgs),
+    /// Show registry package metadata (alias for `x07 pkg info`).
+    Info(pkg::InfoArgs),
     /// Proof-object tooling.
     Prove(prove::ProveArgs),
     /// Produce human review artifacts (semantic diffs).
@@ -473,6 +475,8 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Remove(_)) => vec!["pkg", "remove"],
                 Some(pkg::PkgCommand::Versions(_)) => vec!["pkg", "versions"],
                 Some(pkg::PkgCommand::Info(_)) => vec!["pkg", "info"],
+                Some(pkg::PkgCommand::Verify(_)) => vec!["pkg", "verify"],
+                Some(pkg::PkgCommand::CheckSemver(_)) => vec!["pkg", "check-semver"],
                 Some(pkg::PkgCommand::List(_)) => vec!["pkg", "list"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
@@ -483,6 +487,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
             },
+            Some(Command::Info(_)) => vec!["info"],
             Some(Command::Prove(args)) => match &args.cmd {
                 prove::ProveCommand::Check(_) => vec!["prove", "check"],
             },
@@ -569,6 +574,12 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Service(args) => service::cmd_service(&cli.machine, args),
         Command::Cli(args) => cli::cmd_cli(&cli.machine, args),
         Command::Pkg(args) => pkg::cmd_pkg(&cli.machine, args),
+        Command::Info(args) => pkg::cmd_pkg(
+            &cli.machine,
+            pkg::PkgArgs {
+                cmd: Some(pkg::PkgCommand::Info(args)),
+            },
+        ),
         Command::Prove(args) => prove::cmd_prove(&cli.machine, args),
         Command::Review(args) => review::cmd_review(&cli.machine, args),
         Command::Trust(args) => trust::cmd_trust(&cli.machine, args),

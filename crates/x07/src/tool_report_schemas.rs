@@ -131,6 +131,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("guide") => Some(include_bytes!(
             "../../../spec/x07-tool-guide.report.schema.json"
         )),
+        Some("info") => Some(include_bytes!(
+            "../../../spec/x07-tool-info.report.schema.json"
+        )),
         Some("init") => Some(include_bytes!(
             "../../../spec/x07-tool-init.report.schema.json"
         )),
@@ -160,6 +163,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("pkg.info") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-info.report.schema.json"
+        )),
+        Some("pkg.verify") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-verify.report.schema.json"
+        )),
+        Some("pkg.check-semver") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-check-semver.report.schema.json"
         )),
         Some("pkg.list") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-list.report.schema.json"

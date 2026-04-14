@@ -1147,6 +1147,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-info.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-info.report.schema.json",
+      "schema_version": "x07.tool.info.report@0.1.0",
+      "title": "x07.tool.info.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-init.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-init.report.schema.json",
       "schema_version": "x07.tool.init.report@0.1.0",
@@ -1200,6 +1207,13 @@
       "schema_id": "https://x07.io/spec/x07-tool-pkg-attest-closure.report.schema.json",
       "schema_version": "x07.tool.pkg.attest-closure.report@0.1.0",
       "title": "x07.tool.pkg.attest-closure.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-pkg-check-semver.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-pkg-check-semver.report.schema.json",
+      "schema_version": "x07.tool.pkg.check-semver.report@0.1.0",
+      "title": "x07.tool.pkg.check-semver.report@0.1.0"
     },
     {
       "kind": "schema",
@@ -1270,6 +1284,13 @@
       "schema_id": "https://x07.io/spec/x07-tool-pkg-tree.report.schema.json",
       "schema_version": "x07.tool.pkg.tree.report@0.1.0",
       "title": "x07.tool.pkg.tree.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-pkg-verify.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-pkg-verify.report.schema.json",
+      "schema_version": "x07.tool.pkg.verify.report@0.1.0",
+      "title": "x07.tool.pkg.verify.report@0.1.0"
     },
     {
       "kind": "schema",

@@ -3494,7 +3494,7 @@
         }
       ],
       "name": "ext-curl-c",
-      "package_manifest_sha256": "89fd80fbd45673ad08f592bce11a7a0d86ea6bba76dcb5c1e718c2a8aa21bb19",
+      "package_manifest_sha256": "164069766dcea2ea3029f885c50008adb5e5927b0b05d699aa132eae7eb31f12",
       "path": "packages/ext/x07-ext-curl-c/0.1.4",
       "version": "0.1.4"
     },
@@ -14593,6 +14593,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "72de02d3a7e78f3166075f4920fae1853bc924fed804d3ecdc1df020702c9737",
+  "packages_hash": "de31e78abdb72ddc8a046056910dd48812e37dd33ebba50f039b96d608758035",
   "packages_root": "packages/ext"
 }

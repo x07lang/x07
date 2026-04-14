@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "integrity-demo",
+  "version": "0.1.0",
+  "description": "Packaging integrity demo package (docs fixture).",
+  "license": "MIT OR Apache-2.0",
+  "docs": "This package exists as a docs fixture for x07 packaging integrity.\n\nUsage:\n- Add: x07 pkg add integrity-demo@0.1.0 --sync\n- Import: integrity.demo\n- Call: integrity.demo.answer_v1\n",
+  "module_root": "modules",
+  "modules": ["integrity.demo"],
+  "meta": {
+    "x07c_compat": ">=0.2.2, <0.3.0",
+    "visibility": "docs-fixture"
+  }
+}
+

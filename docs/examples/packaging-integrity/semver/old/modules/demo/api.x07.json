@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["demo.api.f"]},{"body":"x","kind":"defn","name":"demo.api.f","params":[{"name":"x","ty":"i32"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"demo.api","schema_version":"x07.x07ast@0.8.0"}

@@ -39,6 +39,12 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - built-in help renderer (`ext.cli.render_help`)
   - stable machine-readable error map (`ext.cli.err_doc_v2`)
 - Guide + API docs + runnable example: `docs/guides/cli-patterns.md`, `docs/libraries/ext-cli.md`, and `docs/examples/agent-gate/cli-ext-cli/`.
+- Packaging integrity tooling:
+  - `x07 pkg verify` to validate sparse-index signatures (ed25519) and clearly report unsigned indices/packages.
+  - `x07 pkg check-semver` to detect breaking export changes (removed exports or signature changes) between two package directories.
+  - `x07 info` as a top-level alias for `x07 pkg info`.
+- Guide + runnable example: `docs/guides/packaging-integrity.md` and `docs/examples/packaging-integrity/`.
+- `x07 init --package` now includes `license` and `meta.x07c_compat` in the generated `x07-package.json` template.
 
 ### Changed
 

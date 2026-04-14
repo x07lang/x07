@@ -345,6 +345,7 @@ fn is_top_level_command(cmd: &str) -> bool {
     matches!(
         cmd,
         "init"
+            | "info"
             | "test"
             | "bench"
             | "arch"
@@ -417,6 +418,8 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "remove",
             "versions",
             "info",
+            "verify",
+            "check-semver",
             "list",
             "pack",
             "lock",

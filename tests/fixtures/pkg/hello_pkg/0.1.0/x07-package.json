@@ -1,10 +1,15 @@
 {
   "schema_version": "x07.package@0.1.0",
   "name": "hello",
+  "description": "Fixture package used by x07 pkg contract tests.",
+  "license": "MIT OR Apache-2.0",
+  "docs": "This package exists only as a deterministic packing + locking fixture for x07 CI.",
   "version": "0.1.0",
   "module_root": "modules",
   "modules": [
     "hello.util"
-  ]
+  ],
+  "meta": {
+    "x07c_compat": ">=0.2.2, <0.3.0"
+  }
 }
-

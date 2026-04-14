@@ -14,7 +14,7 @@
       "name": "appkit",
       "version": "0.1.0",
       "path": "pkgs/appkit/0.1.0",
-      "package_manifest_sha256": "b12b37853e7665062e5cac5f13323f804a5851de2d18c680ccdbaa1c28062559",
+      "package_manifest_sha256": "0e1d8b652d09bebd2328e0bbb6ae7cd45e8e71335d1a9316b74769308d3d60c3",
       "module_root": "modules",
       "modules_sha256": {
         "appkit.vec": "bb9d3018d8a8223a9039c1113a1f87b54e87b7429d845fcd55ce64b97f8cb645"

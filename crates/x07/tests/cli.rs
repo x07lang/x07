@@ -8550,7 +8550,7 @@ fn x07_init_creates_package_skeleton() {
             .map(|v| v.as_str().expect("next_steps[] string"))
             .collect::<Vec<_>>(),
         vec![
-            "Edit x07-package.json: set description/docs; bump version",
+            "Edit x07-package.json: set description/docs/license; verify meta.x07c_compat; bump version",
             "x07 test --manifest tests/tests.json",
             "x07 pkg pack --package . --out dist/acme-hello-demo-0.1.0.x07pkg",
             "x07 pkg login --index sparse+https://registry.x07.io/index/",
@@ -8607,6 +8607,15 @@ fn x07_init_creates_package_skeleton() {
         .as_str()
         .unwrap_or("")
         .contains("x07 pkg add"));
+    assert_eq!(pkg_doc["license"], "MIT OR Apache-2.0");
+    assert!(
+        pkg_doc["meta"]["x07c_compat"]
+            .as_str()
+            .unwrap_or("")
+            .contains(x07c::X07C_VERSION),
+        "expected meta.x07c_compat to mention x07c version {}",
+        x07c::X07C_VERSION
+    );
 
     let proj_doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
         .expect("parse x07.json");
@@ -8654,6 +8663,281 @@ fn x07_init_creates_package_skeleton() {
         String::from_utf8_lossy(&out.stderr)
     );
     assert!(dir.join("dist/acme-hello-demo-0.1.0.x07pkg").is_file());
+
+    std::fs::remove_dir_all(&parent).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_pkg_verify_accepts_signed_file_index_fixture() {
+    let root = repo_root();
+    let work = root.join("docs/examples/packaging-integrity");
+    let index_dir = work.join("signed-index");
+    assert!(index_dir.is_dir());
+
+    let index_url = format!("sparse+{}", file_url_for_dir(&index_dir));
+    let argv: Vec<String> = vec![
+        "pkg".to_string(),
+        "verify".to_string(),
+        "integrity-demo@0.1.0".to_string(),
+        "--index".to_string(),
+        index_url,
+        "--offline".to_string(),
+    ];
+    let args: Vec<&str> = argv.iter().map(|s| s.as_str()).collect();
+    let out = run_x07_in_dir(&work, &args);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["command"], "pkg.verify");
+    assert_eq!(report["result"]["name"], "integrity-demo");
+    assert_eq!(report["result"]["version"], "0.1.0");
+    assert_eq!(report["result"]["signature"]["ok"], true);
+}
+
+#[test]
+fn x07_pkg_check_semver_accepts_compatible_change_fixture() {
+    let root = repo_root();
+    let work = root.join("docs/examples/packaging-integrity/semver");
+    let old_dir = work.join("old");
+    let new_dir = work.join("new-compatible");
+    assert!(old_dir.is_dir());
+    assert!(new_dir.is_dir());
+
+    let out = run_x07(&[
+        "pkg",
+        "check-semver",
+        "--old",
+        old_dir.to_str().unwrap(),
+        "--new",
+        new_dir.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["command"], "pkg.check-semver");
+    let breaks = report["result"]["breaking_changes"]
+        .as_array()
+        .map(|v| v.len())
+        .unwrap_or(0);
+    assert_eq!(breaks, 0);
+}
+
+#[test]
+fn x07_pkg_check_semver_detects_breaking_change_fixture() {
+    let root = repo_root();
+    let work = root.join("docs/examples/packaging-integrity/semver");
+    let old_dir = work.join("old");
+    let new_dir = work.join("new-breaking");
+    assert!(old_dir.is_dir());
+    assert!(new_dir.is_dir());
+
+    let out = run_x07(&[
+        "pkg",
+        "check-semver",
+        "--old",
+        old_dir.to_str().unwrap(),
+        "--new",
+        new_dir.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["command"], "pkg.check-semver");
+    assert!(
+        report["result"]["breaking_changes"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty()),
+        "expected breaking_changes to be non-empty"
+    );
+    assert_eq!(report["error"]["code"], "X07PKG_SEMVER_BREAKING");
+}
+
+#[test]
+fn x07_info_offline_reads_local_dep_manifest() {
+    let root = repo_root();
+    let parent = fresh_tmp_dir(&root, "tmp_x07_info_offline");
+    if parent.exists() {
+        std::fs::remove_dir_all(&parent).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&parent).expect("create tmp dir");
+
+    let work = parent.join("work");
+    std::fs::create_dir_all(&work).expect("create work dir");
+
+    let demo_pkg = root.join("docs/examples/packaging-integrity/pkg/integrity-demo");
+    assert!(demo_pkg.is_dir());
+    let dep_dir = work.join(".x07/deps/integrity-demo/0.1.0");
+    std::fs::create_dir_all(dep_dir.parent().unwrap()).expect("create deps parent dir");
+    copy_dir_recursive(&demo_pkg, &dep_dir);
+    assert!(dep_dir.join("x07-package.json").is_file());
+
+    let index_dir = root.join("docs/examples/packaging-integrity/signed-index");
+    assert!(index_dir.is_dir());
+    let index_url = format!("sparse+{}", file_url_for_dir(&index_dir));
+
+    let out = run_x07_in_dir(
+        &work,
+        &[
+            "info",
+            "integrity-demo@0.1.0",
+            "--index",
+            &index_url,
+            "--offline",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["command"], "pkg.info");
+    assert_eq!(report["result"]["name"], "integrity-demo");
+    assert_eq!(report["result"]["version"], "0.1.0");
+    assert!(report["result"]["package_manifest"].is_object());
+
+    std::fs::remove_dir_all(&parent).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_pkg_pack_requires_publish_metadata() {
+    let root = repo_root();
+    let parent = fresh_tmp_dir(&root, "tmp_x07_pkg_pack_metadata");
+    if parent.exists() {
+        std::fs::remove_dir_all(&parent).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&parent).expect("create tmp dir");
+
+    let dir = parent.join("demo-pkg");
+    std::fs::create_dir_all(&dir).expect("create package dir");
+    std::fs::create_dir_all(dir.join("modules/demo")).expect("create module dir");
+    let module_bytes = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "demo.api",
+        "imports": [],
+        "decls": []
+    }))
+    .expect("serialize module");
+    write_bytes(&dir.join("modules/demo/api.x07.json"), &module_bytes);
+    let manifest_bytes = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
+        "name": "demo-pkg",
+        "version": "0.1.0",
+        "description": "demo package",
+        "docs": "demo docs",
+        "module_root": "modules",
+        "modules": ["demo.api"],
+        "meta": {
+            "x07c_compat": format!(">={}, <0.3.0", x07c::X07C_VERSION)
+        }
+    }))
+    .expect("serialize x07-package.json");
+    write_bytes(&dir.join("x07-package.json"), &manifest_bytes);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "pkg",
+            "pack",
+            "--package",
+            ".",
+            "--out",
+            "dist/demo-pkg-0.1.0.x07pkg",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["command"], "pkg.pack");
+    assert_eq!(report["error"]["code"], "X07PKG_PACK_FAILED");
+    let msg = report["error"]["message"].as_str().unwrap_or("");
+    assert!(
+        msg.contains("license"),
+        "expected error to mention license, got: {msg}"
+    );
+
+    std::fs::remove_dir_all(&parent).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_pkg_publish_reports_pack_failures_as_json() {
+    let root = repo_root();
+    let parent = fresh_tmp_dir(&root, "tmp_x07_pkg_publish_pack_fail");
+    if parent.exists() {
+        std::fs::remove_dir_all(&parent).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&parent).expect("create tmp dir");
+
+    let dir = parent.join("demo-pkg");
+    std::fs::create_dir_all(&dir).expect("create package dir");
+    std::fs::create_dir_all(dir.join("modules/demo")).expect("create module dir");
+    let module_bytes = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "demo.api",
+        "imports": [],
+        "decls": []
+    }))
+    .expect("serialize module");
+    write_bytes(&dir.join("modules/demo/api.x07.json"), &module_bytes);
+    let manifest_bytes = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
+        "name": "demo-pkg",
+        "version": "0.1.0",
+        "description": "demo package",
+        "docs": "demo docs",
+        "module_root": "modules",
+        "modules": ["demo.api"],
+        "meta": {
+            "x07c_compat": format!(">={}, <0.3.0", x07c::X07C_VERSION)
+        }
+    }))
+    .expect("serialize x07-package.json");
+    write_bytes(&dir.join("x07-package.json"), &manifest_bytes);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "pkg",
+            "publish",
+            "--index",
+            "sparse+https://registry.x07.io/index/",
+            "--package",
+            ".",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["command"], "pkg.publish");
+    assert_eq!(report["error"]["code"], "X07PKG_PUBLISH_PACK");
+    let msg = report["error"]["message"].as_str().unwrap_or("");
+    assert!(
+        msg.contains("license"),
+        "expected error to mention license, got: {msg}"
+    );
 
     std::fs::remove_dir_all(&parent).expect("cleanup tmp dir");
 }

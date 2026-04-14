@@ -32,6 +32,71 @@ fn rm_rf(path: &Path) {
 }
 
 #[test]
+fn lockfile_is_deterministic_and_order_insensitive() {
+    let dir = create_temp_dir("x07_lock_determinism");
+
+    for name in ["a", "b"] {
+        let pkg_dir = dir.join(format!("packages/{name}/0.1.0"));
+        std::fs::create_dir_all(pkg_dir.join(format!("modules/{name}")))
+            .expect("create package dirs");
+        std::fs::write(
+            pkg_dir.join("x07-package.json"),
+            format!(
+                r#"
+                {{
+                  "schema_version": "{PACKAGE_MANIFEST_SCHEMA_VERSION}",
+                  "name": "{name}",
+                  "version": "0.1.0",
+                  "module_root": "modules",
+                  "modules": ["{name}.main"]
+                }}
+                "#
+            ),
+        )
+        .expect("write x07-package.json");
+        std::fs::write(
+            pkg_dir.join(format!("modules/{name}/main.x07.json")),
+            format!(
+                r#"{{ "schema_version": "x07.x07ast@0.8.0", "kind": "module", "module_id": "{name}.main", "imports": [], "decls": [] }}"#
+            ),
+        )
+        .expect("write module");
+    }
+
+    let project_path = dir.join("x07.json");
+    std::fs::write(
+        &project_path,
+        format!(
+            r#"
+            {{
+              "schema_version": "{PROJECT_MANIFEST_SCHEMA_VERSION}",
+              "world": "solve-pure",
+              "entry": "src/main.x07.json",
+              "module_roots": ["src"],
+              "dependencies": [
+                {{ "name": "b", "version": "0.1.0", "path": "packages/b/0.1.0" }},
+                {{ "name": "a", "version": "0.1.0", "path": "packages/a/0.1.0" }}
+              ]
+            }}
+            "#
+        ),
+    )
+    .expect("write project manifest");
+
+    let manifest = project::load_project_manifest(&project_path).expect("load project manifest");
+    let lock = project::compute_lockfile(&project_path, &manifest).expect("compute lockfile");
+    assert_eq!(lock.dependencies.len(), 2);
+    assert_eq!(lock.dependencies[0].name, "a");
+    assert_eq!(lock.dependencies[1].name, "b");
+
+    let mut reordered = lock.clone();
+    reordered.dependencies.reverse();
+    project::verify_lockfile(&project_path, &manifest, &reordered).expect("verify lockfile");
+
+    rm_rf(&dir);
+}
+
+#[test]
 fn project_manifest_rejects_absolute_entry() {
     let dir = create_temp_dir("x07_project_paths");
     let path = dir.join("x07.json");

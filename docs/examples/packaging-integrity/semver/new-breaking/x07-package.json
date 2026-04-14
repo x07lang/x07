@@ -1,0 +1,13 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "semver-demo",
+  "description": "Fixture package used by the packaging-integrity semver docs example.",
+  "license": "MIT OR Apache-2.0",
+  "docs": "This package exists only as a docs fixture for `x07 pkg check-semver`.",
+  "version": "0.1.1",
+  "module_root": "modules",
+  "modules": ["demo.api"],
+  "meta": {
+    "x07c_compat": ">=0.2.2, <0.3.0"
+  }
+}

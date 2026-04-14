@@ -86,6 +86,12 @@ x07 pkg add NAME --sync
 x07 pkg versions NAME
 x07 pkg add NAME@VERSION --sync
 
+# Inspect registry metadata:
+x07 info NAME
+
+# Verify registry index signatures:
+x07 pkg verify NAME@VERSION
+
 # Remove a dependency:
 x07 pkg remove NAME --sync
 ```

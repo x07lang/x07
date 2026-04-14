@@ -153,6 +153,7 @@
 - [Data interoperability](guides/data-interop.md)
 - [Kernel/shell in production](guides/kernel-shell-production.md)
 - [Offline workflows](guides/offline.md)
+- [Packaging integrity](guides/packaging-integrity.md)
 - [Performance tuning](guides/performance-tuning.md)
 - [Extract core migration](guides/extract-core.md)
 - [Web services](guides/web-apps.md)

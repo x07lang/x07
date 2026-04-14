@@ -251,6 +251,10 @@ pub enum PkgCommand {
     Versions(VersionsArgs),
     /// Show package metadata from the index (and local cache when available).
     Info(InfoArgs),
+    /// Verify a package signature from the registry index.
+    Verify(VerifyArgs),
+    /// Detect breaking API changes between two package directories.
+    CheckSemver(CheckSemverArgs),
     /// List available packages from a local `file://` sparse index mirror.
     List(ListArgs),
     /// Pack a local package directory into a publishable archive.
@@ -353,6 +357,35 @@ pub struct InfoArgs {
     /// Package spec in `NAME` or `NAME@VERSION` form.
     #[arg(value_name = "NAME[@VERSION]")]
     pub spec: String,
+}
+
+#[derive(Debug, Args)]
+pub struct VerifyArgs {
+    /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
+    #[arg(long, value_name = "URL", alias = "registry")]
+    pub index: Option<String>,
+
+    /// Disallow network access (requires a `file://` registry index).
+    #[arg(long)]
+    pub offline: bool,
+
+    /// Package spec in `NAME` or `NAME@VERSION` form.
+    ///
+    /// If only `NAME` is provided, this command verifies the latest non-yanked semver version from
+    /// the index.
+    #[arg(value_name = "NAME[@VERSION]")]
+    pub spec: String,
+}
+
+#[derive(Debug, Args)]
+pub struct CheckSemverArgs {
+    /// Old package directory containing `x07-package.json`.
+    #[arg(long, value_name = "DIR")]
+    pub old: PathBuf,
+
+    /// New package directory containing `x07-package.json`.
+    #[arg(long, value_name = "DIR")]
+    pub new: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -662,6 +695,8 @@ pub fn cmd_pkg(
         PkgCommand::Remove(args) => cmd_pkg_remove(args),
         PkgCommand::Versions(args) => cmd_pkg_versions(args),
         PkgCommand::Info(args) => cmd_pkg_info(args),
+        PkgCommand::Verify(args) => cmd_pkg_verify(args),
+        PkgCommand::CheckSemver(args) => cmd_pkg_check_semver(args),
         PkgCommand::List(args) => cmd_pkg_list(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(machine, args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
@@ -2083,8 +2118,70 @@ struct InfoResult {
     package_manifest: Option<Value>,
 }
 
+#[derive(Debug, Serialize)]
+struct VerifyResult {
+    index: String,
+    name: String,
+    version: String,
+    sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    signature: Option<VerifySignatureResult>,
+}
+
+#[derive(Debug, Serialize)]
+struct VerifySignatureResult {
+    kind: String,
+    key_id: String,
+    ok: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct CheckSemverResult {
+    name: String,
+    old_version: String,
+    new_version: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    breaking_changes: Vec<SemverBreakingChange>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+enum SemverBreakingChange {
+    ModuleRemoved {
+        module_id: String,
+    },
+    ExportRemoved {
+        module_id: String,
+        export: String,
+    },
+    ExportSignatureChanged {
+        module_id: String,
+        export: String,
+        old: FnSigJson,
+        new: FnSigJson,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct FnSigJson {
+    params: Vec<Value>,
+    result: Value,
+}
+
 fn cmd_pkg_info(args: InfoArgs) -> Result<std::process::ExitCode> {
     let (code, report) = pkg_info_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn cmd_pkg_verify(args: VerifyArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_verify_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn cmd_pkg_check_semver(args: CheckSemverArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_check_semver_report(&args)?;
     println!("{}", serde_json::to_string(&report)?);
     Ok(code)
 }
@@ -2130,7 +2227,7 @@ fn pkg_info_report(args: &InfoArgs) -> Result<(std::process::ExitCode, PkgReport
     };
 
     let token = x07_pkg::load_token(&index).unwrap_or(None);
-    let client = match SparseIndexClient::from_index_url(&index, token) {
+    let client = match SparseIndexClient::from_index_url(&index, token.clone()) {
         Ok(c) => c,
         Err(err) => {
             let report = PkgReport::<InfoResult> {
@@ -2239,7 +2336,73 @@ fn pkg_info_report(args: &InfoArgs) -> Result<(std::process::ExitCode, PkgReport
             };
             return Ok((std::process::ExitCode::from(20), report));
         } else {
-            (None, None)
+            let url = match client
+                .api_root()
+                .join(&format!("packages/{name}/{version}/metadata"))
+            {
+                Ok(url) => url,
+                Err(err) => {
+                    let report = PkgReport::<InfoResult> {
+                        ok: false,
+                        command: "pkg.info",
+                        result: None,
+                        error: Some(PkgError {
+                            code: "X07PKG_API_URL".to_string(),
+                            message: format!("{err:#}"),
+                        }),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+            };
+            let bytes = match x07_pkg::http_get_bytes(&url, token.as_deref()) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    let report = PkgReport::<InfoResult> {
+                        ok: false,
+                        command: "pkg.info",
+                        result: None,
+                        error: Some(PkgError {
+                            code: "X07PKG_API_FETCH".to_string(),
+                            message: format!(
+                                "fetch package metadata for {name}@{version}: {err:#}"
+                            ),
+                        }),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+            };
+            let doc: Value = match serde_json::from_slice(&bytes) {
+                Ok(doc) => doc,
+                Err(err) => {
+                    let report = PkgReport::<InfoResult> {
+                        ok: false,
+                        command: "pkg.info",
+                        result: None,
+                        error: Some(PkgError {
+                            code: "X07PKG_API_PARSE".to_string(),
+                            message: format!(
+                                "parse package metadata response for {name}@{version}: {err:#}"
+                            ),
+                        }),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+            };
+            let Some(package) = doc.get("package").cloned() else {
+                let report = PkgReport::<InfoResult> {
+                    ok: false,
+                    command: "pkg.info",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_API_PARSE".to_string(),
+                        message: format!(
+                            "package metadata response for {name}@{version} is missing required field \"package\""
+                        ),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            };
+            (None, Some(package))
         }
     };
 
@@ -2259,6 +2422,494 @@ fn pkg_info_report(args: &InfoArgs) -> Result<(std::process::ExitCode, PkgReport
         error: None,
     };
     Ok((std::process::ExitCode::SUCCESS, report))
+}
+
+fn pkg_verify_report(
+    args: &VerifyArgs,
+) -> Result<(std::process::ExitCode, PkgReport<VerifyResult>)> {
+    let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let (registry, offline) =
+        resolve_pkg_registry_and_offline(&base, args.index.as_deref(), args.offline)?;
+    let index = registry.url;
+
+    if offline && !index_url_is_file(&index) {
+        let report = PkgReport::<VerifyResult> {
+            ok: false,
+            command: "pkg.verify",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_OFFLINE_INDEX".to_string(),
+                message: format!("offline mode requires a file:// registry index (got {index:?})"),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let parsed_spec = match parse_user_pkg_spec(&args.spec) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            let report = PkgReport::<VerifyResult> {
+                ok: false,
+                command: "pkg.verify",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let (name, pinned_version) = match parsed_spec {
+        ParsedUserPkgSpec::Pinned { name, version } => (name, Some(version)),
+        ParsedUserPkgSpec::Unpinned { name } => (name, None),
+    };
+
+    let token = x07_pkg::load_token(&index).unwrap_or(None);
+    let client = match SparseIndexClient::from_index_url(&index, token.clone()) {
+        Ok(c) => c,
+        Err(err) => {
+            let report = PkgReport::<VerifyResult> {
+                ok: false,
+                command: "pkg.verify",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_CONFIG".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+    let entries = match client.fetch_entries(&name) {
+        Ok(entries) => entries,
+        Err(err) => {
+            let report = PkgReport::<VerifyResult> {
+                ok: false,
+                command: "pkg.verify",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_FETCH".to_string(),
+                    message: format!(
+                        "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                        name
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let version = match pinned_version {
+        Some(v) => v,
+        None => match latest_non_yanked_semver_version(&entries) {
+            Some(v) => v,
+            None => {
+                let report = PkgReport::<VerifyResult> {
+                    ok: false,
+                    command: "pkg.verify",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                        message: format!("no non-yanked semver versions found for {:?}", name),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            }
+        },
+    };
+
+    let entry = match entries
+        .iter()
+        .find(|e| e.name == name && e.version == version)
+    {
+        Some(e) => e,
+        None => {
+            let report = PkgReport::<VerifyResult> {
+                ok: false,
+                command: "pkg.verify",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                    message: format!("no index entry for {:?}@{:?}", name, version),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let Some(signing) = client.signing() else {
+        let report = PkgReport::<VerifyResult> {
+            ok: false,
+            command: "pkg.verify",
+            result: Some(VerifyResult {
+                index,
+                name,
+                version,
+                sha256: entry.cksum.clone(),
+                signature: None,
+            }),
+            error: Some(PkgError {
+                code: "X07PKG_UNSIGNED".to_string(),
+                message: "registry index does not advertise signing keys (expected config.json signing.kind=ed25519)".to_string(),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    };
+
+    if signing.kind.trim() != "ed25519" {
+        let report = PkgReport::<VerifyResult> {
+            ok: false,
+            command: "pkg.verify",
+            result: Some(VerifyResult {
+                index,
+                name,
+                version,
+                sha256: entry.cksum.clone(),
+                signature: None,
+            }),
+            error: Some(PkgError {
+                code: "X07PKG_SIGNATURE_UNSUPPORTED".to_string(),
+                message: format!(
+                    "unsupported signing kind {:?} (expected \"ed25519\")",
+                    signing.kind
+                ),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let Some(sig) = entry.signature.as_ref() else {
+        let report = PkgReport::<VerifyResult> {
+            ok: false,
+            command: "pkg.verify",
+            result: Some(VerifyResult {
+                index,
+                name,
+                version,
+                sha256: entry.cksum.clone(),
+                signature: None,
+            }),
+            error: Some(PkgError {
+                code: "X07PKG_UNSIGNED".to_string(),
+                message: "index entry is missing a signature".to_string(),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    };
+
+    if sig.kind.trim() != "ed25519" {
+        let report = PkgReport::<VerifyResult> {
+            ok: false,
+            command: "pkg.verify",
+            result: Some(VerifyResult {
+                index,
+                name,
+                version,
+                sha256: entry.cksum.clone(),
+                signature: Some(VerifySignatureResult {
+                    kind: sig.kind.clone(),
+                    key_id: sig.key_id.clone(),
+                    ok: false,
+                }),
+            }),
+            error: Some(PkgError {
+                code: "X07PKG_SIGNATURE_UNSUPPORTED".to_string(),
+                message: format!(
+                    "unsupported signature kind {:?} (expected \"ed25519\")",
+                    sig.kind
+                ),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let Some(key) = signing.public_keys.iter().find(|k| k.id == sig.key_id) else {
+        let report = PkgReport::<VerifyResult> {
+            ok: false,
+            command: "pkg.verify",
+            result: Some(VerifyResult {
+                index,
+                name,
+                version,
+                sha256: entry.cksum.clone(),
+                signature: Some(VerifySignatureResult {
+                    kind: sig.kind.clone(),
+                    key_id: sig.key_id.clone(),
+                    ok: false,
+                }),
+            }),
+            error: Some(PkgError {
+                code: "X07PKG_SIGNATURE_KEY_MISSING".to_string(),
+                message: format!(
+                    "signing key_id {:?} is not present in config.json signing.public_keys",
+                    sig.key_id
+                ),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    };
+
+    let msg = x07_pkg::pkg_sig_message_v1(&entry.name, &entry.version, &entry.cksum);
+    if let Err(err) =
+        x07_pkg::verify_ed25519_signature_b64(&key.ed25519_pub, &msg, &sig.ed25519_sig)
+    {
+        let report = PkgReport::<VerifyResult> {
+            ok: false,
+            command: "pkg.verify",
+            result: Some(VerifyResult {
+                index,
+                name,
+                version,
+                sha256: entry.cksum.clone(),
+                signature: Some(VerifySignatureResult {
+                    kind: sig.kind.clone(),
+                    key_id: sig.key_id.clone(),
+                    ok: false,
+                }),
+            }),
+            error: Some(PkgError {
+                code: "X07PKG_SIGNATURE_INVALID".to_string(),
+                message: format!(
+                    "{err:#} (hint: expected ed25519 signature over message:\n{})",
+                    String::from_utf8_lossy(&msg)
+                ),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let report = PkgReport::<VerifyResult> {
+        ok: true,
+        command: "pkg.verify",
+        result: Some(VerifyResult {
+            index,
+            name,
+            version,
+            sha256: entry.cksum.clone(),
+            signature: Some(VerifySignatureResult {
+                kind: sig.kind.clone(),
+                key_id: sig.key_id.clone(),
+                ok: true,
+            }),
+        }),
+        error: None,
+    };
+    Ok((std::process::ExitCode::SUCCESS, report))
+}
+
+#[derive(Debug)]
+struct PackageSurface {
+    name: String,
+    version: String,
+    modules: BTreeMap<String, ModuleSurface>,
+}
+
+#[derive(Debug)]
+struct ModuleSurface {
+    exports: BTreeMap<String, x07c::typecheck::FnSigSummary>,
+}
+
+fn pkg_check_semver_report(
+    args: &CheckSemverArgs,
+) -> Result<(std::process::ExitCode, PkgReport<CheckSemverResult>)> {
+    if !args.old.is_dir() {
+        let report = PkgReport::<CheckSemverResult> {
+            ok: false,
+            command: "pkg.check-semver",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_SEMVER_DIR".to_string(),
+                message: format!(
+                    "--old must be a directory containing x07-package.json (got {})",
+                    args.old.display()
+                ),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+    if !args.new.is_dir() {
+        let report = PkgReport::<CheckSemverResult> {
+            ok: false,
+            command: "pkg.check-semver",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_SEMVER_DIR".to_string(),
+                message: format!(
+                    "--new must be a directory containing x07-package.json (got {})",
+                    args.new.display()
+                ),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let old_surface = match load_package_surface(&args.old) {
+        Ok(s) => s,
+        Err(err) => {
+            let report = PkgReport::<CheckSemverResult> {
+                ok: false,
+                command: "pkg.check-semver",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SEMVER_LOAD".to_string(),
+                    message: format!("load old package surface: {err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+    let new_surface = match load_package_surface(&args.new) {
+        Ok(s) => s,
+        Err(err) => {
+            let report = PkgReport::<CheckSemverResult> {
+                ok: false,
+                command: "pkg.check-semver",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SEMVER_LOAD".to_string(),
+                    message: format!("load new package surface: {err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    if old_surface.name != new_surface.name {
+        let report = PkgReport::<CheckSemverResult> {
+            ok: false,
+            command: "pkg.check-semver",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_SEMVER_NAME_MISMATCH".to_string(),
+                message: format!(
+                    "package name mismatch: old is {:?} but new is {:?}",
+                    old_surface.name, new_surface.name
+                ),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let breaking_changes = semver_breaking_changes(&old_surface, &new_surface);
+    let ok = breaking_changes.is_empty();
+    let report = PkgReport::<CheckSemverResult> {
+        ok,
+        command: "pkg.check-semver",
+        result: Some(CheckSemverResult {
+            name: old_surface.name,
+            old_version: old_surface.version,
+            new_version: new_surface.version,
+            breaking_changes,
+        }),
+        error: if ok {
+            None
+        } else {
+            Some(PkgError {
+                code: "X07PKG_SEMVER_BREAKING".to_string(),
+                message: "breaking changes detected (hint: bump the major version or restore compatibility)".to_string(),
+            })
+        },
+    };
+
+    Ok((
+        if ok {
+            std::process::ExitCode::SUCCESS
+        } else {
+            std::process::ExitCode::from(20)
+        },
+        report,
+    ))
+}
+
+fn semver_breaking_changes(
+    old: &PackageSurface,
+    new: &PackageSurface,
+) -> Vec<SemverBreakingChange> {
+    let mut breaks: Vec<SemverBreakingChange> = Vec::new();
+
+    for (module_id, old_mod) in &old.modules {
+        let Some(new_mod) = new.modules.get(module_id) else {
+            breaks.push(SemverBreakingChange::ModuleRemoved {
+                module_id: module_id.clone(),
+            });
+            continue;
+        };
+
+        for (export, old_sig) in &old_mod.exports {
+            let Some(new_sig) = new_mod.exports.get(export) else {
+                breaks.push(SemverBreakingChange::ExportRemoved {
+                    module_id: module_id.clone(),
+                    export: export.clone(),
+                });
+                continue;
+            };
+            if old_sig != new_sig {
+                breaks.push(SemverBreakingChange::ExportSignatureChanged {
+                    module_id: module_id.clone(),
+                    export: export.clone(),
+                    old: fn_sig_to_json(old_sig),
+                    new: fn_sig_to_json(new_sig),
+                });
+            }
+        }
+    }
+
+    breaks
+}
+
+fn fn_sig_to_json(sig: &x07c::typecheck::FnSigSummary) -> FnSigJson {
+    FnSigJson {
+        params: sig
+            .params
+            .iter()
+            .map(x07c::x07ast::type_ref_to_value)
+            .collect(),
+        result: x07c::x07ast::type_ref_to_value(&sig.result),
+    }
+}
+
+fn load_package_surface(package_dir: &Path) -> Result<PackageSurface> {
+    let (pkg, pkg_manifest_path, _pkg_manifest_bytes) = project::load_package_manifest(package_dir)
+        .with_context(|| format!("load package manifest in {}", package_dir.display()))?;
+    if pkg.schema_version.trim() != "x07.package@0.1.0" {
+        anyhow::bail!(
+            "unsupported x07-package.json schema_version {:?} (expected \"x07.package@0.1.0\"): {}",
+            pkg.schema_version,
+            pkg_manifest_path.display()
+        );
+    }
+
+    let mut modules: BTreeMap<String, ModuleSurface> = BTreeMap::new();
+    for module_id in &pkg.modules {
+        let rel = format!("{}.x07.json", module_id.replace('.', "/"));
+        let disk_path = package_dir.join(&pkg.module_root).join(&rel);
+        let bytes = std::fs::read(&disk_path)
+            .with_context(|| format!("read module {module_id:?}: {}", disk_path.display()))?;
+        let file = x07c::x07ast::parse_x07ast_json(&bytes)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+            .with_context(|| format!("parse module x07AST: {}", disk_path.display()))?;
+        let sigs = x07c::typecheck::TypecheckSigs::for_file_with_builtins(&file);
+        let mut exports: BTreeMap<String, x07c::typecheck::FnSigSummary> = BTreeMap::new();
+        for export in &file.exports {
+            let Some(sig) = sigs.get(export) else {
+                anyhow::bail!(
+                    "module {:?} export {:?} is missing a signature (expected a function/extern decl)",
+                    module_id,
+                    export
+                );
+            };
+            exports.insert(export.clone(), sig);
+        }
+        modules.insert(module_id.clone(), ModuleSurface { exports });
+    }
+
+    Ok(PackageSurface {
+        name: pkg.name,
+        version: pkg.version,
+        modules,
+    })
 }
 
 pub(crate) fn pkg_add_sync_quiet(
@@ -2787,18 +3438,68 @@ fn cmd_pkg_pack(
     args: PackArgs,
 ) -> Result<std::process::ExitCode> {
     let package_dir = util::resolve_existing_path_upwards(&args.package);
-    let out_path = machine
-        .out
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("pkg pack: missing --out <PATH>"))?
-        .clone();
+    let out_path = match machine.out.as_ref() {
+        Some(out) => out.clone(),
+        None => {
+            let report = PkgReport::<PackResult> {
+                ok: false,
+                command: "pkg.pack",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_PACK_OUT".to_string(),
+                    message: "pkg pack requires --out <PATH>".to_string(),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
 
-    let (_pkg, tar) = pack_package_to_tar(&package_dir)?;
+    let (_pkg, tar) = match pack_package_to_tar(&package_dir) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = PkgReport::<PackResult> {
+                ok: false,
+                command: "pkg.pack",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_PACK_FAILED".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
     if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create output dir: {}", parent.display()))?;
+        if let Err(err) = std::fs::create_dir_all(parent) {
+            let report = PkgReport::<PackResult> {
+                ok: false,
+                command: "pkg.pack",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_PACK_WRITE".to_string(),
+                    message: format!("create output dir {}: {err}", parent.display()),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
     }
-    std::fs::write(&out_path, &tar).with_context(|| format!("write: {}", out_path.display()))?;
+    if let Err(err) = std::fs::write(&out_path, &tar) {
+        let report = PkgReport::<PackResult> {
+            ok: false,
+            command: "pkg.pack",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_PACK_WRITE".to_string(),
+                message: format!("write {}: {err}", out_path.display()),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
 
     let report = PkgReport {
         ok: true,
@@ -3980,7 +4681,7 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         }
 
         let mismatch = if metadata_online {
-            existing != lock
+            !lockfiles_equal_full(&existing, &lock)
         } else {
             !lockfiles_equal_core(&existing, &lock)
         };
@@ -4399,10 +5100,13 @@ fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {
     if a.registry != b.registry {
         return false;
     }
-    if a.dependencies.len() != b.dependencies.len() {
+
+    let da = lockfile_deps_sorted_for_compare(a);
+    let db = lockfile_deps_sorted_for_compare(b);
+    if da.len() != db.len() {
         return false;
     }
-    for (da, db) in a.dependencies.iter().zip(b.dependencies.iter()) {
+    for (da, db) in da.iter().zip(db.iter()) {
         if da.name != db.name || da.version != db.version || da.path != db.path {
             return false;
         }
@@ -4428,6 +5132,44 @@ fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {
 type LockMetadataKey = (String, String, String, String);
 type LockMetadataValue = (Option<bool>, Vec<project::LockAdvisory>);
 type LockMetadataMap = std::collections::HashMap<LockMetadataKey, LockMetadataValue>;
+
+fn lockfile_deps_sorted_for_compare(lock: &project::Lockfile) -> Vec<project::LockedDependency> {
+    let mut deps = lock.dependencies.clone();
+    for dep in &mut deps {
+        dep.advisories.sort_by(|a, b| a.id.cmp(&b.id));
+    }
+    deps.sort_by(|a, b| {
+        (
+            a.name.as_str(),
+            a.version.as_str(),
+            a.path.as_str(),
+            a.module_root.as_str(),
+            a.package_manifest_sha256.as_str(),
+        )
+            .cmp(&(
+                b.name.as_str(),
+                b.version.as_str(),
+                b.path.as_str(),
+                b.module_root.as_str(),
+                b.package_manifest_sha256.as_str(),
+            ))
+    });
+    deps
+}
+
+fn lockfiles_equal_full(a: &project::Lockfile, b: &project::Lockfile) -> bool {
+    if a.schema_version.trim() != b.schema_version.trim() {
+        return false;
+    }
+    if a.toolchain != b.toolchain {
+        return false;
+    }
+    if a.registry != b.registry {
+        return false;
+    }
+
+    lockfile_deps_sorted_for_compare(a) == lockfile_deps_sorted_for_compare(b)
+}
 
 fn preserve_lock_metadata(existing: &project::Lockfile, lock: &mut project::Lockfile) {
     let mut map: LockMetadataMap = LockMetadataMap::new();
@@ -4927,6 +5669,141 @@ mod tests {
             attestation.dependencies[0].advisories,
             vec!["X07-2026-0001".to_string()]
         );
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    fn write_semver_pkg(
+        dir: &Path,
+        name: &str,
+        version: &str,
+        module_id: &str,
+        export_names: &[&str],
+        params: &[(&str, Value)],
+        result: Value,
+    ) {
+        std::fs::create_dir_all(dir.join("modules"))
+            .unwrap_or_else(|_| panic!("create modules dir: {}", dir.display()));
+        std::fs::write(
+            dir.join("x07-package.json"),
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": "x07.package@0.1.0",
+                "name": name,
+                "version": version,
+                "module_root": "modules",
+                "modules": [module_id],
+            }))
+            .expect("serialize package manifest"),
+        )
+        .unwrap_or_else(|_| panic!("write package manifest: {}", dir.display()));
+
+        let rel = format!("modules/{}.x07.json", module_id.replace('.', "/"));
+        let module_path = dir.join(rel);
+        if let Some(parent) = module_path.parent() {
+            std::fs::create_dir_all(parent).expect("create module parent");
+        }
+
+        let params_json = params
+            .iter()
+            .map(|(name, ty)| serde_json::json!({ "name": name, "ty": ty }))
+            .collect::<Vec<Value>>();
+        let module = serde_json::json!({
+            "schema_version": "x07.x07ast@0.8.0",
+            "kind": "module",
+            "module_id": module_id,
+            "imports": [],
+            "decls": [
+                { "kind": "export", "names": export_names },
+                { "kind": "defn", "name": format!("{module_id}.f"), "params": params_json, "result": result, "body": 0 }
+            ]
+        });
+        std::fs::write(
+            &module_path,
+            serde_json::to_vec(&module).expect("serialize module"),
+        )
+        .unwrap_or_else(|_| panic!("write module: {}", module_path.display()));
+    }
+
+    #[test]
+    fn pkg_check_semver_detects_removed_export() {
+        let dir = temp_dir("semver_removed_export");
+        let old_dir = dir.join("old");
+        let new_dir = dir.join("new");
+
+        write_semver_pkg(
+            &old_dir,
+            "ext-semver-demo",
+            "0.1.0",
+            "demo.api",
+            &["demo.api.f"],
+            &[],
+            Value::String("i32".to_string()),
+        );
+        write_semver_pkg(
+            &new_dir,
+            "ext-semver-demo",
+            "0.1.1",
+            "demo.api",
+            &[],
+            &[],
+            Value::String("i32".to_string()),
+        );
+
+        let args = CheckSemverArgs {
+            old: old_dir,
+            new: new_dir,
+        };
+        let (code, report) = pkg_check_semver_report(&args).expect("semver report");
+        assert_eq!(code, std::process::ExitCode::from(20));
+        assert!(!report.ok);
+        let result = report.result.expect("result");
+        assert_eq!(result.name, "ext-semver-demo");
+        assert_eq!(result.breaking_changes.len(), 1);
+        assert!(matches!(
+            result.breaking_changes[0],
+            SemverBreakingChange::ExportRemoved { .. }
+        ));
+
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn pkg_check_semver_detects_signature_change() {
+        let dir = temp_dir("semver_sig_change");
+        let old_dir = dir.join("old");
+        let new_dir = dir.join("new");
+
+        write_semver_pkg(
+            &old_dir,
+            "ext-semver-demo",
+            "0.1.0",
+            "demo.api",
+            &["demo.api.f"],
+            &[("x", Value::String("i32".to_string()))],
+            Value::String("i32".to_string()),
+        );
+        write_semver_pkg(
+            &new_dir,
+            "ext-semver-demo",
+            "0.1.1",
+            "demo.api",
+            &["demo.api.f"],
+            &[("x", Value::String("bytes".to_string()))],
+            Value::String("i32".to_string()),
+        );
+
+        let args = CheckSemverArgs {
+            old: old_dir,
+            new: new_dir,
+        };
+        let (code, report) = pkg_check_semver_report(&args).expect("semver report");
+        assert_eq!(code, std::process::ExitCode::from(20));
+        assert!(!report.ok);
+        let result = report.result.expect("result");
+        assert!(matches!(
+            result.breaking_changes[0],
+            SemverBreakingChange::ExportSignatureChanged { .. }
+        ));
 
         std::fs::remove_dir_all(&dir).expect("cleanup");
     }
@@ -5430,7 +6307,22 @@ fn cmd_pkg_login(args: LoginArgs) -> Result<std::process::ExitCode> {
 
 fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
     let package_dir = util::resolve_existing_path_upwards(&args.package);
-    let (pkg, tar) = pack_package_to_tar(&package_dir)?;
+    let (pkg, tar) = match pack_package_to_tar(&package_dir) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = PkgReport::<PublishResult> {
+                ok: false,
+                command: "pkg.publish",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_PUBLISH_PACK".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
 
     let token = x07_pkg::load_token(&args.index).unwrap_or(None);
     let client = match SparseIndexClient::from_index_url(&args.index, token.clone()) {
@@ -5605,8 +6497,15 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
 }
 
 fn pack_package_to_tar(package_dir: &Path) -> Result<(project::PackageManifest, Vec<u8>)> {
-    let (pkg, _pkg_manifest_path, pkg_manifest_bytes) = project::load_package_manifest(package_dir)
+    let (pkg, pkg_manifest_path, pkg_manifest_bytes) = project::load_package_manifest(package_dir)
         .with_context(|| format!("load package manifest in {}", package_dir.display()))?;
+    validate_package_manifest_required_fields(
+        &pkg.name,
+        &pkg.version,
+        &pkg_manifest_path,
+        &pkg_manifest_bytes,
+    )
+    .with_context(|| format!("validate package metadata: {}", pkg_manifest_path.display()))?;
 
     let mut entries: Vec<(PathBuf, Vec<u8>)> = Vec::new();
     entries.push((PathBuf::from("x07-package.json"), pkg_manifest_bytes));
@@ -5650,6 +6549,75 @@ fn pack_package_to_tar(package_dir: &Path) -> Result<(project::PackageManifest, 
 
     let tar = x07_pkg::build_tar_bytes(&entries)?;
     Ok((pkg, tar))
+}
+
+fn validate_package_manifest_required_fields(
+    pkg_name: &str,
+    pkg_version: &str,
+    pkg_manifest_path: &Path,
+    pkg_manifest_bytes: &[u8],
+) -> Result<()> {
+    let doc: Value = serde_json::from_slice(pkg_manifest_bytes)
+        .with_context(|| format!("parse {}", pkg_manifest_path.display()))?;
+    let obj = doc
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("x07-package.json must be a JSON object"))?;
+
+    fn require_non_empty_string<'a>(
+        obj: &'a serde_json::Map<String, Value>,
+        key: &'static str,
+    ) -> Result<&'a str> {
+        match obj.get(key) {
+            Some(Value::String(s)) => {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    anyhow::bail!("x07-package.json must include a non-empty {key:?} string");
+                }
+                Ok(trimmed)
+            }
+            Some(_) => anyhow::bail!("x07-package.json {key:?} must be a string"),
+            None => anyhow::bail!("x07-package.json is missing required field {key:?}"),
+        }
+    }
+
+    let _description = require_non_empty_string(obj, "description")
+        .with_context(|| format!("validate package metadata for {pkg_name}@{pkg_version}"))?;
+    let _docs = require_non_empty_string(obj, "docs")
+        .with_context(|| format!("validate package metadata for {pkg_name}@{pkg_version}"))?;
+    let _license = require_non_empty_string(obj, "license").with_context(|| {
+        format!(
+            "validate package metadata for {pkg_name}@{pkg_version} (hint: license should be an SPDX expression, e.g. \"MIT\" or \"MIT OR Apache-2.0\")"
+        )
+    })?;
+
+    let meta = obj
+        .get("meta")
+        .ok_or_else(|| anyhow::anyhow!("x07-package.json is missing required field \"meta\""))?;
+    let meta = meta.as_object().ok_or_else(|| {
+        anyhow::anyhow!("x07-package.json meta must be a JSON object (expected meta.x07c_compat)")
+    })?;
+    let x07c_compat = require_non_empty_string(meta, "x07c_compat").with_context(|| {
+        format!(
+            "validate package meta.x07c_compat for {pkg_name}@{pkg_version} (expected a semver range like \">=0.2.2, <0.3.0\")"
+        )
+    })?;
+
+    let req = parse_semver_req(x07c_compat).with_context(|| {
+        format!(
+            "invalid x07-package.json meta.x07c_compat {:?} (expected a semver range like \">=0.2.2, <0.3.0\")",
+            x07c_compat
+        )
+    })?;
+    let cur = current_x07c_semver()?;
+    if !semver_satisfies(&cur, &req) {
+        anyhow::bail!(
+            "x07-package.json meta.x07c_compat {:?} does not include x07c {} for {pkg_name}@{pkg_version} (hint: update x07c_compat to cover the toolchain used to publish this archive)",
+            x07c_compat,
+            x07c::X07C_VERSION
+        );
+    }
+
+    Ok(())
 }
 
 fn temp_unpack_dir(base: &Path) -> Result<PathBuf> {

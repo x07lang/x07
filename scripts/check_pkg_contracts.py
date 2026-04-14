@@ -253,9 +253,13 @@ def main(argv: list[str]) -> int:
                 {
                     "schema_version": "x07.package@0.1.0",
                     "name": "base",
+                    "description": "Fixture package for x07 pkg contract tests (base).",
+                    "license": "MIT OR Apache-2.0",
+                    "docs": "This package exists only as a deterministic packing + locking fixture for x07 CI.",
                     "version": "0.1.0",
                     "module_root": "modules",
                     "modules": ["base.util"],
+                    "meta": {"x07c_compat": ">=0.2.2, <0.3.0"},
                 },
                 indent=2,
             )
@@ -288,10 +292,16 @@ def main(argv: list[str]) -> int:
                 {
                     "schema_version": "x07.package@0.1.0",
                     "name": "meta",
+                    "description": "Fixture package for x07 pkg contract tests (meta).",
+                    "license": "MIT OR Apache-2.0",
+                    "docs": "This package exists only as a deterministic packing + locking fixture for x07 CI.",
                     "version": "0.1.0",
                     "module_root": "modules",
                     "modules": ["meta.main"],
-                    "meta": {"requires_packages": ["base@0.1.0"]},
+                    "meta": {
+                        "x07c_compat": ">=0.2.2, <0.3.0",
+                        "requires_packages": ["base@0.1.0"],
+                    },
                 },
                 indent=2,
             )

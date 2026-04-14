@@ -3,11 +3,13 @@
   "name": "ext-smoke-c-demo",
   "version": "0.1.0",
   "description": "Demo package: C imported via x07import (clang-backed).",
+  "license": "MIT OR Apache-2.0",
   "docs": "Imported module: ext.smoke\nTests module: ext.smoke.tests\n",
   "module_root": "modules",
   "modules": ["ext.smoke", "ext.smoke.tests"],
   "meta": {
     "determinism_tier": "pure",
+    "x07c_compat": ">=0.2.2, <0.3.0",
     "worlds_allowed": [
       "run-os",
       "run-os-sandboxed"

@@ -1,0 +1,12 @@
+{
+  "dl": "https://example.invalid/v1/packages/",
+  "api": "https://example.invalid/v1/",
+  "auth-required": false,
+  "sparse": true,
+  "signing": {
+    "kind": "ed25519",
+    "public_keys": [
+      { "id": "example-ed25519-1", "ed25519_pub": "vQ5ZtKd7FokFBVvDEEtjF2aJgEKsi8i1Ce0G4Rc/oss=" }
+    ]
+  }
+}

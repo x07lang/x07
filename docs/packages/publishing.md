@@ -21,7 +21,7 @@ x07 init --package
 Then follow the canonical workflow (also printed in the init JSON report):
 
 ```bash
-# Edit x07-package.json: set description/docs; bump version
+# Edit x07-package.json: set description/docs/license; verify meta.x07c_compat; bump version
 x07 test --manifest tests/tests.json
 x07 pkg pack --package . --out dist/<name>-<version>.x07pkg
 x07 pkg login --index sparse+https://registry.x07.io/index/
@@ -70,7 +70,7 @@ printf '%s' "$X07_TOKEN" | x07 pkg login --index sparse+https://registry.x07.io/
 
 ### Publishing
 
-Ensure `x07-package.json` contains a non-empty `description` and `docs`, bump the `version`, then publish the directory:
+Ensure `x07-package.json` contains non-empty `description`, `docs`, and `license`, plus a valid `meta.x07c_compat` range, bump the `version`, then publish the directory:
 
 ```bash
 x07 pkg publish --index sparse+https://registry.x07.io/index/ --package .

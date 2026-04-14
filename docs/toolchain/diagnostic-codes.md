@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 479
-- quickfix support (`sometimes` or `always`): 437
-- quickfix coverage: 91.23%
+- total codes: 493
+- quickfix support (`sometimes` or `always`): 446
+- quickfix coverage: 90.47%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -283,6 +283,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07INIT_TESTS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TESTS`. |
 | `X07INIT_TRUST` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TRUST`. |
 | `X07PKG_ADVISED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_ADVISED_DEP`. |
+| `X07PKG_API_FETCH` | x07 / lint / error | never | Registry API request failed. |
+| `X07PKG_API_PARSE` | x07 / lint / error | never | Registry API response is invalid. |
 | `X07PKG_API_URL` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_API_URL`. |
 | `X07PKG_DEP_EXISTS` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_EXISTS`. |
 | `X07PKG_DEP_NOT_FOUND` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_NOT_FOUND`. |
@@ -302,8 +304,12 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_OFFLINE_INDEX` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_INDEX`. |
 | `X07PKG_OFFLINE_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`. |
 | `X07PKG_OFFLINE_REFRESH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_REFRESH`. |
+| `X07PKG_PACK_FAILED` | x07 / lint / error | sometimes | Package packing failed. |
+| `X07PKG_PACK_OUT` | x07 / lint / error | sometimes | Missing output path for package packing. |
+| `X07PKG_PACK_WRITE` | x07 / lint / error | sometimes | Failed to write packed archive. |
 | `X07PKG_PATCH_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PATCH_MISSING_DEP`. |
 | `X07PKG_PUBLISH_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_PUBLISH_FAILED`. |
+| `X07PKG_PUBLISH_PACK` | x07 / lint / error | sometimes | Publish failed while packing the package. |
 | `X07PKG_PUBLISH_RESPONSE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE`. |
 | `X07PKG_PUBLISH_RESPONSE_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE_MISMATCH`. |
 | `X07PKG_REPAIR_LOCAL_INCOMPATIBLE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_LOCAL_INCOMPATIBLE`. |
@@ -313,6 +319,13 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_PATCHED_PATH_INCOMPATIBLE`. |
 | `X07PKG_REPAIR_TOOLCHAIN_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_INVALID`. |
 | `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_REPAIR_TOOLCHAIN_UNSUPPORTED`. |
+| `X07PKG_SEMVER_BREAKING` | x07 / lint / error | sometimes | Breaking API changes detected. |
+| `X07PKG_SEMVER_DIR` | x07 / lint / error | sometimes | Semver check input directory is invalid. |
+| `X07PKG_SEMVER_LOAD` | x07 / lint / error | sometimes | Failed to load package surface for semver check. |
+| `X07PKG_SEMVER_NAME_MISMATCH` | x07 / lint / error | sometimes | Package names do not match for semver check. |
+| `X07PKG_SIGNATURE_INVALID` | x07 / lint / error | never | Package signature is invalid. |
+| `X07PKG_SIGNATURE_KEY_MISSING` | x07 / lint / error | never | Signing key is missing from index config. |
+| `X07PKG_SIGNATURE_UNSUPPORTED` | x07 / lint / error | never | Unsupported signature kind. |
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
 | `X07PKG_TREE_DEP_MANIFEST` | x07 / lint / error | sometimes | pkg.tree could not read a dependency package manifest. |
@@ -324,6 +337,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_TREE_MODULE_ROOTS` | x07 / lint / error | sometimes | pkg.tree could not compute resolved module roots. |
 | `X07PKG_TREE_PROJECT` | x07 / lint / error | sometimes | pkg.tree failed to load the project manifest. |
 | `X07PKG_TREE_REQUIRES_INVALID` | x07 / lint / error | sometimes | pkg.tree found an invalid `meta.requires_packages` entry. |
+| `X07PKG_UNSIGNED` | x07 / lint / error | sometimes | Package or index is unsigned. |
 | `X07PKG_X07C_COMPAT_INVALID` | x07 / lint / error | sometimes | Package compatibility metadata is invalid. |
 | `X07PKG_X07C_INCOMPATIBLE` | x07 / lint / error | sometimes | Package is incompatible with the current compiler. |
 | `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
@@ -6022,6 +6036,49 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_API_FETCH`
+
+Summary: Registry API request failed.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on remote registry API/network availability.
+
+Details:
+
+A registry API request failed while fetching package metadata. This can be caused by network issues, authentication problems, or a registry outage.
+
+Agent strategy:
+
+- Check the network connection and registry availability.
+- If you need offline operation, install the package locally and re-run with `--offline` (where supported).
+- Verify your registry/index URL and credentials if the registry requires auth.
+- Retry the command after the registry is healthy.
+
+
+## `X07PKG_API_PARSE`
+
+Summary: Registry API response is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Indicates a registry API contract mismatch or server-side bug.
+
+Details:
+
+The registry API response could not be parsed or did not match the expected shape.
+
+Agent strategy:
+
+- Retry once to rule out transient proxy/caching issues.
+- If the failure persists, the registry API may be returning a contract-incompatible response; upgrade the toolchain or the registry, or file a bug with the response body.
+- Use local package metadata (installed deps) when offline operation is required.
+
+
 ## `X07PKG_API_URL`
 
 Summary: Package workflow diagnostic `X07PKG_API_URL`.
@@ -6405,6 +6462,66 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_PACK_FAILED`
+
+Summary: Package packing failed.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package directory could not be packed into a `.x07pkg` archive. This typically indicates invalid `x07-package.json` metadata, missing module files, or unsupported files under `ffi/`.
+
+Agent strategy:
+
+- Validate `x07-package.json` fields (including required publishing metadata) and re-run `x07 pkg pack`.
+- Ensure all modules listed in `x07-package.json.modules` exist under `module_root`.
+- If the package contains `ffi/`, ensure it only contains regular files and directories.
+- Re-run with a clean workspace once the package directory is fixed.
+
+
+## `X07PKG_PACK_OUT`
+
+Summary: Missing output path for package packing.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg pack` requires an output path via `--out <PATH>` to write the archive.
+
+Agent strategy:
+
+- Re-run with `--out dist/<name>-<version>.x07pkg`.
+- Ensure the output directory exists or is writable.
+
+
+## `X07PKG_PACK_WRITE`
+
+Summary: Failed to write packed archive.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `.x07pkg` archive was built but could not be written to the output path.
+
+Agent strategy:
+
+- Check filesystem permissions and available disk space.
+- Ensure the `--out` parent directory exists.
+- Re-run `x07 pkg pack` after fixing the output path.
+
+
 ## `X07PKG_PATCH_MISSING_DEP`
 
 Summary: Package workflow diagnostic `X07PKG_PATCH_MISSING_DEP`.
@@ -6444,6 +6561,25 @@ Agent strategy:
 - Reproduce `X07PKG_PUBLISH_FAILED` and capture structured context.
 - Resolve the external dependency/state.
 - Re-run the command and continue repair loop.
+
+
+## `X07PKG_PUBLISH_PACK`
+
+Summary: Publish failed while packing the package.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg publish` failed because `x07 pkg pack` failed for the package directory.
+
+Agent strategy:
+
+- Fix the package directory so `x07 pkg pack --package . --out /tmp/pkg.x07pkg` succeeds.
+- Re-run `x07 pkg publish` once packing succeeds.
 
 
 ## `X07PKG_PUBLISH_RESPONSE`
@@ -6624,6 +6760,146 @@ Agent strategy:
 - Normalize dependency specs and run `x07 pkg lock`.
 - Use `x07 pkg add/remove/versions/login/publish` as needed.
 - Re-run the original package command.
+
+
+## `X07PKG_SEMVER_BREAKING`
+
+Summary: Breaking API changes detected.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg check-semver` detected breaking changes between the old and new package surfaces (removed exports, removed modules, or signature changes).
+
+Agent strategy:
+
+- If the change is intended, bump the major version.
+- If the change is unintended, restore the removed export/module or reintroduce a compatible signature.
+- Re-run `x07 pkg check-semver` to confirm the surface is compatible.
+
+
+## `X07PKG_SEMVER_DIR`
+
+Summary: Semver check input directory is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg check-semver` requires `--old` and `--new` directories that each contain `x07-package.json`.
+
+Agent strategy:
+
+- Ensure both directories exist and contain `x07-package.json`.
+- Re-run `x07 pkg check-semver --old <dir> --new <dir>`.
+
+
+## `X07PKG_SEMVER_LOAD`
+
+Summary: Failed to load package surface for semver check.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The semver checker could not read or typecheck the exported surface of one of the packages.
+
+Agent strategy:
+
+- Ensure the package manifest lists valid modules and that the module files exist.
+- Fix any parse/type errors in exported modules.
+- Re-run `x07 pkg check-semver` after the package directories are healthy.
+
+
+## `X07PKG_SEMVER_NAME_MISMATCH`
+
+Summary: Package names do not match for semver check.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg check-semver` requires the old and new directories to describe the same package name.
+
+Agent strategy:
+
+- Ensure both `x07-package.json` files have the same `name`.
+- Re-run `x07 pkg check-semver` with the correct directories.
+
+
+## `X07PKG_SIGNATURE_INVALID`
+
+Summary: Package signature is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires registry-side re-signing or republishing.
+
+Details:
+
+`x07 pkg verify` found a signature, but it did not validate against the advertised public key.
+
+Agent strategy:
+
+- Treat the package as untrusted and do not use it for sensitive workflows.
+- Verify the registry index URL and signing key configuration.
+- If you control the registry, republish/re-sign the package and ensure the index entry signature matches the package sha256.
+
+
+## `X07PKG_SIGNATURE_KEY_MISSING`
+
+Summary: Signing key is missing from index config.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires registry index configuration to include the signing public key.
+
+Details:
+
+`x07 pkg verify` found a signature key id in the index entry, but the corresponding public key was not present in `config.json`.
+
+Agent strategy:
+
+- Verify the index URL points at the expected sparse index root.
+- If you control the registry, ensure `config.json` lists the signing public key used for published entries.
+- Retry once caches are refreshed.
+
+
+## `X07PKG_SIGNATURE_UNSUPPORTED`
+
+Summary: Unsupported signature kind.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires toolchain or registry configuration changes.
+
+Details:
+
+`x07 pkg verify` encountered a signing kind that the toolchain does not support.
+
+Agent strategy:
+
+- Upgrade the toolchain if the registry uses a newer signature scheme.
+- If you control the registry, configure it to use a supported signature kind.
 
 
 ## `X07PKG_SPEC_INVALID`
@@ -6838,6 +7114,26 @@ Agent strategy:
 
 - Fix the package `x07-package.json` so `meta.requires_packages` is an array of `NAME@VERSION` strings.
 - Re-run `x07 pkg lock` (to refresh closure) and then `x07 pkg tree`.
+
+
+## `X07PKG_UNSIGNED`
+
+Summary: Package or index is unsigned.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg verify` could not verify the package because the index does not advertise signing keys or the entry does not contain a signature.
+
+Agent strategy:
+
+- If you require integrity, use a registry/index that publishes signing keys and per-entry signatures.
+- If the package is expected to be signed, verify the registry configuration and republish if needed.
+- Otherwise, treat the package as unsigned and decide whether it is acceptable for your threat model.
 
 
 ## `X07PKG_X07C_COMPAT_INVALID`

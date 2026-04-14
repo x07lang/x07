@@ -3,6 +3,7 @@
   "name": "appkit",
   "version": "0.1.0",
   "description": "Local helper package used by the multi-module docs example.",
+  "license": "MIT OR Apache-2.0",
   "docs": "Local helper package used by docs/examples/project-multi-module.\n\nModules:\n- appkit.vec\n",
   "module_root": "modules",
   "modules": ["appkit.vec"],
@@ -14,4 +15,3 @@
     "visibility": "experimental"
   }
 }
-
