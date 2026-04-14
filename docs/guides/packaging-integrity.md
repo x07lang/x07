@@ -121,6 +121,14 @@ version=<version>
 sha256=<cksum>
 ```
 
+### Do we need to republish packages?
+
+No. The toolchain upgrade is compatible with existing packages:
+
+- If an index entry has no signature, `x07 pkg verify` reports it as unsigned with an actionable error.
+- Enabling signing only affects *new* publishes. If you want verification to succeed for historical packages too, do a server-side signature backfill (sign existing `name+version+cksum` and update sparse index entries) without re-uploading archives.
+- If you want missing metadata (for example `license`) added to already-published versions, publish a new version; do not mutate an existing semver version.
+
 ### CI integration
 
 `x07 pkg check-semver` exits with code 20 when it detects breaking changes, so it can be used as a CI gate.
