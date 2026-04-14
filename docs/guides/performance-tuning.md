@@ -91,4 +91,8 @@ When you need deeper profiling, prefer repeatable harnesses:
 - keep configuration explicit and version-controlled
 - run in a “dry” mode in CI (no cluster required)
 
+Minimal function profiling is available via `X07_PROFILE=1`:
+
+- `docs/toolchain/profiling.md`
+
 For end-to-end investigation, use the platform’s supported tooling instead of invoking runner binaries directly.

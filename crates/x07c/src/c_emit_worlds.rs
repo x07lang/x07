@@ -241,6 +241,9 @@ pub(super) fn load_budget_profile_cfg_from_arch_v1(
         Ok(bytes) => bytes,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
             let builtin = match profile_id {
+                "archive_extract_safe_v1" => Some(include_str!(
+                    "../../../arch/budgets/profiles/archive_extract_safe_v1.budget.json"
+                )),
                 "stream_xf_plugin_v1" => Some(include_str!(
                     "../../../arch/budgets/profiles/stream_xf_plugin_v1.budget.json"
                 )),
@@ -1318,6 +1321,160 @@ impl<'a> Emitter<'a> {
         Ok(())
     }
 
+    pub(super) fn emit_os_fs_stream_open_read_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_open_read_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_open_read_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_open_read_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_open_read_v1 returns result_i32".to_string(),
+            ));
+        }
+        let path = self.emit_expr(&args[0])?;
+        let caps = self.emit_expr(&args[1])?;
+        if path.ty != Ty::Bytes || caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_open_read_v1 expects (bytes path, bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_open_read_v1({}, {});",
+            path.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
+    pub(super) fn emit_os_fs_stream_read_some_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_read_some_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_read_some_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_read_some_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_read_some_v1 returns result_bytes".to_string(),
+            ));
+        }
+        let handle = self.emit_expr(&args[0])?;
+        let max_bytes = self.emit_expr(&args[1])?;
+        if handle.ty != Ty::I32 || max_bytes.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_read_some_v1 expects (i32 reader_handle, i32 max_bytes)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_read_some_v1((int32_t){}, (int32_t){});",
+            handle.c_name, max_bytes.c_name
+        ));
+        Ok(())
+    }
+
+    pub(super) fn emit_os_fs_stream_close_read_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_close_read_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_close_read_v1",
+        )?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_close_read_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_close_read_v1 returns result_i32".to_string(),
+            ));
+        }
+        let handle = self.emit_expr(&args[0])?;
+        if handle.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_close_read_v1 expects i32 reader_handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_close_read_v1((int32_t){});",
+            handle.c_name
+        ));
+        Ok(())
+    }
+
+    pub(super) fn emit_os_fs_stream_drop_read_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_drop_read_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_drop_read_v1",
+        )?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_drop_read_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_drop_read_v1 returns i32".to_string(),
+            ));
+        }
+        let handle = self.emit_expr(&args[0])?;
+        if handle.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_drop_read_v1 expects i32 reader_handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_drop_read_v1((int32_t){});",
+            handle.c_name
+        ));
+        Ok(())
+    }
+
     pub(super) fn emit_os_fs_mkdirs_v1_to(
         &mut self,
         args: &[Expr],
@@ -1590,6 +1747,159 @@ impl<'a> Emitter<'a> {
         self.line(&format!(
             "{dest} = x07_ext_fs_stat_v1({}, {});",
             path.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
+    pub(super) fn emit_os_archive_tar_extract_to_fs_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.archive.tar_extract_to_fs_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_ARCHIVE,
+            native::ABI_MAJOR_V1,
+            "os.archive.tar_extract_to_fs_v1",
+        )?;
+        if args.len() != 5 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.archive.tar_extract_to_fs_v1 expects 5 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.archive.tar_extract_to_fs_v1 returns bytes".to_string(),
+            ));
+        }
+        let out_root = self.emit_expr(&args[0])?;
+        let tar_path = self.emit_expr(&args[1])?;
+        let caps_read = self.emit_expr(&args[2])?;
+        let caps_write = self.emit_expr(&args[3])?;
+        let profile_id = self.emit_expr(&args[4])?;
+        if out_root.ty != Ty::Bytes
+            || tar_path.ty != Ty::Bytes
+            || caps_read.ty != Ty::Bytes
+            || caps_write.ty != Ty::Bytes
+            || profile_id.ty != Ty::Bytes
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.archive.tar_extract_to_fs_v1 expects (bytes out_root, bytes tar_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_archive_tar_extract_to_fs_v1({}, {}, {}, {}, {});",
+            out_root.c_name,
+            tar_path.c_name,
+            caps_read.c_name,
+            caps_write.c_name,
+            profile_id.c_name
+        ));
+        Ok(())
+    }
+
+    pub(super) fn emit_os_archive_tgz_extract_to_fs_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.archive.tgz_extract_to_fs_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_ARCHIVE,
+            native::ABI_MAJOR_V1,
+            "os.archive.tgz_extract_to_fs_v1",
+        )?;
+        if args.len() != 5 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.archive.tgz_extract_to_fs_v1 expects 5 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.archive.tgz_extract_to_fs_v1 returns bytes".to_string(),
+            ));
+        }
+        let out_root = self.emit_expr(&args[0])?;
+        let tgz_path = self.emit_expr(&args[1])?;
+        let caps_read = self.emit_expr(&args[2])?;
+        let caps_write = self.emit_expr(&args[3])?;
+        let profile_id = self.emit_expr(&args[4])?;
+        if out_root.ty != Ty::Bytes
+            || tgz_path.ty != Ty::Bytes
+            || caps_read.ty != Ty::Bytes
+            || caps_write.ty != Ty::Bytes
+            || profile_id.ty != Ty::Bytes
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.archive.tgz_extract_to_fs_v1 expects (bytes out_root, bytes tgz_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_archive_tgz_extract_to_fs_v1({}, {}, {}, {}, {});",
+            out_root.c_name,
+            tgz_path.c_name,
+            caps_read.c_name,
+            caps_write.c_name,
+            profile_id.c_name
+        ));
+        Ok(())
+    }
+
+    pub(super) fn emit_os_archive_zip_extract_to_fs_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.archive.zip_extract_to_fs_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_ARCHIVE,
+            native::ABI_MAJOR_V1,
+            "os.archive.zip_extract_to_fs_v1",
+        )?;
+        if args.len() != 5 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.archive.zip_extract_to_fs_v1 expects 5 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.archive.zip_extract_to_fs_v1 returns bytes".to_string(),
+            ));
+        }
+        let out_root = self.emit_expr(&args[0])?;
+        let zip_path = self.emit_expr(&args[1])?;
+        let caps_read = self.emit_expr(&args[2])?;
+        let caps_write = self.emit_expr(&args[3])?;
+        let profile_id = self.emit_expr(&args[4])?;
+        if out_root.ty != Ty::Bytes
+            || zip_path.ty != Ty::Bytes
+            || caps_read.ty != Ty::Bytes
+            || caps_write.ty != Ty::Bytes
+            || profile_id.ty != Ty::Bytes
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.archive.zip_extract_to_fs_v1 expects (bytes out_root, bytes zip_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_archive_zip_extract_to_fs_v1({}, {}, {}, {}, {});",
+            out_root.c_name,
+            zip_path.c_name,
+            caps_read.c_name,
+            caps_write.c_name,
+            profile_id.c_name
         ));
         Ok(())
     }

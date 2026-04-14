@@ -69,3 +69,44 @@ fn budget_scope_from_arch_v1_loads_profile_cfg() {
         "expected alloc_bytes limit in C output"
     );
 }
+
+#[test]
+fn budget_scope_from_arch_v1_falls_back_to_builtin_archive_extract_safe_v1() {
+    let root = create_temp_dir("x07c_budget_scope_from_arch_builtin");
+    if root.exists() {
+        std::fs::remove_dir_all(&root).expect("remove old temp dir");
+    }
+    std::fs::create_dir_all(&root).expect("create temp dir");
+
+    let program = serde_json::to_vec(&json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": [
+            "begin",
+            ["let", "r", [
+                "budget.scope_from_arch_v1",
+                ["bytes.lit", "archive_extract_safe_v1"],
+                ["result_bytes.ok", ["bytes.alloc", 0]]
+            ]],
+            ["result_bytes.unwrap_or", "r", ["bytes.alloc", 0]]
+        ],
+    }))
+    .expect("encode x07AST entry JSON");
+
+    let options = CompileOptions {
+        arch_root: Some(root),
+        ..Default::default()
+    };
+    let c_src = compile_program_to_c(program.as_slice(), &options).expect("compile ok");
+    assert!(
+        c_src.contains("archive.extract.safe.v1"),
+        "expected builtin profile label in C output"
+    );
+    assert!(
+        c_src.contains("UINT64_C(134217728)"),
+        "expected builtin alloc_bytes limit in C output"
+    );
+}

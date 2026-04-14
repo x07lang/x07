@@ -15,6 +15,11 @@ impl<'a> Emitter<'a> {
         }
         self.push_char('\n');
 
+        if self.options.profile_fns {
+            self.emit_profile_support();
+            self.push_char('\n');
+        }
+
         self.emit_extern_function_prototypes();
         self.emit_async_function_prototypes();
         self.emit_user_function_prototypes();
@@ -23,11 +28,165 @@ impl<'a> Emitter<'a> {
         self.emit_solve()?;
 
         if self.options.emit_main {
-            self.push_str(RUNTIME_C_MAIN);
+            if self.options.profile_fns {
+                let mut main = RUNTIME_C_MAIN.replace(
+                    "  rt_ext_ctx = &ctx;\n",
+                    "  rt_ext_ctx = &ctx;\n  x07_profile_init();\n",
+                );
+                main = main.replace(
+                    "  fflush(stderr);\n",
+                    "  x07_profile_emit();\n  fflush(stderr);\n",
+                );
+                self.push_str(&main);
+            } else {
+                self.push_str(RUNTIME_C_MAIN);
+            }
         } else {
             self.push_str(RUNTIME_C_LIB);
         }
         Ok(())
+    }
+
+    pub(super) fn emit_profile_support(&mut self) {
+        if self.suppress_output {
+            return;
+        }
+        fn c_escape_string(s: &str) -> String {
+            s.replace('\\', "\\\\").replace('"', "\\\"")
+        }
+
+        let fn_count: usize = 1usize.saturating_add(self.program.functions.len());
+
+        self.line("// --- X07_PROFILE_FN_START");
+        self.line("#if defined(X07_FREESTANDING)");
+        self.line("static void x07_profile_init(void) {}");
+        self.line("static void x07_profile_emit(void) {}");
+        self.line(
+            "static void x07_profile_fn_enter(ctx_t* ctx, uint32_t fn_id) { (void)ctx; (void)fn_id; }",
+        );
+        self.line("static void x07_profile_fn_exit(ctx_t* ctx) { (void)ctx; }");
+        self.line("#else");
+        self.line("#define X07_PROFILE_STACK_CAP 256");
+        self.line(&format!("#define X07_PROFILE_FN_COUNT {fn_count}"));
+        self.line("typedef struct {");
+        self.indent += 1;
+        self.line("uint64_t calls;");
+        self.line("uint64_t fuel_excl;");
+        self.line("uint64_t alloc_calls_excl;");
+        self.line("uint64_t alloc_bytes_excl;");
+        self.indent -= 1;
+        self.line("} x07_profile_fn_acc_t;");
+        self.line("typedef struct {");
+        self.indent += 1;
+        self.line("uint32_t fn_id;");
+        self.line("uint64_t fuel_start;");
+        self.line("uint64_t alloc_calls_start;");
+        self.line("uint64_t alloc_bytes_start;");
+        self.line("uint64_t child_fuel;");
+        self.line("uint64_t child_alloc_calls;");
+        self.line("uint64_t child_alloc_bytes;");
+        self.indent -= 1;
+        self.line("} x07_profile_fn_frame_t;");
+
+        self.line("static uint8_t x07_profile_enabled = 0;");
+        self.line("static x07_profile_fn_acc_t x07_profile_fn_acc[X07_PROFILE_FN_COUNT];");
+        self.line("static x07_profile_fn_frame_t x07_profile_stack[X07_PROFILE_STACK_CAP];");
+        self.line("static uint32_t x07_profile_stack_len = 0;");
+
+        self.line("static const char* x07_profile_fn_names[X07_PROFILE_FN_COUNT] = {");
+        self.indent += 1;
+        self.line("\"solve\",");
+        for f in &self.program.functions {
+            let name = c_escape_string(&f.name);
+            self.line(&format!("\"{name}\","));
+        }
+        self.indent -= 1;
+        self.line("};");
+
+        self.line("static void x07_profile_init(void) {");
+        self.indent += 1;
+        self.line("x07_profile_enabled = 0;");
+        self.line("x07_profile_stack_len = 0;");
+        self.line("const char* v = getenv(\"X07_PROFILE\");");
+        self.line("if (!v || !v[0] || v[0] == '0') return;");
+        self.line("x07_profile_enabled = 1;");
+        self.indent -= 1;
+        self.line("}");
+
+        self.line("static void x07_profile_fn_enter(ctx_t* ctx, uint32_t fn_id) {");
+        self.indent += 1;
+        self.line("if (!x07_profile_enabled) return;");
+        self.line("if (fn_id >= X07_PROFILE_FN_COUNT) return;");
+        self.line("if (x07_profile_stack_len >= X07_PROFILE_STACK_CAP) return;");
+        self.line("x07_profile_fn_acc[fn_id].calls += 1;");
+        self.line("x07_profile_fn_frame_t* fr = &x07_profile_stack[x07_profile_stack_len++];");
+        self.line("fr->fn_id = fn_id;");
+        self.line("fr->fuel_start = ctx->fuel;");
+        self.line("fr->alloc_calls_start = ctx->mem_stats.alloc_calls;");
+        self.line("fr->alloc_bytes_start = ctx->mem_stats.bytes_alloc_total;");
+        self.line("fr->child_fuel = 0;");
+        self.line("fr->child_alloc_calls = 0;");
+        self.line("fr->child_alloc_bytes = 0;");
+        self.indent -= 1;
+        self.line("}");
+
+        self.line("static void x07_profile_fn_exit(ctx_t* ctx) {");
+        self.indent += 1;
+        self.line("if (!x07_profile_enabled) return;");
+        self.line("if (x07_profile_stack_len == 0) return;");
+        self.line("x07_profile_fn_frame_t fr = x07_profile_stack[--x07_profile_stack_len];");
+        self.line("uint64_t fuel_delta = fr.fuel_start - ctx->fuel;");
+        self.line(
+            "uint64_t alloc_calls_delta = ctx->mem_stats.alloc_calls - fr.alloc_calls_start;",
+        );
+        self.line(
+            "uint64_t alloc_bytes_delta = ctx->mem_stats.bytes_alloc_total - fr.alloc_bytes_start;",
+        );
+        self.line(
+            "uint64_t fuel_excl = (fuel_delta > fr.child_fuel) ? (fuel_delta - fr.child_fuel) : 0;",
+        );
+        self.line("uint64_t alloc_calls_excl = (alloc_calls_delta > fr.child_alloc_calls) ? (alloc_calls_delta - fr.child_alloc_calls) : 0;");
+        self.line("uint64_t alloc_bytes_excl = (alloc_bytes_delta > fr.child_alloc_bytes) ? (alloc_bytes_delta - fr.child_alloc_bytes) : 0;");
+        self.line("x07_profile_fn_acc[fr.fn_id].fuel_excl += fuel_excl;");
+        self.line("x07_profile_fn_acc[fr.fn_id].alloc_calls_excl += alloc_calls_excl;");
+        self.line("x07_profile_fn_acc[fr.fn_id].alloc_bytes_excl += alloc_bytes_excl;");
+        self.line("if (x07_profile_stack_len > 0) {");
+        self.indent += 1;
+        self.line(
+            "x07_profile_fn_frame_t* parent = &x07_profile_stack[x07_profile_stack_len - 1];",
+        );
+        self.line("parent->child_fuel += fuel_delta;");
+        self.line("parent->child_alloc_calls += alloc_calls_delta;");
+        self.line("parent->child_alloc_bytes += alloc_bytes_delta;");
+        self.indent -= 1;
+        self.line("}");
+        self.indent -= 1;
+        self.line("}");
+
+        self.line("static void x07_profile_emit(void) {");
+        self.indent += 1;
+        self.line("if (!x07_profile_enabled) return;");
+        self.line(
+            "fprintf(stderr, \"{\\\"schema_version\\\":\\\"x07.profile.fn@0.1.0\\\",\\\"units\\\":{\\\"time\\\":\\\"fuel\\\"},\\\"functions\\\":[\");",
+        );
+        self.line("int first = 1;");
+        self.line("for (uint32_t i = 0; i < X07_PROFILE_FN_COUNT; i++) {");
+        self.indent += 1;
+        self.line("if (x07_profile_fn_acc[i].calls == 0) continue;");
+        self.line("if (!first) fprintf(stderr, \",\");");
+        self.line(
+            "fprintf(stderr, \"{\\\"fn\\\":\\\"%s\\\",\\\"calls\\\":%\" PRIu64 \",\\\"fuel_excl\\\":%\" PRIu64 \",\\\"alloc_calls_excl\\\":%\" PRIu64 \",\\\"alloc_bytes_excl\\\":%\" PRIu64 \"}\", x07_profile_fn_names[i], x07_profile_fn_acc[i].calls, x07_profile_fn_acc[i].fuel_excl, x07_profile_fn_acc[i].alloc_calls_excl, x07_profile_fn_acc[i].alloc_bytes_excl);",
+        );
+        self.line("first = 0;");
+        self.indent -= 1;
+        self.line("}");
+        self.line("fprintf(stderr, \"]}\\n\");");
+        self.line("fflush(stderr);");
+        self.indent -= 1;
+        self.line("}");
+
+        self.line("#endif");
+        self.line("// --- X07_PROFILE_FN_END");
     }
 
     pub(super) fn check_program(&mut self) -> Result<(), CompilerError> {
@@ -242,6 +401,17 @@ impl<'a> Emitter<'a> {
             self.bind(p.name.clone(), v);
         }
 
+        if self.options.profile_fns {
+            let fn_profile_id: u32 = self
+                .program
+                .functions
+                .iter()
+                .position(|g| g.name == f.name)
+                .map(|idx| u32::try_from(idx.saturating_add(1)).unwrap_or(u32::MAX))
+                .unwrap_or(u32::MAX);
+            self.line(&format!("x07_profile_fn_enter(ctx, {fn_profile_id});"));
+        }
+
         self.emit_contract_entry_checks()?;
 
         let result_ty = self.infer_expr_in_new_scope(&f.body)?;
@@ -274,6 +444,9 @@ impl<'a> Emitter<'a> {
         for (ty, c_name) in self.live_owned_drop_list(None) {
             self.emit_drop_var(ty, &c_name);
         }
+        if self.options.profile_fns {
+            self.line("x07_profile_fn_exit(ctx);");
+        }
         self.line("return out;");
 
         self.indent -= 1;
@@ -298,10 +471,16 @@ impl<'a> Emitter<'a> {
 
         self.push_str("static bytes_t solve(ctx_t* ctx, bytes_view_t input) {\n");
         self.indent += 1;
+        if self.options.profile_fns {
+            self.line("x07_profile_fn_enter(ctx, 0);");
+        }
         self.line("bytes_t out = rt_bytes_empty(ctx);");
         self.emit_expr_to(&self.program.solve, Ty::Bytes, "out")?;
         for (ty, c_name) in self.live_owned_drop_list(None) {
             self.emit_drop_var(ty, &c_name);
+        }
+        if self.options.profile_fns {
+            self.line("x07_profile_fn_exit(ctx);");
         }
         self.line("return out;");
         self.indent -= 1;
@@ -2425,6 +2604,15 @@ result_i32_t x07_ext_fs_stream_open_write_v1(bytes_t path, bytes_t caps);
 result_i32_t x07_ext_fs_stream_write_all_v1(int32_t writer_handle, bytes_t data);
 result_i32_t x07_ext_fs_stream_close_v1(int32_t writer_handle);
 int32_t x07_ext_fs_stream_drop_v1(int32_t writer_handle);
+result_i32_t x07_ext_fs_stream_open_read_v1(bytes_t path, bytes_t caps);
+result_bytes_t x07_ext_fs_stream_read_some_v1(int32_t reader_handle, int32_t max_bytes);
+result_i32_t x07_ext_fs_stream_close_read_v1(int32_t reader_handle);
+int32_t x07_ext_fs_stream_drop_read_v1(int32_t reader_handle);
+
+// Native ext-archive backend entrypoints (linked from deps/x07/libx07_ext_archive.*).
+bytes_t x07_ext_archive_tar_extract_to_fs_v1(bytes_t out_root, bytes_t tar_path, bytes_t caps_read, bytes_t caps_write, bytes_t profile_id);
+bytes_t x07_ext_archive_tgz_extract_to_fs_v1(bytes_t out_root, bytes_t tgz_path, bytes_t caps_read, bytes_t caps_write, bytes_t profile_id);
+bytes_t x07_ext_archive_zip_extract_to_fs_v1(bytes_t out_root, bytes_t zip_path, bytes_t caps_read, bytes_t caps_write, bytes_t profile_id);
 
 // Native ext-stdio backend entrypoints (linked from deps/x07/libx07_ext_stdio.*).
 result_bytes_t x07_ext_stdio_read_line_v1(bytes_t caps);

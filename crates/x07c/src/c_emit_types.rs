@@ -1759,6 +1759,73 @@ impl InferCtx {
                         }
                         Ok(Ty::I32.into())
                     }
+                    "os.fs.stream_open_read_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_open_read_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes || self.infer(&args[1])? != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_open_read_v1 expects (bytes path, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "os.fs.stream_read_some_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_read_some_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_read_some_v1 expects (i32 reader_handle, i32 max_bytes)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes.into())
+                    }
+                    "os.fs.stream_close_read_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_close_read_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_close_read_v1 expects i32 reader_handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "os.fs.stream_drop_read_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_drop_read_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_drop_read_v1 expects i32 reader_handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
                     "os.fs.mkdirs_v1" => {
                         self.require_standalone_only(head)?;
                         if args.len() != 2 {
@@ -1885,6 +1952,60 @@ impl InferCtx {
                             ));
                         }
                         Ok(Ty::ResultBytes.into())
+                    }
+                    "os.archive.tar_extract_to_fs_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 5 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.archive.tar_extract_to_fs_v1 expects 5 args".to_string(),
+                            ));
+                        }
+                        for arg in args {
+                            if self.infer(arg)? != Ty::Bytes {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "os.archive.tar_extract_to_fs_v1 expects (bytes out_root, bytes tar_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+                                ));
+                            }
+                        }
+                        Ok(Ty::Bytes.into())
+                    }
+                    "os.archive.tgz_extract_to_fs_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 5 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.archive.tgz_extract_to_fs_v1 expects 5 args".to_string(),
+                            ));
+                        }
+                        for arg in args {
+                            if self.infer(arg)? != Ty::Bytes {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "os.archive.tgz_extract_to_fs_v1 expects (bytes out_root, bytes tgz_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+                                ));
+                            }
+                        }
+                        Ok(Ty::Bytes.into())
+                    }
+                    "os.archive.zip_extract_to_fs_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 5 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.archive.zip_extract_to_fs_v1 expects 5 args".to_string(),
+                            ));
+                        }
+                        for arg in args {
+                            if self.infer(arg)? != Ty::Bytes {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "os.archive.zip_extract_to_fs_v1 expects (bytes out_root, bytes zip_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+                                ));
+                            }
+                        }
+                        Ok(Ty::Bytes.into())
                     }
                     "os.stdio.read_line_v1" => {
                         self.require_standalone_only(head)?;

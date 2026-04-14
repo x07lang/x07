@@ -38,9 +38,13 @@ Arch-driven entry points (recommended for production repos that want pinned limi
 - `std.archive.tgz.extract_tree_from_arch_v1(profile_id, bytes)`
 - `std.archive.zip.extract_tree_from_arch_v1(profile_id, bytes)`
 
+OS streaming extract-to-fs (recommended for large archives):
+
+- `std.archive.extract_os.extract_to_fs_path_from_arch_v1(profile_id, out_root, path, caps_read, caps_write)`
+
 ### 3) Treat failures as data (structured issues)
 
-All archive operations return an `std.doc` envelope.
+Doc-envelope entry points (`... -> bytes`) return an `std.doc` envelope. The `*_from_arch_v1` helpers return `result_bytes` (payload bytes on ok; deterministic error code on err).
 
 - On success: `std.doc.payload_v1` is canonical JSON describing extracted/listed entries.
 - On failure: `std.doc.error_msg_v1` is canonical JSON with schema `x07.archive.issue@0.1.0`, including:
@@ -50,6 +54,7 @@ All archive operations return an `std.doc` envelope.
 Runnable example:
 
 - `docs/examples/agent-gate/archive-safe-extract/zip-hello/`
+- `docs/examples/agent-gate/archive-extract-to-fs/zip-hello/`
 - API reference: `docs/archive/archive-v1.md`
 
 ### Threat model summary

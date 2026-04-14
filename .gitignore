@@ -52,6 +52,7 @@ packages/**/dist/
 # Generated example verification artifacts
 docs/examples/**/.x07/
 docs/examples/**/target/cert/
+docs/examples/**/out/
 
 # OS helper binaries (built by scripts/build_os_helpers.sh)
 /deps/x07/x07-proc-echo
@@ -73,6 +74,11 @@ docs/examples/**/target/cert/
 /deps/x07/libx07_ext_fs.a
 /deps/x07/x07_ext_fs.lib
 /deps/x07/include/x07_ext_fs_abi_v1.h
+
+# Native ext-archive backend artifacts (built by scripts/build_ext_staticlib.sh)
+/deps/x07/libx07_ext_archive.a
+/deps/x07/x07_ext_archive.lib
+/deps/x07/include/x07_ext_archive_abi_v1.h
 
 # Native ext-stdio backend artifacts (built by scripts/build_ext_stdio.sh)
 /deps/x07/libx07_ext_stdio.a

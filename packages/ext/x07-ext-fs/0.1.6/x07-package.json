@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-fs",
+  "description": "OS filesystem API (run-os only).",
+  "docs": "OS filesystem API (run-os only).\n\nModules:\n- std.os.fs\n- std.os.fs.spec\n\nHighlights (v1):\n- streaming reader/writer handles: std.os.fs.stream_*_v1\n- chunked copy helper: std.os.fs.stream_copy_to_end_v1\n- convenience helper: std.os.fs.copy_file_v1\n\nUsage:\n- Add dependency: x07 pkg add ext-fs@0.1.6\n- Import the modules listed above.\n",
+  "version": "0.1.6",
+  "module_root": "modules",
+  "modules": [
+    "std.os.fs",
+    "std.os.fs.spec"
+  ],
+  "meta": {
+    "x07c_compat": ">=0.1.111 <0.3.0",
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

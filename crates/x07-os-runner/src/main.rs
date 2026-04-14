@@ -2813,6 +2813,7 @@ mod tests {
             emit_main: true,
             freestanding: false,
             optimize: true,
+            profile_fns: false,
             contract_mode: compile::ContractMode::RuntimeTrap,
             allow_unsafe: None,
             allow_ffi: None,

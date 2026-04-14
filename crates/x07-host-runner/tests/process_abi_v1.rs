@@ -45,6 +45,7 @@ fn compile_options(world: WorldId) -> x07c::compile::CompileOptions {
         emit_main: true,
         freestanding: false,
         optimize: true,
+        profile_fns: false,
         contract_mode: x07c::compile::ContractMode::RuntimeTrap,
         allow_unsafe: None,
         allow_ffi: None,

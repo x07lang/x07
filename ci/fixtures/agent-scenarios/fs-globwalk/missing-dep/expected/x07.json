@@ -8,8 +8,8 @@
     },
     {
       "name": "ext-fs",
-      "path": ".x07/deps/ext-fs/0.1.5",
-      "version": "0.1.5"
+      "path": ".x07/deps/ext-fs/0.1.6",
+      "version": "0.1.6"
     },
     {
       "name": "ext-glob-rs",
@@ -18,8 +18,8 @@
     },
     {
       "name": "ext-path-glob-rs",
-      "path": ".x07/deps/ext-path-glob-rs/0.1.3",
-      "version": "0.1.3"
+      "path": ".x07/deps/ext-path-glob-rs/0.1.4",
+      "version": "0.1.4"
     }
   ],
   "entry": "src/main.x07.json",

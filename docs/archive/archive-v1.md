@@ -4,7 +4,7 @@ This document pins the **v1 contract** for safe archive parsing/extraction provi
 
 Package:
 
-- `packages/ext/x07-ext-archive-c/0.1.5/`
+- `packages/ext/x07-ext-archive-c/0.1.6/`
 
 Design goals:
 
@@ -55,13 +55,21 @@ Format-specific modules:
 - `std.archive.zip.extract_tree_v1(zip: bytes_view) -> bytes`
 - `std.archive.zip.extract_tree_from_arch_v1(profile_id: bytes_view, zip: bytes_view) -> result_bytes`
 
-All functions above return an `std.doc` envelope encoded as `bytes`.
+OS streaming extract-to-fs (for large archives):
+
+- `std.archive.extract_os.safe_extract_to_fs_path_v1(out_root: bytes, path: bytes, caps_read: bytes, caps_write: bytes, profile_id: bytes_view) -> bytes`
+- `std.archive.extract_os.extract_to_fs_path_from_arch_v1(profile_id: bytes_view, out_root: bytes, path: bytes, caps_read: bytes, caps_write: bytes) -> result_bytes`
+
+Doc-envelope functions (`-> bytes`) return an `std.doc` envelope encoded as `bytes`. The `*_from_arch_v1` helpers return `result_bytes` (payload bytes on ok; deterministic error code on err).
 
 ---
 
 ## Success payloads
 
-On success (`std.doc.is_err_v1(doc) == 0`), the payload is canonical JSON.
+On success, the payload is canonical JSON:
+
+- Doc envelope: `std.doc.payload_v1(doc)`
+- `result_bytes`: `result_bytes.unwrap_or(res, bytes.alloc(0))`
 
 Listing payload shape:
 
@@ -77,14 +85,23 @@ Extract-tree payload shape:
 
 For TAR/TGZ, entries also include `mode`.
 
+Extract-to-fs payload shape:
+
+```json
+{"entries":[{"path":"...","size":123}]}
+```
+
+For TAR/TGZ extract-to-fs, entries also include `mode`.
+
 ---
 
 ## Errors and issue schema
 
-On failure (`std.doc.is_err_v1(doc) == 1`):
+On failure:
 
 - `std.doc.error_code_v1` returns a deterministic error code.
 - `std.doc.error_msg_v1` returns canonical JSON with schema `x07.archive.issue@0.1.0`.
+- For `result_bytes`, use `result_bytes.err_code(res)` for the error code.
 
 Issue fields:
 
@@ -117,4 +134,3 @@ This ensures:
 
 - the profile IDs exist and are schema-valid
 - the allowed archive symbols (`ops_allowed`) match exports in your vendored dependencies
-

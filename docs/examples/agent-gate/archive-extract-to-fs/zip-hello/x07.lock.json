@@ -1,0 +1,206 @@
+{
+  "schema_version": "x07.lock@0.4.0",
+  "toolchain": {
+    "x07_version": "0.2.2",
+    "x07c_version": "0.2.2",
+    "lang_id": "x07-core@0.2.0",
+    "compat": "0.5"
+  },
+  "registry": {
+    "index_url": "sparse+https://registry.x07.io/index/"
+  },
+  "dependencies": [
+    {
+      "name": "ext-archive-c",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-archive-c/0.1.6",
+      "package_manifest_sha256": "54347d9529f5f85178a4af5fe917a531f534ae718a573cbcb299154b7f678233",
+      "module_root": "modules",
+      "modules_sha256": {
+        "std.archive": "0e4261fe45e3fece30cbc28d75ba1d669dc43d8e06b4a1d79906614548236bff",
+        "std.archive.extract_os": "34efe1e0b75931c807ad2fa040ab09b38608136094a9a43a86a351fde17dbc1d",
+        "std.archive.extract_os.tests": "6bf192621ed39abff85f804e5548c136f27d99c6a853bad05b9baa3396fb4479",
+        "std.archive.issue": "91beb420db2890832d77cfa3fd28d33aeaba66c941d09e0e8eab3723d02605f3",
+        "std.archive.json_doc": "5a2feeb73efd668c65b9247029199eab9c5259ab6cf42b6df326b00d71b0dfca",
+        "std.archive.policy": "3d2783f5c97d582c287ab23f398ad0d59d970f0211a4a24dbc5239064d0a371e",
+        "std.archive.tar": "d9d2626be34a5065a5416a7375279ad2b33d8712200a1ffbd19c6a32d2e1286f",
+        "std.archive.tests": "c171b9716480101c69a031e9e7c06a201e88c635c526aaaee1149c9914899271",
+        "std.archive.tgz": "9d5096bcfa3982e1b9806b0a305443dfe2a4cffc971fc56235626126d80bea1a",
+        "std.archive.zip": "6876939b3bacd399219c830345d7d02129a00bb087cd24bad33d2399aa28cc3a"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-base64-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-base64-rs/0.1.4",
+      "package_manifest_sha256": "cddc8875f5089bc2613ee9ba346b1ed0e37c3b769eff8680e6d435d56a53f56c",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.base64": "c5a3fdf95a966a898607d160cc03f86382e11c6c9b09de0585e0abb7709f1c32",
+        "ext.base64.tests": "f185b879647769e0495ecbcd6b32a0d1c35d05dbca7d91b6ee1134ce8a5f4ed4"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-compress-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-compress-rs/0.1.5",
+      "package_manifest_sha256": "358daa5732673d4a6068e405f6726fa55848987f0756ace9a507d9b2f8948334",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.compress": "950cfa2ca211a5070b15b9e65240c5e666a28c1c9efefd17d01ff077d084b88e",
+        "ext.compress.tests": "7398ebc819e8080045f67bd37446d324c4f097ed82e93ec37641a24606c861fc",
+        "ext.zip": "1ecd51bbf80b9e43a4c7fa7d1bdfa6d26397a27a0a6aee2d237a3e0e90f50671",
+        "ext.zip.tests": "bd96f3212022e41840a43dfddbcd3560b76f5a87ec3be6098a69ca5b38952c8b",
+        "ext.zstd": "1e289c31b5a407d6c5fea3c4d5e5cff7d6f59ff185392ba327bc38a08dedb519",
+        "ext.zstd.tests": "160c77242dc967387c3251cb2467df0fa2d876e5c3577c1922805b1d109965c1"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-csv-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-csv-rs/0.1.5",
+      "package_manifest_sha256": "6893f3af3ee3b9ff84f055ae078e463da78305b928210891ec2c84e79004696d",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.csv": "09f75965c511bc084e99e7e0b82e9e19bde36e67b92b5e1eec22c77a2717d793",
+        "ext.csv.data_model": "a4de66fec599d5ef92ca30c056ef4e235a9aff85b74caec7d027c6f3aca9b911",
+        "ext.csv.tests": "2f9a4ea717e4d1eec3ae65c561877a574f0813f5c43badf501c5b4c283475582"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-data-model",
+      "version": "0.1.11",
+      "path": ".x07/deps/ext-data-model/0.1.11",
+      "package_manifest_sha256": "17b1c2a9437638bbd83d608c999613bacc694df6a7ba16f4ad20b8d1a3fb0b19",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.data_model": "0ccbb44a004127875464a769a72f2b56d6a55beb3c3ebaff7686cdddaac8b6c2",
+        "ext.data_model.csv": "42b94c24968c02b7d80446ff90460f444cdf713f4872a70c7ddaa69bb2689d2c",
+        "ext.data_model.csv.tests": "0d6b6062d0a184fcc2a90931800a44841587f5bf954b64e0746a66962647ba03",
+        "ext.data_model.ini": "b0d5f77d4ba731dec07bdc05e749c0bbffe26db14f43415517e999fec63bc234",
+        "ext.data_model.ini.tests": "dae65469c097a352baae7158122964b8350dabce90fb920d67ea908543ad720a",
+        "ext.data_model.json": "7af30d80e5e8aca047deea65bb10d682c7093a7cf75bec05e459b5dc7416e08f",
+        "ext.data_model.json.tests": "f3864d60686079a8f085951225df07f1420793abdbf245a0db563a4c64ec0092",
+        "ext.data_model.tests": "71951d65bc191cadf11cd448815f8d08fe8eefacb8e59ec192958140af2cf2b5",
+        "ext.data_model.toml": "5a26b59380b70c922cc28b3e85afaba8aba08c6483f55d58b6be6b134e3f4f12",
+        "ext.data_model.toml.tests": "31c73adfc54f3fdd9c12856d60dd821fbf951e840b58c094fb81b8c37c6e5d34",
+        "ext.data_model.xml": "1fc40f3c12ee97797447352b044f151ebffae497e3d62490ecf6e9d308ac94dd",
+        "ext.data_model.xml.tests": "e5c5878fe4206102e96e7a40f66a6b6e9e947ae5498369ec569847b1c9b46174",
+        "ext.data_model.yaml": "426c701a64831bd6fd6ca176cf8f76332144261867c5003a2736da3d3777940f",
+        "ext.data_model.yaml.tests": "a6a0acd7e7fbc93c25d2c9874315d9bd09f777523d308199f31995d09c9e96bd"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-error",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-error/0.1.4",
+      "package_manifest_sha256": "c6b770b279357cb808057fddd8704516b74cef37f2c48fa84f06de063e1e6718",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.error.chain": "082d051b9eab7ffba7ab42f20ef6afdbe68389b9060d2fe876575d8fb9f1b76a",
+        "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
+        "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
+        "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-fs",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-fs/0.1.6",
+      "package_manifest_sha256": "d4c1ca950697a86294046656656c0bafe8394a4b42d5158ec8605696de35884a",
+      "module_root": "modules",
+      "modules_sha256": {
+        "std.os.fs": "9327d1c8e8cbfb88f237b23cdf34efe1e924fe7bc5fad552cab84fc7db8b2a69",
+        "std.os.fs.spec": "3341d250b6af9b91441fdfb19e0bb39e53f0d22fb7870786c48176d80680363d"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-ini-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-ini-rs/0.1.4",
+      "package_manifest_sha256": "fb98890e8826175d983a63bbea037cd005a5d555d2d339a295bed709a6f95f0d",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.ini": "9fc4d8075b2b23a3479d2e60b6a42142aac2e27013984d2a1e5b83fae2f80820",
+        "ext.ini.data_model": "4748bc43a9eb46ed4a053fa4f07bf9ec7f9eb1ed814cf29bdb0d47e3e33edc03",
+        "ext.ini.tests": "f311d5006c1db62968f7094a1bdf3dcd1c7ccf0af8aa820e2b67619ba85fd4a1"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-json-rs",
+      "version": "0.1.7",
+      "path": ".x07/deps/ext-json-rs/0.1.7",
+      "package_manifest_sha256": "6e6e85497b70ea851b44a29ff0059d6ffd3802cfd9302a2d5e676d75bc9486de",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.json.canon": "2b1254ac42bdd3a8d616b738e1e0434d13cca30cdc5b97890e35089c66668034",
+        "ext.json.data_model": "c619a03382838f1e5a0a6c8e479144abc5cffeb91f05689e3922529e9228390f",
+        "ext.json.pointer": "24900c8325e399202c20a6fb797363632b5e3652c7ddbacf05d2aa9d7c9598b0",
+        "ext.json.tests": "10108c17ce39db201a8662fea7e433c01b74f2b74833d5cf3497a0ce00261d30"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-toml-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-toml-rs/0.1.5",
+      "package_manifest_sha256": "0ddefacf2b4dd90955b954894a26ab4409e1a4a0fc71363a5d73aeaff060c3da",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.toml": "3bd80fbe0c44b57092432b628d3ce0068abe190d8c27395ebf9bf711bdeeea35",
+        "ext.toml.data_model": "a156658af92d9a9e960d86e58de62c957b02440c7dbd6dca6e56fb28c6a1b642",
+        "ext.toml.tests": "f3a1e8df9afd6da0927c097080344af08a3cf12ae5769686721bf462e122a046"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-unicode-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5",
+      "package_manifest_sha256": "8e316f53852c55576d9f65333538b1d90a1b5da380e9812ee97f046943c88779",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.unicode": "df35037b24fff1346db444d0281f002cc49f992799647d89d1ca80516714bbdb",
+        "ext.unicode.casefold": "2a2be7ca592acef482c3e0015ad9748cd98b9a831bebce0791d11488a70d38c4",
+        "ext.unicode.normalize": "4f86ecc58f838788004617c9978476a1821cb780ed8e640f965d1aa44b826fc5",
+        "ext.unicode.segment": "341c8ace2b44f8fca0c5339bdbc8d102a6d06d36ef4a6a705601539a9fbf03c4",
+        "ext.unicode.tests": "1d5209fc2aab58dca59930459fd054d8065eb7a7dd9e042c179149ba7252064f"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-xml-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-xml-rs/0.1.4",
+      "package_manifest_sha256": "9e784a1b16af2d809c00d50a3dfdd6746528b6633234c0ba130b8427ebbc178f",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.xml": "758a99622b077650c9ec0fdc7fe8d60261c27720bf944361f09dc2fd66d91b3d",
+        "ext.xml.data_model": "c152bb642453e15060f7e6d602db0b1b65a3aa1ddb793037db2024f3d4cccb61",
+        "ext.xml.tests": "3ff5feb0110c2fa362b452b849fbeb6ade61389badb734bff7ba81277adb391c"
+      },
+      "yanked": false
+    },
+    {
+      "name": "ext-yaml-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-yaml-rs/0.1.4",
+      "package_manifest_sha256": "5a906c49ec1edd62a132a9577063148419c1583b2d38f3d79351da86727c7201",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.yaml": "065c86d25102c285092c7b9402ca773f38929f58c3acdebbfb4c6c567c1bf853",
+        "ext.yaml.data_model": "2e1bf8111f4a41a45fd70f142fd17b5637b4a11d067c0ef2d073788b1f492bb3",
+        "ext.yaml.tests": "3b25f2eb094d815c0669f35395d5ff9b1af9c6be5a7089cb50f66639784a0d1e"
+      },
+      "yanked": false
+    }
+  ]
+}

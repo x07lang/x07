@@ -1,0 +1,83 @@
+{
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
+  "world": "run-os",
+  "entry": "src/main.x07.json",
+  "module_roots": [
+    "src"
+  ],
+  "dependencies": [
+    {
+      "name": "ext-archive-c",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-archive-c/0.1.6"
+    },
+    {
+      "name": "ext-base64-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-base64-rs/0.1.4"
+    },
+    {
+      "name": "ext-compress-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-compress-rs/0.1.5"
+    },
+    {
+      "name": "ext-csv-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-csv-rs/0.1.5"
+    },
+    {
+      "name": "ext-data-model",
+      "version": "0.1.11",
+      "path": ".x07/deps/ext-data-model/0.1.11"
+    },
+    {
+      "name": "ext-error",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-error/0.1.4"
+    },
+    {
+      "name": "ext-fs",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-fs/0.1.6"
+    },
+    {
+      "name": "ext-ini-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-ini-rs/0.1.4"
+    },
+    {
+      "name": "ext-json-rs",
+      "version": "0.1.7",
+      "path": ".x07/deps/ext-json-rs/0.1.7"
+    },
+    {
+      "name": "ext-toml-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-toml-rs/0.1.5"
+    },
+    {
+      "name": "ext-unicode-rs",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5"
+    },
+    {
+      "name": "ext-xml-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-xml-rs/0.1.4"
+    },
+    {
+      "name": "ext-yaml-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-yaml-rs/0.1.4"
+    }
+  ],
+  "lockfile": "x07.lock.json",
+  "default_profile": "os",
+  "profiles": {
+    "os": {
+      "world": "run-os"
+    }
+  }
+}

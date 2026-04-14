@@ -57,6 +57,13 @@ ev_result_i32 x07_ext_fs_stream_write_all_v1(int32_t writer_handle, ev_bytes dat
 ev_result_i32 x07_ext_fs_stream_close_v1(int32_t writer_handle);
 int32_t x07_ext_fs_stream_drop_v1(int32_t writer_handle);
 
+// v1 streaming read handle API used by os.fs.stream_* builtins.
+ev_result_i32 x07_ext_fs_stream_open_read_v1(ev_bytes path, ev_bytes caps);
+ev_result_bytes x07_ext_fs_stream_read_some_v1(int32_t reader_handle, int32_t max_bytes);
+ev_result_i32 x07_ext_fs_stream_read_into_v1(int32_t reader_handle, uint8_t* dst, uint32_t cap);
+ev_result_i32 x07_ext_fs_stream_close_read_v1(int32_t reader_handle);
+int32_t x07_ext_fs_stream_drop_read_v1(int32_t reader_handle);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -890,6 +890,18 @@ impl<'a> Emitter<'a> {
             }
             "os.fs.stream_close_v1" => self.emit_os_fs_stream_close_v1_to(args, dest_ty, dest),
             "os.fs.stream_drop_v1" => self.emit_os_fs_stream_drop_v1_to(args, dest_ty, dest),
+            "os.fs.stream_open_read_v1" => {
+                self.emit_os_fs_stream_open_read_v1_to(args, dest_ty, dest)
+            }
+            "os.fs.stream_read_some_v1" => {
+                self.emit_os_fs_stream_read_some_v1_to(args, dest_ty, dest)
+            }
+            "os.fs.stream_close_read_v1" => {
+                self.emit_os_fs_stream_close_read_v1_to(args, dest_ty, dest)
+            }
+            "os.fs.stream_drop_read_v1" => {
+                self.emit_os_fs_stream_drop_read_v1_to(args, dest_ty, dest)
+            }
             "os.fs.mkdirs_v1" => self.emit_os_fs_mkdirs_v1_to(args, dest_ty, dest),
             "os.fs.remove_file_v1" => self.emit_os_fs_remove_file_v1_to(args, dest_ty, dest),
             "os.fs.remove_dir_all_v1" => self.emit_os_fs_remove_dir_all_v1_to(args, dest_ty, dest),
@@ -901,6 +913,16 @@ impl<'a> Emitter<'a> {
                 self.emit_os_fs_walk_glob_sorted_text_v1_to(args, dest_ty, dest)
             }
             "os.fs.stat_v1" => self.emit_os_fs_stat_v1_to(args, dest_ty, dest),
+
+            "os.archive.tar_extract_to_fs_v1" => {
+                self.emit_os_archive_tar_extract_to_fs_v1_to(args, dest_ty, dest)
+            }
+            "os.archive.tgz_extract_to_fs_v1" => {
+                self.emit_os_archive_tgz_extract_to_fs_v1_to(args, dest_ty, dest)
+            }
+            "os.archive.zip_extract_to_fs_v1" => {
+                self.emit_os_archive_zip_extract_to_fs_v1_to(args, dest_ty, dest)
+            }
 
             "os.stdio.read_line_v1" => self.emit_os_stdio_read_line_v1_to(args, dest_ty, dest),
             "os.stdio.write_stdout_v1" => {
@@ -1558,6 +1580,9 @@ impl<'a> Emitter<'a> {
 
         for (ty, c_name) in self.live_owned_drop_list(Some(&v.c_name)) {
             self.emit_drop_var(ty, &c_name);
+        }
+        if self.options.profile_fns {
+            self.line("x07_profile_fn_exit(ctx);");
         }
         self.line(&format!("return {};", v.c_name));
         // `return` terminates control flow. Moves/sets performed while evaluating the return

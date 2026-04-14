@@ -107,12 +107,12 @@ If the result set is empty, the output is the single byte `\n` (empty line list)
 
 ## Public API (package module surface)
 
-Package: `packages/ext/x07-ext-fs/0.1.3/`
+Package: `packages/ext/x07-ext-fs/0.1.6/`
 
 Modules:
 
-- `packages/ext/x07-ext-fs/0.1.3/modules/std/os/fs.x07.json` (`std.os.fs`)
-- `packages/ext/x07-ext-fs/0.1.3/modules/std/os/fs/spec.x07.json` (`std.os.fs.spec`)
+- `packages/ext/x07-ext-fs/0.1.6/modules/std/os/fs.x07.json` (`std.os.fs`)
+- `packages/ext/x07-ext-fs/0.1.6/modules/std/os/fs/spec.x07.json` (`std.os.fs.spec`)
 
 ### Caps helpers (`std.os.fs.spec`)
 
@@ -132,13 +132,33 @@ All operations take `caps: bytes` (FsCapsV1).
 
 - `std.os.fs.read_all_v1(path: bytes, caps: bytes) -> result_bytes`
 - `std.os.fs.write_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`
+- `std.os.fs.append_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`
 - `std.os.fs.mkdirs_v1(path: bytes, caps: bytes) -> result_i32`
 - `std.os.fs.remove_file_v1(path: bytes, caps: bytes) -> result_i32`
 - `std.os.fs.remove_dir_all_v1(path: bytes, caps: bytes) -> result_i32`
 - `std.os.fs.rename_v1(src: bytes, dst: bytes, caps: bytes) -> result_i32`
+- `std.os.fs.copy_file_v1(src: bytes, dst: bytes, caps_read: bytes, caps_write: bytes) -> result_i32`
 - `std.os.fs.list_dir_sorted_text_v1(path: bytes, caps: bytes) -> result_bytes`
 - `std.os.fs.walk_glob_sorted_text_v1(root: bytes, glob: bytes, caps: bytes) -> result_bytes`
 - `std.os.fs.stat_v1(path: bytes, caps: bytes) -> result_bytes` (Ok(payload = FsStatV1))
+
+Streaming read:
+
+- `std.os.fs.stream_open_read_v1(path: bytes, caps: bytes) -> result_i32` (Ok(payload = reader_handle))
+- `std.os.fs.stream_read_some_v1(reader_handle: i32, max_bytes: i32) -> result_bytes` (Ok(payload = bytes); empty bytes = EOF)
+- `std.os.fs.stream_close_read_v1(reader_handle: i32) -> result_i32`
+- `std.os.fs.stream_drop_read_v1(reader_handle: i32) -> i32` (best-effort cleanup; idempotent)
+
+Streaming write:
+
+- `std.os.fs.stream_open_write_v1(path: bytes, caps: bytes) -> result_i32` (Ok(payload = writer_handle))
+- `std.os.fs.stream_write_all_v1(writer_handle: i32, data: bytes_view) -> result_i32`
+- `std.os.fs.stream_close_v1(writer_handle: i32) -> result_i32`
+- `std.os.fs.stream_drop_v1(writer_handle: i32) -> i32` (best-effort cleanup; idempotent)
+
+Streaming utilities:
+
+- `std.os.fs.stream_copy_to_end_v1(reader_handle: i32, writer_handle: i32, chunk_bytes: i32) -> result_i32`
 
 ### Move-only usage note (important)
 
@@ -159,6 +179,7 @@ The stdlib functions above call these builtins (standalone-only):
 
 - `os.fs.read_all_v1(path, caps) -> result_bytes`
 - `os.fs.write_all_v1(path, data, caps) -> result_i32`
+- `os.fs.append_all_v1(path, data, caps) -> result_i32`
 - `os.fs.mkdirs_v1(path, caps) -> result_i32`
 - `os.fs.remove_file_v1(path, caps) -> result_i32`
 - `os.fs.remove_dir_all_v1(path, caps) -> result_i32`
@@ -166,6 +187,14 @@ The stdlib functions above call these builtins (standalone-only):
 - `os.fs.list_dir_sorted_text_v1(path, caps) -> result_bytes`
 - `os.fs.walk_glob_sorted_text_v1(root, glob, caps) -> result_bytes`
 - `os.fs.stat_v1(path, caps) -> result_bytes`
+- `os.fs.stream_open_read_v1(path, caps) -> result_i32`
+- `os.fs.stream_read_some_v1(reader_handle, max_bytes) -> result_bytes`
+- `os.fs.stream_close_read_v1(reader_handle) -> result_i32`
+- `os.fs.stream_drop_read_v1(reader_handle) -> i32`
+- `os.fs.stream_open_write_v1(path, caps) -> result_i32`
+- `os.fs.stream_write_all_v1(writer_handle, data) -> result_i32`
+- `os.fs.stream_close_v1(writer_handle) -> result_i32`
+- `os.fs.stream_drop_v1(writer_handle) -> i32`
 
 In this repo, these builtins call the native backend:
 
@@ -187,6 +216,7 @@ Reserved v1 space: **60000–60999**.
 | 60002 | `FS_ERR_DISABLED` |
 | 60003 | `FS_ERR_BAD_PATH` |
 | 60004 | `FS_ERR_BAD_CAPS` |
+| 60005 | `FS_ERR_BAD_HANDLE` |
 | 60010 | `FS_ERR_NOT_FOUND` |
 | 60011 | `FS_ERR_ALREADY_EXISTS` |
 | 60012 | `FS_ERR_NOT_DIR` |

@@ -13,8 +13,11 @@ export X07_I_ACCEPT_WEAKER_ISOLATION="${X07_I_ACCEPT_WEAKER_ISOLATION:-1}"
 export X07_OFFLINE="${X07_OFFLINE:-1}"
 
 ./scripts/ci/check_tools.sh >/dev/null
+./scripts/ci/ensure_runners.sh >/dev/null
 ./scripts/ci/ensure_math_backend.sh >/dev/null
 ./scripts/ci/ensure_stream_xf_backend.sh >/dev/null
+./scripts/ci/ensure_ext_fs_backend.sh >/dev/null
+./scripts/ci/ensure_ext_archive_backend.sh >/dev/null
 
 x07_bin="${X07_BIN:-}"
 if [[ -z "${x07_bin}" ]]; then
@@ -25,10 +28,11 @@ if [[ "$x07_bin" != /* ]]; then
 fi
 
 ext_roots=(
-  "packages/ext/x07-ext-archive-c/0.1.5/modules"
+  "packages/ext/x07-ext-archive-c/0.1.6/modules"
   "packages/ext/x07-ext-base64-rs/0.1.4/modules"
   "packages/ext/x07-ext-compress-rs/0.1.5/modules"
   "packages/ext/x07-ext-data-model/0.1.11/modules"
+  "packages/ext/x07-ext-fs/0.1.6/modules"
   "packages/ext/x07-ext-json-rs/0.1.7/modules"
   "packages/ext/x07-ext-unicode-rs/0.1.5/modules"
 )
@@ -39,7 +43,7 @@ for r in "${ext_roots[@]}"; do
 done
 
 "$x07_bin" test \
-  --manifest packages/ext/x07-ext-archive-c/0.1.5/tests/tests.json \
+  --manifest packages/ext/x07-ext-archive-c/0.1.6/tests/tests.json \
   --no-fail-fast \
   --json=false \
   "${ext_root_args[@]}"
@@ -52,4 +56,3 @@ done
   "${ext_root_args[@]}"
 
 echo "ok: archive corpus suite passed"
-

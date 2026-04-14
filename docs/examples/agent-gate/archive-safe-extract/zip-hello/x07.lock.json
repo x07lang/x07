@@ -12,12 +12,14 @@
   "dependencies": [
     {
       "name": "ext-archive-c",
-      "version": "0.1.5",
-      "path": ".x07/deps/ext-archive-c/0.1.5",
-      "package_manifest_sha256": "2b6bdfdebd36ce93775a720d3cf08d94ffc637969c654ad0033f94cd6592a573",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-archive-c/0.1.6",
+      "package_manifest_sha256": "54347d9529f5f85178a4af5fe917a531f534ae718a573cbcb299154b7f678233",
       "module_root": "modules",
       "modules_sha256": {
         "std.archive": "0e4261fe45e3fece30cbc28d75ba1d669dc43d8e06b4a1d79906614548236bff",
+        "std.archive.extract_os": "34efe1e0b75931c807ad2fa040ab09b38608136094a9a43a86a351fde17dbc1d",
+        "std.archive.extract_os.tests": "6bf192621ed39abff85f804e5548c136f27d99c6a853bad05b9baa3396fb4479",
         "std.archive.issue": "91beb420db2890832d77cfa3fd28d33aeaba66c941d09e0e8eab3723d02605f3",
         "std.archive.json_doc": "5a2feeb73efd668c65b9247029199eab9c5259ab6cf42b6df326b00d71b0dfca",
         "std.archive.policy": "3d2783f5c97d582c287ab23f398ad0d59d970f0211a4a24dbc5239064d0a371e",

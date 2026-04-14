@@ -14,8 +14,8 @@
     },
     {
       "name": "ext-fs",
-      "version": "0.1.5",
-      "path": ".x07/deps/ext-fs/0.1.5"
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-fs/0.1.6"
     },
     {
       "name": "ext-html-lite-rs",

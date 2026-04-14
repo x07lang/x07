@@ -51,9 +51,10 @@ This loads:
 
 - `arch/budgets/profiles/hot_parse_v1.budget.json` (`schema_version: "x07.budget.profile@0.1.0"`)
 
+Note: A small set of toolchain-provided profiles (currently `stream_xf_plugin_v1` and `archive_extract_safe_v1`) has a built-in default if the profile file is missing. For production repos, prefer pinning the profile under `arch/budgets/profiles/` so budgets remain explicit and reviewable.
+
 `x07 arch check` can:
 
 - validate the budgets index: `arch/budgets/index.x07budgets.json` (`schema_version: "x07.arch.budgets.index@0.1.0"`)
 - enforce that selected boundaries are wrapped in `budget.scope_from_arch_v1`
 - enforce that `profile_id` is declared in the budgets index
-

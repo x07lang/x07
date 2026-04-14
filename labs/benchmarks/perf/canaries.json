@@ -4,7 +4,7 @@
     "labs/benchmarks/solve-full/stdlib-parity-smoke.json": {
       "tasks": {
         "full/cache_rr_bodies_in_kv_concat": {
-          "c_source_size": 288955,
+          "c_source_size": 289760,
           "cases": [
             {
               "fuel_used": 420,
@@ -15,7 +15,7 @@
           "compile_fuel_used": 1474
         },
         "full/mini_app_report_v1": {
-          "c_source_size": 464771,
+          "c_source_size": 465576,
           "cases": [
             {
               "fuel_used": 25381,
@@ -30,7 +30,7 @@
     "labs/benchmarks/solve-pure/abi-types-smoke.json": {
       "tasks": {
         "canary/ext_json_canonicalize_small": {
-          "c_source_size": 374413,
+          "c_source_size": 375218,
           "cases": [
             {
               "fuel_used": 2193,
@@ -46,7 +46,7 @@
           "compile_fuel_used": 6060
         },
         "canary/std_json_canonicalize_small": {
-          "c_source_size": 370343,
+          "c_source_size": 371148,
           "cases": [
             {
               "fuel_used": 1151,
@@ -62,7 +62,7 @@
           "compile_fuel_used": 8780
         },
         "canary/std_prng_x07rand32_v1_stream": {
-          "c_source_size": 211826,
+          "c_source_size": 212631,
           "cases": [
             {
               "fuel_used": 893,
@@ -73,7 +73,7 @@
           "compile_fuel_used": 831
         },
         "smoke/box_select_reverse": {
-          "c_source_size": 197751,
+          "c_source_size": 198556,
           "cases": [
             {
               "fuel_used": 22,
@@ -89,7 +89,7 @@
           "compile_fuel_used": 172
         },
         "smoke/echo": {
-          "c_source_size": 192950,
+          "c_source_size": 193755,
           "cases": [
             {
               "fuel_used": 2,
@@ -100,7 +100,7 @@
           "compile_fuel_used": 6
         },
         "smoke/interface_dispatch_checksum_u8": {
-          "c_source_size": 196124,
+          "c_source_size": 196929,
           "cases": [
             {
               "fuel_used": 47,
@@ -116,7 +116,7 @@
           "compile_fuel_used": 144
         },
         "smoke/result_try_gate": {
-          "c_source_size": 197851,
+          "c_source_size": 198656,
           "cases": [
             {
               "fuel_used": 32,
@@ -132,7 +132,7 @@
           "compile_fuel_used": 130
         },
         "smoke/vec_dup4": {
-          "c_source_size": 194730,
+          "c_source_size": 195535,
           "cases": [
             {
               "fuel_used": 17,
@@ -143,7 +143,7 @@
           "compile_fuel_used": 104
         },
         "smoke/view_extract_window": {
-          "c_source_size": 196998,
+          "c_source_size": 197803,
           "cases": [
             {
               "fuel_used": 40,
@@ -158,7 +158,7 @@
     "labs/benchmarks/solve-pure/emitters-v1-suite.json": {
       "tasks": {
         "pure/emitters_btree_map_emit_kv_u32le_u32le_sorted_by_key": {
-          "c_source_size": 217939,
+          "c_source_size": 218744,
           "cases": [
             {
               "fuel_used": 891,
@@ -179,7 +179,7 @@
           "compile_fuel_used": 1333
         },
         "pure/emitters_btree_set_emit_u32le_sorted_unique": {
-          "c_source_size": 210764,
+          "c_source_size": 211569,
           "cases": [
             {
               "fuel_used": 1147,
@@ -195,7 +195,7 @@
           "compile_fuel_used": 956
         },
         "pure/emitters_deque_rotate_left_u32le": {
-          "c_source_size": 235512,
+          "c_source_size": 236317,
           "cases": [
             {
               "fuel_used": 1226,
@@ -216,7 +216,7 @@
           "compile_fuel_used": 1618
         },
         "pure/emitters_hash_map_emit_kv_u32le_u32le_sorted_by_key": {
-          "c_source_size": 225813,
+          "c_source_size": 226618,
           "cases": [
             {
               "fuel_used": 1034,
@@ -237,7 +237,7 @@
           "compile_fuel_used": 1646
         },
         "pure/emitters_hash_set_emit_u32le_sorted_unique": {
-          "c_source_size": 215745,
+          "c_source_size": 216550,
           "cases": [
             {
               "fuel_used": 1176,
@@ -258,7 +258,7 @@
           "compile_fuel_used": 1808
         },
         "pure/emitters_heap_emit_u32le_sorted": {
-          "c_source_size": 239571,
+          "c_source_size": 240376,
           "cases": [
             {
               "fuel_used": 2977,

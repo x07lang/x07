@@ -556,6 +556,15 @@ result_i32_t x07_ext_fs_stream_open_write_v1(bytes_t path, bytes_t caps);
 result_i32_t x07_ext_fs_stream_write_all_v1(int32_t writer_handle, bytes_t data);
 result_i32_t x07_ext_fs_stream_close_v1(int32_t writer_handle);
 int32_t x07_ext_fs_stream_drop_v1(int32_t writer_handle);
+result_i32_t x07_ext_fs_stream_open_read_v1(bytes_t path, bytes_t caps);
+result_bytes_t x07_ext_fs_stream_read_some_v1(int32_t reader_handle, int32_t max_bytes);
+result_i32_t x07_ext_fs_stream_close_read_v1(int32_t reader_handle);
+int32_t x07_ext_fs_stream_drop_read_v1(int32_t reader_handle);
+
+// Native ext-archive backend entrypoints (linked from deps/x07/libx07_ext_archive.*).
+bytes_t x07_ext_archive_tar_extract_to_fs_v1(bytes_t out_root, bytes_t tar_path, bytes_t caps_read, bytes_t caps_write, bytes_t profile_id);
+bytes_t x07_ext_archive_tgz_extract_to_fs_v1(bytes_t out_root, bytes_t tgz_path, bytes_t caps_read, bytes_t caps_write, bytes_t profile_id);
+bytes_t x07_ext_archive_zip_extract_to_fs_v1(bytes_t out_root, bytes_t zip_path, bytes_t caps_read, bytes_t caps_write, bytes_t profile_id);
 
 // Native ext-stdio backend entrypoints (linked from deps/x07/libx07_ext_stdio.*).
 result_bytes_t x07_ext_stdio_read_line_v1(bytes_t caps);

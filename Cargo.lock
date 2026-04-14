@@ -555,9 +555,9 @@ checksum = "b7ac824320a75a52197e8f2d787f6a38b6718bb6897a35142d749af3c0e8f4fe"
 
 [[package]]
 name = "flate2"
-version = "1.1.8"
+version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b375d6465b98090a5f25b1c7703f3859783755aa9a80433b36e0379a3ec2f369"
+checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -2981,6 +2981,19 @@ name = "x07-contracts"
 version = "0.2.2"
 
 [[package]]
+name = "x07-ext-archive-native"
+version = "0.2.2"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "serde",
+ "serde_json",
+ "tar",
+ "x07-ext-os-native-core",
+ "zip",
+]
+
+[[package]]
 name = "x07-ext-db-mysql-native"
 version = "0.2.2"
 dependencies = [
@@ -3044,6 +3057,7 @@ dependencies = [
  "globset",
  "once_cell",
  "walkdir",
+ "x07-ext-os-native-core",
 ]
 
 [[package]]
@@ -3069,6 +3083,13 @@ dependencies = [
  "sha2",
  "time",
  "x07-ext-obj-native-core",
+]
+
+[[package]]
+name = "x07-ext-os-native-core"
+version = "0.2.2"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]

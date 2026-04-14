@@ -5,6 +5,17 @@ use x07_worlds::WorldId;
 
 use crate::{compile, lint};
 
+fn env_flag_enabled(name: &str) -> bool {
+    std::env::var(name).ok().is_some_and(|raw| {
+        let v = raw.trim();
+        if v.is_empty() {
+            return false;
+        }
+        let lower = v.to_ascii_lowercase();
+        !matches!(lower.as_str(), "0" | "false" | "no" | "off")
+    })
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct WorldFeatures {
     pub enable_fs: bool,
@@ -77,6 +88,7 @@ pub fn compile_options_for_world(
     module_roots: Vec<PathBuf>,
 ) -> compile::CompileOptions {
     let features = features_for_world(world);
+    let profile_fns = env_flag_enabled("X07_PROFILE");
     compile::CompileOptions {
         world,
         compat: crate::compat::Compat::default(),
@@ -89,6 +101,7 @@ pub fn compile_options_for_world(
         emit_main: true,
         freestanding: false,
         optimize: true,
+        profile_fns,
         contract_mode: compile::ContractMode::RuntimeTrap,
         allow_unsafe: features.allow_unsafe,
         allow_ffi: features.allow_ffi,

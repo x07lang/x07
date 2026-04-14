@@ -215,13 +215,13 @@
     },
     {
       "name": "ext-fs",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-fs/0.1.4",
-      "package_manifest_sha256": "aa753b9496376641a64531b126b000d8acb934f0578c60ff107a2cb9a571f567",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-fs/0.1.6",
+      "package_manifest_sha256": "d4c1ca950697a86294046656656c0bafe8394a4b42d5158ec8605696de35884a",
       "module_root": "modules",
       "modules_sha256": {
-        "std.os.fs": "c3067e3b7526d5e14a0c70493290f7512b7a6652af62f042e0629d842090ae31",
-        "std.os.fs.spec": "b2f5276147697446a50e5d73a6037da1ceb8fcde1c9eadbe5aac654ab1091c7f"
+        "std.os.fs": "9327d1c8e8cbfb88f237b23cdf34efe1e924fe7bc5fad552cab84fc7db8b2a69",
+        "std.os.fs.spec": "3341d250b6af9b91441fdfb19e0bb39e53f0d22fb7870786c48176d80680363d"
       },
       "yanked": false
     },
@@ -292,15 +292,15 @@
     },
     {
       "name": "ext-path-glob-rs",
-      "version": "0.1.2",
-      "path": ".x07/deps/ext-path-glob-rs/0.1.2",
-      "package_manifest_sha256": "ad534544c09180f96098cd8c0b518ccd1e68d356ee30b1888ddd3477eb721d6c",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-path-glob-rs/0.1.4",
+      "package_manifest_sha256": "2925a2c36cd5bd497686457981f001f2f7e8f60db69bed7bea7af9efa13c7ad0",
       "module_root": "modules",
       "modules_sha256": {
-        "std.os.fs.glob": "397164b5dcb5a986f92efd268a993af9cdc053cf3431151b70a0c2141e17fdd5",
-        "std.os.fs.globwalk.tests": "3d4f98561cc4b3c2cbeb5c90d1f1dd2a8e951b4c2a9ea47231f41d22b340088e",
-        "std.os.fs.ignore": "5207b89d94ce6b654a78af5c6e85abc0486d06d7db59670f7d19022eba978373",
-        "std.os.fs.walk": "482b3be2dfa2a3b50c81768c44401aff031ad5341e048eee86de84ad910d9514"
+        "std.os.fs.glob": "931dcfb7c57bce9b024e1ab6ef3416055971a83f36cfa98b9d335e8c9aed7d05",
+        "std.os.fs.globwalk.tests": "35629af22bcf0d2fb31bb3ee03ac0469ea50d632048b17de0e50a9b19212e029",
+        "std.os.fs.ignore": "b09870652b1dbb7243b9cd9162149b6617aae85210577dfa05a7890f4491857d",
+        "std.os.fs.walk": "e760dca3c18983791be147bae1ca1045c3a2640c277bc75f4deade281fd72151"
       },
       "yanked": false
     },
@@ -334,12 +334,12 @@
     },
     {
       "name": "ext-walkdir-rs",
-      "version": "0.1.2",
-      "path": ".x07/deps/ext-walkdir-rs/0.1.2",
-      "package_manifest_sha256": "fc9c4937e8a4b4983d9fa246a06b68456af3cf76701b1d03e0ae151a80dcd748",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-walkdir-rs/0.1.4",
+      "package_manifest_sha256": "f5148949d345404a25234a75ad04d2e3355de306c9fdf06590f1c11c8a919bdc",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.walkdir": "03bb56255d35e6825abcd2c275e581a6e3a9fe8e504a81ffd1f295ddb348e668"
+        "ext.walkdir": "448245b7a962fc9d6d59663f7c3a9bb40360069657b38ae5a8ee13843037b080"
       },
       "yanked": false
     },

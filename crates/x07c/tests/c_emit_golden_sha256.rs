@@ -84,7 +84,7 @@ fn golden_sha256_solve_pure_stream_json_canon_pipe() {
     let c = compile(program.as_slice(), CompileOptions::default());
     assert_eq!(
         sha256_hex(&c),
-        "7e2e2226645ea51196d6a643859c47e462112685ac83b9b72043efd14672e7f7"
+        "e76f9fba240ab567b0c3727abb269820a806e5f3aa570bef97d23b62c8b30122"
     );
 }
 
@@ -112,7 +112,7 @@ fn golden_sha256_solve_pure_async_tasks() {
     let c = compile(program.as_slice(), CompileOptions::default());
     assert_eq!(
         sha256_hex(&c),
-        "da57aca275ee602a63ddcfbeb4f7434f510ed50d2b03a36b7fd564cb20aec707"
+        "dc85e23c979bcc3c77fa988135dd35a3303aadb707d6642f4e9d29ca21638b47"
     );
 }
 
@@ -133,13 +133,14 @@ fn golden_sha256_solve_pure_contracts_runtime_trap() {
     let c = compile(program.as_slice(), CompileOptions::default());
     assert_eq!(
         sha256_hex(&c),
-        "5c2f20405973d1bed8f02dad4811e19398b7b6165ac81da3d9d8a20321819a07"
+        "2157fbacd9d9a0847092cb7ca5c372606c06557c704201ec5f9f1ab1dd9be0b0"
     );
 }
 
 #[test]
 fn golden_sha256_run_os_os_fs_read_file() {
-    let options = x07c::world_config::compile_options_for_world(WorldId::RunOs, Vec::new());
+    let mut options = x07c::world_config::compile_options_for_world(WorldId::RunOs, Vec::new());
+    options.profile_fns = false;
     let program = entry(
         Vec::new(),
         json!(["os.fs.read_file", ["bytes.lit", "hello.txt"]]),
@@ -147,13 +148,14 @@ fn golden_sha256_run_os_os_fs_read_file() {
     let c = compile(program.as_slice(), options);
     assert_eq!(
         sha256_hex(&c),
-        "1710a79eb49637bcb8762d5a5006c610e8a03dd6a68de668ca6ab069f17c6c87"
+        "480bf61ca7e6057d9b6ba2977e7640c94fcf7afe8f968a6f0d5056c009e9fae3"
     );
 }
 
 #[test]
 fn golden_sha256_run_os_mega_fixture() {
-    let options = x07c::world_config::compile_options_for_world(WorldId::RunOs, Vec::new());
+    let mut options = x07c::world_config::compile_options_for_world(WorldId::RunOs, Vec::new());
+    options.profile_fns = false;
     let program = entry(
         vec![
             json!({
@@ -195,6 +197,6 @@ fn golden_sha256_run_os_mega_fixture() {
     let c = compile(program.as_slice(), options);
     assert_eq!(
         sha256_hex(&c),
-        "afe3ea2bf614d33d131adc91f33f92b8b865c7884dafee1b22ea33d709a885f8"
+        "948cda74ba5e3206e56ece7da6270d3cc5496363fdcf5678b8be3e275e36fcc3"
     );
 }

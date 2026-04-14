@@ -1,0 +1,12 @@
+[package]
+name = "x07-ext-os-native-core"
+version = "0.2.2"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+doctest = false
+
+[dependencies]
+once_cell = "1.19.0"
+

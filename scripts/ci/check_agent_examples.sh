@@ -31,6 +31,7 @@ fi
 
 # Ensure the native ext-fs backend exists (required by OS-world examples).
 ./scripts/ci/ensure_ext_fs_backend.sh >/dev/null
+./scripts/ci/ensure_ext_archive_backend.sh >/dev/null
 
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
@@ -753,6 +754,28 @@ expected_15='{"entries":[{"data_b64":"aGVsbG8=","path":"hello.txt","size":5}]}'$
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "archive-safe-extract" --path "$archive_work/tmp/runner.json" --expect "$expected_15" >/dev/null
 
 echo "ok: archive-safe-extract"
+
+# ----------------------------
+# Example 16: Streamed archive extraction to filesystem (run-os + ext-archive-c + ext-fs)
+# ----------------------------
+
+echo "==> agent example: archive-extract-to-fs (run-os + ext-archive-c + ext-fs)"
+
+archive_fs_work="$tmp_dir/archive-extract-to-fs"
+copy_project "docs/examples/agent-gate/archive-extract-to-fs/zip-hello" "$archive_fs_work"
+
+seed_official_deps "$archive_fs_work"
+pkg_lock_check "$archive_fs_work"
+fmt_check_all "$archive_fs_work"
+lint_check_one "$archive_fs_work" "run-os" "src/main.x07.json"
+
+wrapped_16="$(run_x07_run "archive-extract-to-fs" "$archive_fs_work" --profile os)"
+unwrap_and_check_wrapped_report "archive-extract-to-fs" "$wrapped_16" "$archive_fs_work/tmp/runner.json" "os" "run-os" "true"
+
+expected_16='{"entries":[{"path":"hello.txt","size":5}]}'$'\n'
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "archive-extract-to-fs" --path "$archive_fs_work/tmp/runner.json" --expect "$expected_16" >/dev/null
+
+echo "ok: archive-extract-to-fs"
 
 echo
 echo "ok: agent examples gate passed"

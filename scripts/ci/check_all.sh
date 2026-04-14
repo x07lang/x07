@@ -111,6 +111,9 @@ step "stage native ext-jsonschema backend"
 step "stage native ext-obj-s3 backend"
 ./scripts/ci/ensure_ext_obj_s3_backend.sh
 
+step "stage native ext-archive backend"
+./scripts/ci/ensure_ext_archive_backend.sh
+
 step "cargo test"
 cargo test
 

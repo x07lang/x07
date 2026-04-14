@@ -73,8 +73,8 @@
     },
     {
       "name": "ext-fs",
-      "path": ".x07/deps/ext-fs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-fs/0.1.6",
+      "version": "0.1.6"
     },
     {
       "name": "ext-glob-rs",
@@ -103,8 +103,8 @@
     },
     {
       "name": "ext-path-glob-rs",
-      "path": ".x07/deps/ext-path-glob-rs/0.1.2",
-      "version": "0.1.2"
+      "path": ".x07/deps/ext-path-glob-rs/0.1.4",
+      "version": "0.1.4"
     },
     {
       "name": "ext-toml-rs",
@@ -118,8 +118,8 @@
     },
     {
       "name": "ext-walkdir-rs",
-      "path": ".x07/deps/ext-walkdir-rs/0.1.2",
-      "version": "0.1.2"
+      "path": ".x07/deps/ext-walkdir-rs/0.1.4",
+      "version": "0.1.4"
     },
     {
       "name": "ext-xml-rs",

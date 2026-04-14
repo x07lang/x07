@@ -144,6 +144,21 @@ pub fn guide_md() -> String {
     out.push_str("  - `os.fs.list_dir_sorted_text_v1(path: bytes, caps: bytes) -> result_bytes`\n");
     out.push_str("  - `os.fs.walk_glob_sorted_text_v1(root: bytes, glob: bytes, caps: bytes) -> result_bytes`\n");
     out.push_str("  - `os.fs.stat_v1(path: bytes, caps: bytes) -> result_bytes`\n");
+    out.push_str("  - `os.fs.stream_open_write_v1(path: bytes, caps: bytes) -> result_i32`\n");
+    out.push_str(
+        "  - `os.fs.stream_write_all_v1(writer_handle: i32, data: bytes_view) -> result_i32`\n",
+    );
+    out.push_str("  - `os.fs.stream_close_v1(writer_handle: i32) -> result_i32`\n");
+    out.push_str("  - `os.fs.stream_drop_v1(writer_handle: i32) -> i32`\n");
+    out.push_str("  - `os.fs.stream_open_read_v1(path: bytes, caps: bytes) -> result_i32`\n");
+    out.push_str(
+        "  - `os.fs.stream_read_some_v1(reader_handle: i32, max_bytes: i32) -> result_bytes`\n",
+    );
+    out.push_str("  - `os.fs.stream_close_read_v1(reader_handle: i32) -> result_i32`\n");
+    out.push_str("  - `os.fs.stream_drop_read_v1(reader_handle: i32) -> i32`\n");
+    out.push_str("  - `os.archive.tar_extract_to_fs_v1(out_root: bytes, tar_path: bytes, caps_read: bytes, caps_write: bytes, profile_id: bytes) -> bytes`\n");
+    out.push_str("  - `os.archive.tgz_extract_to_fs_v1(out_root: bytes, tgz_path: bytes, caps_read: bytes, caps_write: bytes, profile_id: bytes) -> bytes`\n");
+    out.push_str("  - `os.archive.zip_extract_to_fs_v1(out_root: bytes, zip_path: bytes, caps_read: bytes, caps_write: bytes, profile_id: bytes) -> bytes`\n");
     out.push_str("  - `os.env.get(key: bytes) -> bytes`\n");
     out.push_str("  - `os.time.now_unix_ms() -> i32`\n");
     out.push_str("  - `os.time.now_instant_v1() -> bytes`\n");

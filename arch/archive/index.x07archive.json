@@ -6,7 +6,11 @@
       "profile_path": "arch/archive/profiles/tar_extract_safe_v1.archive.json",
       "worlds_allowed": ["run-os", "run-os-sandboxed", "solve-fs"],
       "kinds_allowed": ["tar_v1"],
-      "ops_allowed": ["std.archive.tar.extract_tree_v1", "std.archive.tar.list_v1"],
+      "ops_allowed": [
+        "std.archive.extract_os.safe_extract_to_fs_path_v1",
+        "std.archive.tar.extract_tree_v1",
+        "std.archive.tar.list_v1"
+      ],
       "budget_profile_id": "archive_extract_safe_v1",
       "description": "Strict path policy; bounded output; deterministic failure codes."
     },
@@ -15,7 +19,11 @@
       "profile_path": "arch/archive/profiles/tgz_extract_safe_v1.archive.json",
       "worlds_allowed": ["run-os", "run-os-sandboxed", "solve-fs"],
       "kinds_allowed": ["tgz_v1"],
-      "ops_allowed": ["std.archive.tgz.extract_tree_v1", "std.archive.tgz.list_v1"],
+      "ops_allowed": [
+        "std.archive.extract_os.safe_extract_to_fs_path_v1",
+        "std.archive.tgz.extract_tree_v1",
+        "std.archive.tgz.list_v1"
+      ],
       "budget_profile_id": "archive_extract_safe_v1",
       "description": "tar + gzip; bounded inflate and extraction."
     },
@@ -24,7 +32,11 @@
       "profile_path": "arch/archive/profiles/zip_extract_safe_v1.archive.json",
       "worlds_allowed": ["run-os", "run-os-sandboxed", "solve-fs"],
       "kinds_allowed": ["zip_v1"],
-      "ops_allowed": ["std.archive.zip.extract_tree_v1", "std.archive.zip.list_v1"],
+      "ops_allowed": [
+        "std.archive.extract_os.safe_extract_to_fs_path_v1",
+        "std.archive.zip.extract_tree_v1",
+        "std.archive.zip.list_v1"
+      ],
       "budget_profile_id": "archive_extract_safe_v1",
       "description": "zip; strict path policy; bounded output; deterministic failure codes."
     }

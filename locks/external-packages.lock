@@ -356,6 +356,76 @@
       "version": "0.1.5"
     },
     {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.archive.extract_os.tests",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/extract_os/tests.x07.json",
+          "sha256": "6bf192621ed39abff85f804e5548c136f27d99c6a853bad05b9baa3396fb4479",
+          "size_bytes": 3232
+        },
+        {
+          "module_id": "std.archive.extract_os",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/extract_os.x07.json",
+          "sha256": "34efe1e0b75931c807ad2fa040ab09b38608136094a9a43a86a351fde17dbc1d",
+          "size_bytes": 3215
+        },
+        {
+          "module_id": "std.archive.issue",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/issue.x07.json",
+          "sha256": "91beb420db2890832d77cfa3fd28d33aeaba66c941d09e0e8eab3723d02605f3",
+          "size_bytes": 5806
+        },
+        {
+          "module_id": "std.archive.json_doc",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/json_doc.x07.json",
+          "sha256": "5a2feeb73efd668c65b9247029199eab9c5259ab6cf42b6df326b00d71b0dfca",
+          "size_bytes": 1301
+        },
+        {
+          "module_id": "std.archive.policy",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/policy.x07.json",
+          "sha256": "3d2783f5c97d582c287ab23f398ad0d59d970f0211a4a24dbc5239064d0a371e",
+          "size_bytes": 4917
+        },
+        {
+          "module_id": "std.archive.tar",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/tar.x07.json",
+          "sha256": "d9d2626be34a5065a5416a7375279ad2b33d8712200a1ffbd19c6a32d2e1286f",
+          "size_bytes": 16429
+        },
+        {
+          "module_id": "std.archive.tests",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/tests.x07.json",
+          "sha256": "c171b9716480101c69a031e9e7c06a201e88c635c526aaaee1149c9914899271",
+          "size_bytes": 11252
+        },
+        {
+          "module_id": "std.archive.tgz",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/tgz.x07.json",
+          "sha256": "9d5096bcfa3982e1b9806b0a305443dfe2a4cffc971fc56235626126d80bea1a",
+          "size_bytes": 4978
+        },
+        {
+          "module_id": "std.archive.zip",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive/zip.x07.json",
+          "sha256": "6876939b3bacd399219c830345d7d02129a00bb087cd24bad33d2399aa28cc3a",
+          "size_bytes": 12129
+        },
+        {
+          "module_id": "std.archive",
+          "path": "packages/ext/x07-ext-archive-c/0.1.6/modules/std/archive.x07.json",
+          "sha256": "0e4261fe45e3fece30cbc28d75ba1d669dc43d8e06b4a1d79906614548236bff",
+          "size_bytes": 1652
+        }
+      ],
+      "name": "ext-archive-c",
+      "package_manifest_sha256": "54347d9529f5f85178a4af5fe917a531f534ae718a573cbcb299154b7f678233",
+      "path": "packages/ext/x07-ext-archive-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
       "determinism_tier": "os-world-only",
       "import_mode": "handwritten",
       "modules": [
@@ -6371,6 +6441,28 @@
       "version": "0.1.5"
     },
     {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.os.fs.spec",
+          "path": "packages/ext/x07-ext-fs/0.1.6/modules/std/os/fs/spec.x07.json",
+          "sha256": "3341d250b6af9b91441fdfb19e0bb39e53f0d22fb7870786c48176d80680363d",
+          "size_bytes": 5800
+        },
+        {
+          "module_id": "std.os.fs",
+          "path": "packages/ext/x07-ext-fs/0.1.6/modules/std/os/fs.x07.json",
+          "sha256": "9327d1c8e8cbfb88f237b23cdf34efe1e924fe7bc5fad552cab84fc7db8b2a69",
+          "size_bytes": 6449
+        }
+      ],
+      "name": "ext-fs",
+      "package_manifest_sha256": "d4c1ca950697a86294046656656c0bafe8394a4b42d5158ec8605696de35884a",
+      "path": "packages/ext/x07-ext-fs/0.1.6",
+      "version": "0.1.6"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "handwritten",
       "modules": [
@@ -10438,6 +10530,40 @@
       "version": "0.1.3"
     },
     {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.os.fs.glob",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.4/modules/std/os/fs/glob.x07.json",
+          "sha256": "931dcfb7c57bce9b024e1ab6ef3416055971a83f36cfa98b9d335e8c9aed7d05",
+          "size_bytes": 605
+        },
+        {
+          "module_id": "std.os.fs.globwalk.tests",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.4/modules/std/os/fs/globwalk/tests.x07.json",
+          "sha256": "35629af22bcf0d2fb31bb3ee03ac0469ea50d632048b17de0e50a9b19212e029",
+          "size_bytes": 2341
+        },
+        {
+          "module_id": "std.os.fs.ignore",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.4/modules/std/os/fs/ignore.x07.json",
+          "sha256": "b09870652b1dbb7243b9cd9162149b6617aae85210577dfa05a7890f4491857d",
+          "size_bytes": 1423
+        },
+        {
+          "module_id": "std.os.fs.walk",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.4/modules/std/os/fs/walk.x07.json",
+          "sha256": "e760dca3c18983791be147bae1ca1045c3a2640c277bc75f4deade281fd72151",
+          "size_bytes": 712
+        }
+      ],
+      "name": "ext-path-glob-rs",
+      "package_manifest_sha256": "2925a2c36cd5bd497686457981f001f2f7e8f60db69bed7bea7af9efa13c7ad0",
+      "path": "packages/ext/x07-ext-path-glob-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "x07import",
       "modules": [
@@ -13397,6 +13523,22 @@
       "version": "0.1.3"
     },
     {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.walkdir",
+          "path": "packages/ext/x07-ext-walkdir-rs/0.1.4/modules/ext/walkdir.x07.json",
+          "sha256": "448245b7a962fc9d6d59663f7c3a9bb40360069657b38ae5a8ee13843037b080",
+          "size_bytes": 697
+        }
+      ],
+      "name": "ext-walkdir-rs",
+      "package_manifest_sha256": "f5148949d345404a25234a75ad04d2e3355de306c9fdf06590f1c11c8a919bdc",
+      "path": "packages/ext/x07-ext-walkdir-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
       "determinism_tier": "mixed",
       "import_mode": "handwritten",
       "modules": [
@@ -14451,6 +14593,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "4c0f4afb875fd58992236508dc2c6499ddf76403879d69860b6ee031f5117b52",
+  "packages_hash": "72de02d3a7e78f3166075f4920fae1853bc924fed804d3ecdc1df020702c9737",
   "packages_root": "packages/ext"
 }

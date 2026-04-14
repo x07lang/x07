@@ -9,6 +9,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
+use x07_ext_os_native_core::{
+    bytes_to_utf8, cap_allow_hidden, cap_allow_symlinks, cap_atomic_write, cap_create_parents,
+    cap_overwrite, effective_max, enforce_read_path, enforce_write_path, map_io_err,
+    open_atomic_tmp_best_effort, parse_caps_v1, policy, FS_ERR_ALREADY_EXISTS, FS_ERR_BAD_HANDLE,
+    FS_ERR_BAD_PATH, FS_ERR_DEPTH_EXCEEDED, FS_ERR_IO, FS_ERR_IS_DIR, FS_ERR_NOT_DIR,
+    FS_ERR_NOT_FOUND, FS_ERR_POLICY_DENY, FS_ERR_SYMLINK_DENIED, FS_ERR_TOO_LARGE,
+    FS_ERR_TOO_MANY_ENTRIES, FS_ERR_UNSUPPORTED,
+};
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -53,93 +61,6 @@ extern "C" {
 const EV_TRAP_FS_INTERNAL: i32 = 9300;
 
 // -------------------------
-// Error code space (FS v1)
-// -------------------------
-
-const FS_ERR_POLICY_DENY: i32 = 60001;
-const FS_ERR_DISABLED: i32 = 60002;
-const FS_ERR_BAD_PATH: i32 = 60003;
-const FS_ERR_BAD_CAPS: i32 = 60004;
-const FS_ERR_BAD_HANDLE: i32 = 60005;
-
-const FS_ERR_NOT_FOUND: i32 = 60010;
-const FS_ERR_ALREADY_EXISTS: i32 = 60011;
-const FS_ERR_NOT_DIR: i32 = 60012;
-const FS_ERR_IS_DIR: i32 = 60013;
-const FS_ERR_PERMISSION: i32 = 60014;
-const FS_ERR_IO: i32 = 60015;
-const FS_ERR_TOO_LARGE: i32 = 60016;
-const FS_ERR_TOO_MANY_ENTRIES: i32 = 60017;
-const FS_ERR_DEPTH_EXCEEDED: i32 = 60018;
-const FS_ERR_SYMLINK_DENIED: i32 = 60019;
-const FS_ERR_UNSUPPORTED: i32 = 60020;
-
-// -------------------------
-// Caps decoding (FsCapsV1)
-// -------------------------
-
-#[derive(Clone, Copy, Debug)]
-struct CapsV1 {
-    max_read_bytes: u32,
-    max_write_bytes: u32,
-    max_entries: u32,
-    max_depth: u32,
-    flags: u32,
-}
-
-const CAP_ALLOW_SYMLINKS: u32 = 1 << 0;
-const CAP_ALLOW_HIDDEN: u32 = 1 << 1;
-const CAP_CREATE_PARENTS: u32 = 1 << 2;
-const CAP_OVERWRITE: u32 = 1 << 3;
-const CAP_ATOMIC_WRITE: u32 = 1 << 4;
-
-fn read_u32_le(b: &[u8], off: usize) -> Option<u32> {
-    let slice = b.get(off..off + 4)?;
-    Some(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
-}
-
-fn parse_caps_v1(caps: &[u8]) -> Result<CapsV1, i32> {
-    if caps.len() != 24 {
-        return Err(FS_ERR_BAD_CAPS);
-    }
-    let version = read_u32_le(caps, 0).ok_or(FS_ERR_BAD_CAPS)?;
-    if version != 1 {
-        return Err(FS_ERR_BAD_CAPS);
-    }
-    Ok(CapsV1 {
-        max_read_bytes: read_u32_le(caps, 4).ok_or(FS_ERR_BAD_CAPS)?,
-        max_write_bytes: read_u32_le(caps, 8).ok_or(FS_ERR_BAD_CAPS)?,
-        max_entries: read_u32_le(caps, 12).ok_or(FS_ERR_BAD_CAPS)?,
-        max_depth: read_u32_le(caps, 16).ok_or(FS_ERR_BAD_CAPS)?,
-        flags: read_u32_le(caps, 20).ok_or(FS_ERR_BAD_CAPS)?,
-    })
-}
-
-fn cap_allow_symlinks(c: CapsV1) -> bool {
-    (c.flags & CAP_ALLOW_SYMLINKS) != 0
-}
-fn cap_allow_hidden(c: CapsV1) -> bool {
-    (c.flags & CAP_ALLOW_HIDDEN) != 0
-}
-fn cap_create_parents(c: CapsV1) -> bool {
-    (c.flags & CAP_CREATE_PARENTS) != 0
-}
-fn cap_overwrite(c: CapsV1) -> bool {
-    (c.flags & CAP_OVERWRITE) != 0
-}
-fn cap_atomic_write(c: CapsV1) -> bool {
-    (c.flags & CAP_ATOMIC_WRITE) != 0
-}
-
-fn effective_max(policy_max: u32, caps_max: u32) -> u32 {
-    if caps_max == 0 {
-        policy_max
-    } else {
-        policy_max.min(caps_max)
-    }
-}
-
-// -------------------------
 // Streaming write handles (FS v1)
 // -------------------------
 
@@ -158,7 +79,7 @@ fn writers() -> &'static Mutex<Vec<Option<WriterHandleV1>>> {
     WRITERS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn writer_idx(handle: i32) -> Option<usize> {
+fn handle_idx(handle: i32) -> Option<usize> {
     if handle <= 0 {
         None
     } else {
@@ -166,10 +87,10 @@ fn writer_idx(handle: i32) -> Option<usize> {
     }
 }
 
-fn writer_insert(table: &mut Vec<Option<WriterHandleV1>>, w: WriterHandleV1) -> Result<i32, i32> {
+fn handle_insert<T>(table: &mut Vec<Option<T>>, v: T) -> Result<i32, i32> {
     for (idx, slot) in table.iter_mut().enumerate() {
         if slot.is_none() {
-            *slot = Some(w);
+            *slot = Some(v);
             let h = idx + 1;
             if h > (i32::MAX as usize) {
                 *slot = None;
@@ -178,7 +99,7 @@ fn writer_insert(table: &mut Vec<Option<WriterHandleV1>>, w: WriterHandleV1) -> 
             return Ok(h as i32);
         }
     }
-    table.push(Some(w));
+    table.push(Some(v));
     let h = table.len();
     if h > (i32::MAX as usize) {
         table.pop();
@@ -187,270 +108,21 @@ fn writer_insert(table: &mut Vec<Option<WriterHandleV1>>, w: WriterHandleV1) -> 
     Ok(h as i32)
 }
 
-fn open_atomic_tmp_best_effort(
-    path: &Path,
-    overwrite: bool,
-) -> Result<(std::fs::File, PathBuf), i32> {
-    let Some(parent) = path.parent() else {
-        return Err(FS_ERR_BAD_PATH);
-    };
-    let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
-        return Err(FS_ERR_BAD_PATH);
-    };
-
-    if path.exists() {
-        match std::fs::metadata(path) {
-            Ok(m) if m.is_dir() => return Err(FS_ERR_IS_DIR),
-            Ok(_) if !overwrite => return Err(FS_ERR_ALREADY_EXISTS),
-            Ok(_) => {}
-            Err(e) => return Err(map_io_err(&e)),
-        }
-    }
-
-    let mut counter: u32 = 0;
-    loop {
-        let candidate = parent.join(format!("{name}.x07_tmp_{counter}"));
-        match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&candidate)
-        {
-            Ok(f) => return Ok((f, candidate)),
-            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                counter = counter.wrapping_add(1);
-                continue;
-            }
-            Err(e) => return Err(map_io_err(&e)),
-        }
-    }
-}
-
 // -------------------------
-// Policy env plumbing (runner)
+// Streaming read handles (FS v1)
 // -------------------------
 
-#[derive(Clone, Debug)]
-struct Policy {
-    sandboxed: bool,
-    enabled: bool,
-    deny_hidden: bool,
-
-    read_roots: Vec<PathBuf>,
-    write_roots: Vec<PathBuf>,
-
-    allow_symlinks: bool,
-    allow_mkdir: bool,
-    allow_remove: bool,
-    allow_rename: bool,
-    allow_walk: bool,
-    allow_glob: bool,
-
+#[derive(Debug)]
+struct ReaderHandleV1 {
+    file: Option<std::fs::File>,
     max_read_bytes: u32,
-    max_write_bytes: u32,
-    max_entries: u32,
-    max_depth: u32,
+    read: u32,
 }
 
-static POLICY: OnceCell<Policy> = OnceCell::new();
+static READERS: OnceCell<Mutex<Vec<Option<ReaderHandleV1>>>> = OnceCell::new();
 
-fn env_bool(name: &str, default: bool) -> bool {
-    std::env::var(name)
-        .ok()
-        .and_then(|v| match v.as_str() {
-            "1" | "true" | "TRUE" | "yes" | "YES" => Some(true),
-            "0" | "false" | "FALSE" | "no" | "NO" => Some(false),
-            _ => None,
-        })
-        .unwrap_or(default)
-}
-
-fn env_u32_nonzero(name: &str, default: u32) -> u32 {
-    std::env::var(name)
-        .ok()
-        .and_then(|v| v.parse::<u32>().ok())
-        .filter(|&v| v != 0)
-        .unwrap_or(default)
-}
-
-fn canonicalize_best_effort(p: &Path) -> PathBuf {
-    if p.is_absolute() {
-        return p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
-    }
-    let abs = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(p);
-    abs.canonicalize().unwrap_or(abs)
-}
-
-fn env_roots(name: &str) -> Vec<PathBuf> {
-    let Ok(v) = std::env::var(name) else {
-        return vec![];
-    };
-    v.split(';')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .map(|s| canonicalize_best_effort(Path::new(s)))
-        .collect()
-}
-
-fn load_policy() -> Policy {
-    let sandboxed = env_bool("X07_OS_SANDBOXED", false);
-    let enabled = env_bool("X07_OS_FS", !sandboxed);
-    let deny_hidden = env_bool("X07_OS_DENY_HIDDEN", sandboxed);
-
-    let read_roots = env_roots("X07_OS_FS_READ_ROOTS");
-    let write_roots = env_roots("X07_OS_FS_WRITE_ROOTS");
-
-    Policy {
-        sandboxed,
-        enabled,
-        deny_hidden,
-        read_roots,
-        write_roots,
-        allow_symlinks: env_bool("X07_OS_FS_ALLOW_SYMLINKS", !sandboxed),
-        allow_mkdir: env_bool("X07_OS_FS_ALLOW_MKDIR", !sandboxed),
-        allow_remove: env_bool("X07_OS_FS_ALLOW_REMOVE", !sandboxed),
-        allow_rename: env_bool("X07_OS_FS_ALLOW_RENAME", !sandboxed),
-        allow_walk: env_bool("X07_OS_FS_ALLOW_WALK", !sandboxed),
-        allow_glob: env_bool("X07_OS_FS_ALLOW_GLOB", !sandboxed),
-        max_read_bytes: env_u32_nonzero("X07_OS_FS_MAX_READ_BYTES", 16 * 1024 * 1024),
-        max_write_bytes: env_u32_nonzero("X07_OS_FS_MAX_WRITE_BYTES", 16 * 1024 * 1024),
-        max_entries: env_u32_nonzero("X07_OS_FS_MAX_ENTRIES", 10_000),
-        max_depth: env_u32_nonzero("X07_OS_FS_MAX_DEPTH", 64),
-    }
-}
-
-fn policy() -> &'static Policy {
-    POLICY.get_or_init(load_policy)
-}
-
-// -------------------------
-// Path parsing & enforcement
-// -------------------------
-
-fn bytes_to_utf8(b: &[u8]) -> Result<&str, i32> {
-    std::str::from_utf8(b).map_err(|_| FS_ERR_BAD_PATH)
-}
-
-fn parse_safe_path_v1(input: &[u8]) -> Result<(PathBuf, bool), i32> {
-    let s = bytes_to_utf8(input)?;
-    if s.is_empty() {
-        return Err(FS_ERR_BAD_PATH);
-    }
-    if s.as_bytes().iter().any(|&b| b == 0 || b == b'\\') {
-        return Err(FS_ERR_BAD_PATH);
-    }
-
-    let abs = s.as_bytes()[0] == b'/';
-    let body = if abs { &s[1..] } else { s };
-    if body.is_empty() {
-        return Err(FS_ERR_BAD_PATH);
-    }
-
-    let mut segs: Vec<&str> = Vec::new();
-    let mut hidden = false;
-    for raw in body.split('/') {
-        if raw.is_empty() {
-            return Err(FS_ERR_BAD_PATH);
-        }
-        if raw == "." {
-            continue;
-        }
-        if raw == ".." {
-            return Err(FS_ERR_BAD_PATH);
-        }
-        if raw.starts_with('.') {
-            hidden = true;
-        }
-        segs.push(raw);
-    }
-    if segs.is_empty() {
-        return Err(FS_ERR_BAD_PATH);
-    }
-    let mut pb = if abs {
-        PathBuf::from("/")
-    } else {
-        PathBuf::new()
-    };
-    for seg in segs {
-        pb.push(seg);
-    }
-    Ok((pb, hidden))
-}
-
-fn canonicalize_existing_prefix(path: &Path) -> PathBuf {
-    let mut cur = path.to_path_buf();
-    let mut missing: Vec<std::ffi::OsString> = Vec::new();
-    while !cur.exists() {
-        let Some(name) = cur.file_name() else {
-            break;
-        };
-        missing.push(name.to_os_string());
-        let Some(parent) = cur.parent() else {
-            break;
-        };
-        cur = parent.to_path_buf();
-    }
-
-    let mut base = canonicalize_best_effort(&cur);
-    for part in missing.iter().rev() {
-        base.push(part);
-    }
-    base
-}
-
-fn is_allowed_by_roots(abs_path: &Path, roots: &[PathBuf]) -> bool {
-    roots.iter().any(|r| abs_path.starts_with(r))
-}
-
-fn enforce_read_path(caps: CapsV1, path_bytes: &[u8]) -> Result<PathBuf, i32> {
-    let pol = policy();
-    if !pol.enabled {
-        return Err(FS_ERR_DISABLED);
-    }
-
-    let (path, hidden) = parse_safe_path_v1(path_bytes)?;
-    if pol.deny_hidden && hidden && !cap_allow_hidden(caps) {
-        return Err(FS_ERR_POLICY_DENY);
-    }
-
-    if !pol.sandboxed {
-        return Ok(path);
-    }
-    if pol.read_roots.is_empty() {
-        return Err(FS_ERR_POLICY_DENY);
-    }
-
-    let abs = canonicalize_existing_prefix(&canonicalize_best_effort(&path));
-    if !is_allowed_by_roots(&abs, &pol.read_roots) {
-        return Err(FS_ERR_POLICY_DENY);
-    }
-    Ok(abs)
-}
-
-fn enforce_write_path(caps: CapsV1, path_bytes: &[u8]) -> Result<PathBuf, i32> {
-    let pol = policy();
-    if !pol.enabled {
-        return Err(FS_ERR_DISABLED);
-    }
-
-    let (path, hidden) = parse_safe_path_v1(path_bytes)?;
-    if pol.deny_hidden && hidden && !cap_allow_hidden(caps) {
-        return Err(FS_ERR_POLICY_DENY);
-    }
-
-    if !pol.sandboxed {
-        return Ok(path);
-    }
-    if pol.write_roots.is_empty() {
-        return Err(FS_ERR_POLICY_DENY);
-    }
-
-    let abs = canonicalize_existing_prefix(&canonicalize_best_effort(&path));
-    if !is_allowed_by_roots(&abs, &pol.write_roots) {
-        return Err(FS_ERR_POLICY_DENY);
-    }
-    Ok(abs)
+fn readers() -> &'static Mutex<Vec<Option<ReaderHandleV1>>> {
+    READERS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
 // -------------------------
@@ -501,16 +173,6 @@ unsafe fn alloc_bytes(len: u32) -> ev_bytes {
         ev_trap(EV_TRAP_FS_INTERNAL);
     }
     out
-}
-
-fn map_io_err(e: &io::Error) -> i32 {
-    match e.kind() {
-        io::ErrorKind::NotFound => FS_ERR_NOT_FOUND,
-        io::ErrorKind::AlreadyExists => FS_ERR_ALREADY_EXISTS,
-        io::ErrorKind::PermissionDenied => FS_ERR_PERMISSION,
-        io::ErrorKind::Unsupported => FS_ERR_UNSUPPORTED,
-        _ => FS_ERR_IO,
-    }
 }
 
 fn join_lines_sorted(mut lines: Vec<String>) -> Vec<u8> {
@@ -775,7 +437,7 @@ pub extern "C" fn x07_ext_fs_stream_open_write_v1(path: ev_bytes, caps: ev_bytes
             };
 
             let handle = match writers().lock() {
-                Ok(mut table) => writer_insert(
+                Ok(mut table) => handle_insert(
                     &mut table,
                     WriterHandleV1 {
                         file: Some(f),
@@ -833,7 +495,7 @@ pub extern "C" fn x07_ext_fs_stream_open_write_v1(path: ev_bytes, caps: ev_bytes
         };
 
         let handle = match writers().lock() {
-            Ok(mut table) => writer_insert(
+            Ok(mut table) => handle_insert(
                 &mut table,
                 WriterHandleV1 {
                     file: Some(f),
@@ -863,7 +525,7 @@ pub extern "C" fn x07_ext_fs_stream_write_all_v1(
         let Ok(mut table) = writers().lock() else {
             return err_i32(FS_ERR_IO);
         };
-        let Some(idx) = writer_idx(writer_handle) else {
+        let Some(idx) = handle_idx(writer_handle) else {
             return err_i32(FS_ERR_BAD_HANDLE);
         };
         let Some(w) = table.get_mut(idx).and_then(|v| v.as_mut()) else {
@@ -897,7 +559,7 @@ pub extern "C" fn x07_ext_fs_stream_close_v1(writer_handle: i32) -> ev_result_i3
         let Ok(mut table) = writers().lock() else {
             return err_i32(FS_ERR_IO);
         };
-        let Some(idx) = writer_idx(writer_handle) else {
+        let Some(idx) = handle_idx(writer_handle) else {
             return err_i32(FS_ERR_BAD_HANDLE);
         };
         let Some(w) = table.get_mut(idx).and_then(|v| v.as_mut()) else {
@@ -929,7 +591,7 @@ pub extern "C" fn x07_ext_fs_stream_drop_v1(writer_handle: i32) -> i32 {
         let Ok(mut table) = writers().lock() else {
             return 1;
         };
-        let Some(idx) = writer_idx(writer_handle) else {
+        let Some(idx) = handle_idx(writer_handle) else {
             return 1;
         };
         let Some(w) = table.get_mut(idx).and_then(|v| v.take()) else {
@@ -987,6 +649,208 @@ fn write_atomic_best_effort(path: &Path, data: &[u8], overwrite: bool) -> ev_res
         return err_i32(map_io_err(&e));
     }
     ok_i32(data.len() as i32)
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_open_read_v1(path: ev_bytes, caps: ev_bytes) -> ev_result_i32 {
+    std::panic::catch_unwind(|| unsafe {
+        let caps = match parse_caps_v1(bytes_as_slice(caps)) {
+            Ok(caps) => caps,
+            Err(code) => return err_i32(code),
+        };
+
+        let pol = policy();
+        if cap_allow_symlinks(caps) && !pol.allow_symlinks {
+            return err_i32(FS_ERR_SYMLINK_DENIED);
+        }
+
+        let path_bytes = bytes_as_slice(path);
+        let pb = match enforce_read_path(caps, path_bytes) {
+            Ok(p) => p,
+            Err(code) => return err_i32(code),
+        };
+
+        let md = match std::fs::metadata(&pb) {
+            Ok(m) => m,
+            Err(e) => return err_i32(map_io_err(&e)),
+        };
+        if md.is_dir() {
+            return err_i32(FS_ERR_IS_DIR);
+        }
+
+        let max_read = effective_max(pol.max_read_bytes, caps.max_read_bytes);
+        if md.len() > (max_read as u64) {
+            return err_i32(FS_ERR_TOO_LARGE);
+        }
+
+        let f = match std::fs::File::open(&pb) {
+            Ok(f) => f,
+            Err(e) => return err_i32(map_io_err(&e)),
+        };
+
+        let handle = match readers().lock() {
+            Ok(mut table) => handle_insert(
+                &mut table,
+                ReaderHandleV1 {
+                    file: Some(f),
+                    max_read_bytes: max_read,
+                    read: 0,
+                },
+            ),
+            Err(_) => Err(FS_ERR_IO),
+        };
+
+        match handle {
+            Ok(h) => ok_i32(h),
+            Err(code) => err_i32(code),
+        }
+    })
+    .unwrap_or_else(|_| err_i32(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_read_some_v1(
+    reader_handle: i32,
+    max_bytes: i32,
+) -> ev_result_bytes {
+    std::panic::catch_unwind(|| {
+        if max_bytes <= 0 {
+            return ok_bytes_vec(Vec::new());
+        }
+
+        let Ok(mut table) = readers().lock() else {
+            return err_bytes(FS_ERR_IO);
+        };
+        let Some(idx) = handle_idx(reader_handle) else {
+            return err_bytes(FS_ERR_BAD_HANDLE);
+        };
+        let Some(r) = table.get_mut(idx).and_then(|v| v.as_mut()) else {
+            return err_bytes(FS_ERR_BAD_HANDLE);
+        };
+        let Some(f) = r.file.as_mut() else {
+            return ok_bytes_vec(Vec::new());
+        };
+
+        let Some(rem) = r.max_read_bytes.checked_sub(r.read) else {
+            r.file = None;
+            return err_bytes(FS_ERR_TOO_LARGE);
+        };
+        if rem == 0 {
+            r.file = None;
+            return ok_bytes_vec(Vec::new());
+        }
+
+        let want = (max_bytes as u32).min(rem);
+        let mut buf: Vec<u8> = vec![0u8; want as usize];
+        let got = match f.read(&mut buf) {
+            Ok(n) => n,
+            Err(e) => return err_bytes(map_io_err(&e)),
+        };
+        if got == 0 {
+            r.file = None;
+            return ok_bytes_vec(Vec::new());
+        }
+        buf.truncate(got);
+
+        r.read = r.read.saturating_add(got as u32);
+        ok_bytes_vec(buf)
+    })
+    .unwrap_or_else(|_| err_bytes(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn x07_ext_fs_stream_read_into_v1(
+    reader_handle: i32,
+    dst_ptr: *mut u8,
+    dst_cap: u32,
+) -> ev_result_i32 {
+    std::panic::catch_unwind(|| unsafe {
+        if dst_cap == 0 {
+            return ok_i32(0);
+        }
+        if dst_ptr.is_null() {
+            return err_i32(FS_ERR_IO);
+        }
+
+        let Ok(mut table) = readers().lock() else {
+            return err_i32(FS_ERR_IO);
+        };
+        let Some(idx) = handle_idx(reader_handle) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+        let Some(r) = table.get_mut(idx).and_then(|v| v.as_mut()) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+        let Some(f) = r.file.as_mut() else {
+            return ok_i32(0);
+        };
+
+        let Some(rem) = r.max_read_bytes.checked_sub(r.read) else {
+            r.file = None;
+            return err_i32(FS_ERR_TOO_LARGE);
+        };
+        if rem == 0 {
+            r.file = None;
+            return ok_i32(0);
+        }
+        let cap = dst_cap.min(rem);
+        let dst = core::slice::from_raw_parts_mut(dst_ptr, cap as usize);
+        let got = match f.read(dst) {
+            Ok(n) => n,
+            Err(e) => return err_i32(map_io_err(&e)),
+        };
+        if got == 0 {
+            r.file = None;
+            return ok_i32(0);
+        }
+        r.read = r.read.saturating_add(got as u32);
+        if got > (i32::MAX as usize) {
+            return err_i32(FS_ERR_UNSUPPORTED);
+        }
+        ok_i32(got as i32)
+    })
+    .unwrap_or_else(|_| err_i32(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_close_read_v1(reader_handle: i32) -> ev_result_i32 {
+    std::panic::catch_unwind(|| {
+        let Ok(mut table) = readers().lock() else {
+            return err_i32(FS_ERR_IO);
+        };
+        let Some(idx) = handle_idx(reader_handle) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+        let Some(r) = table.get_mut(idx).and_then(|v| v.as_mut()) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+
+        // Idempotent close.
+        let Some(f) = r.file.take() else {
+            return ok_i32(1);
+        };
+        drop(f);
+        ok_i32(1)
+    })
+    .unwrap_or_else(|_| err_i32(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_drop_read_v1(reader_handle: i32) -> i32 {
+    std::panic::catch_unwind(|| {
+        let Ok(mut table) = readers().lock() else {
+            return 1;
+        };
+        let Some(idx) = handle_idx(reader_handle) else {
+            return 1;
+        };
+        let Some(r) = table.get_mut(idx).and_then(|v| v.take()) else {
+            return 1;
+        };
+        drop(r.file);
+        1
+    })
+    .unwrap_or(1)
 }
 
 #[no_mangle]
@@ -1359,6 +1223,7 @@ pub extern "C" fn x07_ext_fs_stat_v1(path: ev_bytes, caps: ev_bytes) -> ev_resul
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x07_ext_os_native_core::{CAP_ATOMIC_WRITE, CAP_CREATE_PARENTS, CAP_OVERWRITE};
 
     #[no_mangle]
     extern "C" fn ev_bytes_alloc(len: u32) -> ev_bytes {
@@ -1409,6 +1274,22 @@ mod tests {
         });
         let out = unsafe { res.payload.ok };
         unsafe { std::slice::from_raw_parts(out.ptr, out.len as usize).to_vec() }
+    }
+
+    fn err_bytes(res: ev_result_bytes) -> i32 {
+        assert_eq!(res.tag, 0, "expected err");
+        unsafe { res.payload.err as i32 }
+    }
+
+    fn caps_read_v1(max_read_bytes: u32, flags: u32) -> Vec<u8> {
+        let mut out = Vec::with_capacity(24);
+        out.extend_from_slice(&1u32.to_le_bytes());
+        out.extend_from_slice(&max_read_bytes.to_le_bytes());
+        out.extend_from_slice(&0u32.to_le_bytes()); // max_write_bytes
+        out.extend_from_slice(&0u32.to_le_bytes()); // max_entries
+        out.extend_from_slice(&0u32.to_le_bytes()); // max_depth
+        out.extend_from_slice(&flags.to_le_bytes());
+        out
     }
 
     #[test]
@@ -1496,6 +1377,85 @@ mod tests {
             FS_ERR_BAD_HANDLE
         );
         assert_eq!(err_i32(x07_ext_fs_stream_close_v1(123)), FS_ERR_BAD_HANDLE);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_stream_reader_handle_v1_smoke() {
+        std::env::set_var("X07_OS_SANDBOXED", "0");
+        std::env::set_var("X07_OS_FS", "1");
+        std::env::set_var("X07_OS_FS_MAX_READ_BYTES", "1000000");
+
+        let root = format!("target/x07_ext_fs_stream_read_test_{}", std::process::id());
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("create test dir");
+
+        let in_path = format!("{root}/in.txt");
+        std::fs::write(&in_path, b"abcdefgh").expect("write in.txt");
+
+        let caps = caps_read_v1(8, 0);
+        let h = ok_i32(x07_ext_fs_stream_open_read_v1(
+            to_ev_bytes(in_path.as_bytes()),
+            to_ev_bytes(&caps),
+        ));
+        assert!(h > 0);
+
+        assert_eq!(
+            ok_bytes(x07_ext_fs_stream_read_some_v1(h, 3)),
+            b"abc".to_vec()
+        );
+        assert_eq!(
+            ok_bytes(x07_ext_fs_stream_read_some_v1(h, 3)),
+            b"def".to_vec()
+        );
+        assert_eq!(
+            ok_bytes(x07_ext_fs_stream_read_some_v1(h, 3)),
+            b"gh".to_vec()
+        );
+        assert_eq!(
+            ok_bytes(x07_ext_fs_stream_read_some_v1(h, 3)),
+            Vec::<u8>::new()
+        );
+        assert_eq!(ok_i32(x07_ext_fs_stream_close_read_v1(h)), 1);
+        assert_eq!(x07_ext_fs_stream_drop_read_v1(h), 1);
+
+        // read_into variant (no allocations).
+        let h2 = ok_i32(x07_ext_fs_stream_open_read_v1(
+            to_ev_bytes(in_path.as_bytes()),
+            to_ev_bytes(&caps),
+        ));
+        let mut tmp = vec![0u8; 3];
+        assert_eq!(
+            ok_i32(unsafe {
+                x07_ext_fs_stream_read_into_v1(h2, tmp.as_mut_ptr(), tmp.len() as u32)
+            }),
+            3
+        );
+        assert_eq!(tmp, b"abc");
+        assert_eq!(ok_i32(x07_ext_fs_stream_close_read_v1(h2)), 1);
+        assert_eq!(x07_ext_fs_stream_drop_read_v1(h2), 1);
+
+        // Too-large files are rejected at open.
+        let too_big_path = format!("{root}/too_big.txt");
+        std::fs::write(&too_big_path, b"abcdefghi").expect("write too_big.txt");
+        assert_eq!(
+            err_i32(x07_ext_fs_stream_open_read_v1(
+                to_ev_bytes(too_big_path.as_bytes()),
+                to_ev_bytes(&caps),
+            )),
+            FS_ERR_TOO_LARGE
+        );
+
+        // Invalid handle errors.
+        assert_eq!(
+            err_bytes(x07_ext_fs_stream_read_some_v1(123, 1)),
+            FS_ERR_BAD_HANDLE
+        );
+        assert_eq!(
+            err_i32(x07_ext_fs_stream_close_read_v1(123)),
+            FS_ERR_BAD_HANDLE
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }

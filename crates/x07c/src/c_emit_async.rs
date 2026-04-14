@@ -4062,6 +4062,128 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "os.fs.stream_open_read_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_open_read_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultI32
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_open_read_v1 expects (bytes path, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_open_read_v1({}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.fs.stream_read_some_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_read_some_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultBytes
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_read_some_v1 expects (i32 reader_handle, i32 max_bytes)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_read_some_v1((int32_t){}, (int32_t){});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.fs.stream_close_read_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_close_read_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 || dest.ty != Ty::ResultI32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_close_read_v1 expects i32 reader_handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_close_read_v1((int32_t){});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.fs.stream_drop_read_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_drop_read_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_drop_read_v1 expects i32 reader_handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_drop_read_v1((int32_t){});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "os.fs.mkdirs_v1" => {
                         self.require_native_backend(
                             native::BACKEND_ID_EXT_FS,
@@ -4287,6 +4409,126 @@ impl<'a> Emitter<'a> {
                             format!(
                                 "{} = x07_ext_fs_stat_v1({}, {});",
                                 dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.archive.tar_extract_to_fs_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_ARCHIVE,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.archive.tar_extract_to_fs_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 5
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                            || args[2].ty != Ty::Bytes
+                            || args[3].ty != Ty::Bytes
+                            || args[4].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.archive.tar_extract_to_fs_v1 expects (bytes out_root, bytes tar_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_archive_tar_extract_to_fs_v1({}, {}, {}, {}, {});",
+                                dest.c_name,
+                                args[0].c_name,
+                                args[1].c_name,
+                                args[2].c_name,
+                                args[3].c_name,
+                                args[4].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.archive.tgz_extract_to_fs_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_ARCHIVE,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.archive.tgz_extract_to_fs_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 5
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                            || args[2].ty != Ty::Bytes
+                            || args[3].ty != Ty::Bytes
+                            || args[4].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.archive.tgz_extract_to_fs_v1 expects (bytes out_root, bytes tgz_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_archive_tgz_extract_to_fs_v1({}, {}, {}, {}, {});",
+                                dest.c_name,
+                                args[0].c_name,
+                                args[1].c_name,
+                                args[2].c_name,
+                                args[3].c_name,
+                                args[4].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.archive.zip_extract_to_fs_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_ARCHIVE,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.archive.zip_extract_to_fs_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 5
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                            || args[2].ty != Ty::Bytes
+                            || args[3].ty != Ty::Bytes
+                            || args[4].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.archive.zip_extract_to_fs_v1 expects (bytes out_root, bytes zip_path, bytes caps_read, bytes caps_write, bytes profile_id)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_archive_zip_extract_to_fs_v1({}, {}, {}, {}, {});",
+                                dest.c_name,
+                                args[0].c_name,
+                                args[1].c_name,
+                                args[2].c_name,
+                                args[3].c_name,
+                                args[4].c_name
                             ),
                         );
                         self.line(state, format!("goto st_{cont};"));

@@ -1,12 +1,12 @@
 diff --git a/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/broken/src/main.x07.json b/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/expected/src/main.x07.json
-index 2f1696e..dda909c 100644
+index 2f1696ee..dda909ce 100644
 --- a/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/broken/src/main.x07.json
 +++ b/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/expected/src/main.x07.json
 @@ -1,2 +1 @@
  {"decls":[],"imports":["app"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.3.0","solve":["app.solve","input"]}
 -
 diff --git a/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/broken/x07.json b/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/expected/x07.json
-index 96de0e2..328c6b4 100644
+index 96de0e2b..774a0230 100644
 --- a/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/broken/x07.json
 +++ b/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/expected/x07.json
 @@ -1,13 +1,37 @@
@@ -22,8 +22,8 @@ index 96de0e2..328c6b4 100644
 +    },
 +    {
 +      "name": "ext-fs",
-+      "path": ".x07/deps/ext-fs/0.1.5",
-+      "version": "0.1.5"
++      "path": ".x07/deps/ext-fs/0.1.6",
++      "version": "0.1.6"
 +    },
 +    {
 +      "name": "ext-glob-rs",
@@ -32,8 +32,8 @@ index 96de0e2..328c6b4 100644
 +    },
 +    {
 +      "name": "ext-path-glob-rs",
-+      "path": ".x07/deps/ext-path-glob-rs/0.1.3",
-+      "version": "0.1.3"
++      "path": ".x07/deps/ext-path-glob-rs/0.1.4",
++      "version": "0.1.4"
 +    }
 +  ],
    "entry": "src/main.x07.json",
@@ -56,19 +56,20 @@ index 96de0e2..328c6b4 100644
  }
 -
 diff --git a/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/broken/x07.lock.json b/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/expected/x07.lock.json
-index 2925fc0..2a8b969 100644
+index e41c44c4..baa290f7 100644
 --- a/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/broken/x07.lock.json
 +++ b/ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/expected/x07.lock.json
-@@ -1,4 +1,57 @@
- {
-   "schema_version": "x07.lock@0.3.0",
+@@ -9,5 +9,58 @@
+   "registry": {
+     "index_url": "sparse+https://registry.x07.io/index/"
+   },
 -  "dependencies": []
 +  "dependencies": [
 +    {
 +      "name": "ext-error",
 +      "version": "0.1.4",
 +      "path": ".x07/deps/ext-error/0.1.4",
-+      "package_manifest_sha256": "2583aae477f906bf67bd815972b333760588c54d7a1776831be85f1956bfc01e",
++      "package_manifest_sha256": "c6b770b279357cb808057fddd8704516b74cef37f2c48fa84f06de063e1e6718",
 +      "module_root": "modules",
 +      "modules_sha256": {
 +        "ext.error.chain": "082d051b9eab7ffba7ab42f20ef6afdbe68389b9060d2fe876575d8fb9f1b76a",
@@ -80,13 +81,13 @@ index 2925fc0..2a8b969 100644
 +    },
 +    {
 +      "name": "ext-fs",
-+      "version": "0.1.5",
-+      "path": ".x07/deps/ext-fs/0.1.5",
-+      "package_manifest_sha256": "b40d97a9ab3b09b10b2c18c6527c05342dc0b775a7a713773e8f7d3a6fb31ae2",
++      "version": "0.1.6",
++      "path": ".x07/deps/ext-fs/0.1.6",
++      "package_manifest_sha256": "d4c1ca950697a86294046656656c0bafe8394a4b42d5158ec8605696de35884a",
 +      "module_root": "modules",
 +      "modules_sha256": {
-+        "std.os.fs": "5dbbfa61f3a455c5ed7575ec8e87d3c20589f29595fa5ec2f6bdf09ae54e14d5",
-+        "std.os.fs.spec": "b2f5276147697446a50e5d73a6037da1ceb8fcde1c9eadbe5aac654ab1091c7f"
++        "std.os.fs": "9327d1c8e8cbfb88f237b23cdf34efe1e924fe7bc5fad552cab84fc7db8b2a69",
++        "std.os.fs.spec": "3341d250b6af9b91441fdfb19e0bb39e53f0d22fb7870786c48176d80680363d"
 +      },
 +      "yanked": false
 +    },
@@ -94,7 +95,7 @@ index 2925fc0..2a8b969 100644
 +      "name": "ext-glob-rs",
 +      "version": "0.1.3",
 +      "path": ".x07/deps/ext-glob-rs/0.1.3",
-+      "package_manifest_sha256": "5c27be1e2ca5ed7f5b0e99c31b5c1a239b55186871df5fd3d807112cb2b10b3d",
++      "package_manifest_sha256": "031c75c4ebeceec314ed8640644031ecd5b4d22c5f9c938563358ce6d6009fbc",
 +      "module_root": "modules",
 +      "modules_sha256": {
 +        "ext.glob": "dad342b77eed67aaec80ad597919fac0a6e8af9478ba4dcdd1a423ed215788ff",
@@ -104,9 +105,9 @@ index 2925fc0..2a8b969 100644
 +    },
 +    {
 +      "name": "ext-path-glob-rs",
-+      "version": "0.1.3",
-+      "path": ".x07/deps/ext-path-glob-rs/0.1.3",
-+      "package_manifest_sha256": "e9907ae7878352174bbbbf1360063ab20842d946aafd7b13b14b1db90e6d7062",
++      "version": "0.1.4",
++      "path": ".x07/deps/ext-path-glob-rs/0.1.4",
++      "package_manifest_sha256": "2925a2c36cd5bd497686457981f001f2f7e8f60db69bed7bea7af9efa13c7ad0",
 +      "module_root": "modules",
 +      "modules_sha256": {
 +        "std.os.fs.glob": "931dcfb7c57bce9b024e1ab6ef3416055971a83f36cfa98b9d335e8c9aed7d05",

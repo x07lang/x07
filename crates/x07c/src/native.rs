@@ -5,6 +5,7 @@ pub const ABI_MAJOR_V1: u32 = 1;
 pub const BACKEND_ID_MATH: &str = "x07.math";
 pub const BACKEND_ID_TIME: &str = "x07.time";
 pub const BACKEND_ID_EXT_FS: &str = "x07.ext.fs";
+pub const BACKEND_ID_EXT_ARCHIVE: &str = "x07.ext.archive";
 pub const BACKEND_ID_EXT_RAND: &str = "x07.ext.rand";
 pub const BACKEND_ID_EXT_STDIO: &str = "x07.ext.stdio";
 pub const BACKEND_ID_EXT_JSONSCHEMA: &str = "x07.ext.jsonschema";

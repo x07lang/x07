@@ -24,6 +24,13 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - Pinned archive profiles under `arch/archive/profiles/` (`*_extract_safe_v1.archive.json`).
 - Archive security corpus + CI gate: `tests/corpora/archive/` and `scripts/ci/check_archive_corpus.sh`.
 - Guide + API docs + runnable example: `docs/guides/safe-archives.md`, `docs/archive/archive-v1.md`, and `docs/examples/agent-gate/archive-safe-extract/zip-hello/`.
+- Streaming filesystem IO via `ext-fs@0.1.6`:
+  - streaming reader/writer handles under `std.os.fs.stream_*_v1`
+  - `std.os.fs.copy_file_v1` and `std.os.fs.stream_copy_to_end_v1`
+- Streaming archive extract-to-fs via `ext-archive-c@0.1.6` + native `os.archive.*`:
+  - `std.archive.extract_os.safe_extract_to_fs_path_v1` and `std.archive.extract_os.extract_to_fs_path_from_arch_v1`
+  - Guide + runnable example: `docs/guides/streaming-io.md` and `docs/examples/agent-gate/archive-extract-to-fs/zip-hello/`
+- Minimal deterministic profiling via `X07_PROFILE=1` (JSON line `x07.profile.fn@0.1.0` on stderr); docs: `docs/toolchain/profiling.md`.
 - CLI specrows tooling:
   - `x07 cli specrows check` and `x07 cli specrows fmt` (alias: `x07 cli spec`) for semantic validation and canonical formatting.
   - `x07 cli specrows compile` for emitting specbin for `ext.cli.parse_compiled*`.
