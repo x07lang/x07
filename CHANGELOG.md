@@ -43,6 +43,8 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - `x07 pkg verify` to validate sparse-index signatures (ed25519) and clearly report unsigned indices/packages.
   - `x07 pkg check-semver` to detect breaking export changes (removed exports or signature changes) between two package directories.
   - `x07 info` as a top-level alias for `x07 pkg info`.
+  - `x07 pkg pack` / `x07 pkg publish` now validate required `x07-package.json` metadata (`description`, `docs`, `license`, `meta.x07c_compat`) before producing archives.
+  - Package archives now include `ffi/` contents when present (for FFI-backed packages).
 - Guide + runnable example: `docs/guides/packaging-integrity.md` and `docs/examples/packaging-integrity/`.
 - `x07 init --package` now includes `license` and `meta.x07c_compat` in the generated `x07-package.json` template.
 
