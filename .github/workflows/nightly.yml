@@ -161,6 +161,7 @@ jobs:
         run: |
           ./scripts/build_ext_regex.sh
           ./scripts/build_ext_fs.sh
+          ./scripts/ci/ensure_ext_archive_backend.sh
           ./scripts/build_ext_stdio.sh
           ./scripts/build_ext_rand.sh
           ./scripts/build_ext_jsonschema.sh
