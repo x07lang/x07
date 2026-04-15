@@ -1595,6 +1595,27 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-impl-check.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-impl-check.report.schema.json",
+      "schema_version": "x07.tool.xtal.impl.check.report@0.1.0",
+      "title": "x07.tool.xtal.impl.check.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-impl-sync.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-impl-sync.report.schema.json",
+      "schema_version": "x07.tool.xtal.impl.sync.report@0.1.0",
+      "title": "x07.tool.xtal.impl.sync.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-impl.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-impl.report.schema.json",
+      "schema_version": "x07.tool.xtal.impl.report@0.1.0",
+      "title": "x07.tool.xtal.impl.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-xtal-spec-check.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-xtal-spec-check.report.schema.json",
       "schema_version": "x07.tool.xtal.spec.check.report@0.1.0",

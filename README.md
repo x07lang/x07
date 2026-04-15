@@ -71,11 +71,11 @@ x07 ast apply-patch --in program.x07.json --patch patch.json --out program.x07.j
 
 ### Spec-first workflows
 
-XTAL (Phase A) and the `x07 gen` gate support spec-first and generated-artifact workflows. These flows assume you already have spec inputs and checked-in generated artifacts.
+XTAL and the `x07 gen` gate support spec-first and generated-artifact workflows. These flows assume you already have spec inputs and checked-in generated artifacts.
 
 Docs:
 
-- `docs/toolchain/xtal-phase-a.md`
+- `docs/toolchain/xtal.md`
 - `docs/toolchain/generated-artifacts.md`
 
 Core gates:

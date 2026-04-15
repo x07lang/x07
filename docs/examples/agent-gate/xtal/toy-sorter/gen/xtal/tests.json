@@ -35,6 +35,26 @@
       "id": "xtal/toy.sorter/op.sort_u8_asc.v1/ex0005",
       "returns": "result_i32",
       "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.toy.sorter.tests.prop_0001",
+      "expect": "pass",
+      "id": "xtal/toy.sorter/op.sort_u8_asc.v1/prop0001",
+      "pbt": {
+        "cases": 100,
+        "max_shrinks": 4096,
+        "params": [
+          {
+            "gen": {
+              "kind": "bytes",
+              "max_len": 64
+            },
+            "name": "b"
+          }
+        ]
+      },
+      "returns": "bytes_status_v1",
+      "world": "solve-pure"
     }
   ]
 }

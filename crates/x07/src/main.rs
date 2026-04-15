@@ -151,7 +151,7 @@ enum Command {
     Sm(sm::SmArgs),
     /// Generator determinism gates (arch/gen/index.x07gen.json).
     Gen(gen::GenArgs),
-    /// XTAL (Trusted Autonomous Lifecycle) Phase A tooling.
+    /// XTAL (Trusted Autonomous Lifecycle) tooling.
     Xtal(xtal::XtalArgs),
     /// Record RR fixtures.
     #[command(hide = true)]
@@ -544,6 +544,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["xtal"],
                 Some(xtal::XtalCommand::Dev(_)) => vec!["xtal", "dev"],
                 Some(xtal::XtalCommand::Verify(_)) => vec!["xtal", "verify"],
+                Some(xtal::XtalCommand::Impl(imp)) => match &imp.cmd {
+                    None => vec!["xtal", "impl"],
+                    Some(xtal::XtalImplCommand::Check(_)) => vec!["xtal", "impl", "check"],
+                    Some(xtal::XtalImplCommand::Sync(_)) => vec!["xtal", "impl", "sync"],
+                },
                 Some(xtal::XtalCommand::Spec(spec)) => match &spec.cmd {
                     None => vec!["xtal", "spec"],
                     Some(xtal::XtalSpecCommand::Fmt(_)) => vec!["xtal", "spec", "fmt"],

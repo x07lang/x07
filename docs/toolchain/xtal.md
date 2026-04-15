@@ -1,12 +1,12 @@
-# XTAL Phase A (intent → spec)
+# XTAL (intent → spec)
 
-XTAL Phase A adds a spec-first surface for X07 projects:
+XTAL provides a spec-first surface for X07 projects:
 
 - `*.x07spec.json` modules are the canonical intent/behavior interface.
 - Optional `*.x07spec.examples.jsonl` example cases provide a minimum semantic oracle.
-- A deterministic generator converts examples into normal X07 unit tests under `gen/xtal/`.
+- A deterministic generator converts examples and declared properties into normal X07 tests under `gen/xtal/`.
 
-Example project: `docs/examples/agent-gate/xtal-phase-a/toy-sorter/`.
+Example project: `docs/examples/agent-gate/xtal/toy-sorter/`.
 
 ## Artifacts
 
@@ -21,10 +21,17 @@ Example project: `docs/examples/agent-gate/xtal-phase-a/toy-sorter/`.
 - Schema: `x07.x07spec_examples@0.1.0` (see `docs/spec/schemas/x07.x07spec_examples@0.1.0.schema.json`)
 - One JSON object per line.
 
-Phase A minimum value encodings:
+Minimum value encodings:
 
 - `bytes` / `bytes_view`: `{"kind":"bytes_b64","b64":"..."}`
 - `i32`: a JSON integer (and the object form `{"kind":"i32","i32":123}` / `{"kind":"i32","value":123}` is accepted)
+
+### Properties (`ensures_props`)
+
+Each operation can declare `ensures_props[]` entries that reference a property function.
+
+- The property function is executed under property-based testing (PBT).
+- The property function MUST return a `bytes_status_v1` payload (see `std.test.status_ok` / `std.test.status_fail`).
 
 ## Commands
 
@@ -38,8 +45,6 @@ Phase A minimum value encodings:
 - `x07 xtal spec lint --input <spec.x07spec.json>`
 - `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`
   - Validates op ids, signatures, contract clause type/purity checks, and example cases.
-- `x07 xtal dev --phase A`
-  - Runs the Phase A spec pipeline (fmt/lint/check).
 
 ### Tests generation (examples → unit tests)
 
@@ -47,19 +52,37 @@ Phase A minimum value encodings:
   - Writes:
     - `gen/xtal/tests.json` (`x07.tests_manifest@0.2.0`)
     - `gen/xtal/<module_path>/tests.x07.json` (`module_id: gen.xtal.<module_id>.tests`)
+  - Generates:
+    - unit tests from examples (returns `result_i32`)
+    - PBT property wrappers for `ensures_props` (returns `bytes_status_v1`)
 - `x07 xtal tests gen-from-spec --project x07.json --check`
   - Fails if any generated output would change (drift check).
 
+### Implementation conformance
+
+- `x07 xtal impl check --project x07.json`
+  - Validates that each spec module has a corresponding implementation module under `src/`.
+  - Validates exports, signatures, and contract-core clause alignment.
+- `x07 xtal impl sync --project x07.json --write`
+  - Creates missing modules and stubs, adds missing exports, and syncs contract-core clauses.
+  - Requires deterministic clause ids for contract-core clauses (use `x07 xtal spec fmt --inject-ids --write`).
+
 ### End-to-end wrapper
 
+- `x07 xtal dev`
+  - Runs spec fmt/lint/check.
+  - If `arch/gen/index.x07gen.json` exists (or `--gen-index` is passed), runs `x07 gen verify`.
+  - Otherwise, runs `x07 xtal tests gen-from-spec --check`.
+  - Runs `x07 xtal impl check`.
 - `x07 xtal verify`
-  - Runs spec checks and generation drift check.
-  - Executes `x07 test --manifest gen/xtal/tests.json`.
+  - Runs `dev` + `x07 test --all --manifest gen/xtal/tests.json`.
   - Writes `target/xtal/tests.report.json` (test report).
 
 ## Output conventions
 
 - Generated test module id: `gen.xtal.<module_id>.tests`
-- Generated test entrypoints: `gen.xtal.<module_id>.tests.ex_0001`, `...ex_0002`, …
-- Manifest test ids: `xtal/<module_id>/<op_id>/ex0001`, `.../ex0002`, …
+- Generated unit test entrypoints: `gen.xtal.<module_id>.tests.ex_0001`, `...ex_0002`, …
+- Generated property wrapper entrypoints: `gen.xtal.<module_id>.tests.prop_0001`, `...prop_0002`, …
+- Manifest unit test ids: `xtal/<module_id>/<op_id>/ex0001`, `.../ex0002`, …
+- Manifest property test ids: `xtal/<module_id>/<op_id>/prop0001`, `.../prop0002`, …
 - XTAL reports record deterministic input digests in `meta.spec_digests` and `meta.examples_digests` (sha256 + bytes_len) for review/trust artifacts.

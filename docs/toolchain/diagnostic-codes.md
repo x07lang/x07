@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 545
-- quickfix support (`sometimes` or `always`): 498
-- quickfix coverage: 91.38%
+- total codes: 568
+- quickfix support (`sometimes` or `always`): 521
+- quickfix coverage: 91.73%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -44,7 +44,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_DEV_NO_SPECS` | x07 / run / error | sometimes | XTAL dev pipeline found no spec modules. |
 | `EXTAL_EXAMPLES_ARGS_EXTRA` | x07 / lint / error | sometimes | Example provides an extra arg. |
 | `EXTAL_EXAMPLES_ARGS_MISSING` | x07 / lint / error | sometimes | Example is missing a required arg. |
-| `EXTAL_EXAMPLES_ARG_KIND_UNSUPPORTED` | x07 / lint / error | sometimes | Example arg encoding kind is unsupported in Phase A. |
+| `EXTAL_EXAMPLES_ARG_KIND_UNSUPPORTED` | x07 / lint / error | sometimes | Example arg encoding kind is unsupported in the current XTAL subset. |
 | `EXTAL_EXAMPLES_B64_INVALID` | x07 / lint / error | sometimes | Example contains invalid base64 payload. |
 | `EXTAL_EXAMPLES_EXPECT_KIND_UNSUPPORTED` | x07 / lint / error | sometimes | Example expect encoding kind is unsupported. |
 | `EXTAL_EXAMPLES_IO_READ_FAILED` | x07 / parse / error | sometimes | Cannot read examples JSONL file. |
@@ -53,9 +53,23 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_EXAMPLES_SCHEMA_INVALID` | x07 / parse / error | sometimes | Examples JSONL line violates the structural schema. |
 | `EXTAL_EXAMPLES_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | Examples schema_version is unsupported. |
 | `EXTAL_GEN_DRIFT` | x07 / run / error | sometimes | Generated outputs drifted (check mode). |
+| `EXTAL_GEN_INDEX_MISSING` | x07 / parse / error | sometimes | Generator index file is missing. |
 | `EXTAL_GEN_NO_EXAMPLES` | x07 / run / error | sometimes | Spec modules contain no examples to generate tests from. |
 | `EXTAL_GEN_NO_SPECS` | x07 / run / error | sometimes | No spec modules found for generation. |
 | `EXTAL_GEN_UNSUPPORTED_TY` | x07 / run / error | sometimes | Generator cannot embed a value for the requested type/kind. |
+| `EXTAL_IMPL_CONTRACT_EXTRA` | x07 / lint / warning | sometimes | Implementation has extra contract clauses beyond the spec. |
+| `EXTAL_IMPL_CONTRACT_EXTRA_REQUIRES` | x07 / lint / error | sometimes | Implementation has extra requires clauses not present in the spec. |
+| `EXTAL_IMPL_CONTRACT_MISMATCH` | x07 / lint / error | sometimes | Implementation contract clause does not match the spec clause. |
+| `EXTAL_IMPL_CONTRACT_MISSING` | x07 / lint / error | sometimes | Implementation is missing a contract-core clause from the spec. |
+| `EXTAL_IMPL_EXPORT_MISSING` | x07 / lint / error | sometimes | Operation is missing from the implementation export list. |
+| `EXTAL_IMPL_IO_READ_FAILED` | x07 / parse / error | sometimes | Failed to read an implementation module file. |
+| `EXTAL_IMPL_KIND_UNSUPPORTED` | x07 / lint / error | sometimes | Implementation file kind is unsupported for module conformance. |
+| `EXTAL_IMPL_MODULE_ID_MISMATCH` | x07 / lint / error | sometimes | Implementation module_id does not match the spec module_id. |
+| `EXTAL_IMPL_MODULE_MISSING` | x07 / lint / error | sometimes | Implementation module is missing for a spec module. |
+| `EXTAL_IMPL_NO_SPECS` | x07 / parse / error | sometimes | No spec files found for implementation conformance checks. |
+| `EXTAL_IMPL_SIGNATURE_MISMATCH` | x07 / lint / error | sometimes | Implementation signature does not match the spec. |
+| `EXTAL_IMPL_UNSUPPORTED_TY` | x07 / lower / error | sometimes | Unsupported type for generated implementation stubs. |
+| `EXTAL_IMPL_X07AST_PARSE` | x07 / parse / error | sometimes | Implementation module is not valid x07AST JSON. |
 | `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED` | x07 / type / error | sometimes | Contract clause uses a disallowed builtin/head. |
 | `EXTAL_SPEC_CONTRACT_EXPR_NOT_I32` | x07 / type / error | sometimes | Contract clause does not typecheck to i32. |
 | `EXTAL_SPEC_CONTRACT_EXPR_PARSE` | x07 / parse / error | sometimes | Contract clause expression is not valid XTAL JSON expr. |
@@ -63,6 +77,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_SPEC_CONTRACT_USES_RESULT_OUTSIDE_ENSURES` | x07 / type / error | sometimes | `__result` used outside ensures. |
 | `EXTAL_SPEC_CONTRACT_WITNESS_INVALID` | x07 / type / error | sometimes | Contract witness is invalid or not contract-pure. |
 | `EXTAL_SPEC_EXAMPLES_REF_MISSING` | x07 / lint / error | sometimes | Spec examples_ref points to a missing file. |
+| `EXTAL_SPEC_HAS_ASSUMPTIONS` | x07 / lint / warning | sometimes | Spec declares assumptions. |
+| `EXTAL_SPEC_IDS_REQUIRED_FOR_SYNC` | x07 / lint / error | always | Contract-core clause ids are required for implementation syncing. |
 | `EXTAL_SPEC_IO_READ_FAILED` | x07 / parse / error | sometimes | Cannot read spec file. |
 | `EXTAL_SPEC_JSON_PARSE` | x07 / parse / error | sometimes | Spec file contains invalid JSON. |
 | `EXTAL_SPEC_MODULE_ID_INVALID` | x07 / lint / error | sometimes | Spec module_id is invalid. |
@@ -73,8 +89,14 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_SPEC_OP_NAME_MISSING` | x07 / lint / error | sometimes | Spec operation is missing name. |
 | `EXTAL_SPEC_PARAM_NAME_DUPLICATE` | x07 / lint / error | sometimes | Spec has duplicate parameter names. |
 | `EXTAL_SPEC_PARAM_NAME_INVALID` | x07 / lint / error | sometimes | Spec parameter name is invalid. |
-| `EXTAL_SPEC_PARAM_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec parameter type is unsupported in Phase A. |
-| `EXTAL_SPEC_RESULT_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec result type is unsupported in Phase A. |
+| `EXTAL_SPEC_PARAM_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec parameter type is unsupported in the current XTAL subset. |
+| `EXTAL_SPEC_PROP_ARGS_EMPTY` | x07 / lint / error | sometimes | Property args list is empty. |
+| `EXTAL_SPEC_PROP_ARG_DUPLICATE` | x07 / lint / error | sometimes | Property args contain a duplicate name. |
+| `EXTAL_SPEC_PROP_ARG_NAME_INVALID` | x07 / lint / error | sometimes | Property wrapper parameter name is invalid. |
+| `EXTAL_SPEC_PROP_ARG_UNKNOWN` | x07 / lint / error | sometimes | Property arg name does not match an operation parameter. |
+| `EXTAL_SPEC_PROP_NAME_INVALID` | x07 / lint / error | sometimes | Property name is invalid. |
+| `EXTAL_SPEC_PROP_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Property argument type is unsupported for PBT generation. |
+| `EXTAL_SPEC_RESULT_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec result type is unsupported in the current XTAL subset. |
 | `EXTAL_SPEC_SCHEMA_INVALID` | x07 / parse / error | sometimes | Spec JSON violates the structural schema. |
 | `EXTAL_SPEC_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | Spec schema_version is unsupported. |
 | `EXTAL_VERIFY_TESTS_FAILED` | x07 / run / error | sometimes | XTAL verify: x07 test failed. |
@@ -224,6 +246,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_GEN_NONDETERMINISTIC` | x07 / run / error | sometimes | Generator outputs are not deterministic. |
 | `E_GEN_RUN_FAILED` | x07 / run / error | sometimes | Generator command failed. |
 | `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
+| `WXTAL_IMPL_PARAM_NAME_MISMATCH` | x07 / lint / warning | sometimes | Implementation parameter names differ from the spec. |
 | `WXTAL_SPEC_NONCANONICAL_JSON` | x07 / rewrite / warning | always | Spec JSON is not in canonical form. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
 | `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
@@ -1278,7 +1301,7 @@ Agent strategy:
 
 ## `EXTAL_EXAMPLES_ARG_KIND_UNSUPPORTED`
 
-Summary: Example arg encoding kind is unsupported in Phase A.
+Summary: Example arg encoding kind is unsupported in the current XTAL subset.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -1287,7 +1310,7 @@ Quickfix support: `sometimes`
 
 Details:
 
-Example arg encoding kind is unsupported in Phase A.
+Example arg encoding kind is unsupported in the current XTAL subset.
 
 This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
 
@@ -1465,6 +1488,25 @@ Agent strategy:
 - Commit updated `gen/xtal/**` outputs and re-run `--check`.
 
 
+## `EXTAL_GEN_INDEX_MISSING`
+
+Summary: Generator index file is missing.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL wrapper commands were configured to use a generator index file, but the path does not exist.
+
+Agent strategy:
+
+- Create a generator index at `arch/gen/index.x07gen.json` (recommended), or pass the correct `--gen-index` path.
+- Re-run `x07 xtal dev` / `x07 xtal verify`.
+
+
 ## `EXTAL_GEN_NO_EXAMPLES`
 
 Summary: Spec modules contain no examples to generate tests from.
@@ -1526,6 +1568,255 @@ Agent strategy:
 
 - Re-run generation with `x07 xtal tests gen-from-spec --project x07.json --write`.
 - Commit updated `gen/xtal/**` outputs and re-run `--check`.
+
+
+## `EXTAL_IMPL_CONTRACT_EXTRA`
+
+Summary: Implementation has extra contract clauses beyond the spec.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Extra `ensures`/`invariant` clauses are allowed but should be intentional and documented.
+
+Agent strategy:
+
+- If the extra clauses are unintended, remove them or sync from spec.
+- Otherwise, keep them and ensure they remain spec-compatible.
+
+
+## `EXTAL_IMPL_CONTRACT_EXTRA_REQUIRES`
+
+Summary: Implementation has extra requires clauses not present in the spec.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Extra preconditions strengthen the contract beyond the spec and are rejected by implementation conformance checks.
+
+Agent strategy:
+
+- Remove the extra `requires` clause(s), or add the intended clauses to the spec (with review).
+- Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_CONTRACT_MISMATCH`
+
+Summary: Implementation contract clause does not match the spec clause.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+When a contract-core clause is matched by id, the implementation expression must match the spec expression.
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --project x07.json --write` to rewrite mismatched contract-core clauses.
+- Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_CONTRACT_MISSING`
+
+Summary: Implementation is missing a contract-core clause from the spec.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract-core spec clauses (requires/ensures/invariant that pass contracts-only typecheck) must be present in the implementation contracts.
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --project x07.json --write` to insert missing contract-core clauses.
+- Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_EXPORT_MISSING`
+
+Summary: Operation is missing from the implementation export list.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Each spec operation must be exported from the corresponding implementation module.
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --project x07.json --write` to add missing exports.
+- Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_IO_READ_FAILED`
+
+Summary: Failed to read an implementation module file.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The implementation module exists but could not be read from disk.
+
+Agent strategy:
+
+- Check file permissions and path correctness.
+- Re-run `x07 xtal impl check --project x07.json`.
+
+
+## `EXTAL_IMPL_KIND_UNSUPPORTED`
+
+Summary: Implementation file kind is unsupported for module conformance.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL implementation conformance expects x07AST kind `module` for implementation files under `src/`.
+
+Agent strategy:
+
+- Ensure the implementation file is an x07AST module (`kind: "module"`).
+- Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_MODULE_ID_MISMATCH`
+
+Summary: Implementation module_id does not match the spec module_id.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The spec module_id and the implementation module_id must match for reliable conformance checking and syncing.
+
+Agent strategy:
+
+- Fix `module_id` in the implementation module to match the spec.
+- Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_MODULE_MISSING`
+
+Summary: Implementation module is missing for a spec module.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+For each `spec/<module_id>.x07spec.json`, XTAL expects an implementation module at `src/<module_id with '\.' replaced by '/'>.x07.json`.
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --project x07.json --write` to create missing modules and stubs.
+- Commit the new `src/**` file(s), then re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_NO_SPECS`
+
+Summary: No spec files found for implementation conformance checks.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The implementation conformance command could not find any `*.x07spec.json` modules under the configured spec directory.
+
+Agent strategy:
+
+- Ensure your project has spec modules under `spec/` (recommended).
+- Or pass the correct `--spec-dir`.
+- Re-run `x07 xtal impl check --project x07.json`.
+
+
+## `EXTAL_IMPL_SIGNATURE_MISMATCH`
+
+Summary: Implementation signature does not match the spec.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Implementation param counts/types/brands and result type/brand must match the spec operation signature.
+
+Agent strategy:
+
+- Edit the implementation `defn` signature (or the spec) so param and result types/brands match.
+- Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_UNSUPPORTED_TY`
+
+Summary: Unsupported type for generated implementation stubs.
+
+Origins:
+- x07 (stage: lower, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL implementation syncing can create stubs for a limited type subset. A stub body could not be generated for this type.
+
+Agent strategy:
+
+- Implement the function body manually (or adjust the spec signature into the supported subset).
+- Re-run `x07 xtal impl sync --project x07.json --write` if needed.
+
+
+## `EXTAL_IMPL_X07AST_PARSE`
+
+Summary: Implementation module is not valid x07AST JSON.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The implementation module could not be parsed as an x07AST JSON document.
+
+Agent strategy:
+
+- Run `x07 fmt --write --path <module.x07.json>` to canonicalize and validate shape.
+- If the file is not meant to be x07AST JSON, replace it with a valid `*.x07.json` module.
+- Re-run `x07 xtal impl check`.
 
 
 ## `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED`
@@ -1680,6 +1971,45 @@ Agent strategy:
 - Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
 - Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
 - Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_HAS_ASSUMPTIONS`
+
+Summary: Spec declares assumptions.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Assumptions are recorded for review and trust gating. They may widen the assumption surface of the project.
+
+Agent strategy:
+
+- Review the listed assumption ids and their text in the spec module.
+- If assumptions are not intended, remove them.
+- Re-run `x07 xtal spec check --project x07.json`.
+
+
+## `EXTAL_SPEC_IDS_REQUIRED_FOR_SYNC`
+
+Summary: Contract-core clause ids are required for implementation syncing.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `always`
+
+Details:
+
+Implementation syncing uses clause ids to match and update contract-core clauses deterministically.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --inject-ids --write --input <spec.x07spec.json>`.
+- Re-run `x07 xtal impl sync --project x07.json --write`.
 
 
 ## `EXTAL_SPEC_IO_READ_FAILED`
@@ -1904,7 +2234,7 @@ Agent strategy:
 
 ## `EXTAL_SPEC_PARAM_TY_UNSUPPORTED`
 
-Summary: Spec parameter type is unsupported in Phase A.
+Summary: Spec parameter type is unsupported in the current XTAL subset.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -1913,7 +2243,7 @@ Quickfix support: `sometimes`
 
 Details:
 
-Spec parameter type is unsupported in Phase A.
+Spec parameter type is unsupported in the current XTAL subset.
 
 This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
 
@@ -1924,9 +2254,9 @@ Agent strategy:
 - Apply deterministic edits to fix reported pointers, then re-run.
 
 
-## `EXTAL_SPEC_RESULT_TY_UNSUPPORTED`
+## `EXTAL_SPEC_PROP_ARGS_EMPTY`
 
-Summary: Spec result type is unsupported in Phase A.
+Summary: Property args list is empty.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -1935,7 +2265,123 @@ Quickfix support: `sometimes`
 
 Details:
 
-Spec result type is unsupported in Phase A.
+Each `ensures_props` entry must specify at least one argument name that maps to an operation parameter.
+
+Agent strategy:
+
+- Add one or more operation parameter names to `ensures_props[].args`.
+- Re-run `x07 xtal tests gen-from-spec --check`.
+
+
+## `EXTAL_SPEC_PROP_ARG_DUPLICATE`
+
+Summary: Property args contain a duplicate name.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A property arg list must not repeat the same operation parameter name.
+
+Agent strategy:
+
+- Remove the duplicate arg name(s) from `ensures_props[].args`.
+- Re-run `x07 xtal tests gen-from-spec --check`.
+
+
+## `EXTAL_SPEC_PROP_ARG_NAME_INVALID`
+
+Summary: Property wrapper parameter name is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The generated property wrapper could not derive a valid local parameter name from the referenced operation parameter name.
+
+Agent strategy:
+
+- Rename the operation parameter to a valid local name in the spec and implementation.
+- Re-run `x07 xtal tests gen-from-spec --write`, then commit updated outputs.
+
+
+## `EXTAL_SPEC_PROP_ARG_UNKNOWN`
+
+Summary: Property arg name does not match an operation parameter.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Each `ensures_props[].args[]` entry must reference a parameter name declared by the operation.
+
+Agent strategy:
+
+- Fix the arg name to match an operation parameter name.
+- Re-run `x07 xtal tests gen-from-spec --check`.
+
+
+## `EXTAL_SPEC_PROP_NAME_INVALID`
+
+Summary: Property name is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+An `ensures_props[].prop` value must be a qualified symbol of the form `module.name`.
+
+Agent strategy:
+
+- Fix `ensures_props[].prop` to a valid qualified symbol.
+- Ensure the referenced property function exists and is exported.
+- Re-run `x07 xtal tests gen-from-spec --check`.
+
+
+## `EXTAL_SPEC_PROP_TY_UNSUPPORTED`
+
+Summary: Property argument type is unsupported for PBT generation.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The current PBT generator supports `i32`, `bytes`, and `bytes_view` operation parameter types for property wrappers.
+
+Agent strategy:
+
+- Adjust the spec operation parameter types into the supported subset for PBT.
+- Or omit the property from `ensures_props` until a generator mapping exists.
+- Re-run `x07 xtal tests gen-from-spec --check`.
+
+
+## `EXTAL_SPEC_RESULT_TY_UNSUPPORTED`
+
+Summary: Spec result type is unsupported in the current XTAL subset.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec result type is unsupported in the current XTAL subset.
 
 This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
 
@@ -4956,6 +5402,25 @@ Agent strategy:
 - Reproduce `E_SBOM_GENERATION_FAILED` with the failing command.
 - Inspect structured diagnostic fields.
 - Apply deterministic edits and re-run.
+
+
+## `WXTAL_IMPL_PARAM_NAME_MISMATCH`
+
+Summary: Implementation parameter names differ from the spec.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Parameter names are currently checked at warning level; types/brands must still match exactly.
+
+Agent strategy:
+
+- Rename implementation parameters to match the spec parameter names for consistency.
+- Re-run `x07 xtal impl check`.
 
 
 ## `WXTAL_SPEC_NONCANONICAL_JSON`

@@ -43,8 +43,9 @@ Minimal example:
 - `x07 gen verify --index arch/gen/index.x07gen.json`
   - Non-mutating.
   - Checks that declared `outputs` exist.
-  - Runs each generator in a clean temporary copy of the project, then compares outputs against the committed tree (drift check).
-  - In `double_run_v1`, runs each generator twice and compares the two output trees (determinism gate).
+  - Runs each generator’s `check_argv` in a clean temporary copy of the project (against the committed outputs).
+  - Runs each generator’s `write_argv` in clean temporary copies to verify drift and determinism.
+  - In `double_run_v1`, runs `write_argv` twice and compares the two output trees (determinism gate).
 - `x07 gen write --index arch/gen/index.x07gen.json`
   - Mutating.
   - Removes declared outputs, then runs each generator’s `write_argv` in the project root.
@@ -55,4 +56,3 @@ Minimal example:
 2. Regenerate outputs: `x07 gen write --index arch/gen/index.x07gen.json`
 3. Commit both inputs and outputs.
 4. CI runs: `x07 gen verify --index arch/gen/index.x07gen.json`
-

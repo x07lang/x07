@@ -238,6 +238,22 @@ fn cmd_gen_verify(
 
             let temp_a = TempDirGuard::new("gen_verify_a")?;
             copy_project_tree(&project_root, &temp_a.path)?;
+            let run_check = run_self(&temp_a.path, &entry.check_argv)?;
+            if run_check.exit_code != 0 {
+                diagnostics.push(diag_error(
+                    "E_GEN_RUN_FAILED",
+                    diagnostics::Stage::Run,
+                    format!(
+                        "generator {:?} failed in verify check run (exit_code={}): {}",
+                        entry.id,
+                        run_check.exit_code,
+                        stderr_summary(&run_check.stderr)
+                    ),
+                    None,
+                ));
+                generator_results.push(json!({"id": entry.id, "status": "error"}));
+                continue;
+            }
             remove_outputs(&temp_a.path, &entry.outputs);
             let run_a = run_self(&temp_a.path, &entry.write_argv)?;
             if run_a.exit_code != 0 {

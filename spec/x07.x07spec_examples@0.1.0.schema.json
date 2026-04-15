@@ -43,7 +43,7 @@
       "maximum": 2147483647
     },
     "value": {
-      "description": "Phase-A minimum value encoding (bytes_b64 and i32).",
+      "description": "Minimum value encoding (bytes_b64 and i32).",
       "oneOf": [{ "$ref": "#/$defs/bytes_b64" }, { "$ref": "#/$defs/i32" }, { "$ref": "#/$defs/i32_obj" }]
     }
   }

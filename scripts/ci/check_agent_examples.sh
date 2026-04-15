@@ -842,5 +842,59 @@ expected_17='{"count":3,"label":"hello","pretty":false,"schema_version":"x07.exa
 
 echo "ok: json-report"
 
+# ----------------------------
+# Example 18: XTAL toy-sorter (solve-pure)
+# ----------------------------
+
+echo "==> agent example: xtal-toy-sorter (solve-pure)"
+
+xtal_work="$tmp_dir/xtal-toy-sorter"
+copy_project "docs/examples/agent-gate/xtal/toy-sorter" "$xtal_work"
+
+seed_official_deps "$xtal_work"
+pkg_lock_check "$xtal_work"
+fmt_check_all "$xtal_work"
+
+mkdir -p "$xtal_work/tmp"
+xtal_verify_report="$xtal_work/tmp/xtal.verify.report.json"
+xtal_verify_stderr="$xtal_work/tmp/xtal.verify.stderr"
+set +e
+(cd "$xtal_work" && "$x07_bin" xtal verify --project x07.json >"$xtal_verify_report" 2>"$xtal_verify_stderr")
+xtal_verify_code="$?"
+set -e
+if [[ "$xtal_verify_code" -ne 0 ]]; then
+  echo "ERROR: xtal-toy-sorter: x07 xtal verify failed (exit $xtal_verify_code)" >&2
+  if [[ -s "$xtal_verify_stderr" ]]; then
+    echo "--- stderr ($xtal_verify_stderr) ---" >&2
+    cat "$xtal_verify_stderr" >&2 || true
+  fi
+  if [[ -s "$xtal_verify_report" ]]; then
+    echo "--- report ($xtal_verify_report) ---" >&2
+    cat "$xtal_verify_report" >&2 || true
+  fi
+  exit 1
+fi
+
+gen_verify_report="$xtal_work/tmp/gen.verify.report.json"
+gen_verify_stderr="$xtal_work/tmp/gen.verify.stderr"
+set +e
+(cd "$xtal_work" && "$x07_bin" gen verify --index arch/gen/index.x07gen.json >"$gen_verify_report" 2>"$gen_verify_stderr")
+gen_verify_code="$?"
+set -e
+if [[ "$gen_verify_code" -ne 0 ]]; then
+  echo "ERROR: xtal-toy-sorter: x07 gen verify failed (exit $gen_verify_code)" >&2
+  if [[ -s "$gen_verify_stderr" ]]; then
+    echo "--- stderr ($gen_verify_stderr) ---" >&2
+    cat "$gen_verify_stderr" >&2 || true
+  fi
+  if [[ -s "$gen_verify_report" ]]; then
+    echo "--- report ($gen_verify_report) ---" >&2
+    cat "$gen_verify_report" >&2 || true
+  fi
+  exit 1
+fi
+
+echo "ok: xtal-toy-sorter"
+
 echo
 echo "ok: agent examples gate passed"

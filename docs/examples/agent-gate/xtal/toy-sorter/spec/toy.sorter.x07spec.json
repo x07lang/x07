@@ -19,7 +19,16 @@
           "id": "len_preserved"
         }
       ],
-      "ensures_props": [],
+      "ensures_props": [
+        {
+          "args": [
+            "b"
+          ],
+          "doc": "Property-based: output is sorted ascending and preserves the input multiset.",
+          "id": "prop_sort_u8_asc",
+          "prop": "toy.sorter.prop_sort_u8_asc"
+        }
+      ],
       "examples_ref": "spec/toy.sorter.x07spec.examples.jsonl",
       "id": "op.sort_u8_asc.v1",
       "name": "toy.sorter.sort_u8_asc",

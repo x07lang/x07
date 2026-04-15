@@ -54,7 +54,7 @@
 - [Schema derive](toolchain/schema-derive.md)
 - [State machines](toolchain/state-machines.md)
 - [Generated artifacts](toolchain/generated-artifacts.md)
-- [XTAL Phase A](toolchain/xtal-phase-a.md)
+- [XTAL](toolchain/xtal.md)
 - [Running programs](toolchain/running-programs.md)
 - [Embedding in C](toolchain/embedding-in-c.md)
 - [Repair loop](toolchain/repair-loop.md)

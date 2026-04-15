@@ -13,6 +13,7 @@ use x07c::ast::Expr;
 use x07c::diagnostics;
 use x07c::x07ast;
 
+use crate::gen::{GenArgs, GenCommand, GenVerifyArgs};
 use crate::report_common;
 use crate::util;
 
@@ -27,6 +28,8 @@ const TESTS_MANIFEST_SCHEMA_VERSION: &str = "x07.tests_manifest@0.2.0";
 const DEFAULT_SPEC_DIR: &str = "spec";
 const DEFAULT_GEN_DIR: &str = "gen/xtal";
 const DEFAULT_MANIFEST_PATH: &str = "gen/xtal/tests.json";
+const DEFAULT_GEN_INDEX_PATH: &str = "arch/gen/index.x07gen.json";
+const DEFAULT_IMPL_DIR: &str = "src";
 const DEFAULT_VERIFY_DIR: &str = "target/xtal";
 const DEFAULT_VERIFY_TEST_REPORT_PATH: &str = "target/xtal/tests.report.json";
 
@@ -40,7 +43,7 @@ pub struct XtalArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum XtalCommand {
-    /// Run Phase-A spec pipeline (fmt/lint/check).
+    /// Run the spec pipeline (fmt/lint/check).
     Dev(XtalDevArgs),
     /// Verify spec + generated tests + test execution.
     Verify(XtalVerifyArgs),
@@ -48,6 +51,8 @@ pub enum XtalCommand {
     Spec(XtalSpecArgs),
     /// Work with generated tests from spec examples.
     Tests(XtalTestsArgs),
+    /// Implementation conformance helpers.
+    Impl(XtalImplArgs),
 }
 
 #[derive(Debug, Args)]
@@ -56,13 +61,13 @@ pub struct XtalDevArgs {
     #[arg(long, value_name = "PATH")]
     pub project: Option<PathBuf>,
 
-    /// XTAL phase to run (currently only `A` is supported).
-    #[arg(long, value_name = "PHASE", default_value = "A")]
-    pub phase: String,
-
     /// Spec directory relative to the project root.
     #[arg(long, value_name = "DIR", default_value = DEFAULT_SPEC_DIR)]
     pub spec_dir: PathBuf,
+
+    /// Generator index path relative to the project root (defaults to `arch/gen/index.x07gen.json` if present).
+    #[arg(long, value_name = "PATH")]
+    pub gen_index: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -74,6 +79,10 @@ pub struct XtalVerifyArgs {
     /// Spec directory relative to the project root.
     #[arg(long, value_name = "DIR", default_value = DEFAULT_SPEC_DIR)]
     pub spec_dir: PathBuf,
+
+    /// Generator index path relative to the project root (defaults to `arch/gen/index.x07gen.json` if present).
+    #[arg(long, value_name = "PATH")]
+    pub gen_index: Option<PathBuf>,
 
     /// Generated output directory relative to the project root.
     #[arg(long, value_name = "DIR", default_value = DEFAULT_GEN_DIR)]
@@ -147,7 +156,7 @@ pub struct XtalSpecScaffoldArgs {
     #[arg(long, value_name = "NAME:TY")]
     pub param: Vec<String>,
 
-    /// Operation result type (Phase-A minimum: bytes, bytes_view, i32).
+    /// Operation result type (currently supported: bytes, bytes_view, i32).
     #[arg(long, value_name = "TY", default_value = "i32")]
     pub result: String,
 
@@ -197,6 +206,53 @@ pub struct XtalTestsGenArgs {
     pub write: bool,
 }
 
+#[derive(Debug, Args)]
+pub struct XtalImplArgs {
+    #[command(subcommand)]
+    pub cmd: Option<XtalImplCommand>,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum XtalImplCommand {
+    /// Validate that implementations exist and match the spec.
+    Check(XtalImplCheckArgs),
+    /// Create or update implementation stubs from the spec.
+    Sync(XtalImplSyncArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct XtalImplCheckArgs {
+    /// Project manifest path (defaults to searching upwards for x07.json).
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Spec directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_SPEC_DIR)]
+    pub spec_dir: PathBuf,
+
+    /// Implementation directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_IMPL_DIR)]
+    pub impl_dir: PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub struct XtalImplSyncArgs {
+    /// Project manifest path (defaults to searching upwards for x07.json).
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Spec directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_SPEC_DIR)]
+    pub spec_dir: PathBuf,
+
+    /// Implementation directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_IMPL_DIR)]
+    pub impl_dir: PathBuf,
+
+    #[arg(long)]
+    pub write: bool,
+}
+
 pub fn cmd_xtal(
     machine: &crate::reporting::MachineArgs,
     args: XtalArgs,
@@ -209,6 +265,20 @@ pub fn cmd_xtal(
         XtalCommand::Verify(args) => cmd_xtal_verify(machine, args),
         XtalCommand::Spec(args) => cmd_xtal_spec(machine, args),
         XtalCommand::Tests(args) => cmd_xtal_tests(machine, args),
+        XtalCommand::Impl(args) => cmd_xtal_impl(machine, args),
+    }
+}
+
+fn cmd_xtal_impl(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalImplArgs,
+) -> Result<std::process::ExitCode> {
+    let Some(cmd) = args.cmd else {
+        anyhow::bail!("missing xtal impl subcommand (try --help)");
+    };
+    match cmd {
+        XtalImplCommand::Check(args) => cmd_xtal_impl_check(machine, args),
+        XtalImplCommand::Sync(args) => cmd_xtal_impl_sync(machine, args),
     }
 }
 
@@ -216,20 +286,15 @@ fn cmd_xtal_dev(
     machine: &crate::reporting::MachineArgs,
     args: XtalDevArgs,
 ) -> Result<std::process::ExitCode> {
-    if args.phase.trim() != "A" && args.phase.trim() != "a" {
-        anyhow::bail!(
-            "unsupported --phase {:?} (only \"A\" is supported)",
-            args.phase
-        );
-    }
-
     let project_root = resolve_project_root(args.project.as_deref(), None)?;
     let spec_root = project_root.join(&args.spec_dir);
+    let gen_index = resolve_gen_index_path(&project_root, args.gen_index.as_deref());
 
     let mut diagnostics = Vec::new();
     let spec_files = collect_spec_files(&spec_root, &Vec::new(), &mut diagnostics);
     let mut merged_spec_digests: BTreeMap<String, Value> = BTreeMap::new();
     let mut merged_examples_digests: BTreeMap<String, Value> = BTreeMap::new();
+    let mut merged_impl_digests: BTreeMap<String, Value> = BTreeMap::new();
     let mut spec_fmt_ok = true;
     let mut spec_fmt_report: Option<Value> = None;
     let mut spec_lint_report: Option<Value> = None;
@@ -318,9 +383,114 @@ fn cmd_xtal_dev(
         }
     }
 
+    let mut gen_ok = true;
+    let mut gen_report: Option<Value> = None;
+    if let Some(gen_index) = gen_index {
+        if gen_index.is_file() {
+            let gen_args = GenArgs {
+                cmd: Some(GenCommand::Verify(GenVerifyArgs { index: gen_index })),
+            };
+            match capture_report_json("xtal_gen_verify", |m| crate::gen::cmd_gen(m, gen_args)) {
+                Ok((code, v)) => {
+                    if code != std::process::ExitCode::SUCCESS {
+                        gen_ok = false;
+                    }
+                    diagnostics
+                        .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
+                    gen_report = Some(v);
+                }
+                Err(err) => {
+                    gen_ok = false;
+                    diagnostics.push(diag_error(
+                        "X07-INTERNAL-0001",
+                        diagnostics::Stage::Run,
+                        format!("gen verify capture failed: {err:#}"),
+                        None,
+                    ));
+                }
+            }
+        } else {
+            gen_ok = false;
+            diagnostics.push(diag_error(
+                "EXTAL_GEN_INDEX_MISSING",
+                diagnostics::Stage::Parse,
+                format!("generator index does not exist: {}", gen_index.display()),
+                None,
+            ));
+        }
+    } else if !spec_files.is_empty() {
+        let gen_args = XtalTestsGenArgs {
+            project: Some(project_root.join("x07.json")),
+            spec: Vec::new(),
+            spec_dir: args.spec_dir.clone(),
+            out_dir: PathBuf::from(DEFAULT_GEN_DIR),
+            check: true,
+            write: false,
+        };
+        match capture_report_json("xtal_gen_from_spec", |m| {
+            cmd_xtal_tests_gen_from_spec(m, gen_args)
+        }) {
+            Ok((code, v)) => {
+                if code != std::process::ExitCode::SUCCESS {
+                    gen_ok = false;
+                }
+                merge_meta_digests(&v, "spec_digests", &mut merged_spec_digests);
+                merge_meta_digests(&v, "examples_digests", &mut merged_examples_digests);
+                diagnostics
+                    .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
+                gen_report = Some(v);
+            }
+            Err(err) => {
+                gen_ok = false;
+                diagnostics.push(diag_error(
+                    "X07-INTERNAL-0001",
+                    diagnostics::Stage::Run,
+                    format!("tests gen-from-spec capture failed: {err:#}"),
+                    None,
+                ));
+            }
+        }
+    }
+
+    let mut impl_ok = true;
+    let mut impl_report: Option<Value> = None;
+    if !spec_files.is_empty() {
+        let impl_args = XtalImplCheckArgs {
+            project: Some(project_root.join("x07.json")),
+            spec_dir: args.spec_dir.clone(),
+            impl_dir: PathBuf::from(DEFAULT_IMPL_DIR),
+        };
+        match capture_report_json("xtal_impl_check", |m| cmd_xtal_impl_check(m, impl_args)) {
+            Ok((code, v)) => {
+                if code != std::process::ExitCode::SUCCESS {
+                    impl_ok = false;
+                }
+                merge_meta_digests(&v, "impl_digests", &mut merged_impl_digests);
+                diagnostics
+                    .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
+                impl_report = Some(v);
+            }
+            Err(err) => {
+                impl_ok = false;
+                diagnostics.push(diag_error(
+                    "X07-INTERNAL-0001",
+                    diagnostics::Stage::Run,
+                    format!("impl check capture failed: {err:#}"),
+                    None,
+                ));
+            }
+        }
+    }
+
     let mut report = diagnostics::Report::ok();
     report = report.with_diagnostics(diagnostics);
     if !spec_fmt_ok {
+        report.ok = false;
+    }
+    if !gen_ok {
+        report.ok = false;
+    }
+    if !impl_ok {
         report.ok = false;
     }
     report.meta.insert(
@@ -339,6 +509,10 @@ fn cmd_xtal_dev(
         "examples_digests".to_string(),
         Value::Array(merged_examples_digests.into_values().collect()),
     );
+    report.meta.insert(
+        "impl_digests".to_string(),
+        Value::Array(merged_impl_digests.into_values().collect()),
+    );
     if let Some(v) = spec_fmt_report {
         report.meta.insert("spec_fmt_report".to_string(), v);
     }
@@ -347,6 +521,12 @@ fn cmd_xtal_dev(
     }
     if let Some(v) = spec_check_report {
         report.meta.insert("spec_check_report".to_string(), v);
+    }
+    if let Some(v) = gen_report {
+        report.meta.insert("generator_report".to_string(), v);
+    }
+    if let Some(v) = impl_report {
+        report.meta.insert("impl_check_report".to_string(), v);
     }
     write_report(machine, &report)?;
 
@@ -390,12 +570,14 @@ fn cmd_xtal_verify(
 ) -> Result<std::process::ExitCode> {
     let project_root = resolve_project_root(args.project.as_deref(), None)?;
     let spec_root = project_root.join(&args.spec_dir);
+    let gen_index = resolve_gen_index_path(&project_root, args.gen_index.as_deref());
     let manifest_path = project_root.join(&args.manifest);
 
     let mut diagnostics = Vec::new();
     let spec_files = collect_spec_files(&spec_root, &Vec::new(), &mut diagnostics);
     let mut merged_spec_digests: BTreeMap<String, Value> = BTreeMap::new();
     let mut merged_examples_digests: BTreeMap<String, Value> = BTreeMap::new();
+    let mut merged_impl_digests: BTreeMap<String, Value> = BTreeMap::new();
     let mut spec_fmt_ok = true;
     let mut spec_fmt_report: Option<Value> = None;
 
@@ -456,20 +638,79 @@ fn cmd_xtal_verify(
     };
 
     // tests gen-from-spec --check
-    let gen_args = XtalTestsGenArgs {
-        project: Some(project_root.join("x07.json")),
-        spec: Vec::new(),
-        spec_dir: args.spec_dir.clone(),
-        out_dir: args.gen_dir.clone(),
-        check: true,
-        write: false,
+    let (gen_code, gen_report) = if let Some(gen_index) = gen_index {
+        if gen_index.is_file() {
+            let gen_args = GenArgs {
+                cmd: Some(GenCommand::Verify(GenVerifyArgs { index: gen_index })),
+            };
+            match capture_report_json("xtal_verify_gen_verify", |m| {
+                crate::gen::cmd_gen(m, gen_args)
+            }) {
+                Ok((code, v)) => {
+                    diagnostics
+                        .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
+                    (code, Some(v))
+                }
+                Err(err) => {
+                    diagnostics.push(diag_error(
+                        "X07-INTERNAL-0001",
+                        diagnostics::Stage::Run,
+                        format!("gen verify capture failed: {err:#}"),
+                        None,
+                    ));
+                    (std::process::ExitCode::from(1), None)
+                }
+            }
+        } else {
+            diagnostics.push(diag_error(
+                "EXTAL_GEN_INDEX_MISSING",
+                diagnostics::Stage::Parse,
+                format!("generator index does not exist: {}", gen_index.display()),
+                None,
+            ));
+            (std::process::ExitCode::from(1), None)
+        }
+    } else {
+        let gen_args = XtalTestsGenArgs {
+            project: Some(project_root.join("x07.json")),
+            spec: Vec::new(),
+            spec_dir: args.spec_dir.clone(),
+            out_dir: args.gen_dir.clone(),
+            check: true,
+            write: false,
+        };
+        match capture_report_json("xtal_verify_gen_from_spec", |m| {
+            cmd_xtal_tests_gen_from_spec(m, gen_args)
+        }) {
+            Ok((code, v)) => {
+                merge_meta_digests(&v, "spec_digests", &mut merged_spec_digests);
+                merge_meta_digests(&v, "examples_digests", &mut merged_examples_digests);
+                diagnostics
+                    .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
+                (code, Some(v))
+            }
+            Err(err) => {
+                diagnostics.push(diag_error(
+                    "X07-INTERNAL-0001",
+                    diagnostics::Stage::Run,
+                    format!("tests gen-from-spec capture failed: {err:#}"),
+                    None,
+                ));
+                (std::process::ExitCode::from(1), None)
+            }
+        }
     };
-    let (gen_code, gen_report) = match capture_report_json("xtal_verify_gen_from_spec", |m| {
-        cmd_xtal_tests_gen_from_spec(m, gen_args)
+
+    let impl_args = XtalImplCheckArgs {
+        project: Some(project_root.join("x07.json")),
+        spec_dir: args.spec_dir.clone(),
+        impl_dir: PathBuf::from(DEFAULT_IMPL_DIR),
+    };
+    let (impl_code, impl_report) = match capture_report_json("xtal_verify_impl_check", |m| {
+        cmd_xtal_impl_check(m, impl_args)
     }) {
         Ok((code, v)) => {
-            merge_meta_digests(&v, "spec_digests", &mut merged_spec_digests);
-            merge_meta_digests(&v, "examples_digests", &mut merged_examples_digests);
+            merge_meta_digests(&v, "impl_digests", &mut merged_impl_digests);
             diagnostics.extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
             (code, Some(v))
         }
@@ -477,7 +718,7 @@ fn cmd_xtal_verify(
             diagnostics.push(diag_error(
                 "X07-INTERNAL-0001",
                 diagnostics::Stage::Run,
-                format!("tests gen-from-spec capture failed: {err:#}"),
+                format!("impl check capture failed: {err:#}"),
                 None,
             ));
             (std::process::ExitCode::from(1), None)
@@ -486,7 +727,9 @@ fn cmd_xtal_verify(
 
     // Run tests if prechecks succeeded.
     let mut tests_ok = false;
-    if check_code == std::process::ExitCode::SUCCESS && gen_code == std::process::ExitCode::SUCCESS
+    if check_code == std::process::ExitCode::SUCCESS
+        && gen_code == std::process::ExitCode::SUCCESS
+        && impl_code == std::process::ExitCode::SUCCESS
     {
         std::fs::create_dir_all(project_root.join(DEFAULT_VERIFY_DIR)).with_context(|| {
             format!("mkdir: {}", project_root.join(DEFAULT_VERIFY_DIR).display())
@@ -496,6 +739,7 @@ fn cmd_xtal_verify(
             &project_root,
             &[
                 "test".to_string(),
+                "--all".to_string(),
                 "--manifest".to_string(),
                 manifest_path.display().to_string(),
                 "--report-out".to_string(),
@@ -548,6 +792,10 @@ fn cmd_xtal_verify(
         "examples_digests".to_string(),
         Value::Array(merged_examples_digests.into_values().collect()),
     );
+    report.meta.insert(
+        "impl_digests".to_string(),
+        Value::Array(merged_impl_digests.into_values().collect()),
+    );
     report
         .meta
         .insert("tests_ok".to_string(), Value::Bool(tests_ok));
@@ -555,7 +803,10 @@ fn cmd_xtal_verify(
         report.meta.insert("spec_check_report".to_string(), v);
     }
     if let Some(v) = gen_report {
-        report.meta.insert("gen_from_spec_report".to_string(), v);
+        report.meta.insert("generator_report".to_string(), v);
+    }
+    if let Some(v) = impl_report {
+        report.meta.insert("impl_check_report".to_string(), v);
     }
     if let Some(v) = spec_fmt_report {
         report.meta.insert("spec_fmt_report".to_string(), v);
@@ -567,6 +818,1013 @@ fn cmd_xtal_verify(
     } else {
         std::process::ExitCode::from(1)
     })
+}
+
+fn resolve_gen_index_path(project_root: &Path, arg: Option<&Path>) -> Option<PathBuf> {
+    let Some(arg) = arg else {
+        let default = project_root.join(DEFAULT_GEN_INDEX_PATH);
+        return default.is_file().then_some(default);
+    };
+    Some(if arg.is_absolute() {
+        arg.to_path_buf()
+    } else {
+        project_root.join(arg)
+    })
+}
+
+fn cmd_xtal_impl_check(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalImplCheckArgs,
+) -> Result<std::process::ExitCode> {
+    let project_root = resolve_project_root(args.project.as_deref(), None)?;
+    let spec_root = project_root.join(&args.spec_dir);
+    let impl_root = project_root.join(&args.impl_dir);
+
+    let mut diags = Vec::new();
+    let spec_files = collect_spec_files(&spec_root, &Vec::new(), &mut diags);
+    if spec_files.is_empty() {
+        diags.push(diag_error(
+            "EXTAL_IMPL_NO_SPECS",
+            diagnostics::Stage::Parse,
+            format!("no spec files found under {}", spec_root.display()),
+            None,
+        ));
+    }
+
+    let mut modules: Vec<(PathBuf, SpecFile)> = Vec::new();
+    for spec_path in &spec_files {
+        let (doc_opt, lint_diags) = lint_one_spec_file(spec_path)?;
+        diags.extend(lint_diags);
+        let Some(doc) = doc_opt else {
+            continue;
+        };
+        let spec: SpecFile = match serde_json::from_value(doc) {
+            Ok(v) => v,
+            Err(err) => {
+                diags.push(spec_error(
+                    "EXTAL_SPEC_SCHEMA_INVALID",
+                    diagnostics::Stage::Parse,
+                    spec_path,
+                    None,
+                    format!("spec JSON shape is invalid: {err}"),
+                ));
+                continue;
+            }
+        };
+        modules.push((spec_path.clone(), spec));
+    }
+
+    let mut impl_paths: BTreeSet<PathBuf> = BTreeSet::new();
+    for (spec_path, spec) in &modules {
+        check_impl_module(&impl_root, spec_path, spec, &mut diags, &mut impl_paths)?;
+    }
+
+    let mut report = diagnostics::Report::ok();
+    report = report.with_diagnostics(diags);
+    report.meta.insert(
+        "project_root".to_string(),
+        Value::String(project_root.display().to_string()),
+    );
+    report.meta.insert(
+        "spec_dir".to_string(),
+        Value::String(args.spec_dir.display().to_string()),
+    );
+    report.meta.insert(
+        "impl_dir".to_string(),
+        Value::String(args.impl_dir.display().to_string()),
+    );
+    let spec_digests: Vec<Value> = spec_files
+        .iter()
+        .filter_map(|p| file_digest_value(p))
+        .collect();
+    report
+        .meta
+        .insert("spec_digests".to_string(), Value::Array(spec_digests));
+    let impl_digests: Vec<Value> = impl_paths
+        .iter()
+        .filter_map(|p| file_digest_value(p))
+        .collect();
+    report
+        .meta
+        .insert("impl_digests".to_string(), Value::Array(impl_digests));
+    write_report(machine, &report)?;
+
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
+}
+
+fn cmd_xtal_impl_sync(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalImplSyncArgs,
+) -> Result<std::process::ExitCode> {
+    if !args.write {
+        anyhow::bail!("set --write to apply changes");
+    }
+
+    let project_root = resolve_project_root(args.project.as_deref(), None)?;
+    let spec_root = project_root.join(&args.spec_dir);
+    let impl_root = project_root.join(&args.impl_dir);
+
+    let mut diags = Vec::new();
+    let spec_files = collect_spec_files(&spec_root, &Vec::new(), &mut diags);
+    if spec_files.is_empty() {
+        diags.push(diag_error(
+            "EXTAL_IMPL_NO_SPECS",
+            diagnostics::Stage::Parse,
+            format!("no spec files found under {}", spec_root.display()),
+            None,
+        ));
+    }
+
+    let mut modules: Vec<(PathBuf, SpecFile)> = Vec::new();
+    for spec_path in &spec_files {
+        let (doc_opt, lint_diags) = lint_one_spec_file(spec_path)?;
+        diags.extend(lint_diags);
+        let Some(doc) = doc_opt else {
+            continue;
+        };
+        let spec: SpecFile = match serde_json::from_value(doc) {
+            Ok(v) => v,
+            Err(err) => {
+                diags.push(spec_error(
+                    "EXTAL_SPEC_SCHEMA_INVALID",
+                    diagnostics::Stage::Parse,
+                    spec_path,
+                    None,
+                    format!("spec JSON shape is invalid: {err}"),
+                ));
+                continue;
+            }
+        };
+        modules.push((spec_path.clone(), spec));
+    }
+
+    let mut ids_ok = true;
+    for (spec_path, spec) in &modules {
+        for (op_idx, op) in spec.operations.iter().enumerate() {
+            let core =
+                collect_contract_core_clauses(spec_path, &spec.module_id, op_idx, op, &mut diags)?;
+            for c in &core.requires {
+                if c.clause.id.as_deref().unwrap_or("").trim().is_empty() {
+                    ids_ok = false;
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_IDS_REQUIRED_FOR_SYNC",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("{}/id", c.spec_ptr),
+                        }),
+                        "contract-core clause missing id (run `x07 xtal spec fmt --inject-ids --write`)",
+                    ));
+                }
+            }
+            for c in &core.ensures {
+                if c.clause.id.as_deref().unwrap_or("").trim().is_empty() {
+                    ids_ok = false;
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_IDS_REQUIRED_FOR_SYNC",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("{}/id", c.spec_ptr),
+                        }),
+                        "contract-core clause missing id (run `x07 xtal spec fmt --inject-ids --write`)",
+                    ));
+                }
+            }
+            for c in &core.invariant {
+                if c.clause.id.as_deref().unwrap_or("").trim().is_empty() {
+                    ids_ok = false;
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_IDS_REQUIRED_FOR_SYNC",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("{}/id", c.spec_ptr),
+                        }),
+                        "contract-core clause missing id (run `x07 xtal spec fmt --inject-ids --write`)",
+                    ));
+                }
+            }
+        }
+    }
+
+    if ids_ok {
+        for (spec_path, spec) in &modules {
+            sync_one_impl_module(&impl_root, spec_path, spec, &mut diags)?;
+        }
+    }
+
+    let mut report = diagnostics::Report::ok();
+    report = report.with_diagnostics(diags);
+    report.meta.insert(
+        "project_root".to_string(),
+        Value::String(project_root.display().to_string()),
+    );
+    report.meta.insert(
+        "spec_dir".to_string(),
+        Value::String(args.spec_dir.display().to_string()),
+    );
+    report.meta.insert(
+        "impl_dir".to_string(),
+        Value::String(args.impl_dir.display().to_string()),
+    );
+    let spec_digests: Vec<Value> = spec_files
+        .iter()
+        .filter_map(|p| file_digest_value(p))
+        .collect();
+    report
+        .meta
+        .insert("spec_digests".to_string(), Value::Array(spec_digests));
+    write_report(machine, &report)?;
+
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
+}
+
+#[derive(Debug, Clone)]
+struct CoreContractClauses {
+    requires: Vec<CoreClauseItem>,
+    ensures: Vec<CoreClauseItem>,
+    invariant: Vec<CoreClauseItem>,
+}
+
+#[derive(Debug, Clone)]
+struct CoreClauseItem {
+    spec_ptr: String,
+    clause: x07ast::ContractClauseAst,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ContractClauseKind {
+    Requires,
+    Ensures,
+    Invariant,
+}
+
+fn collect_contract_core_clauses(
+    spec_path: &Path,
+    module_id: &str,
+    op_idx: usize,
+    op: &SpecOperation,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<CoreContractClauses> {
+    let mut core = CoreContractClauses {
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
+    };
+
+    for (c_idx, clause) in op.requires.iter().enumerate() {
+        let spec_ptr = format!("/operations/{op_idx}/requires/{c_idx}");
+        let Some(clause) = parse_spec_clause_to_contract_ast(spec_path, &spec_ptr, clause, diags)
+        else {
+            continue;
+        };
+        if contract_clause_is_contract_core(module_id, op, ContractClauseKind::Requires, &clause)? {
+            core.requires.push(CoreClauseItem { spec_ptr, clause });
+        }
+    }
+    for (c_idx, clause) in op.ensures.iter().enumerate() {
+        let spec_ptr = format!("/operations/{op_idx}/ensures/{c_idx}");
+        let Some(clause) = parse_spec_clause_to_contract_ast(spec_path, &spec_ptr, clause, diags)
+        else {
+            continue;
+        };
+        if contract_clause_is_contract_core(module_id, op, ContractClauseKind::Ensures, &clause)? {
+            core.ensures.push(CoreClauseItem { spec_ptr, clause });
+        }
+    }
+    for (c_idx, clause) in op.invariant.iter().enumerate() {
+        let spec_ptr = format!("/operations/{op_idx}/invariant/{c_idx}");
+        let Some(clause) = parse_spec_clause_to_contract_ast(spec_path, &spec_ptr, clause, diags)
+        else {
+            continue;
+        };
+        if contract_clause_is_contract_core(module_id, op, ContractClauseKind::Invariant, &clause)?
+        {
+            core.invariant.push(CoreClauseItem { spec_ptr, clause });
+        }
+    }
+
+    Ok(core)
+}
+
+fn parse_spec_clause_to_contract_ast(
+    spec_path: &Path,
+    base_ptr: &str,
+    clause: &SpecClause,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Option<x07ast::ContractClauseAst> {
+    let expr = match x07c::ast::expr_from_json(&clause.expr) {
+        Ok(e) => e,
+        Err(err) => {
+            diags.push(spec_error(
+                "EXTAL_SPEC_CONTRACT_EXPR_PARSE",
+                diagnostics::Stage::Parse,
+                spec_path,
+                Some(diagnostics::Location::X07Ast {
+                    ptr: format!("{base_ptr}/expr"),
+                }),
+                err,
+            ));
+            return None;
+        }
+    };
+
+    let mut witness = Vec::new();
+    for (w_idx, w) in clause.witness.iter().enumerate() {
+        match x07c::ast::expr_from_json(w) {
+            Ok(e) => witness.push(e),
+            Err(err) => {
+                diags.push(spec_error(
+                    "EXTAL_SPEC_CONTRACT_WITNESS_INVALID",
+                    diagnostics::Stage::Parse,
+                    spec_path,
+                    Some(diagnostics::Location::X07Ast {
+                        ptr: format!("{base_ptr}/witness/{w_idx}"),
+                    }),
+                    err,
+                ));
+                return None;
+            }
+        }
+    }
+
+    Some(x07ast::ContractClauseAst {
+        id: clause.id.clone(),
+        expr,
+        witness,
+    })
+}
+
+fn contract_clause_is_contract_core(
+    module_id: &str,
+    op: &SpecOperation,
+    kind: ContractClauseKind,
+    clause: &x07ast::ContractClauseAst,
+) -> Result<bool> {
+    if !is_supported_ty(&op.result) {
+        return Ok(false);
+    }
+    let params = op
+        .params
+        .iter()
+        .map(|p| x07ast::AstFunctionParam {
+            name: p.name.clone(),
+            ty: x07ast::TypeRef::Named(p.ty.clone()),
+            brand: p.brand.clone(),
+        })
+        .collect();
+
+    let mut f = x07ast::AstFunctionDef {
+        name: op.name.clone(),
+        type_params: Vec::new(),
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
+        loop_contracts: Vec::new(),
+        params,
+        result: x07ast::TypeRef::Named(op.result.clone()),
+        result_brand: op.result_brand.clone(),
+        body: int_expr(0),
+    };
+    match kind {
+        ContractClauseKind::Requires => f.requires.push(clause.clone()),
+        ContractClauseKind::Ensures => f.ensures.push(clause.clone()),
+        ContractClauseKind::Invariant => f.invariant.push(clause.clone()),
+    }
+
+    let file = x07ast::X07AstFile {
+        schema_version: x07_contracts::X07AST_SCHEMA_VERSION.to_string(),
+        kind: x07ast::X07AstKind::Module,
+        module_id: module_id.to_string(),
+        imports: BTreeSet::new(),
+        exports: BTreeSet::new(),
+        functions: vec![f],
+        async_functions: Vec::new(),
+        extern_functions: Vec::new(),
+        solve: None,
+        meta: BTreeMap::new(),
+    };
+
+    let report = x07c::typecheck::typecheck_file_local(
+        &file,
+        &x07c::typecheck::TypecheckOptions {
+            mode: x07c::typecheck::TypecheckMode::ContractsOnly,
+            compat: x07c::compat::Compat::default(),
+        },
+    );
+    Ok(report
+        .diagnostics
+        .iter()
+        .all(|d| d.severity != diagnostics::Severity::Error))
+}
+
+fn check_impl_module(
+    impl_root: &Path,
+    spec_path: &Path,
+    spec: &SpecFile,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+    impl_paths: &mut BTreeSet<PathBuf>,
+) -> Result<()> {
+    let impl_path = module_id_to_impl_path(impl_root, &spec.module_id);
+    if !impl_path.is_file() {
+        diags.push(impl_error(
+            "EXTAL_IMPL_MODULE_MISSING",
+            diagnostics::Stage::Lint,
+            &impl_path,
+            None,
+            format!(
+                "missing impl module for spec module_id {:?} (expected {})",
+                spec.module_id,
+                impl_path.display()
+            ),
+        ));
+        return Ok(());
+    }
+    impl_paths.insert(impl_path.clone());
+
+    let bytes = match std::fs::read(&impl_path) {
+        Ok(b) => b,
+        Err(err) => {
+            diags.push(impl_error(
+                "EXTAL_IMPL_IO_READ_FAILED",
+                diagnostics::Stage::Parse,
+                &impl_path,
+                None,
+                format!("cannot read file: {err}"),
+            ));
+            return Ok(());
+        }
+    };
+    let file = match x07ast::parse_x07ast_json(&bytes) {
+        Ok(f) => f,
+        Err(err) => {
+            diags.push(impl_error(
+                "EXTAL_IMPL_X07AST_PARSE",
+                diagnostics::Stage::Parse,
+                &impl_path,
+                None,
+                err.to_string(),
+            ));
+            return Ok(());
+        }
+    };
+
+    if file.kind != x07ast::X07AstKind::Module {
+        diags.push(impl_error(
+            "EXTAL_IMPL_KIND_UNSUPPORTED",
+            diagnostics::Stage::Lint,
+            &impl_path,
+            Some(diagnostics::Location::X07Ast {
+                ptr: "/kind".to_string(),
+            }),
+            format!("expected kind=\"module\" (got {:?})", file.kind),
+        ));
+    }
+    if file.module_id != spec.module_id {
+        diags.push(impl_error(
+            "EXTAL_IMPL_MODULE_ID_MISMATCH",
+            diagnostics::Stage::Lint,
+            &impl_path,
+            Some(diagnostics::Location::X07Ast {
+                ptr: "/module_id".to_string(),
+            }),
+            format!(
+                "module_id mismatch: expected {:?} got {:?}",
+                spec.module_id, file.module_id
+            ),
+        ));
+    }
+
+    for (op_idx, op) in spec.operations.iter().enumerate() {
+        if op.name.trim().is_empty() {
+            continue;
+        }
+        if !file.exports.contains(&op.name) {
+            diags.push(impl_error(
+                "EXTAL_IMPL_EXPORT_MISSING",
+                diagnostics::Stage::Lint,
+                &impl_path,
+                Some(diagnostics::Location::X07Ast {
+                    ptr: "/exports".to_string(),
+                }),
+                format!("operation is not exported: {:?}", op.name),
+            ));
+        }
+
+        let Some(defn) = file.functions.iter().find(|f| f.name == op.name) else {
+            diags.push(impl_error(
+                "EXTAL_IMPL_SIGNATURE_MISMATCH",
+                diagnostics::Stage::Lint,
+                &impl_path,
+                None,
+                format!("missing defn for operation {:?}", op.name),
+            ));
+            continue;
+        };
+
+        let (sig_ok, mut sig_warns, sig_errors) = compare_defn_signature_to_spec(op, defn);
+        diags.append(&mut sig_warns);
+        if !sig_errors.is_empty() {
+            diags.push(impl_error(
+                "EXTAL_IMPL_SIGNATURE_MISMATCH",
+                diagnostics::Stage::Lint,
+                &impl_path,
+                None,
+                format!(
+                    "signature mismatch for {:?}: {}",
+                    op.name,
+                    sig_errors.join("; ")
+                ),
+            ));
+        }
+        if !sig_ok {
+            continue;
+        }
+
+        let core = collect_contract_core_clauses(spec_path, &spec.module_id, op_idx, op, diags)?;
+        check_contract_alignment(&impl_path, op, defn, &core, diags);
+    }
+
+    Ok(())
+}
+
+fn sync_one_impl_module(
+    impl_root: &Path,
+    spec_path: &Path,
+    spec: &SpecFile,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<()> {
+    let impl_path = module_id_to_impl_path(impl_root, &spec.module_id);
+
+    let mut required_exports: BTreeSet<String> = BTreeSet::new();
+    for op in &spec.operations {
+        if !op.name.trim().is_empty() {
+            required_exports.insert(op.name.clone());
+        }
+    }
+
+    if !impl_path.is_file() {
+        let mut file = x07ast::X07AstFile {
+            schema_version: x07_contracts::X07AST_SCHEMA_VERSION.to_string(),
+            kind: x07ast::X07AstKind::Module,
+            module_id: spec.module_id.clone(),
+            imports: BTreeSet::new(),
+            exports: required_exports,
+            functions: Vec::new(),
+            async_functions: Vec::new(),
+            extern_functions: Vec::new(),
+            solve: None,
+            meta: BTreeMap::new(),
+        };
+
+        for (op_idx, op) in spec.operations.iter().enumerate() {
+            if op.name.trim().is_empty() {
+                continue;
+            }
+            let core =
+                collect_contract_core_clauses(spec_path, &spec.module_id, op_idx, op, diags)?;
+            file.functions.push(stub_defn_from_spec(op, &core, diags));
+        }
+
+        write_x07ast_file(&impl_path, &mut file)?;
+        return Ok(());
+    }
+
+    let original_bytes = std::fs::read(&impl_path).with_context(|| {
+        format!(
+            "read impl module {}",
+            impl_path
+                .strip_prefix(impl_root)
+                .unwrap_or(&impl_path)
+                .display()
+        )
+    })?;
+    let mut file = match x07ast::parse_x07ast_json(&original_bytes) {
+        Ok(f) => f,
+        Err(err) => {
+            diags.push(impl_error(
+                "EXTAL_IMPL_X07AST_PARSE",
+                diagnostics::Stage::Parse,
+                &impl_path,
+                None,
+                err.to_string(),
+            ));
+            return Ok(());
+        }
+    };
+
+    for name in &required_exports {
+        file.exports.insert(name.clone());
+    }
+
+    for (op_idx, op) in spec.operations.iter().enumerate() {
+        if op.name.trim().is_empty() {
+            continue;
+        }
+        let core = collect_contract_core_clauses(spec_path, &spec.module_id, op_idx, op, diags)?;
+        let Some(defn_idx) = file.functions.iter().position(|f| f.name == op.name) else {
+            file.functions.push(stub_defn_from_spec(op, &core, diags));
+            continue;
+        };
+
+        if !defn_signature_exact_matches_spec(op, &file.functions[defn_idx]) {
+            continue;
+        }
+
+        let desired_requires: Vec<x07ast::ContractClauseAst> =
+            core.requires.iter().map(|c| c.clause.clone()).collect();
+        let desired_ensures: Vec<x07ast::ContractClauseAst> =
+            core.ensures.iter().map(|c| c.clause.clone()).collect();
+        let desired_invariant: Vec<x07ast::ContractClauseAst> =
+            core.invariant.iter().map(|c| c.clause.clone()).collect();
+
+        file.functions[defn_idx].requires = desired_requires;
+        upsert_contract_clauses(&mut file.functions[defn_idx].ensures, &desired_ensures);
+        upsert_contract_clauses(&mut file.functions[defn_idx].invariant, &desired_invariant);
+    }
+
+    write_x07ast_file_if_changed(&impl_path, &mut file, &original_bytes)?;
+    Ok(())
+}
+
+fn stub_defn_from_spec(
+    op: &SpecOperation,
+    core: &CoreContractClauses,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> x07ast::AstFunctionDef {
+    let params = op
+        .params
+        .iter()
+        .map(|p| x07ast::AstFunctionParam {
+            name: p.name.clone(),
+            ty: x07ast::TypeRef::Named(p.ty.clone()),
+            brand: p.brand.clone(),
+        })
+        .collect();
+
+    let requires: Vec<x07ast::ContractClauseAst> =
+        core.requires.iter().map(|c| c.clause.clone()).collect();
+    let ensures: Vec<x07ast::ContractClauseAst> =
+        core.ensures.iter().map(|c| c.clause.clone()).collect();
+    let invariant: Vec<x07ast::ContractClauseAst> =
+        core.invariant.iter().map(|c| c.clause.clone()).collect();
+
+    let body = default_body_for_ty(&op.result, diags);
+
+    x07ast::AstFunctionDef {
+        name: op.name.clone(),
+        type_params: Vec::new(),
+        requires,
+        ensures,
+        invariant,
+        loop_contracts: Vec::new(),
+        params,
+        result: x07ast::TypeRef::Named(op.result.clone()),
+        result_brand: op.result_brand.clone(),
+        body,
+    }
+}
+
+fn default_body_for_ty(ty: &str, diags: &mut Vec<diagnostics::Diagnostic>) -> Expr {
+    match ty.trim() {
+        "i32" => int_expr(0),
+        "bytes" => list_expr([ident("bytes.empty")]),
+        "bytes_view" => list_expr([ident("bytes.view"), list_expr([ident("bytes.empty")])]),
+        other => {
+            diags.push(diag_error(
+                "EXTAL_IMPL_UNSUPPORTED_TY",
+                diagnostics::Stage::Lower,
+                format!("unsupported type for stub body: {other:?}"),
+                None,
+            ));
+            int_expr(0)
+        }
+    }
+}
+
+fn module_id_to_impl_path(impl_root: &Path, module_id: &str) -> PathBuf {
+    let rel = module_id.replace('.', "/");
+    impl_root.join(format!("{rel}.x07.json"))
+}
+
+fn compare_defn_signature_to_spec(
+    op: &SpecOperation,
+    defn: &x07ast::AstFunctionDef,
+) -> (bool, Vec<diagnostics::Diagnostic>, Vec<String>) {
+    let mut ok = true;
+    let mut warns = Vec::new();
+    let mut errors = Vec::new();
+
+    if defn.params.len() != op.params.len() {
+        ok = false;
+        errors.push(format!(
+            "param count: expected {} got {}",
+            op.params.len(),
+            defn.params.len()
+        ));
+    }
+
+    for (idx, (spec_p, impl_p)) in op.params.iter().zip(defn.params.iter()).enumerate() {
+        if spec_p.name != impl_p.name {
+            warns.push(diag_warning(
+                "WXTAL_IMPL_PARAM_NAME_MISMATCH",
+                diagnostics::Stage::Lint,
+                format!(
+                    "param name mismatch at index {idx}: expected {:?} got {:?}",
+                    spec_p.name, impl_p.name
+                ),
+                None,
+            ));
+        }
+        if !type_ref_matches_spec(&impl_p.ty, &spec_p.ty) {
+            ok = false;
+            errors.push(format!(
+                "param {idx} type: expected {:?} got {:?}",
+                spec_p.ty, impl_p.ty
+            ));
+        }
+        if spec_p.brand != impl_p.brand {
+            ok = false;
+            errors.push(format!(
+                "param {idx} brand: expected {:?} got {:?}",
+                spec_p.brand, impl_p.brand
+            ));
+        }
+    }
+
+    if !type_ref_matches_spec(&defn.result, &op.result) {
+        ok = false;
+        errors.push(format!(
+            "result type: expected {:?} got {:?}",
+            op.result, defn.result
+        ));
+    }
+    if op.result_brand != defn.result_brand {
+        ok = false;
+        errors.push(format!(
+            "result brand: expected {:?} got {:?}",
+            op.result_brand, defn.result_brand
+        ));
+    }
+
+    (ok, warns, errors)
+}
+
+fn defn_signature_exact_matches_spec(op: &SpecOperation, defn: &x07ast::AstFunctionDef) -> bool {
+    if defn.params.len() != op.params.len() {
+        return false;
+    }
+    for (spec_p, impl_p) in op.params.iter().zip(defn.params.iter()) {
+        if spec_p.name != impl_p.name {
+            return false;
+        }
+        if spec_p.brand != impl_p.brand {
+            return false;
+        }
+        if !type_ref_matches_spec(&impl_p.ty, &spec_p.ty) {
+            return false;
+        }
+    }
+    if !type_ref_matches_spec(&defn.result, &op.result) {
+        return false;
+    }
+    if op.result_brand != defn.result_brand {
+        return false;
+    }
+    true
+}
+
+fn type_ref_matches_spec(impl_ty: &x07ast::TypeRef, spec_ty: &str) -> bool {
+    impl_ty.as_named().unwrap_or("") == spec_ty.trim()
+}
+
+fn check_contract_alignment(
+    impl_path: &Path,
+    op: &SpecOperation,
+    defn: &x07ast::AstFunctionDef,
+    core: &CoreContractClauses,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) {
+    let requires_spec: Vec<&x07ast::ContractClauseAst> =
+        core.requires.iter().map(|c| &c.clause).collect();
+    let ensures_spec: Vec<&x07ast::ContractClauseAst> =
+        core.ensures.iter().map(|c| &c.clause).collect();
+    let invariant_spec: Vec<&x07ast::ContractClauseAst> =
+        core.invariant.iter().map(|c| &c.clause).collect();
+
+    check_contract_clause_list(
+        impl_path,
+        op,
+        "requires",
+        &requires_spec,
+        &defn.requires,
+        true,
+        diags,
+    );
+    check_contract_clause_list(
+        impl_path,
+        op,
+        "ensures",
+        &ensures_spec,
+        &defn.ensures,
+        false,
+        diags,
+    );
+    check_contract_clause_list(
+        impl_path,
+        op,
+        "invariant",
+        &invariant_spec,
+        &defn.invariant,
+        false,
+        diags,
+    );
+}
+
+fn check_contract_clause_list(
+    impl_path: &Path,
+    op: &SpecOperation,
+    kind: &str,
+    spec_core: &[&x07ast::ContractClauseAst],
+    impl_clauses: &[x07ast::ContractClauseAst],
+    extra_is_error: bool,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) {
+    let mut matched_impl: BTreeSet<usize> = BTreeSet::new();
+    for spec_clause in spec_core {
+        match find_matching_impl_clause(spec_clause, impl_clauses) {
+            None => diags.push(impl_error(
+                "EXTAL_IMPL_CONTRACT_MISSING",
+                diagnostics::Stage::Lint,
+                impl_path,
+                None,
+                format!(
+                    "missing {kind} clause for {:?} (id={:?})",
+                    op.name, spec_clause.id
+                ),
+            )),
+            Some((idx, matched_by_id)) => {
+                matched_impl.insert(idx);
+                if matched_by_id && impl_clauses[idx].expr != spec_clause.expr {
+                    diags.push(impl_error(
+                        "EXTAL_IMPL_CONTRACT_MISMATCH",
+                        diagnostics::Stage::Lint,
+                        impl_path,
+                        None,
+                        format!(
+                            "{kind} clause mismatch for {:?} (id={:?})",
+                            op.name, spec_clause.id
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
+    for (idx, clause) in impl_clauses.iter().enumerate() {
+        if matched_impl.contains(&idx) {
+            continue;
+        }
+        if extra_is_error {
+            diags.push(impl_error(
+                "EXTAL_IMPL_CONTRACT_EXTRA_REQUIRES",
+                diagnostics::Stage::Lint,
+                impl_path,
+                None,
+                format!(
+                    "extra requires clause for {:?} (id={:?})",
+                    op.name, clause.id
+                ),
+            ));
+        } else {
+            diags.push(impl_warning(
+                "EXTAL_IMPL_CONTRACT_EXTRA",
+                diagnostics::Stage::Lint,
+                impl_path,
+                None,
+                format!("extra {kind} clause for {:?} (id={:?})", op.name, clause.id),
+            ));
+        }
+    }
+}
+
+fn find_matching_impl_clause(
+    spec_clause: &x07ast::ContractClauseAst,
+    impl_clauses: &[x07ast::ContractClauseAst],
+) -> Option<(usize, bool)> {
+    let spec_id = spec_clause.id.as_deref().unwrap_or("").trim();
+    if !spec_id.is_empty() {
+        for (idx, clause) in impl_clauses.iter().enumerate() {
+            if clause.id.as_deref().unwrap_or("").trim() == spec_id {
+                return Some((idx, true));
+            }
+        }
+    }
+    for (idx, clause) in impl_clauses.iter().enumerate() {
+        if clause.expr == spec_clause.expr {
+            return Some((idx, false));
+        }
+    }
+    None
+}
+
+fn upsert_contract_clauses(
+    existing: &mut Vec<x07ast::ContractClauseAst>,
+    desired: &[x07ast::ContractClauseAst],
+) {
+    for want in desired {
+        let want_id = want.id.as_deref().unwrap_or("").trim();
+        if !want_id.is_empty() {
+            if let Some(slot) = existing
+                .iter_mut()
+                .find(|c| c.id.as_deref().unwrap_or("").trim() == want_id)
+            {
+                slot.expr = want.expr.clone();
+                slot.witness = want.witness.clone();
+                continue;
+            }
+        }
+
+        if let Some(slot) = existing.iter_mut().find(|c| c.expr == want.expr) {
+            if slot.id.is_none() {
+                slot.id = want.id.clone();
+            }
+            continue;
+        }
+
+        existing.push(want.clone());
+    }
+}
+
+fn write_x07ast_file(path: &Path, file: &mut x07ast::X07AstFile) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("mkdir: {}", parent.display()))?;
+    }
+
+    x07ast::canonicalize_x07ast_file(file);
+    let mut v = x07ast::x07ast_file_to_value(file);
+    x07ast::canon_value_jcs(&mut v);
+    let text = serde_json::to_string(&v)? + "\n";
+    util::write_atomic(path, text.as_bytes()).with_context(|| format!("write: {}", path.display()))
+}
+
+fn write_x07ast_file_if_changed(
+    path: &Path,
+    file: &mut x07ast::X07AstFile,
+    original_bytes: &[u8],
+) -> Result<()> {
+    x07ast::canonicalize_x07ast_file(file);
+    let mut v = x07ast::x07ast_file_to_value(file);
+    x07ast::canon_value_jcs(&mut v);
+    let new_text = serde_json::to_string(&v)? + "\n";
+    if new_text.as_bytes() != original_bytes {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("mkdir: {}", parent.display()))?;
+        }
+        util::write_atomic(path, new_text.as_bytes())
+            .with_context(|| format!("write: {}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn impl_error(
+    code: &str,
+    stage: diagnostics::Stage,
+    file: &Path,
+    loc: Option<diagnostics::Location>,
+    message: impl Into<String>,
+) -> diagnostics::Diagnostic {
+    let mut d = diag_error(code, stage, message, loc);
+    d.data.insert(
+        "file".to_string(),
+        Value::String(file.display().to_string()),
+    );
+    d
+}
+
+fn impl_warning(
+    code: &str,
+    stage: diagnostics::Stage,
+    file: &Path,
+    loc: Option<diagnostics::Location>,
+    message: impl Into<String>,
+) -> diagnostics::Diagnostic {
+    let mut d = diag_warning(code, stage, message, loc);
+    d.data.insert(
+        "file".to_string(),
+        Value::String(file.display().to_string()),
+    );
+    d
 }
 
 fn cmd_xtal_spec_fmt(
@@ -785,6 +2043,35 @@ fn cmd_xtal_spec_check(
             }
         };
         specs.push((input.clone(), doc, spec));
+    }
+
+    for (path, _doc, spec) in &specs {
+        if spec.assumptions.is_empty() {
+            continue;
+        }
+        let mut ids: Vec<&str> = spec
+            .assumptions
+            .iter()
+            .map(|a| a.id.trim())
+            .filter(|id| !id.is_empty())
+            .collect();
+        ids.sort();
+        ids.dedup();
+        let shown: Vec<&str> = ids.iter().copied().take(20).collect();
+        let more = ids.len().saturating_sub(shown.len());
+        let mut msg = format!("spec declares assumptions: {:?}", shown);
+        if more > 0 {
+            msg.push_str(&format!(" (+{more} more)"));
+        }
+        diags.push(spec_warning(
+            "EXTAL_SPEC_HAS_ASSUMPTIONS",
+            diagnostics::Stage::Lint,
+            path,
+            Some(diagnostics::Location::X07Ast {
+                ptr: "/assumptions".to_string(),
+            }),
+            msg,
+        ));
     }
 
     // If lint has errors, keep going best-effort but avoid cascading on empty specs.
@@ -1291,13 +2578,17 @@ fn generate_tests_from_specs(
     // Load examples by file path once.
     let mut examples_cache: BTreeMap<String, Vec<ExampleLine>> = BTreeMap::new();
 
-    for (_spec_path, spec) in modules {
+    for (spec_path, spec) in modules {
         let module_id = spec.module_id.as_str();
         let gen_module_id = format!("gen.xtal.{module_id}.tests");
         let mut exports = BTreeSet::new();
         let mut functions = Vec::new();
+        let mut imports: BTreeSet<String> = BTreeSet::new();
+        imports.insert("std.test".to_string());
+        imports.insert(module_id.to_string());
 
         let mut global_idx = 0usize;
+        let mut prop_idx = 0usize;
 
         for op in &spec.operations {
             let Some(op_id) = op.id.as_deref() else {
@@ -1359,16 +2650,244 @@ fn generate_tests_from_specs(
             }
         }
 
+        for (op_idx, op) in spec.operations.iter().enumerate() {
+            let Some(op_id) = op.id.as_deref() else {
+                continue;
+            };
+
+            for (op_prop_idx, prop) in op.ensures_props.iter().enumerate() {
+                let prop_symbol = prop.prop.trim();
+                if prop_symbol.is_empty() {
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_PROP_NAME_INVALID",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("/operations/{op_idx}/ensures_props/{op_prop_idx}/prop"),
+                        }),
+                        "property name must be non-empty".to_string(),
+                    ));
+                    continue;
+                }
+                if let Err(msg) = x07c::validate::validate_symbol(prop_symbol) {
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_PROP_NAME_INVALID",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("/operations/{op_idx}/ensures_props/{op_prop_idx}/prop"),
+                        }),
+                        msg,
+                    ));
+                    continue;
+                }
+                let Some((prop_module_id, _local)) = prop_symbol.rsplit_once('.') else {
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_PROP_NAME_INVALID",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("/operations/{op_idx}/ensures_props/{op_prop_idx}/prop"),
+                        }),
+                        "property name must be a qualified symbol (module.name)".to_string(),
+                    ));
+                    continue;
+                };
+                if let Err(msg) = x07c::validate::validate_module_id(prop_module_id) {
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_PROP_NAME_INVALID",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("/operations/{op_idx}/ensures_props/{op_prop_idx}/prop"),
+                        }),
+                        msg,
+                    ));
+                    continue;
+                }
+
+                if prop.args.is_empty() {
+                    diags.push(spec_error(
+                        "EXTAL_SPEC_PROP_ARGS_EMPTY",
+                        diagnostics::Stage::Lint,
+                        spec_path,
+                        Some(diagnostics::Location::X07Ast {
+                            ptr: format!("/operations/{op_idx}/ensures_props/{op_prop_idx}/args"),
+                        }),
+                        "property args must be non-empty".to_string(),
+                    ));
+                    continue;
+                }
+
+                let mut wrapper_params: Vec<x07ast::AstFunctionParam> = Vec::new();
+                let mut pbt_params: Vec<Value> = Vec::new();
+                let mut call_args: Vec<Expr> = Vec::new();
+                let mut seen_param_names: BTreeSet<String> = BTreeSet::new();
+
+                let mut prop_ok = true;
+                for (arg_idx, arg_name_raw) in prop.args.iter().enumerate() {
+                    let arg_name = arg_name_raw.trim();
+                    if arg_name.is_empty() {
+                        diags.push(spec_error(
+                            "EXTAL_SPEC_PROP_ARG_UNKNOWN",
+                            diagnostics::Stage::Lint,
+                            spec_path,
+                            Some(diagnostics::Location::X07Ast {
+                                ptr: format!(
+                                    "/operations/{op_idx}/ensures_props/{op_prop_idx}/args/{arg_idx}"
+                                ),
+                            }),
+                            "arg name must be non-empty".to_string(),
+                        ));
+                        prop_ok = false;
+                        continue;
+                    }
+                    if !seen_param_names.insert(arg_name.to_string()) {
+                        diags.push(spec_error(
+                            "EXTAL_SPEC_PROP_ARG_DUPLICATE",
+                            diagnostics::Stage::Lint,
+                            spec_path,
+                            Some(diagnostics::Location::X07Ast {
+                                ptr: format!(
+                                    "/operations/{op_idx}/ensures_props/{op_prop_idx}/args/{arg_idx}"
+                                ),
+                            }),
+                            format!("duplicate arg name: {:?}", arg_name),
+                        ));
+                        prop_ok = false;
+                        continue;
+                    }
+
+                    let Some(op_param) = op.params.iter().find(|p| p.name == arg_name) else {
+                        diags.push(spec_error(
+                            "EXTAL_SPEC_PROP_ARG_UNKNOWN",
+                            diagnostics::Stage::Lint,
+                            spec_path,
+                            Some(diagnostics::Location::X07Ast {
+                                ptr: format!(
+                                    "/operations/{op_idx}/ensures_props/{op_prop_idx}/args/{arg_idx}"
+                                ),
+                            }),
+                            format!("unknown op param name: {:?}", arg_name),
+                        ));
+                        prop_ok = false;
+                        continue;
+                    };
+
+                    let (wrapper_ty, gen) = match op_param.ty.trim() {
+                        "i32" => (
+                            "i32".to_string(),
+                            json!({"kind": "i32", "min": -1000, "max": 1000}),
+                        ),
+                        "bytes" => ("bytes".to_string(), json!({"kind": "bytes", "max_len": 64})),
+                        "bytes_view" => {
+                            ("bytes".to_string(), json!({"kind": "bytes", "max_len": 64}))
+                        }
+                        other => {
+                            diags.push(spec_error(
+                                "EXTAL_SPEC_PROP_TY_UNSUPPORTED",
+                                diagnostics::Stage::Lint,
+                                spec_path,
+                                Some(diagnostics::Location::X07Ast {
+                                    ptr: format!(
+                                        "/operations/{op_idx}/ensures_props/{op_prop_idx}/args/{arg_idx}"
+                                    ),
+                                }),
+                                format!("unsupported arg type for PBT: {other:?}"),
+                            ));
+                            prop_ok = false;
+                            continue;
+                        }
+                    };
+
+                    let mut wrapper_name = arg_name.to_string();
+                    if wrapper_name == "input" {
+                        wrapper_name = format!("{wrapper_name}_v1");
+                    }
+                    if let Err(msg) = x07c::validate::validate_local_name(&wrapper_name) {
+                        diags.push(spec_error(
+                            "EXTAL_SPEC_PROP_ARG_NAME_INVALID",
+                            diagnostics::Stage::Lint,
+                            spec_path,
+                            Some(diagnostics::Location::X07Ast {
+                                ptr: format!(
+                                    "/operations/{op_idx}/ensures_props/{op_prop_idx}/args/{arg_idx}"
+                                ),
+                            }),
+                            msg,
+                        ));
+                        prop_ok = false;
+                        continue;
+                    }
+
+                    wrapper_params.push(x07ast::AstFunctionParam {
+                        name: wrapper_name.clone(),
+                        ty: x07ast::TypeRef::Named(wrapper_ty),
+                        brand: op_param.brand.clone(),
+                    });
+                    pbt_params.push(json!({
+                        "name": wrapper_name,
+                        "gen": gen
+                    }));
+
+                    call_args.push(if op_param.ty.trim() == "bytes_view" {
+                        list_expr([
+                            ident("bytes.view"),
+                            ident(wrapper_params.last().unwrap().name.clone()),
+                        ])
+                    } else {
+                        ident(wrapper_params.last().unwrap().name.clone())
+                    });
+                }
+
+                if !prop_ok {
+                    continue;
+                }
+
+                imports.insert(prop_module_id.to_string());
+                prop_idx += 1;
+                let wrapper_name = format!("{gen_module_id}.prop_{prop_idx:04}");
+                exports.insert(wrapper_name.clone());
+
+                let mut call_items: Vec<Expr> = Vec::with_capacity(1 + call_args.len());
+                call_items.push(ident(prop_symbol.to_string()));
+                call_items.extend(call_args);
+                let body = list_expr_vec(call_items);
+
+                functions.push(x07ast::AstFunctionDef {
+                    name: wrapper_name.clone(),
+                    type_params: Vec::new(),
+                    requires: Vec::new(),
+                    ensures: Vec::new(),
+                    invariant: Vec::new(),
+                    loop_contracts: Vec::new(),
+                    params: wrapper_params,
+                    result: x07ast::TypeRef::Named("bytes".to_string()),
+                    result_brand: None,
+                    body,
+                });
+
+                let test_id = format!("xtal/{module_id}/{op_id}/prop{prop_idx:04}");
+                test_entries.push(json!({
+                    "id": test_id,
+                    "world": "solve-pure",
+                    "entry": wrapper_name,
+                    "expect": "pass",
+                    "returns": "bytes_status_v1",
+                    "pbt": {
+                        "cases": 100,
+                        "max_shrinks": 4096,
+                        "params": pbt_params
+                    }
+                }));
+            }
+        }
+
         let file = x07ast::X07AstFile {
             schema_version: x07_contracts::X07AST_SCHEMA_VERSION.to_string(),
             kind: x07ast::X07AstKind::Module,
             module_id: gen_module_id.clone(),
-            imports: {
-                let mut imps = BTreeSet::new();
-                imps.insert("std.test".to_string());
-                imps.insert(module_id.to_string());
-                imps
-            },
+            imports,
             exports,
             functions,
             async_functions: Vec::new(),
@@ -1379,7 +2898,7 @@ fn generate_tests_from_specs(
 
         let mut v = x07ast::x07ast_file_to_value(&file);
         x07ast::canon_value_jcs(&mut v);
-        let mut bytes = serde_json::to_vec_pretty(&v)?;
+        let mut bytes = serde_json::to_vec(&v)?;
         if bytes.last() != Some(&b'\n') {
             bytes.push(b'\n');
         }

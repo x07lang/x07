@@ -1,4 +1,4 @@
-# Determinism (Phase A)
+# Determinism (XTAL baseline)
 
 Deterministic evaluation depends on two invariants:
 
