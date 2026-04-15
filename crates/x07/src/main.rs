@@ -32,6 +32,7 @@ mod diag;
 mod doc;
 mod doctor;
 mod fix_suggest;
+mod gen;
 mod guide;
 mod init;
 mod patch;
@@ -62,6 +63,7 @@ mod trust;
 mod util;
 mod verify;
 mod x07ast_util;
+mod xtal;
 
 #[derive(Parser, Debug)]
 #[command(name = "x07")]
@@ -147,6 +149,10 @@ enum Command {
     Schema(schema::SchemaArgs),
     /// Generate and validate state machines.
     Sm(sm::SmArgs),
+    /// Generator determinism gates (arch/gen/index.x07gen.json).
+    Gen(gen::GenArgs),
+    /// XTAL (Trusted Autonomous Lifecycle) Phase A tooling.
+    Xtal(xtal::XtalArgs),
     /// Record RR fixtures.
     #[command(hide = true)]
     Rr(rr::RrArgs),
@@ -529,6 +535,29 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(sm::SmCommand::Check(_)) => vec!["sm", "check"],
                 Some(sm::SmCommand::Gen(_)) => vec!["sm", "gen"],
             },
+            Some(Command::Gen(args)) => match &args.cmd {
+                None => vec!["gen"],
+                Some(gen::GenCommand::Verify(_)) => vec!["gen", "verify"],
+                Some(gen::GenCommand::Write(_)) => vec!["gen", "write"],
+            },
+            Some(Command::Xtal(args)) => match &args.cmd {
+                None => vec!["xtal"],
+                Some(xtal::XtalCommand::Dev(_)) => vec!["xtal", "dev"],
+                Some(xtal::XtalCommand::Verify(_)) => vec!["xtal", "verify"],
+                Some(xtal::XtalCommand::Spec(spec)) => match &spec.cmd {
+                    None => vec!["xtal", "spec"],
+                    Some(xtal::XtalSpecCommand::Fmt(_)) => vec!["xtal", "spec", "fmt"],
+                    Some(xtal::XtalSpecCommand::Lint(_)) => vec!["xtal", "spec", "lint"],
+                    Some(xtal::XtalSpecCommand::Check(_)) => vec!["xtal", "spec", "check"],
+                    Some(xtal::XtalSpecCommand::Scaffold(_)) => vec!["xtal", "spec", "scaffold"],
+                },
+                Some(xtal::XtalCommand::Tests(tests)) => match &tests.cmd {
+                    None => vec!["xtal", "tests"],
+                    Some(xtal::XtalTestsCommand::GenFromSpec(_)) => {
+                        vec!["xtal", "tests", "gen-from-spec"]
+                    }
+                },
+            },
             Some(Command::Rr(args)) => match &args.cmd {
                 None => vec!["rr"],
                 Some(rr::RrCommand::Record(_)) => vec!["rr", "record"],
@@ -587,6 +616,8 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Doc(args) => doc::cmd_doc(&cli.machine, args),
         Command::Schema(args) => schema::cmd_schema(&cli.machine, args),
         Command::Sm(args) => sm::cmd_sm(&cli.machine, args),
+        Command::Gen(args) => gen::cmd_gen(&cli.machine, args),
+        Command::Xtal(args) => xtal::cmd_xtal(&cli.machine, args),
         Command::Rr(args) => rr::cmd_rr(&cli.machine, args),
         Command::Verify(args) => verify::cmd_verify(&cli.machine, args),
         Command::Mcp(args) => cmd_mcp(args),

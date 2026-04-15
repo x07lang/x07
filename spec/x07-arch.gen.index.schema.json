@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.gen.index.schema.json",
+  "title": "x07.arch.gen.index@0.1.0",
+  "description": "Generator index (contracts-as-data) consumed by `x07 gen verify` and `x07 gen write`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generators"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.gen.index@0.1.0" },
+    "generators": { "type": "array", "items": { "$ref": "#/$defs/generator" }, "default": [] }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "argv": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "mode": {
+      "type": "string",
+      "enum": ["double_run_v1", "single_run_v1"],
+      "default": "double_run_v1"
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "check_argv", "write_argv", "outputs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "check_argv": { "$ref": "#/$defs/argv" },
+        "write_argv": { "$ref": "#/$defs/argv" },
+        "outputs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/rel_path" } }
+      }
+    }
+  }
+}

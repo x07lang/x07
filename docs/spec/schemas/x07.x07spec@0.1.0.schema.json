@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.x07spec@0.1.0.schema.json",
+  "title": "x07.x07spec@0.1.0",
+  "description": "XTAL spec module format (intent/spec layer).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "module_id", "operations"],
+  "properties": {
+    "schema_version": { "const": "x07.x07spec@0.1.0" },
+    "module_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "doc": { "type": "string" },
+    "ids": {
+      "description": "Optional stable IDs for spec entities. If omitted, tools may synthesize stable IDs and write them during fmt.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "sorts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sort" },
+      "default": []
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/operation" }
+    },
+    "assumptions": {
+      "description": "Explicit assumptions that the rest of XTAL must track. These widen the trusted surface and must be review-gated.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/assumption" },
+      "default": []
+    },
+    "nonfunctional": {
+      "description": "Optional NFR intents for later stages (budgets, determinism, capability posture).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "determinism": {
+          "enum": ["unspecified", "must_be_deterministic", "may_use_os_world"]
+        },
+        "budget_profile": { "type": "string" },
+        "capability_profile": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "sort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "doc": { "type": "string" },
+        "invariant": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/clause" },
+          "default": []
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "params", "result"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "doc": { "type": "string" },
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/param" }
+        },
+        "result": { "type": "string" },
+        "result_brand": { "type": "string" },
+        "requires": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/clause" },
+          "default": []
+        },
+        "ensures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/clause" },
+          "default": []
+        },
+        "invariant": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/clause" },
+          "default": []
+        },
+        "ensures_props": {
+          "description": "Properties compiled to tests (and optionally runtime monitors).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/prop" },
+          "default": []
+        },
+        "examples_ref": {
+          "description": "Optional JSONL file path (repo-relative) containing example cases for this module.",
+          "type": "string"
+        }
+      }
+    },
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ty"],
+      "properties": {
+        "name": { "type": "string" },
+        "ty": { "type": "string" },
+        "brand": { "type": "string" }
+      }
+    },
+    "clause": {
+      "description": "Matches x07AST contract clause shape.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr"],
+      "properties": {
+        "id": { "type": "string" },
+        "expr": { "$ref": "#/$defs/x07_expr" },
+        "witness": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/x07_expr" }
+        }
+      }
+    },
+    "prop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prop", "args"],
+      "properties": {
+        "id": { "type": "string" },
+        "prop": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "doc": { "type": "string" }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "severity": { "enum": ["low", "medium", "high"], "default": "medium" }
+      }
+    },
+    "x07_expr": {
+      "description": "x07AST expression shape (loose, validated by x07 expression checker).",
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "array" },
+        { "type": "object" }
+      ]
+    }
+  }
+}

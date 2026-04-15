@@ -1,0 +1,5 @@
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.sort_u8_asc.v1","args":{"b":{"kind":"bytes_b64","b64":"AQID"}},"expect":{"kind":"bytes_b64","b64":"AQID"},"tags":["smoke"],"doc":"Already sorted"}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.sort_u8_asc.v1","args":{"b":{"kind":"bytes_b64","b64":"AwEC"}},"expect":{"kind":"bytes_b64","b64":"AQID"},"tags":["smoke"],"doc":"Sort 3,1,2"}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.sort_u8_asc.v1","args":{"b":{"kind":"bytes_b64","b64":""}},"expect":{"kind":"bytes_b64","b64":""},"tags":["edge"],"doc":"Empty input"}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.sort_u8_asc.v1","args":{"b":{"kind":"bytes_b64","b64":"AgEC"}},"expect":{"kind":"bytes_b64","b64":"AQIC"},"tags":["smoke"],"doc":"Duplicates"}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.sort_u8_asc.v1","args":{"b":{"kind":"bytes_b64","b64":"AwIB"}},"expect":{"kind":"bytes_b64","b64":"AQID"},"tags":["smoke"],"doc":"Descending"}

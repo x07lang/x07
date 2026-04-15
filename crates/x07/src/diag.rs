@@ -990,9 +990,10 @@ fn scan_source_codes(roots: &[PathBuf]) -> Result<ExtractedCodes> {
         r#"(?:diag_[A-Za-z0-9_]*|[A-Za-z0-9_]*_diag(?:_[A-Za-z0-9_]+)*|diagnostic_error|with_code|error_code|warning_code)\s*\(\s*"([A-Z][A-Z0-9_-]{0,63})""#,
     )
     .context("compile diagnostic-call regex")?;
-    let re_literal_code =
-        Regex::new(r#""((?:X07(?:TC|V|REL|PROOF)_[A-Z0-9][A-Z0-9_-]{0,63})|(?:X7I[0-9]{4}))""#)
-            .context("compile literal-code regex")?;
+    let re_literal_code = Regex::new(
+        r#""((?:X07(?:TC|V|REL|PROOF)_[A-Z0-9][A-Z0-9_-]{0,63})|(?:X7I[0-9]{4})|(?:E_GEN_[A-Z0-9][A-Z0-9_-]{0,63})|(?:W_GEN_[A-Z0-9][A-Z0-9_-]{0,63})|(?:EXTAL_[A-Z0-9][A-Z0-9_-]{0,63})|(?:WXTAL_[A-Z0-9][A-Z0-9_-]{0,63}))""#,
+    )
+    .context("compile literal-code regex")?;
     let re_x7i_literal =
         Regex::new(r#""(X7I[0-9]{4})""#).context("compile x07import-code regex")?;
 

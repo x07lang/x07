@@ -6,6 +6,16 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Added
 
+- XTAL Phase A tooling:
+  - `x07 xtal spec fmt|lint|check|scaffold` for authoring and validating `*.x07spec.json` modules and `*.x07spec.examples.jsonl`.
+  - `x07 xtal tests gen-from-spec` for generating deterministic unit tests from spec examples under `gen/xtal/`.
+  - `x07 xtal dev --phase A` and `x07 xtal verify` wrappers for a single-command Phase A loop (spec checks, generation drift check, and test execution).
+- Generator determinism gate:
+  - `arch/gen/index.x07gen.json` (`x07.arch.gen.index@0.1.0`) for declaring generator outputs and pinned invocations.
+  - `x07 gen verify|write` for byte-for-byte drift checks and (optional) double-run determinism verification across declared generators.
+- Schemas:
+  - `x07.x07spec@0.1.0` and `x07.x07spec_examples@0.1.0` for XTAL Phase A spec and example artifacts.
+
 ### Changed
 
 ### Fixed

@@ -1,0 +1,1 @@
+{"decls":[],"imports":["toy.sorter"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.8.0","solve":["toy.sorter.sort_u8_asc",["view.to_bytes","input"]]}

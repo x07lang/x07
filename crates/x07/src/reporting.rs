@@ -376,6 +376,8 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "doc"
             | "schema"
             | "sm"
+            | "gen"
+            | "xtal"
             | "rr"
             | "patch"
             | "verify"
@@ -441,6 +443,10 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
         "service" => &["archetypes", "genpack", "validate"],
         "service.genpack" => &["schema", "grammar"],
         "sm" => &["check", "gen"],
+        "gen" => &["verify", "write"],
+        "xtal" => &["dev", "verify", "spec", "tests"],
+        "xtal.spec" => &["fmt", "lint", "check", "scaffold"],
+        "xtal.tests" => &["gen-from-spec"],
         "rr" => &["record"],
         "patch" => &["apply"],
         _ => &[],

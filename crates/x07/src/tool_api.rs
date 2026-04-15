@@ -777,7 +777,7 @@ fn infer_nondeterminism(scope: Option<&str>, argv: &[OsString]) -> reporting::No
     nd
 }
 
-fn extract_diagnostics(doc: Option<&Value>) -> Option<Vec<diagnostics::Diagnostic>> {
+pub(crate) fn extract_diagnostics(doc: Option<&Value>) -> Option<Vec<diagnostics::Diagnostic>> {
     let doc = doc?;
     let obj = doc.as_object()?;
 

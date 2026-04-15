@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.x07spec_examples@0.1.0.schema.json",
+  "title": "x07.x07spec_examples@0.1.0",
+  "description": "One JSONL line representing an XTAL example case for an operation id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "op", "args", "expect"],
+  "properties": {
+    "schema_version": { "const": "x07.x07spec_examples@0.1.0" },
+    "op": { "type": "string", "minLength": 1 },
+    "args": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/value" }
+    },
+    "expect": { "$ref": "#/$defs/value" },
+    "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "doc": { "type": "string" }
+  },
+  "$defs": {
+    "bytes_b64": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "b64"],
+      "properties": {
+        "kind": { "const": "bytes_b64" },
+        "b64": { "type": "string" }
+      }
+    },
+    "i32_obj": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "i32" },
+        "i32": { "$ref": "#/$defs/i32" },
+        "value": { "$ref": "#/$defs/i32" }
+      }
+    },
+    "i32": {
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    "value": {
+      "description": "Phase-A minimum value encoding (bytes_b64 and i32).",
+      "oneOf": [{ "$ref": "#/$defs/bytes_b64" }, { "$ref": "#/$defs/i32" }, { "$ref": "#/$defs/i32_obj" }]
+    }
+  }
+}

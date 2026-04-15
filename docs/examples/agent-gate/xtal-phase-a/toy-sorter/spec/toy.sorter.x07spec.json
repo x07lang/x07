@@ -1,0 +1,37 @@
+{
+  "module_id": "toy.sorter",
+  "operations": [
+    {
+      "doc": "Return a new byte string containing the bytes of input in ascending order.",
+      "ensures": [
+        {
+          "expr": [
+            "=",
+            [
+              "bytes.len",
+              "__result"
+            ],
+            [
+              "bytes.len",
+              "b"
+            ]
+          ],
+          "id": "len_preserved"
+        }
+      ],
+      "ensures_props": [],
+      "examples_ref": "spec/toy.sorter.x07spec.examples.jsonl",
+      "id": "op.sort_u8_asc.v1",
+      "name": "toy.sorter.sort_u8_asc",
+      "params": [
+        {
+          "name": "b",
+          "ty": "bytes"
+        }
+      ],
+      "requires": [],
+      "result": "bytes"
+    }
+  ],
+  "schema_version": "x07.x07spec@0.1.0"
+}

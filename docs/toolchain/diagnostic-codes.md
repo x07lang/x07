@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 493
-- quickfix support (`sometimes` or `always`): 446
-- quickfix coverage: 90.47%
+- total codes: 545
+- quickfix support (`sometimes` or `always`): 498
+- quickfix coverage: 91.38%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -41,6 +41,43 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `ETEST_TESTS_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TESTS_EMPTY`. |
 | `ETEST_TIMEOUT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TIMEOUT_INVALID`. |
 | `ETEST_WORLD_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_WORLD_INVALID`. |
+| `EXTAL_DEV_NO_SPECS` | x07 / run / error | sometimes | XTAL dev pipeline found no spec modules. |
+| `EXTAL_EXAMPLES_ARGS_EXTRA` | x07 / lint / error | sometimes | Example provides an extra arg. |
+| `EXTAL_EXAMPLES_ARGS_MISSING` | x07 / lint / error | sometimes | Example is missing a required arg. |
+| `EXTAL_EXAMPLES_ARG_KIND_UNSUPPORTED` | x07 / lint / error | sometimes | Example arg encoding kind is unsupported in Phase A. |
+| `EXTAL_EXAMPLES_B64_INVALID` | x07 / lint / error | sometimes | Example contains invalid base64 payload. |
+| `EXTAL_EXAMPLES_EXPECT_KIND_UNSUPPORTED` | x07 / lint / error | sometimes | Example expect encoding kind is unsupported. |
+| `EXTAL_EXAMPLES_IO_READ_FAILED` | x07 / parse / error | sometimes | Cannot read examples JSONL file. |
+| `EXTAL_EXAMPLES_JSON_PARSE` | x07 / parse / error | sometimes | Examples JSONL line contains invalid JSON. |
+| `EXTAL_EXAMPLES_OP_UNKNOWN` | x07 / lint / error | sometimes | Example references an unknown op id. |
+| `EXTAL_EXAMPLES_SCHEMA_INVALID` | x07 / parse / error | sometimes | Examples JSONL line violates the structural schema. |
+| `EXTAL_EXAMPLES_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | Examples schema_version is unsupported. |
+| `EXTAL_GEN_DRIFT` | x07 / run / error | sometimes | Generated outputs drifted (check mode). |
+| `EXTAL_GEN_NO_EXAMPLES` | x07 / run / error | sometimes | Spec modules contain no examples to generate tests from. |
+| `EXTAL_GEN_NO_SPECS` | x07 / run / error | sometimes | No spec modules found for generation. |
+| `EXTAL_GEN_UNSUPPORTED_TY` | x07 / run / error | sometimes | Generator cannot embed a value for the requested type/kind. |
+| `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED` | x07 / type / error | sometimes | Contract clause uses a disallowed builtin/head. |
+| `EXTAL_SPEC_CONTRACT_EXPR_NOT_I32` | x07 / type / error | sometimes | Contract clause does not typecheck to i32. |
+| `EXTAL_SPEC_CONTRACT_EXPR_PARSE` | x07 / parse / error | sometimes | Contract clause expression is not valid XTAL JSON expr. |
+| `EXTAL_SPEC_CONTRACT_MODULE_CALL_FORBIDDEN` | x07 / type / error | sometimes | Contract clause contains a forbidden module call. |
+| `EXTAL_SPEC_CONTRACT_USES_RESULT_OUTSIDE_ENSURES` | x07 / type / error | sometimes | `__result` used outside ensures. |
+| `EXTAL_SPEC_CONTRACT_WITNESS_INVALID` | x07 / type / error | sometimes | Contract witness is invalid or not contract-pure. |
+| `EXTAL_SPEC_EXAMPLES_REF_MISSING` | x07 / lint / error | sometimes | Spec examples_ref points to a missing file. |
+| `EXTAL_SPEC_IO_READ_FAILED` | x07 / parse / error | sometimes | Cannot read spec file. |
+| `EXTAL_SPEC_JSON_PARSE` | x07 / parse / error | sometimes | Spec file contains invalid JSON. |
+| `EXTAL_SPEC_MODULE_ID_INVALID` | x07 / lint / error | sometimes | Spec module_id is invalid. |
+| `EXTAL_SPEC_OPS_EMPTY` | x07 / lint / error | sometimes | Spec has zero operations. |
+| `EXTAL_SPEC_OP_ID_DUPLICATE` | x07 / lint / error | sometimes | Spec has duplicate operation ids. |
+| `EXTAL_SPEC_OP_ID_MISSING` | x07 / lint / error | sometimes | Spec operation is missing id. |
+| `EXTAL_SPEC_OP_NAME_INVALID` | x07 / lint / error | sometimes | Spec operation name is invalid. |
+| `EXTAL_SPEC_OP_NAME_MISSING` | x07 / lint / error | sometimes | Spec operation is missing name. |
+| `EXTAL_SPEC_PARAM_NAME_DUPLICATE` | x07 / lint / error | sometimes | Spec has duplicate parameter names. |
+| `EXTAL_SPEC_PARAM_NAME_INVALID` | x07 / lint / error | sometimes | Spec parameter name is invalid. |
+| `EXTAL_SPEC_PARAM_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec parameter type is unsupported in Phase A. |
+| `EXTAL_SPEC_RESULT_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec result type is unsupported in Phase A. |
+| `EXTAL_SPEC_SCHEMA_INVALID` | x07 / parse / error | sometimes | Spec JSON violates the structural schema. |
+| `EXTAL_SPEC_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | Spec schema_version is unsupported. |
+| `EXTAL_VERIFY_TESTS_FAILED` | x07 / run / error | sometimes | XTAL verify: x07 test failed. |
 | `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`. |
 | `E_ARCH_ARCHIVE_OP_UNKNOWN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_OP_UNKNOWN`. |
 | `E_ARCH_ARCHIVE_SCHEMA_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_SCHEMA_INVALID`. |
@@ -172,7 +209,22 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_ARCH_WORLD_EDGE_FORBIDDEN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WORLD_EDGE_FORBIDDEN`. |
 | `E_BENCH_SUITE_LOAD` | x07 / lint / error | sometimes | Diagnostic code `E_BENCH_SUITE_LOAD`. |
 | `E_DEPS_CAP_POLICY_DENY` | x07 / lint / error | sometimes | Diagnostic code `E_DEPS_CAP_POLICY_DENY`. |
+| `E_GEN_DRIFT` | x07 / run / error | sometimes | Committed generator outputs drifted. |
+| `E_GEN_ENTRY_CHECK_ARGV_CONTAINS_WRITE` | x07 / parse / error | sometimes | Generator index entry check_argv contains --write. |
+| `E_GEN_ENTRY_CHECK_ARGV_EMPTY` | x07 / parse / error | sometimes | Generator index entry check_argv is empty. |
+| `E_GEN_ENTRY_MODE_UNSUPPORTED` | x07 / parse / error | sometimes | Generator index entry mode is unsupported. |
+| `E_GEN_ENTRY_OUTPUTS_EMPTY` | x07 / parse / error | sometimes | Generator index entry outputs is empty. |
+| `E_GEN_ENTRY_WRITE_ARGV_CONTAINS_CHECK` | x07 / parse / error | sometimes | Generator index entry write_argv contains --check. |
+| `E_GEN_ENTRY_WRITE_ARGV_EMPTY` | x07 / parse / error | sometimes | Generator index entry write_argv is empty. |
+| `E_GEN_INDEX_IO_READ_FAILED` | x07 / parse / error | sometimes | Cannot read generator index file. |
+| `E_GEN_INDEX_JSON_PARSE` | x07 / parse / error | sometimes | Generator index file contains invalid JSON. |
+| `E_GEN_INDEX_SCHEMA_INVALID` | x07 / parse / error | sometimes | Generator index violates the structural schema. |
+| `E_GEN_INDEX_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | Generator index schema_version is unsupported. |
+| `E_GEN_MISSING_OUTPUT` | x07 / run / error | sometimes | Declared generator output root is missing. |
+| `E_GEN_NONDETERMINISTIC` | x07 / run / error | sometimes | Generator outputs are not deterministic. |
+| `E_GEN_RUN_FAILED` | x07 / run / error | sometimes | Generator command failed. |
 | `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
+| `WXTAL_SPEC_NONCANONICAL_JSON` | x07 / rewrite / warning | always | Spec JSON is not in canonical form. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
 | `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
 | `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | sometimes | Diagnostic code `W_DEPS_CAP_POLICY_MISSING`. |
@@ -1160,6 +1212,802 @@ Agent strategy:
 - Validate `tests/tests.json` fields and world requirements.
 - Apply canonical manifest edits (id/world/entry/expect/returns/paths).
 - Re-run `x07 test`.
+
+
+## `EXTAL_DEV_NO_SPECS`
+
+Summary: XTAL dev pipeline found no spec modules.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL dev pipeline found no spec modules.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Reproduce the diagnostic and apply the recommended fix.
+
+
+## `EXTAL_EXAMPLES_ARGS_EXTRA`
+
+Summary: Example provides an extra arg.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Example provides an extra arg.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_ARGS_MISSING`
+
+Summary: Example is missing a required arg.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Example is missing a required arg.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_ARG_KIND_UNSUPPORTED`
+
+Summary: Example arg encoding kind is unsupported in Phase A.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Example arg encoding kind is unsupported in Phase A.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_B64_INVALID`
+
+Summary: Example contains invalid base64 payload.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Example contains invalid base64 payload.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_EXPECT_KIND_UNSUPPORTED`
+
+Summary: Example expect encoding kind is unsupported.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Example expect encoding kind is unsupported.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_IO_READ_FAILED`
+
+Summary: Cannot read examples JSONL file.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Cannot read examples JSONL file.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_JSON_PARSE`
+
+Summary: Examples JSONL line contains invalid JSON.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Examples JSONL line contains invalid JSON.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_OP_UNKNOWN`
+
+Summary: Example references an unknown op id.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Example references an unknown op id.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_SCHEMA_INVALID`
+
+Summary: Examples JSONL line violates the structural schema.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Examples JSONL line violates the structural schema.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_EXAMPLES_SCHEMA_VERSION_UNSUPPORTED`
+
+Summary: Examples schema_version is unsupported.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Examples schema_version is unsupported.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix the referenced `*.x07spec.examples.jsonl` line(s).
+- Re-run `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+
+
+## `EXTAL_GEN_DRIFT`
+
+Summary: Generated outputs drifted (check mode).
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generated outputs drifted (check mode).
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Re-run generation with `x07 xtal tests gen-from-spec --project x07.json --write`.
+- Commit updated `gen/xtal/**` outputs and re-run `--check`.
+
+
+## `EXTAL_GEN_NO_EXAMPLES`
+
+Summary: Spec modules contain no examples to generate tests from.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec modules contain no examples to generate tests from.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Re-run generation with `x07 xtal tests gen-from-spec --project x07.json --write`.
+- Commit updated `gen/xtal/**` outputs and re-run `--check`.
+
+
+## `EXTAL_GEN_NO_SPECS`
+
+Summary: No spec modules found for generation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+No spec modules found for generation.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Re-run generation with `x07 xtal tests gen-from-spec --project x07.json --write`.
+- Commit updated `gen/xtal/**` outputs and re-run `--check`.
+
+
+## `EXTAL_GEN_UNSUPPORTED_TY`
+
+Summary: Generator cannot embed a value for the requested type/kind.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator cannot embed a value for the requested type/kind.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Re-run generation with `x07 xtal tests gen-from-spec --project x07.json --write`.
+- Commit updated `gen/xtal/**` outputs and re-run `--check`.
+
+
+## `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED`
+
+Summary: Contract clause uses a disallowed builtin/head.
+
+Origins:
+- x07 (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract clause uses a disallowed builtin/head.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_CONTRACT_EXPR_NOT_I32`
+
+Summary: Contract clause does not typecheck to i32.
+
+Origins:
+- x07 (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract clause does not typecheck to i32.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_CONTRACT_EXPR_PARSE`
+
+Summary: Contract clause expression is not valid XTAL JSON expr.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract clause expression is not valid XTAL JSON expr.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_CONTRACT_MODULE_CALL_FORBIDDEN`
+
+Summary: Contract clause contains a forbidden module call.
+
+Origins:
+- x07 (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract clause contains a forbidden module call.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_CONTRACT_USES_RESULT_OUTSIDE_ENSURES`
+
+Summary: `__result` used outside ensures.
+
+Origins:
+- x07 (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`__result` used outside ensures.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_CONTRACT_WITNESS_INVALID`
+
+Summary: Contract witness is invalid or not contract-pure.
+
+Origins:
+- x07 (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract witness is invalid or not contract-pure.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_EXAMPLES_REF_MISSING`
+
+Summary: Spec examples_ref points to a missing file.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec examples_ref points to a missing file.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_IO_READ_FAILED`
+
+Summary: Cannot read spec file.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Cannot read spec file.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_JSON_PARSE`
+
+Summary: Spec file contains invalid JSON.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec file contains invalid JSON.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_MODULE_ID_INVALID`
+
+Summary: Spec module_id is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec module_id is invalid.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_OPS_EMPTY`
+
+Summary: Spec has zero operations.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec has zero operations.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_OP_ID_DUPLICATE`
+
+Summary: Spec has duplicate operation ids.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec has duplicate operation ids.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_OP_ID_MISSING`
+
+Summary: Spec operation is missing id.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec operation is missing id.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_OP_NAME_INVALID`
+
+Summary: Spec operation name is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec operation name is invalid.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_OP_NAME_MISSING`
+
+Summary: Spec operation is missing name.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec operation is missing name.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_PARAM_NAME_DUPLICATE`
+
+Summary: Spec has duplicate parameter names.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec has duplicate parameter names.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_PARAM_NAME_INVALID`
+
+Summary: Spec parameter name is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec parameter name is invalid.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_PARAM_TY_UNSUPPORTED`
+
+Summary: Spec parameter type is unsupported in Phase A.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec parameter type is unsupported in Phase A.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_RESULT_TY_UNSUPPORTED`
+
+Summary: Spec result type is unsupported in Phase A.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec result type is unsupported in Phase A.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_SCHEMA_INVALID`
+
+Summary: Spec JSON violates the structural schema.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec JSON violates the structural schema.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_SCHEMA_VERSION_UNSUPPORTED`
+
+Summary: Spec schema_version is unsupported.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec schema_version is unsupported.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_VERIFY_TESTS_FAILED`
+
+Summary: XTAL verify: x07 test failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL verify: x07 test failed.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Reproduce the diagnostic and apply the recommended fix.
 
 
 ## `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`
@@ -3782,6 +4630,314 @@ Agent strategy:
 - Apply deterministic edits and re-run.
 
 
+## `E_GEN_DRIFT`
+
+Summary: Committed generator outputs drifted.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Committed generator outputs drifted.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_ENTRY_CHECK_ARGV_CONTAINS_WRITE`
+
+Summary: Generator index entry check_argv contains --write.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index entry check_argv contains --write.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_ENTRY_CHECK_ARGV_EMPTY`
+
+Summary: Generator index entry check_argv is empty.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index entry check_argv is empty.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_ENTRY_MODE_UNSUPPORTED`
+
+Summary: Generator index entry mode is unsupported.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index entry mode is unsupported.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_ENTRY_OUTPUTS_EMPTY`
+
+Summary: Generator index entry outputs is empty.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index entry outputs is empty.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_ENTRY_WRITE_ARGV_CONTAINS_CHECK`
+
+Summary: Generator index entry write_argv contains --check.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index entry write_argv contains --check.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_ENTRY_WRITE_ARGV_EMPTY`
+
+Summary: Generator index entry write_argv is empty.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index entry write_argv is empty.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_INDEX_IO_READ_FAILED`
+
+Summary: Cannot read generator index file.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Cannot read generator index file.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_INDEX_JSON_PARSE`
+
+Summary: Generator index file contains invalid JSON.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index file contains invalid JSON.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_INDEX_SCHEMA_INVALID`
+
+Summary: Generator index violates the structural schema.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index violates the structural schema.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_INDEX_SCHEMA_VERSION_UNSUPPORTED`
+
+Summary: Generator index schema_version is unsupported.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator index schema_version is unsupported.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_MISSING_OUTPUT`
+
+Summary: Declared generator output root is missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Declared generator output root is missing.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_NONDETERMINISTIC`
+
+Summary: Generator outputs are not deterministic.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator outputs are not deterministic.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
+## `E_GEN_RUN_FAILED`
+
+Summary: Generator command failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Generator command failed.
+
+This diagnostic is deterministic and intended to be actionable in the standard x07 repair loop.
+
+Agent strategy:
+
+- Fix `arch/gen/index.x07gen.json` (schema/version/argv/outputs).
+- Regenerate outputs with `x07 gen write --index arch/gen/index.x07gen.json`.
+- Commit outputs and verify with `x07 gen verify --index arch/gen/index.x07gen.json`.
+
+
 ## `E_SBOM_GENERATION_FAILED`
 
 Summary: Diagnostic code `E_SBOM_GENERATION_FAILED`.
@@ -3800,6 +4956,26 @@ Agent strategy:
 - Reproduce `E_SBOM_GENERATION_FAILED` with the failing command.
 - Inspect structured diagnostic fields.
 - Apply deterministic edits and re-run.
+
+
+## `WXTAL_SPEC_NONCANONICAL_JSON`
+
+Summary: Spec JSON is not in canonical form.
+
+Origins:
+- x07 (stage: rewrite, severity: warning)
+
+Quickfix support: `always`
+
+Details:
+
+The spec parses and passes schema checks, but its bytes are not in canonical JSON form. Canonical formatting is deterministic and intended for reviewable diffs.
+
+Agent strategy:
+
+- Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
+- Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
+- Apply deterministic edits to fix reported pointers, then re-run.
 
 
 ## `W_ARCH_CONTRACTS_LOCK_MISSING`

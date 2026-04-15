@@ -84,6 +84,25 @@ def semver_from_base_schema(base_schema: dict) -> str:
     raise SystemExit(f"base schema title missing @semver: {title!r}")
 
 
+def semver_from_title(title: str) -> str | None:
+    if "@" not in title:
+        return None
+    return title.split("@", 1)[1].strip() or None
+
+
+def semver_for_existing_schema(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    title = doc.get("title")
+    if not isinstance(title, str):
+        return None
+    return semver_from_title(title)
+
+
 def tool_schema_version(scope: str | None, semver: str) -> str:
     if scope is None:
         return f"x07.tool.root.report@{semver}"
@@ -134,23 +153,26 @@ def planned_tool_schema_writes(scopes: list[str]) -> list[PlannedWrite]:
     semver = semver_from_base_schema(base_schema)
 
     planned: list[PlannedWrite] = []
+    root_filename = tool_schema_filename(None)
+    root_semver = semver_for_existing_schema(SPEC_DIR / root_filename) or semver
     planned.append(
         PlannedWrite(
-            path=SPEC_DIR / tool_schema_filename(None),
-            content=(json.dumps(build_tool_schema(base_schema, None, semver), indent=2) + "\n").encode(
-                "utf-8"
-            ),
+            path=SPEC_DIR / root_filename,
+            content=(
+                json.dumps(build_tool_schema(base_schema, None, root_semver), indent=2) + "\n"
+            ).encode("utf-8"),
         )
     )
     for scope in scopes:
         if scope in NATIVE_REPORT_SCOPES:
             continue
         filename = tool_schema_filename(scope)
+        scope_semver = semver_for_existing_schema(SPEC_DIR / filename) or semver
         planned.append(
             PlannedWrite(
                 path=SPEC_DIR / filename,
                 content=(
-                    json.dumps(build_tool_schema(base_schema, scope, semver), indent=2) + "\n"
+                    json.dumps(build_tool_schema(base_schema, scope, scope_semver), indent=2) + "\n"
                 ).encode("utf-8"),
             )
         )

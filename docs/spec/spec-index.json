@@ -391,6 +391,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.gen.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.gen.index.schema.json",
+      "schema_version": "x07.arch.gen.index@0.1.0",
+      "title": "x07.arch.gen.index@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-arch.manifest.lock.schema.json",
       "schema_id": "https://x07.io/spec/x07-arch.manifest.lock.schema.json",
       "schema_version": "x07.arch.manifest.lock@0.1.0",
@@ -1140,6 +1147,27 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-gen-verify.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-gen-verify.report.schema.json",
+      "schema_version": "x07.tool.gen.verify.report@0.1.0",
+      "title": "x07.tool.gen.verify.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-gen-write.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-gen-write.report.schema.json",
+      "schema_version": "x07.tool.gen.write.report@0.1.0",
+      "title": "x07.tool.gen.write.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-gen.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-gen.report.schema.json",
+      "schema_version": "x07.tool.gen.report@0.1.0",
+      "title": "x07.tool.gen.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-guide.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-guide.report.schema.json",
       "schema_version": "x07.tool.guide.report@0.1.0",
@@ -1560,6 +1588,76 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-dev.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-dev.report.schema.json",
+      "schema_version": "x07.tool.xtal.dev.report@0.1.0",
+      "title": "x07.tool.xtal.dev.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-spec-check.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-spec-check.report.schema.json",
+      "schema_version": "x07.tool.xtal.spec.check.report@0.1.0",
+      "title": "x07.tool.xtal.spec.check.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-spec-fmt.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-spec-fmt.report.schema.json",
+      "schema_version": "x07.tool.xtal.spec.fmt.report@0.1.0",
+      "title": "x07.tool.xtal.spec.fmt.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-spec-lint.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-spec-lint.report.schema.json",
+      "schema_version": "x07.tool.xtal.spec.lint.report@0.1.0",
+      "title": "x07.tool.xtal.spec.lint.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-spec-scaffold.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-spec-scaffold.report.schema.json",
+      "schema_version": "x07.tool.xtal.spec.scaffold.report@0.1.0",
+      "title": "x07.tool.xtal.spec.scaffold.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-spec.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-spec.report.schema.json",
+      "schema_version": "x07.tool.xtal.spec.report@0.1.0",
+      "title": "x07.tool.xtal.spec.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-tests-gen-from-spec.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-tests-gen-from-spec.report.schema.json",
+      "schema_version": "x07.tool.xtal.tests.gen-from-spec.report@0.1.0",
+      "title": "x07.tool.xtal.tests.gen-from-spec.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-tests.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-tests.report.schema.json",
+      "schema_version": "x07.tool.xtal.tests.report@0.1.0",
+      "title": "x07.tool.xtal.tests.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-verify.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-verify.report.schema.json",
+      "schema_version": "x07.tool.xtal.verify.report@0.1.0",
+      "title": "x07.tool.xtal.verify.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal.report.schema.json",
+      "schema_version": "x07.tool.xtal.report@0.1.0",
+      "title": "x07.tool.xtal.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool.events.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool.events.schema.json",
       "schema_version": "x07.tool.events@0.1.0",
@@ -1718,6 +1816,20 @@
       "schema_id": "https://x07.io/spec/x07.verify.cex@0.2.0.schema.json",
       "schema_version": "x07.verify.cex@0.2.0",
       "title": "X07 Verify Counterexample v0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.x07spec@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.x07spec@0.1.0.schema.json",
+      "schema_version": "x07.x07spec@0.1.0",
+      "title": "x07.x07spec@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.x07spec_examples@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.x07spec_examples@0.1.0.schema.json",
+      "schema_version": "x07.x07spec_examples@0.1.0",
+      "title": "x07.x07spec_examples@0.1.0"
     },
     {
       "kind": "schema",

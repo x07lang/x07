@@ -1,0 +1,34 @@
+{
+  "schema_version": "x07.arch.gen.index@0.1.0",
+  "generators": [
+    {
+      "id": "xtal.toy_sorter",
+      "mode": "double_run_v1",
+      "check_argv": [
+        "xtal",
+        "tests",
+        "gen-from-spec",
+        "--project",
+        "x07.json",
+        "--spec-dir",
+        "spec",
+        "--out-dir",
+        "gen/xtal",
+        "--check"
+      ],
+      "write_argv": [
+        "xtal",
+        "tests",
+        "gen-from-spec",
+        "--project",
+        "x07.json",
+        "--spec-dir",
+        "spec",
+        "--out-dir",
+        "gen/xtal",
+        "--write"
+      ],
+      "outputs": ["gen/xtal/"]
+    }
+  ]
+}

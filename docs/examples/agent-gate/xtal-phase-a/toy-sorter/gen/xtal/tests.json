@@ -1,0 +1,40 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "entry": "gen.xtal.toy.sorter.tests.ex_0001",
+      "expect": "pass",
+      "id": "xtal/toy.sorter/op.sort_u8_asc.v1/ex0001",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.toy.sorter.tests.ex_0002",
+      "expect": "pass",
+      "id": "xtal/toy.sorter/op.sort_u8_asc.v1/ex0002",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.toy.sorter.tests.ex_0003",
+      "expect": "pass",
+      "id": "xtal/toy.sorter/op.sort_u8_asc.v1/ex0003",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.toy.sorter.tests.ex_0004",
+      "expect": "pass",
+      "id": "xtal/toy.sorter/op.sort_u8_asc.v1/ex0004",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.toy.sorter.tests.ex_0005",
+      "expect": "pass",
+      "id": "xtal/toy.sorter/op.sort_u8_asc.v1/ex0005",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    }
+  ]
+}

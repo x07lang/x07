@@ -21,6 +21,7 @@ They are intentionally small and deterministic.
 - `json-report`: typed CLI → DataModel → canonical JSON report (has `tests/`)
 - `archive-safe-extract/zip-hello`: safe ZIP extraction (pure, hardened defaults) via `ext-archive-c`
 - `web-crawler-local`: `run-os-sandboxed` HTTP crawl against a local fixture site (policy-gated)
+- `xtal-phase-a/toy-sorter`: XTAL Phase A spec → deterministic generated tests + `x07 gen` gate (`arch/gen/index.x07gen.json`)
 
 ## Run the gate locally
 
