@@ -439,6 +439,12 @@ pub struct VerifyArgs {
     #[arg(long, value_name = "N", default_value_t = 16)]
     pub max_bytes_len: u32,
 
+    /// Override the encoded verification input length (bytes).
+    ///
+    /// If set, it must be >= the required encoding length for the target signature.
+    #[arg(long, value_name = "N")]
+    pub input_len_bytes: Option<u32>,
+
     /// Base directory for verification artifacts.
     ///
     /// Defaults to `<project_root>/.x07/artifacts` or `<cwd>/.x07/artifacts`.
@@ -491,7 +497,7 @@ impl Bounds {
         Bounds {
             unwind: args.unwind,
             max_bytes_len: args.max_bytes_len,
-            input_len_bytes: 0,
+            input_len_bytes: args.input_len_bytes.unwrap_or(0),
         }
     }
 }
@@ -1009,12 +1015,30 @@ fn cmd_verify_inner(
         );
     }
 
-    let input_len_bytes = compute_input_len_bytes(&target, args.max_bytes_len).map_err(|err| {
-        anyhow::anyhow!(
-            "internal verify precheck mismatch for {:?}: {err}",
-            args.entry
-        )
-    })?;
+    let required_input_len_bytes =
+        compute_input_len_bytes(&target, args.max_bytes_len).map_err(|err| {
+            anyhow::anyhow!(
+                "internal verify precheck mismatch for {:?}: {err}",
+                args.entry
+            )
+        })?;
+    let input_len_bytes = match args.input_len_bytes {
+        Some(v) if v < required_input_len_bytes => {
+            let d = diag_verify(
+                "X07V_EARGS",
+                format!(
+                    "--input-len-bytes must be >= {required_input_len_bytes} for {:?} (got {v})",
+                    args.entry
+                ),
+            );
+            return write_report_and_exit(
+                machine,
+                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
+            );
+        }
+        Some(v) => v,
+        None => required_input_len_bytes,
+    };
     let bounds = Bounds {
         unwind: args.unwind,
         max_bytes_len: args.max_bytes_len,
@@ -1464,6 +1488,7 @@ fn cmd_verify_smt(
     }
 
     normalize_smt2_logic_for_z3(&smt2_path)?;
+    ensure_smt2_reason_unknown_query(&smt2_path)?;
     artifacts.smt2_path = Some(smt2_path.display().to_string());
 
     if !command_exists("z3") {
@@ -1547,6 +1572,7 @@ fn cmd_verify_smt(
     };
 
     let status = z3_stdout.lines().next().unwrap_or("").trim();
+    let reason_unknown = parse_z3_reason_unknown(&z3_stdout);
     if status.is_empty() && !smt2_has_solver_query(&smt2_path)? {
         let artifacts = finalize_success_artifacts(artifacts)?;
         return write_report_and_exit(
@@ -1695,17 +1721,28 @@ fn cmd_verify_smt(
                 )),
             )
         }
-        other => write_report_and_exit(
-            machine,
-            attach_summary(VerifyReport::inconclusive(
-                plan.mode,
-                &args.entry,
-                bounds,
-                diag_verify("X07V_SMT_UNKNOWN", format!("solver returned {other:?}")),
-                artifacts,
-                2,
-            )),
-        ),
+        other => {
+            let (code, message) =
+                if other == "unknown" && reason_unknown.as_deref() == Some("timeout") {
+                    (
+                        "X07V_SMT_TIMEOUT",
+                        "solver returned \"unknown\" (reason=timeout)".to_string(),
+                    )
+                } else {
+                    ("X07V_SMT_UNKNOWN", format!("solver returned {other:?}"))
+                };
+            write_report_and_exit(
+                machine,
+                attach_summary(VerifyReport::inconclusive(
+                    plan.mode,
+                    &args.entry,
+                    bounds,
+                    diag_verify(code, message),
+                    artifacts,
+                    2,
+                )),
+            )
+        }
     }
 }
 
@@ -1764,6 +1801,44 @@ fn normalize_smt2_logic_for_z3(path: &Path) -> Result<()> {
     }
     util::write_atomic(path, normalized.as_bytes())
         .with_context(|| format!("rewrite smt2 logic: {}", path.display()))
+}
+
+fn ensure_smt2_reason_unknown_query(path: &Path) -> Result<()> {
+    if !smt2_has_solver_query(path)? {
+        return Ok(());
+    }
+    let raw = std::fs::read(path).with_context(|| format!("read smt2: {}", path.display()))?;
+    let mut text = String::from_utf8(raw).context("SMT2 output is not valid UTF-8")?;
+    if text.contains(":reason-unknown") {
+        return Ok(());
+    }
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+    text.push_str("(get-info :reason-unknown)\n");
+    util::write_atomic(path, text.as_bytes())
+        .with_context(|| format!("write smt2: {}", path.display()))?;
+    Ok(())
+}
+
+fn parse_z3_reason_unknown(stdout: &str) -> Option<String> {
+    for line in stdout.lines().skip(1) {
+        let line = line.trim();
+        if !line.starts_with("(:reason-unknown") {
+            continue;
+        }
+        let start = line.find('"')?;
+        let end = line.rfind('"')?;
+        if end <= start {
+            return None;
+        }
+        let reason = &line[start + 1..end];
+        if reason.is_empty() {
+            return None;
+        }
+        return Some(reason.to_string());
+    }
+    None
 }
 
 fn smt2_has_solver_query(path: &Path) -> Result<bool> {
@@ -5902,6 +5977,7 @@ pub(crate) fn check_proof_object_path(proof_path: &Path) -> Result<VerifyProofCh
         module_root: Vec::new(),
         unwind: object.unwind,
         max_bytes_len: object.max_bytes_len,
+        input_len_bytes: None,
         artifact_dir: None,
         summary: imported_summary_paths.clone(),
         allow_imported_stubs: true,
@@ -6203,6 +6279,18 @@ pub(crate) fn check_proof_object_path(proof_path: &Path) -> Result<VerifyProofCh
         ));
     }
     if let Err(err) = normalize_smt2_logic_for_z3(&replay_smt2_path) {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!("{err:#}"),
+            None,
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    if let Err(err) = ensure_smt2_reason_unknown_query(&replay_smt2_path) {
         return Ok(rejected_proof_check_report_for_object(
             &object,
             proof_digest,
@@ -7440,6 +7528,7 @@ exit 1
             module_root: vec![dir.clone()],
             unwind: 8,
             max_bytes_len: 16,
+            input_len_bytes: None,
             artifact_dir: None,
             summary: Vec::new(),
             allow_imported_stubs: false,

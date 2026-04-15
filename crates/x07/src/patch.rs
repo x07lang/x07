@@ -40,18 +40,18 @@ pub struct PatchApplyArgs {
     pub write: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-struct PatchTarget {
-    path: String,
-    patch: Vec<diagnostics::PatchOp>,
-    #[serde(default)]
-    note: Option<String>,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub(crate) struct PatchTarget {
+    pub(crate) path: String,
+    pub(crate) patch: Vec<diagnostics::PatchOp>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) note: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-struct PatchSet {
-    schema_version: String,
-    patches: Vec<PatchTarget>,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub(crate) struct PatchSet {
+    pub(crate) schema_version: String,
+    pub(crate) patches: Vec<PatchTarget>,
 }
 
 #[derive(Debug, Clone, Serialize)]

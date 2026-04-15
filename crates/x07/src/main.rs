@@ -554,6 +554,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     Some(xtal::XtalSpecCommand::Fmt(_)) => vec!["xtal", "spec", "fmt"],
                     Some(xtal::XtalSpecCommand::Lint(_)) => vec!["xtal", "spec", "lint"],
                     Some(xtal::XtalSpecCommand::Check(_)) => vec!["xtal", "spec", "check"],
+                    Some(xtal::XtalSpecCommand::Extract(_)) => vec!["xtal", "spec", "extract"],
                     Some(xtal::XtalSpecCommand::Scaffold(_)) => vec!["xtal", "spec", "scaffold"],
                 },
                 Some(xtal::XtalCommand::Tests(tests)) => match &tests.cmd {

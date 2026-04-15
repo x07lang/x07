@@ -7,19 +7,27 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 ### Added
 
 - XTAL tooling:
-  - `x07 xtal spec fmt|lint|check|scaffold` for authoring and validating `*.x07spec.json` modules and `*.x07spec.examples.jsonl`.
+  - `x07 xtal spec fmt|lint|check|extract|scaffold` for authoring, validating, and extracting `*.x07spec.json` modules and `*.x07spec.examples.jsonl`.
   - `x07 xtal tests gen-from-spec` for generating deterministic unit tests from spec examples and property checks from `ensures_props` under `gen/xtal/`.
-  - `x07 xtal impl check|sync` for validating and synchronizing implementation exports/signatures/contracts against specs.
-  - `x07 xtal dev` and `x07 xtal verify` wrappers for a single-command XTAL loop (spec checks, generator drift checks, impl conformance checks, and test execution).
+  - `x07 xtal impl check|sync` for validating and synchronizing implementation exports/signatures/contracts against specs (including optional patch emission via `impl sync --patchset-out`).
+  - `x07 xtal dev` and `x07 xtal verify` wrappers for a single-command XTAL loop (spec checks, generator drift checks, impl conformance checks, verification runs, and test execution).
 - Generator determinism gate:
   - `arch/gen/index.x07gen.json` (`x07.arch.gen.index@0.1.0`) for declaring generator outputs and pinned invocations.
   - `x07 gen verify|write` for byte-for-byte drift checks and (optional) double-run determinism verification across declared generators.
 - Schemas:
   - `x07.x07spec@0.1.0` and `x07.x07spec_examples@0.1.0` for XTAL spec and example artifacts.
+  - `x07.xtal.verify_summary@0.1.0` for aggregate `x07 xtal verify` outputs (`target/xtal/verify/summary.json`).
+- Formal verification:
+  - `x07 verify --input-len-bytes` for overriding the verification input encoding length (advanced; used by wrappers that derive verification inputs).
 
 ### Changed
 
+- `x07 xtal verify` now runs `x07 verify --coverage` and `x07 verify --prove` for each spec operation entrypoint (and records results under `target/xtal/verify/`).
+- `x07 xtal impl check` now enforces that `ensures_props[*].prop` symbols exist, are exported, and have compatible signatures for the selected args.
+
 ### Fixed
+
+- `x07 prove check` no longer spuriously rejects proofs when the proof run requires a larger verification-input encoding (now recorded and validated consistently during replay).
 
 ## v0.2.3
 

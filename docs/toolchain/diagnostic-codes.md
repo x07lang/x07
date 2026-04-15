@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 568
-- quickfix support (`sometimes` or `always`): 521
-- quickfix coverage: 91.73%
+- total codes: 587
+- quickfix support (`sometimes` or `always`): 540
+- quickfix coverage: 91.99%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -67,7 +67,13 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_IMPL_MODULE_ID_MISMATCH` | x07 / lint / error | sometimes | Implementation module_id does not match the spec module_id. |
 | `EXTAL_IMPL_MODULE_MISSING` | x07 / lint / error | sometimes | Implementation module is missing for a spec module. |
 | `EXTAL_IMPL_NO_SPECS` | x07 / parse / error | sometimes | No spec files found for implementation conformance checks. |
+| `EXTAL_IMPL_PROP_DEFN_MISSING` | x07 / lint / error | sometimes | Property function definition is missing. |
+| `EXTAL_IMPL_PROP_EXPORT_MISSING` | x07 / lint / error | sometimes | Property function is not exported. |
+| `EXTAL_IMPL_PROP_MODULE_MISSING` | x07 / lint / error | sometimes | Property function module is missing. |
+| `EXTAL_IMPL_PROP_RESULT_TYPE_MISMATCH` | x07 / lint / error | sometimes | Property function result type is invalid. |
+| `EXTAL_IMPL_PROP_SIGNATURE_MISMATCH` | x07 / lint / error | sometimes | Property function signature does not match the spec. |
 | `EXTAL_IMPL_SIGNATURE_MISMATCH` | x07 / lint / error | sometimes | Implementation signature does not match the spec. |
+| `EXTAL_IMPL_SYNC_REQUIRED` | x07 / lint / error | sometimes | Implementation sync is required. |
 | `EXTAL_IMPL_UNSUPPORTED_TY` | x07 / lower / error | sometimes | Unsupported type for generated implementation stubs. |
 | `EXTAL_IMPL_X07AST_PARSE` | x07 / parse / error | sometimes | Implementation module is not valid x07AST JSON. |
 | `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED` | x07 / type / error | sometimes | Contract clause uses a disallowed builtin/head. |
@@ -77,6 +83,10 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_SPEC_CONTRACT_USES_RESULT_OUTSIDE_ENSURES` | x07 / type / error | sometimes | `__result` used outside ensures. |
 | `EXTAL_SPEC_CONTRACT_WITNESS_INVALID` | x07 / type / error | sometimes | Contract witness is invalid or not contract-pure. |
 | `EXTAL_SPEC_EXAMPLES_REF_MISSING` | x07 / lint / error | sometimes | Spec examples_ref points to a missing file. |
+| `EXTAL_SPEC_EXTRACT_DIFFERS` | x07 / lint / error | sometimes | Extracted spec differs from the existing spec. |
+| `EXTAL_SPEC_EXTRACT_IMPL_MODULE_MISSING` | x07 / parse / error | sometimes | Implementation module is missing for spec extraction. |
+| `EXTAL_SPEC_EXTRACT_NO_EXPORTS` | x07 / lint / error | sometimes | No eligible exports found for spec extraction. |
+| `EXTAL_SPEC_EXTRACT_UNSUPPORTED_SIGNATURE` | x07 / lint / warning | sometimes | Exported function signature is unsupported for spec extraction. |
 | `EXTAL_SPEC_HAS_ASSUMPTIONS` | x07 / lint / warning | sometimes | Spec declares assumptions. |
 | `EXTAL_SPEC_IDS_REQUIRED_FOR_SYNC` | x07 / lint / error | always | Contract-core clause ids are required for implementation syncing. |
 | `EXTAL_SPEC_IO_READ_FAILED` | x07 / parse / error | sometimes | Cannot read spec file. |
@@ -99,6 +109,11 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_SPEC_RESULT_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec result type is unsupported in the current XTAL subset. |
 | `EXTAL_SPEC_SCHEMA_INVALID` | x07 / parse / error | sometimes | Spec JSON violates the structural schema. |
 | `EXTAL_SPEC_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | Spec schema_version is unsupported. |
+| `EXTAL_VERIFY_COVERAGE_FAILED` | x07 / run / error | sometimes | Coverage verification failed. |
+| `EXTAL_VERIFY_PROVE_COUNTEREXAMPLE` | x07 / run / error | sometimes | Proof attempt found a counterexample. |
+| `EXTAL_VERIFY_PROVE_ERROR` | x07 / run / error | sometimes | Proof attempt failed with an internal error. |
+| `EXTAL_VERIFY_PROVE_TOOL_MISSING` | x07 / run / error | sometimes | Proof tool is missing or unavailable. |
+| `EXTAL_VERIFY_REPORT_MISSING` | x07 / run / error | sometimes | Expected verify report was not produced. |
 | `EXTAL_VERIFY_TESTS_FAILED` | x07 / run / error | sometimes | XTAL verify: x07 test failed. |
 | `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`. |
 | `E_ARCH_ARCHIVE_OP_UNKNOWN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_OP_UNKNOWN`. |
@@ -248,6 +263,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
 | `WXTAL_IMPL_PARAM_NAME_MISMATCH` | x07 / lint / warning | sometimes | Implementation parameter names differ from the spec. |
 | `WXTAL_SPEC_NONCANONICAL_JSON` | x07 / rewrite / warning | always | Spec JSON is not in canonical form. |
+| `WXTAL_VERIFY_PROVE_INCONCLUSIVE` | x07 / run / warning | sometimes | Proof attempt was inconclusive. |
+| `WXTAL_VERIFY_PROVE_TIMEOUT` | x07 / run / warning | sometimes | Proof attempt hit the configured budget. |
+| `WXTAL_VERIFY_PROVE_UNSUPPORTED` | x07 / run / warning | sometimes | Proof attempt is unsupported for this entry. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
 | `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
 | `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | sometimes | Diagnostic code `W_DEPS_CAP_POLICY_MISSING`. |
@@ -545,6 +563,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07V_SCHEDULER_MODEL_UNTRUSTED` | x07 / lint / error | sometimes | Async proof cannot proceed without the trusted scheduler model. |
 | `X07V_SCOPE_INVARIANT_FAILED` | x07 / lint / error | never | An async scope invariant failed under proof. |
 | `X07V_SMT_SAT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_SAT`. |
+| `X07V_SMT_TIMEOUT` | x07 / run / error | sometimes | SMT solver returned unknown due to a timeout. |
 | `X07V_SMT_UNKNOWN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_UNKNOWN`. |
 | `X07V_SUMMARY_MISMATCH` | x07 / lint / error | never | An imported proof summary does not match the current declaration. |
 | `X07V_SUMMARY_MISSING` | x07 / lint / error | sometimes | A reachable imported proof summary dependency is missing. |
@@ -1761,6 +1780,111 @@ Agent strategy:
 - Re-run `x07 xtal impl check --project x07.json`.
 
 
+## `EXTAL_IMPL_PROP_DEFN_MISSING`
+
+Summary: Property function definition is missing.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A property function symbol is exported but no matching `defn` was found in the implementation module.
+
+Message: `Property "{prop}" referenced by op "{op_id}" is exported by "{impl_path}" but no matching defn was found.`
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --patchset-out <PATH>` (or `--write`) to scaffold a failing stub `defn`.
+- Implement the property function body and re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_PROP_EXPORT_MISSING`
+
+Summary: Property function is not exported.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A property function exists in the implementation module but is not listed in `exports`, so generated property tests cannot call it.
+
+Message: `Property "{prop}" referenced by op "{op_id}" exists but is not exported by "{impl_path}".`
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --patchset-out <PATH>` (or `--write`) to update exports and scaffold missing stubs.
+- Re-run `x07 xtal impl check` and then `x07 xtal verify`.
+
+
+## `EXTAL_IMPL_PROP_MODULE_MISSING`
+
+Summary: Property function module is missing.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A spec operation references a property function via `ensures_props[*].prop`, but the implementation module for that symbol was not found.
+
+Message: `Property "{prop}" referenced by op "{op_id}" was not found: module "{module_id}" does not exist at "{impl_path}".`
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --patchset-out <PATH>` (or `--write`) to scaffold missing modules and property stubs.
+- Implement the property function body and re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_PROP_RESULT_TYPE_MISMATCH`
+
+Summary: Property function result type is invalid.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Property functions referenced by `ensures_props` must return a bytes status value.
+
+Message: `Property "{prop}" referenced by op "{op_id}" must return bytes_status_v1 but returns {reason} in "{impl_path}".`
+
+Agent strategy:
+
+- Update the property function result type to `bytes` (status) and re-run `x07 xtal impl check`.
+- Use `x07 xtal impl sync --patchset-out <PATH>` to sync stubs/signatures when appropriate.
+
+
+## `EXTAL_IMPL_PROP_SIGNATURE_MISMATCH`
+
+Summary: Property function signature does not match the spec.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The referenced property function exists, but its parameter list (count/types/brands) does not match what the spec operation requires.
+
+Message: `Property "{prop}" referenced by op "{op_id}" has a signature mismatch in "{impl_path}". Expected: {reason}.`
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --patchset-out <PATH>` (or `--write`) to sync the property signature to the spec-derived expectation.
+- If the spec is wrong, update the spec and re-run the generation + verify lane.
+
+
 ## `EXTAL_IMPL_SIGNATURE_MISMATCH`
 
 Summary: Implementation signature does not match the spec.
@@ -1778,6 +1902,25 @@ Agent strategy:
 
 - Edit the implementation `defn` signature (or the spec) so param and result types/brands match.
 - Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_IMPL_SYNC_REQUIRED`
+
+Summary: Implementation sync is required.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The implementation does not match the spec-derived contract core. `x07 xtal impl sync` would change one or more files.
+
+Agent strategy:
+
+- Run `x07 xtal impl sync --patchset-out <PATH>` to generate a reviewable patchset (or `--write` to apply directly).
+- Re-run `x07 xtal impl check` and `x07 xtal verify`.
 
 
 ## `EXTAL_IMPL_UNSUPPORTED_TY`
@@ -1971,6 +2114,82 @@ Agent strategy:
 - Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
 - Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
 - Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_SPEC_EXTRACT_DIFFERS`
+
+Summary: Extracted spec differs from the existing spec.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The extracted best-effort spec does not match the current spec file, and no output mode was selected.
+
+Agent strategy:
+
+- Re-run `x07 xtal spec extract --write` to update the spec file, or `--patchset-out <PATH>` to produce a reviewable patch.
+- Review changes and re-run `x07 xtal spec check`.
+
+
+## `EXTAL_SPEC_EXTRACT_IMPL_MODULE_MISSING`
+
+Summary: Implementation module is missing for spec extraction.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec extraction could not find the requested implementation module.
+
+Agent strategy:
+
+- Confirm `--module-id` / `--impl-path` points at a valid `*.x07.json` module.
+- If the module should exist, generate or restore it, then re-run `x07 xtal spec extract`.
+
+
+## `EXTAL_SPEC_EXTRACT_NO_EXPORTS`
+
+Summary: No eligible exports found for spec extraction.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec extraction only considers exported `defn` items with supported signatures.
+
+Agent strategy:
+
+- Export one or more supported `defn` functions from the implementation module.
+- Re-run `x07 xtal spec extract` and write the spec with `--write` or emit a patchset with `--patchset-out`.
+
+
+## `EXTAL_SPEC_EXTRACT_UNSUPPORTED_SIGNATURE`
+
+Summary: Exported function signature is unsupported for spec extraction.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Spec extraction only includes exported `defn` items with supported signature types (currently `bytes`, `bytes_view`, `i32`) and without generics.
+
+Agent strategy:
+
+- Adjust the exported surface to use supported parameter/result types.
+- Re-run `x07 xtal spec extract`.
 
 
 ## `EXTAL_SPEC_HAS_ASSUMPTIONS`
@@ -2434,6 +2653,111 @@ Agent strategy:
 - Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
 - Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
 - Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_VERIFY_COVERAGE_FAILED`
+
+Summary: Coverage verification failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL verify runs `x07 verify --coverage` per entry and expects success.
+
+Message: `Coverage verification failed for "{entry}" (world="{world}"). See report: {report_path}.`
+
+Agent strategy:
+
+- Open the referenced coverage report JSON and inspect the first error diagnostic.
+- Fix the underlying contract/type issue and re-run `x07 xtal verify`.
+
+
+## `EXTAL_VERIFY_PROVE_COUNTEREXAMPLE`
+
+Summary: Proof attempt found a counterexample.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL verify runs bounded proof attempts per entry. A counterexample indicates a real contract violation under the verification model.
+
+Message: `Proof attempt found a counterexample for "{entry}" (world="{world}", policy="{policy}"). See report: {report_path}.`
+
+Agent strategy:
+
+- Inspect the prove report JSON for the counterexample payload and the failing clause id.
+- Apply the minimal contract-preserving fix and re-run `x07 xtal verify`.
+
+
+## `EXTAL_VERIFY_PROVE_ERROR`
+
+Summary: Proof attempt failed with an internal error.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A proof attempt exited unexpectedly.
+
+Message: `Proof attempt failed with an internal error for "{entry}" (world="{world}"). Exit code {exit_code}. See report: {report_path}. stderr: {stderr_1l}`
+
+Agent strategy:
+
+- Inspect the prove report JSON and stderr excerpt.
+- Reduce the entry surface (smaller bounds) or file a toolchain bug if the failure is internal.
+
+
+## `EXTAL_VERIFY_PROVE_TOOL_MISSING`
+
+Summary: Proof tool is missing or unavailable.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof engine required for `x07 verify --prove` is not available on this system.
+
+Message: `Proof tool is missing or unavailable while proving "{entry}" (world="{world}"). See report: {report_path}.`
+
+Agent strategy:
+
+- Install the missing solver/toolchain dependency (for example `z3`).
+- Re-run `x07 xtal verify`.
+
+
+## `EXTAL_VERIFY_REPORT_MISSING`
+
+Summary: Expected verify report was not produced.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A nested `x07 verify` or `x07 test` invocation did not produce the expected report file at the configured path.
+
+Message: `Expected verify report was not produced for "{entry}" (world="{world}"): {report_path}.`
+
+Agent strategy:
+
+- Re-run with `--report-out` pointing at a writable path.
+- Inspect stderr for the nested command to see why the report was not written.
 
 
 ## `EXTAL_VERIFY_TESTS_FAILED`
@@ -5441,6 +5765,69 @@ Agent strategy:
 - Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
 - Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
 - Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `WXTAL_VERIFY_PROVE_INCONCLUSIVE`
+
+Summary: Proof attempt was inconclusive.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A bounded proof attempt returned `inconclusive`. In balanced policy this is recorded as a warning; in strict policy it fails the command.
+
+Message: `Proof attempt was inconclusive for "{entry}" (world="{world}", policy="{policy}"). See report: {report_path}.`
+
+Agent strategy:
+
+- Inspect the prove report JSON to see why it was inconclusive.
+- If needed, raise bounds (`--unwind`, `--max-bytes-len`) or switch to `--proof-policy strict` only when the codebase is ready.
+
+
+## `WXTAL_VERIFY_PROVE_TIMEOUT`
+
+Summary: Proof attempt hit the configured budget.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The solver reported a timeout (within configured bounds). In balanced policy this is recorded as a warning; in strict policy it fails the command.
+
+Message: `Proof attempt hit the configured budget for "{entry}" (world="{world}", policy="{policy}"). See report: {report_path}.`
+
+Agent strategy:
+
+- Increase budgets (`--unwind`, `--max-bytes-len`, `--input-len-bytes`) and re-run `x07 xtal verify`.
+- If timeouts are expected, keep balanced policy so the lane remains usable.
+
+
+## `WXTAL_VERIFY_PROVE_UNSUPPORTED`
+
+Summary: Proof attempt is unsupported for this entry.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof engine reported `unsupported` for this entry. In balanced policy this is recorded as a warning; in strict policy it fails the command.
+
+Message: `Proof attempt is unsupported for "{entry}" (world="{world}", policy="{policy}"). See report: {report_path}.`
+
+Agent strategy:
+
+- Inspect the prove report JSON for the unsupported reason code.
+- If the entry is outside the supported subset, keep balanced policy and rely on tests/runtime checks for that surface.
 
 
 ## `W_ARCH_CONTRACTS_LOCK_MISSING`
@@ -11457,6 +11844,25 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07V_SMT_TIMEOUT`
+
+Summary: SMT solver returned unknown due to a timeout.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The solver returned `unknown` and reported `reason-unknown=timeout` for the SMT query.
+
+Agent strategy:
+
+- Increase solver/verification bounds and re-run `x07 verify`.
+- If the target is expected to be hard to prove, keep the default bounded lane and rely on tests for that surface.
 
 
 ## `X07V_SMT_UNKNOWN`

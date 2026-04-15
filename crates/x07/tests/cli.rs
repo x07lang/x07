@@ -14597,3 +14597,221 @@ fn x07_explain_works_from_installed_toolchain_layout() {
         "unexpected stdout:\n{stdout}"
     );
 }
+
+#[test]
+fn x07_xtal_impl_check_reports_missing_property_module() {
+    let dir = fresh_os_tmp_dir("x07_xtal_impl_check_prop_module_missing");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    write_verify_project_files(&dir);
+
+    std::fs::create_dir_all(dir.join("spec")).expect("create spec dir");
+    std::fs::create_dir_all(dir.join("src").join("toy")).expect("create src dir");
+
+    write_json(
+        &dir.join("spec").join("toy.sorter.x07spec.json"),
+        &serde_json::json!({
+            "schema_version": "x07.x07spec@0.1.0",
+            "module_id": "toy.sorter",
+            "operations": [
+                {
+                    "id": "op.sort_u8_asc.v1",
+                    "name": "toy.sorter.sort_u8_asc",
+                    "params": [{"name": "input", "ty": "bytes_view"}],
+                    "result": "bytes",
+                    "ensures_props": [{"prop": "toy.props.is_sorted", "args": ["input"]}]
+                }
+            ]
+        }),
+    );
+
+    write_json(
+        &dir.join("src").join("toy").join("sorter.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "toy.sorter",
+            "imports": [],
+            "decls": [
+                {"kind": "export", "names": ["toy.sorter.sort_u8_asc"]},
+                {
+                    "kind": "defn",
+                    "name": "toy.sorter.sort_u8_asc",
+                    "params": [{"name": "input", "ty": "bytes_view"}],
+                    "result": "bytes",
+                    "body": ["bytes.empty"]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(&dir, &["xtal", "impl", "check"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v["ok"], false);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(
+        diags.iter().any(|d| {
+            d.get("code").and_then(Value::as_str) == Some("EXTAL_IMPL_PROP_MODULE_MISSING")
+        }),
+        "missing EXTAL_IMPL_PROP_MODULE_MISSING in diagnostics: {diags:?}"
+    );
+}
+
+#[test]
+fn x07_xtal_impl_sync_patchset_out_emits_patchset() {
+    let dir = fresh_os_tmp_dir("x07_xtal_impl_sync_patchset_out");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    write_verify_project_files(&dir);
+    std::fs::create_dir_all(dir.join("spec")).expect("create spec dir");
+
+    write_json(
+        &dir.join("spec").join("toy.app.x07spec.json"),
+        &serde_json::json!({
+            "schema_version": "x07.x07spec@0.1.0",
+            "module_id": "toy.app",
+            "operations": [
+                {
+                    "id": "op.main.v1",
+                    "name": "toy.app.main",
+                    "params": [],
+                    "result": "i32"
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["xtal", "impl", "sync", "--patchset-out", "impl.patch.json"],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
+
+    let patchset_path = dir.join("impl.patch.json");
+    assert!(patchset_path.is_file(), "missing patchset file");
+    assert!(
+        !dir.join("src").join("toy").join("app.x07.json").exists(),
+        "patchset mode must not write impl files"
+    );
+
+    let patchset_bytes = std::fs::read(&patchset_path).expect("read patchset");
+    let patchset: Value = serde_json::from_slice(&patchset_bytes).expect("parse patchset JSON");
+    assert_eq!(patchset["schema_version"], X07_PATCHSET_SCHEMA_VERSION);
+    let patches = patchset["patches"].as_array().expect("patches[]");
+    assert_eq!(patches.len(), 1);
+    let path0 = patches[0]["path"].as_str().expect("patches[0].path");
+    assert_eq!(path0.replace('\\', "/"), "src/toy/app.x07.json");
+}
+
+#[test]
+fn x07_xtal_spec_extract_patchset_out_emits_patchset() {
+    let dir = fresh_os_tmp_dir("x07_xtal_spec_extract_patchset_out");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    write_verify_project_files(&dir);
+    std::fs::create_dir_all(dir.join("src").join("toy")).expect("create src dir");
+
+    write_json(
+        &dir.join("src").join("toy").join("app.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "toy.app",
+            "imports": [],
+            "decls": [
+                {"kind": "export", "names": ["toy.app.main"]},
+                {
+                    "kind": "defn",
+                    "name": "toy.app.main",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": "x"
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "xtal",
+            "spec",
+            "extract",
+            "--module-id",
+            "toy.app",
+            "--patchset-out",
+            "spec.patch.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
+
+    let patchset_path = dir.join("spec.patch.json");
+    assert!(patchset_path.is_file(), "missing patchset file");
+    assert!(
+        !dir.join("spec").join("toy.app.x07spec.json").exists(),
+        "patchset mode must not write spec files"
+    );
+
+    let patchset_bytes = std::fs::read(&patchset_path).expect("read patchset");
+    let patchset: Value = serde_json::from_slice(&patchset_bytes).expect("parse patchset JSON");
+    assert_eq!(patchset["schema_version"], X07_PATCHSET_SCHEMA_VERSION);
+    let patches = patchset["patches"].as_array().expect("patches[]");
+    assert_eq!(patches.len(), 1);
+    let path0 = patches[0]["path"].as_str().expect("patches[0].path");
+    assert_eq!(path0.replace('\\', "/"), "spec/toy.app.x07spec.json");
+
+    let ops = patches[0]["patch"].as_array().expect("patch ops[]");
+    assert_eq!(ops.len(), 1);
+    assert_eq!(ops[0]["op"], "replace");
+    assert_eq!(ops[0]["path"], "");
+    let value = &ops[0]["value"];
+    assert_eq!(value["schema_version"], "x07.x07spec@0.1.0");
+    assert_eq!(value["module_id"], "toy.app");
+    let operations = value["operations"].as_array().expect("operations[]");
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0]["id"], "op.main.v1");
+    assert_eq!(operations[0]["name"], "toy.app.main");
+}

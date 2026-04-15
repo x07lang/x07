@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.xtal.verify_summary@0.1.0.schema.json",
+  "title": "x07.xtal.verify_summary@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "project",
+    "settings",
+    "inputs",
+    "results",
+    "artifacts",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.xtal.verify_summary@0.1.0"
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "argv"],
+      "properties": {
+        "name": { "type": "string", "const": "x07" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "argv": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "minItems": 1
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "os": { "type": "string" },
+            "arch": { "type": "string" }
+          }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "manifest_path", "manifest_sha256"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "manifest_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "manifest_sha256": { "$ref": "#/$defs/sha256_hex" },
+        "xtal_manifest_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "xtal_manifest_sha256": { "$ref": "#/$defs/sha256_hex" }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world", "proof_policy"],
+      "properties": {
+        "world": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "proof_policy": { "type": "string", "enum": ["balanced", "strict"] },
+        "verify_bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "unwind": { "type": "integer", "minimum": 0 },
+            "max_bytes_len": { "type": "integer", "minimum": 0 },
+            "input_len_bytes": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digests"],
+      "properties": {
+        "digests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "spec_tree_sha256",
+            "impl_tree_sha256",
+            "arch_tree_sha256",
+            "gen_tree_sha256"
+          ],
+          "properties": {
+            "spec_tree_sha256": { "$ref": "#/$defs/sha256_hex" },
+            "impl_tree_sha256": { "$ref": "#/$defs/sha256_hex" },
+            "arch_tree_sha256": { "$ref": "#/$defs/sha256_hex" },
+            "gen_tree_sha256": { "$ref": "#/$defs/sha256_hex" }
+          }
+        },
+        "spec_modules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" }
+        },
+        "example_streams": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" }
+        },
+        "impl_modules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" }
+        },
+        "generated_artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" }
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "prechecks", "verification", "tests", "diagnostics"],
+      "properties": {
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "prechecks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spec", "generation", "impl"],
+          "properties": {
+            "spec": { "$ref": "#/$defs/outcome" },
+            "generation": { "$ref": "#/$defs/outcome" },
+            "impl": { "$ref": "#/$defs/outcome" }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["coverage_outcome", "prove_outcome", "counts"],
+          "properties": {
+            "coverage_outcome": { "$ref": "#/$defs/outcome" },
+            "prove_outcome": { "$ref": "#/$defs/outcome" },
+            "counts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entries_total",
+                "coverage_fail",
+                "prove_proven",
+                "prove_counterexample",
+                "prove_inconclusive",
+                "prove_unsupported",
+                "prove_timeout",
+                "prove_error",
+                "prove_tool_missing"
+              ],
+              "properties": {
+                "entries_total": { "type": "integer", "minimum": 0 },
+                "coverage_fail": { "type": "integer", "minimum": 0 },
+                "prove_proven": { "type": "integer", "minimum": 0 },
+                "prove_counterexample": { "type": "integer", "minimum": 0 },
+                "prove_inconclusive": { "type": "integer", "minimum": 0 },
+                "prove_unsupported": { "type": "integer", "minimum": 0 },
+                "prove_timeout": { "type": "integer", "minimum": 0 },
+                "prove_error": { "type": "integer", "minimum": 0 },
+                "prove_tool_missing": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        },
+        "tests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "report"],
+          "properties": {
+            "outcome": { "$ref": "#/$defs/outcome" },
+            "report": { "$ref": "#/$defs/report_ref" },
+            "passed": { "type": "integer", "minimum": 0 },
+            "failed": { "type": "integer", "minimum": 0 },
+            "skipped": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "diagnostics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "report", "error_count", "warning_count"],
+          "properties": {
+            "outcome": { "$ref": "#/$defs/outcome" },
+            "report": { "$ref": "#/$defs/report_ref" },
+            "error_count": { "type": "integer", "minimum": 0 },
+            "warning_count": { "type": "integer", "minimum": 0 },
+            "top_codes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["code", "count"],
+                "properties": {
+                  "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+                  "count": { "type": "integer", "minimum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verify_dir", "reports"],
+      "properties": {
+        "verify_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "reports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/report_ref" }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry_result" }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total_ms": { "type": "integer", "minimum": 0 },
+        "prechecks_ms": { "type": "integer", "minimum": 0 },
+        "verification_ms": { "type": "integer", "minimum": 0 },
+        "tests_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "sha256_hex": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "outcome": { "type": "string", "enum": ["pass", "fail", "warn", "skip"] },
+    "file_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256": { "$ref": "#/$defs/sha256_hex" }
+      }
+    },
+    "report_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256", "schema_version"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "xtal_verify_summary",
+            "xtal_diag_report",
+            "x07_verify_coverage_report",
+            "x07_verify_prove_report",
+            "x07_verify_proof_object",
+            "x07_tests_report"
+          ]
+        },
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256": { "$ref": "#/$defs/sha256_hex" },
+        "schema_version": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "prove_raw": {
+      "type": "string",
+      "enum": [
+        "proven",
+        "counterexample",
+        "inconclusive",
+        "unsupported",
+        "timeout",
+        "tool_missing",
+        "error"
+      ]
+    },
+    "entry_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "op_id", "spec_path", "coverage", "prove"],
+      "properties": {
+        "entry": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "op_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "spec_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "report"],
+          "properties": {
+            "outcome": { "$ref": "#/$defs/outcome" },
+            "report": { "$ref": "#/$defs/report_ref" }
+          }
+        },
+        "prove": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["raw", "policy_outcome", "report"],
+          "properties": {
+            "raw": { "$ref": "#/$defs/prove_raw" },
+            "policy_outcome": { "$ref": "#/$defs/outcome" },
+            "report": { "$ref": "#/$defs/report_ref" },
+            "proof_object": { "$ref": "#/$defs/report_ref" }
+          }
+        }
+      }
+    }
+  }
+}

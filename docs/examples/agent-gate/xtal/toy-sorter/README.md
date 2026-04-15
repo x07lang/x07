@@ -12,6 +12,12 @@ Run the full wrapper:
 
 - `x07 xtal verify --project x07.json`
 
+Key outputs:
+
+- Aggregate summary: `target/xtal/verify/summary.json`
+- Per-entry verification reports: `target/xtal/verify/coverage/` and `target/xtal/verify/prove/`
+- Wrapper diagnostics report: `target/xtal/xtal.verify.diag.json`
+
 ## Generated artifacts gate
 
 This project uses the standard generator index at `arch/gen/index.x07gen.json`.
@@ -23,4 +29,3 @@ This project uses the standard generator index at `arch/gen/index.x07gen.json`.
 
 - Check exports/signatures/contracts: `x07 xtal impl check --project x07.json`
 - Sync exports/contracts/stubs from spec: `x07 xtal impl sync --project x07.json --write`
-

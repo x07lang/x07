@@ -32,6 +32,8 @@ Each operation can declare `ensures_props[]` entries that reference a property f
 
 - The property function is executed under property-based testing (PBT).
 - The property function MUST return a `bytes_status_v1` payload (see `std.test.status_ok` / `std.test.status_fail`).
+- `ensures_props[*].args[]` selects which operation parameters are passed to the property function.
+- `x07 xtal impl check` enforces that the referenced function exists, is exported, has a compatible signature for the selected args (including brands), and returns `bytes`.
 
 ## Commands
 
@@ -39,6 +41,7 @@ Each operation can declare `ensures_props[]` entries that reference a property f
 
 - `x07 xtal spec scaffold --module-id <id> --op <local_name> --param <name:ty> --result <ty> [--examples] [--out-path <path>]`
 - `x07 xtal spec fmt --input <spec.x07spec.json> --write [--inject-ids]`
+- `x07 xtal spec extract --project x07.json (--module-id <id> | --impl-path <path>) (--write | --patchset-out <path>)`
 
 ### Validation
 
@@ -65,6 +68,7 @@ Each operation can declare `ensures_props[]` entries that reference a property f
   - Validates exports, signatures, and contract-core clause alignment.
 - `x07 xtal impl sync --project x07.json --write`
   - Creates missing modules and stubs, adds missing exports, and syncs contract-core clauses.
+  - If `--patchset-out <path>` is provided, emits an `x07.patchset@0.1.0` instead of writing files.
   - Requires deterministic clause ids for contract-core clauses (use `x07 xtal spec fmt --inject-ids --write`).
 
 ### End-to-end wrapper
@@ -75,8 +79,21 @@ Each operation can declare `ensures_props[]` entries that reference a property f
   - Otherwise, runs `x07 xtal tests gen-from-spec --check`.
   - Runs `x07 xtal impl check`.
 - `x07 xtal verify`
-  - Runs `dev` + `x07 test --all --manifest gen/xtal/tests.json`.
-  - Writes `target/xtal/tests.report.json` (test report).
+  - Runs `dev` prechecks.
+  - Runs formal verification per spec operation entrypoint:
+    - `x07 verify --coverage --entry <spec.operations[*].name>`
+    - `x07 verify --prove --entry <spec.operations[*].name> --emit-proof <path>`
+  - Runs `x07 test --all --manifest gen/xtal/tests.json`.
+  - Writes:
+    - `target/xtal/xtal.verify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
+    - `target/xtal/verify/summary.json` (aggregate summary, `x07.xtal.verify_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.verify_summary@0.1.0.schema.json`)
+    - `target/xtal/tests.report.json` (test report)
+    - `target/xtal/verify/coverage/<module_path>/<local>.report.json` (per-entry coverage reports)
+    - `target/xtal/verify/prove/<module_path>/<local>.report.json` (per-entry prove reports)
+    - `target/xtal/verify/prove/<module_path>/<local>.proof.json` (proof objects, when emitted)
+  - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
+  - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
+  - Proof runs require external tooling; see `docs/toolchain/formal-verification.md`.
 
 ## Output conventions
 

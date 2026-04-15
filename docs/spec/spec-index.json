@@ -1623,6 +1623,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-spec-extract.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-spec-extract.report.schema.json",
+      "schema_version": "x07.tool.xtal.spec.extract.report@0.1.0",
+      "title": "x07.tool.xtal.spec.extract.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-xtal-spec-fmt.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-xtal-spec-fmt.report.schema.json",
       "schema_version": "x07.tool.xtal.spec.fmt.report@0.1.0",
@@ -1851,6 +1858,13 @@
       "schema_id": "https://x07.io/spec/x07.x07spec_examples@0.1.0.schema.json",
       "schema_version": "x07.x07spec_examples@0.1.0",
       "title": "x07.x07spec_examples@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.xtal.verify_summary@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.xtal.verify_summary@0.1.0.schema.json",
+      "schema_version": "x07.xtal.verify_summary@0.1.0",
+      "title": "x07.xtal.verify_summary@0.1.0"
     },
     {
       "kind": "schema",
