@@ -64,6 +64,7 @@ mod util;
 mod verify;
 mod x07ast_util;
 mod xtal;
+mod xtal_violation;
 
 #[derive(Parser, Debug)]
 #[command(name = "x07")]
@@ -546,6 +547,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(xtal::XtalCommand::Verify(_)) => vec!["xtal", "verify"],
                 Some(xtal::XtalCommand::Certify(_)) => vec!["xtal", "certify"],
                 Some(xtal::XtalCommand::Repair(_)) => vec!["xtal", "repair"],
+                Some(xtal::XtalCommand::Ingest(_)) => vec!["xtal", "ingest"],
                 Some(xtal::XtalCommand::Impl(imp)) => match &imp.cmd {
                     None => vec!["xtal", "impl"],
                     Some(xtal::XtalImplCommand::Check(_)) => vec!["xtal", "impl", "check"],
@@ -1511,6 +1513,22 @@ fn run_one_test(
                         &info.clause_id,
                     ) {
                         Ok(path) => {
+                            let manifest_dir =
+                                args.manifest.parent().unwrap_or_else(|| Path::new("."));
+                            let project_manifest = crate::util::resolve_existing_path_upwards_from(
+                                manifest_dir,
+                                Path::new("x07.json"),
+                            );
+                            let project_root = if project_manifest.is_file() {
+                                project_manifest.parent().unwrap_or(manifest_dir)
+                            } else {
+                                manifest_dir
+                            };
+                            let _ = crate::xtal_violation::maybe_write_contract_violation_bundle(
+                                project_root,
+                                &path,
+                            );
+
                             result.failure_kind = Some("contract_violation".to_string());
                             result.contract_repro_path = Some(display_path(&path));
                         }
@@ -2266,6 +2284,22 @@ fn run_one_test_os(
                         &info.clause_id,
                     ) {
                         Ok(path) => {
+                            let manifest_dir =
+                                args.manifest.parent().unwrap_or_else(|| Path::new("."));
+                            let project_manifest = crate::util::resolve_existing_path_upwards_from(
+                                manifest_dir,
+                                Path::new("x07.json"),
+                            );
+                            let project_root = if project_manifest.is_file() {
+                                project_manifest.parent().unwrap_or(manifest_dir)
+                            } else {
+                                manifest_dir
+                            };
+                            let _ = crate::xtal_violation::maybe_write_contract_violation_bundle(
+                                project_root,
+                                &path,
+                            );
+
                             result.failure_kind = Some("contract_violation".to_string());
                             result.contract_repro_path = Some(display_path(&path));
                         }

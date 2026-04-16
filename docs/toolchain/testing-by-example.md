@@ -114,6 +114,7 @@ Contract failures:
 
 - If a test fails due to a runtime contract violation, the report includes `failure_kind: "contract_violation"` and `contract_repro_path`.
 - The repro JSON is written under `.x07/artifacts/contract/<clause_id>/repro.json` (default artifact dir).
+- If the project has `arch/xtal/xtal.json` (or `X07_XTAL_VIOLATIONS_DIR` is set), x07 also writes an XTAL violation bundle under `target/xtal/violations/<id>/` (`violation.json` + `repro.json`).
 
 Assertion payloads (`std.test.assert_bytes_eq`):
 

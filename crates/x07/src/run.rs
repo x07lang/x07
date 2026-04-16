@@ -772,7 +772,7 @@ pub fn cmd_run(
                         target_kind: Some(target_kind.as_str().to_string()),
                         target_path: Some(target_path.display().to_string()),
                     };
-                    let _ = crate::contract_repro::write_repro(
+                    if let Ok(repro_path) = crate::contract_repro::write_repro(
                         &repro_root,
                         world.as_str(),
                         &runner_cfg,
@@ -780,7 +780,13 @@ pub fn cmd_run(
                         info.payload,
                         source,
                         &info.clause_id,
-                    );
+                    ) {
+                        let root = project_root.as_deref().unwrap_or(&cwd);
+                        let _ = crate::xtal_violation::maybe_write_contract_violation_bundle(
+                            root,
+                            &repro_path,
+                        );
+                    }
                 }
             }
         }

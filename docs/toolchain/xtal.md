@@ -110,6 +110,7 @@ Each operation can declare `ensures_props[]` entries that reference a property f
 - `x07 xtal certify`
   - Requires `arch/xtal/xtal.json`.
   - Optionally runs `x07 xtal dev` prechecks (skip with `--no-prechecks`).
+  - Uses `--spec-dir <dir>` (default: `spec`) to bind spec/example inputs into the certification bundle manifest.
   - Selects entrypoints from the XTAL manifest (pass `--entry` to pick one, or `--all` to certify all).
   - For each entrypoint, runs `x07 trust certify` with:
     - `--profile <trust.cert_profile>`
@@ -118,6 +119,7 @@ Each operation can declare `ensures_props[]` entries that reference a property f
   - Writes:
     - `target/xtal/xtal.certify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
     - `target/xtal/cert/summary.json` (`x07.xtal.certify_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.certify_summary@0.1.0.schema.json`)
+    - `target/xtal/cert/bundle.json` (`x07.xtal.cert_bundle@0.1.0`; digests for the certification outputs plus bound spec/example inputs)
     - `target/xtal/cert/<entry>/...` (certificate bundles and trust artifacts from `x07 trust certify`)
 - `x07 xtal repair`
   - Reads `target/xtal/verify/summary.json` (baseline) and attempts a bounded repair for one failing entry.
@@ -142,3 +144,25 @@ Each operation can declare `ensures_props[]` entries that reference a property f
 - Manifest unit test ids: `xtal/<module_id>/<op_id>/ex0001`, `.../ex0002`, …
 - Manifest property test ids: `xtal/<module_id>/<op_id>/prop0001`, `.../prop0002`, …
 - XTAL reports record deterministic input digests in `meta.spec_digests` and `meta.examples_digests` (sha256 + bytes_len) for review/trust artifacts.
+
+## Runtime violations
+
+When a runtime contract violation is detected (for example via `x07 test` or `x07 run`), x07 can write a self-contained violation bundle under `target/xtal/violations/<id>/`.
+
+By default, this is enabled when the project has `arch/xtal/xtal.json`. To override the output directory (or to enable it for non-XTAL projects), set `X07_XTAL_VIOLATIONS_DIR` (absolute, or relative to the project root).
+
+Artifacts:
+
+- `target/xtal/violations/<id>/violation.json` (`x07.xtal.violation@0.1.0`)
+- `target/xtal/violations/<id>/repro.json` (`x07.contract.repro@0.1.0`)
+
+## `x07 xtal ingest`
+
+Normalize a violation (`x07.xtal.violation@0.1.0`) or a contract repro (`x07.contract.repro@0.1.0`) into a canonical ingest workspace. This is intended as the first step for automated repair flows.
+
+Artifacts:
+
+- `target/xtal/xtal.ingest.diag.json` (`x07diag.report@0.3.0`)
+- `target/xtal/ingest/summary.json` (`x07.xtal.ingest_summary@0.1.0`)
+- `target/xtal/ingest/<id>/violation.json` (`x07.xtal.violation@0.1.0`)
+- `target/xtal/ingest/<id>/repro.json` (`x07.contract.repro@0.1.0`)

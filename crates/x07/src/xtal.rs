@@ -35,6 +35,14 @@ const CERTIFY_SUMMARY_SCHEMA_VERSION: &str = "x07.xtal.certify_summary@0.1.0";
 const CERTIFY_SUMMARY_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.xtal.certify_summary@0.1.0.schema.json");
 
+const CERT_BUNDLE_SCHEMA_VERSION: &str = "x07.xtal.cert_bundle@0.1.0";
+const CERT_BUNDLE_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07.xtal.cert_bundle@0.1.0.schema.json");
+
+const INGEST_SUMMARY_SCHEMA_VERSION: &str = "x07.xtal.ingest_summary@0.1.0";
+const INGEST_SUMMARY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07.xtal.ingest_summary@0.1.0.schema.json");
+
 const TESTS_MANIFEST_SCHEMA_VERSION: &str = "x07.tests_manifest@0.2.0";
 const DEFAULT_SPEC_DIR: &str = "spec";
 const DEFAULT_GEN_DIR: &str = "gen/xtal";
@@ -50,6 +58,8 @@ const DEFAULT_VERIFY_DIAG_REPORT_PATH: &str = "target/xtal/xtal.verify.diag.json
 const DEFAULT_VERIFY_SUMMARY_PATH: &str = "target/xtal/verify/summary.json";
 const DEFAULT_CERT_DIR: &str = "target/xtal/cert";
 const DEFAULT_CERT_DIAG_REPORT_PATH: &str = "target/xtal/xtal.certify.diag.json";
+const DEFAULT_INGEST_DIR: &str = "target/xtal/ingest";
+const DEFAULT_INGEST_DIAG_REPORT_PATH: &str = "target/xtal/xtal.ingest.diag.json";
 const DEFAULT_REPAIR_DIR: &str = "target/xtal/repair";
 const DEFAULT_REPAIR_ATTEMPTS_DIR: &str = "target/xtal/repair/attempts";
 const DEFAULT_REPAIR_PATCHSET_PATH: &str = "target/xtal/repair/patchset.json";
@@ -76,6 +86,8 @@ pub enum XtalCommand {
     Certify(XtalCertifyArgs),
     /// Attempt a bounded repair for a failing `x07 xtal verify`.
     Repair(XtalRepairArgs),
+    /// Ingest a violation bundle or contract repro into a canonical workspace.
+    Ingest(XtalIngestArgs),
     /// Work with spec modules.
     Spec(XtalSpecArgs),
     /// Work with generated tests from spec examples.
@@ -97,6 +109,21 @@ pub struct XtalDevArgs {
     /// Generator index path relative to the project root (defaults to `arch/gen/index.x07gen.json` if present).
     #[arg(long, value_name = "PATH")]
     pub gen_index: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+pub struct XtalIngestArgs {
+    /// Project manifest path (defaults to searching upwards for x07.json).
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Path to a violation (`x07.xtal.violation@0.1.0`) or contract repro (`x07.contract.repro@0.1.0`).
+    #[arg(long, value_name = "PATH")]
+    pub input: PathBuf,
+
+    /// Output directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_INGEST_DIR)]
+    pub out_dir: PathBuf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -221,6 +248,10 @@ pub struct XtalCertifyArgs {
     /// Project manifest path (defaults to searching upwards for x07.json).
     #[arg(long, value_name = "PATH")]
     pub project: Option<PathBuf>,
+
+    /// Spec directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_SPEC_DIR)]
+    pub spec_dir: PathBuf,
 
     /// Output directory for certification artifacts (relative to project root).
     #[arg(long, value_name = "DIR", default_value = DEFAULT_CERT_DIR)]
@@ -451,6 +482,7 @@ pub fn cmd_xtal(
         XtalCommand::Verify(args) => cmd_xtal_verify(machine, args),
         XtalCommand::Certify(args) => cmd_xtal_certify(machine, args),
         XtalCommand::Repair(args) => cmd_xtal_repair(machine, args),
+        XtalCommand::Ingest(args) => cmd_xtal_ingest(machine, args),
         XtalCommand::Spec(args) => cmd_xtal_spec(machine, args),
         XtalCommand::Tests(args) => cmd_xtal_tests(machine, args),
         XtalCommand::Impl(args) => cmd_xtal_impl(machine, args),
@@ -504,7 +536,7 @@ fn cmd_xtal_certify(
     if !args.no_prechecks {
         let dev_args = XtalDevArgs {
             project: Some(project_root.join("x07.json")),
-            spec_dir: PathBuf::from(DEFAULT_SPEC_DIR),
+            spec_dir: args.spec_dir.clone(),
             gen_index: None,
         };
         match capture_report_json("xtal_certify_dev", |m| cmd_xtal_dev(m, dev_args)) {
@@ -705,12 +737,56 @@ fn cmd_xtal_certify(
         Value::String(summary_rel),
     );
     report.meta.insert(
+        "certify_bundle_path".to_string(),
+        Value::String(format!(
+            "{}/bundle.json",
+            args.out_dir
+                .to_string_lossy()
+                .replace('\\', "/")
+                .trim_end_matches('/')
+        )),
+    );
+    report.meta.insert(
         "certify_diag_path".to_string(),
         Value::String(DEFAULT_CERT_DIAG_REPORT_PATH.to_string()),
     );
 
     write_certify_diag_report(&project_root, &report)?;
     write_certify_summary(&project_root, &args.out_dir, &summary)?;
+    write_cert_bundle_manifest(
+        &project_root,
+        &args.out_dir,
+        &args.spec_dir,
+        &entries,
+        report.ok,
+        {
+            let mut out = Vec::new();
+            let x07_manifest = project_root.join("x07.json");
+            if x07_manifest.is_file() {
+                out.push(x07_manifest);
+            }
+            if xtal_manifest_path.is_file() {
+                out.push(xtal_manifest_path.clone());
+            }
+            if let Some(trust_profile_path) = trust_profile_path.as_ref().filter(|p| p.is_file()) {
+                out.push(trust_profile_path.to_path_buf());
+            }
+            if let Some(baseline) = args
+                .baseline
+                .as_deref()
+                .map(|p| util::resolve_existing_path_upwards_from(&project_root, p))
+                .filter(|p| p.is_file())
+            {
+                out.push(baseline);
+            }
+            let diag_abs = project_root.join(DEFAULT_CERT_DIAG_REPORT_PATH);
+            if diag_abs.is_file() {
+                out.push(diag_abs);
+            }
+            out
+        }
+        .as_slice(),
+    )?;
 
     write_report(machine, &report)?;
 
@@ -718,6 +794,190 @@ fn cmd_xtal_certify(
         std::process::ExitCode::SUCCESS
     } else {
         std::process::ExitCode::from(20)
+    })
+}
+
+fn cmd_xtal_ingest(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalIngestArgs,
+) -> Result<std::process::ExitCode> {
+    let project_root =
+        resolve_project_root(args.project.as_deref(), None).context("resolve project root")?;
+
+    let cwd = std::env::current_dir().context("cwd")?;
+    let input_abs = if args.input.is_absolute() {
+        args.input.clone()
+    } else {
+        cwd.join(&args.input)
+    };
+
+    let out_root_abs = project_root.join(&args.out_dir);
+
+    let mut diagnostics: Vec<diagnostics::Diagnostic> = Vec::new();
+
+    let ingest_res: Result<(String, Value, Vec<u8>, String)> = (|| {
+        // Resolve directories by convention.
+        let mut input_file = input_abs.clone();
+        if input_file.is_dir() {
+            let violation_json = input_file.join("violation.json");
+            let repro_json = input_file.join("repro.json");
+            if violation_json.is_file() {
+                input_file = violation_json;
+            } else if repro_json.is_file() {
+                input_file = repro_json;
+            } else {
+                anyhow::bail!(
+                    "input dir does not contain violation.json or repro.json: {}",
+                    input_abs.display()
+                );
+            }
+        }
+
+        let bytes = std::fs::read(&input_file)
+            .with_context(|| format!("read: {}", input_file.display()))?;
+        let doc: Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse JSON: {}", input_file.display()))?;
+        let schema_version = doc
+            .get("schema_version")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+
+        if schema_version == crate::xtal_violation::VIOLATION_SCHEMA_VERSION {
+            // Input is a violation record; resolve the referenced repro.
+            let repro_rel = doc
+                .pointer("/repro/path")
+                .and_then(Value::as_str)
+                .unwrap_or("repro.json");
+            let repro_abs = input_file
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(repro_rel);
+            let repro_bytes = std::fs::read(&repro_abs)
+                .with_context(|| format!("read: {}", repro_abs.display()))?;
+
+            let original_repro_path = doc
+                .get("original_repro_path")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string());
+
+            let (id, mut violation) = crate::xtal_violation::build_contract_violation_doc(
+                &project_root,
+                None,
+                &repro_bytes,
+            )?;
+
+            if let Some(original_repro_path) = original_repro_path {
+                if let Some(obj) = violation.as_object_mut() {
+                    obj.insert(
+                        "original_repro_path".to_string(),
+                        Value::String(original_repro_path),
+                    );
+                }
+            }
+
+            Ok(("violation".to_string(), violation, repro_bytes, id))
+        } else if schema_version == x07_contracts::X07_CONTRACT_REPRO_SCHEMA_VERSION {
+            // Input is a contract repro.
+            let repro_bytes = bytes;
+            let (id, violation) = crate::xtal_violation::build_contract_violation_doc(
+                &project_root,
+                Some(&input_file),
+                &repro_bytes,
+            )?;
+            Ok(("contract_repro".to_string(), violation, repro_bytes, id))
+        } else {
+            anyhow::bail!(
+                "unsupported input schema_version '{}' (expected '{}' or '{}')",
+                schema_version,
+                crate::xtal_violation::VIOLATION_SCHEMA_VERSION,
+                x07_contracts::X07_CONTRACT_REPRO_SCHEMA_VERSION
+            )
+        }
+    })();
+
+    let mut report = diagnostics::Report::ok();
+    report.meta.insert(
+        "ingest_input_path".to_string(),
+        Value::String(
+            input_abs
+                .strip_prefix(&project_root)
+                .unwrap_or(&input_abs)
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+    );
+
+    match ingest_res {
+        Ok((input_kind, violation_doc, repro_bytes, id)) => {
+            std::fs::create_dir_all(&out_root_abs)
+                .with_context(|| format!("mkdir: {}", out_root_abs.display()))?;
+
+            let incident_dir_abs = out_root_abs.join(&id);
+            crate::xtal_violation::write_violation_bundle(
+                &incident_dir_abs,
+                &violation_doc,
+                &repro_bytes,
+            )
+            .context("write ingest violation bundle")?;
+
+            let summary = build_ingest_summary_value(
+                &project_root,
+                &args.out_dir,
+                &input_kind,
+                &input_abs,
+                &id,
+                &violation_doc,
+                &incident_dir_abs,
+            )?;
+            write_ingest_summary(&project_root, &args.out_dir, &summary)?;
+
+            let out_dir_rel = args.out_dir.to_string_lossy().replace('\\', "/");
+            let out_dir_rel_trim = out_dir_rel.trim_end_matches('/');
+            report.meta.insert(
+                "ingest_summary_path".to_string(),
+                Value::String(format!("{}/summary.json", out_dir_rel_trim)),
+            );
+            report
+                .meta
+                .insert("ingest_incident_id".to_string(), Value::String(id.clone()));
+            report.meta.insert(
+                "ingest_incident_dir".to_string(),
+                Value::String(format!("{}/{}", out_dir_rel_trim, id)),
+            );
+
+            report
+                .meta
+                .insert("ingest_input_kind".to_string(), Value::String(input_kind));
+
+            report.meta.insert(
+                "ingest_violation_path".to_string(),
+                Value::String(format!("{}/{}/violation.json", out_dir_rel_trim, id)),
+            );
+            report.meta.insert(
+                "ingest_repro_path".to_string(),
+                Value::String(format!("{}/{}/repro.json", out_dir_rel_trim, id)),
+            );
+        }
+        Err(err) => {
+            diagnostics.push(diag_error(
+                "EXTAL_INGEST_FAILED",
+                diagnostics::Stage::Run,
+                format!("xtal ingest failed: {err:#}"),
+                None,
+            ));
+            report.ok = false;
+        }
+    }
+
+    report = report.with_diagnostics(diagnostics);
+
+    write_ingest_diag_report(&project_root, &report)?;
+    write_report(machine, &report)?;
+
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
     })
 }
 
@@ -999,6 +1259,335 @@ fn write_certify_summary(project_root: &Path, out_dir: &Path, summary: &Value) -
         .context("serialize xtal certify summary")?;
     util::write_atomic(&summary_path, &bytes)
         .with_context(|| format!("write: {}", summary_path.display()))?;
+    Ok(())
+}
+
+fn build_cert_bundle_manifest_value(
+    project_root: &Path,
+    out_dir: &Path,
+    spec_dir: &Path,
+    entries: &[String],
+    ok: bool,
+    bundle_path_abs: &Path,
+    external_files_abs: &[PathBuf],
+) -> Result<Value> {
+    let out_dir_rel = out_dir.to_string_lossy().replace('\\', "/");
+    let out_dir_rel_trim = out_dir_rel.trim_end_matches('/');
+
+    let spec_dir_rel = spec_dir.to_string_lossy().replace('\\', "/");
+
+    let mut entry_rows: Vec<Value> = Vec::new();
+    for entry in entries {
+        let entry_dir = safe_entry_dir_component(entry);
+        entry_rows.push(json!({
+            "entry": entry,
+            "dir": format!("{}/{}", out_dir_rel_trim, entry_dir),
+        }));
+    }
+
+    let out_dir_abs = project_root.join(out_dir);
+    let mut files = collect_file_digests_under(project_root, &out_dir_abs, bundle_path_abs)?;
+
+    // Deterministic ordering for consumers.
+    files.sort_by(|a, b| {
+        let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+        let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+        ap.cmp(bp)
+    });
+
+    let mut spec_digests: Vec<Value> = Vec::new();
+    let mut examples_digests: Vec<Value> = Vec::new();
+    let spec_root_abs = project_root.join(spec_dir);
+    if spec_root_abs.is_dir() {
+        let mut tmp_diags = Vec::new();
+        let spec_files = collect_spec_files(&spec_root_abs, &Vec::new(), &mut tmp_diags);
+        for path in &spec_files {
+            spec_digests.push(file_digest_rel_value(project_root, path)?);
+        }
+
+        let mut examples_paths: BTreeSet<PathBuf> = BTreeSet::new();
+        for entry in WalkDir::new(&spec_root_abs)
+            .follow_links(false)
+            .into_iter()
+            .flatten()
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if name.starts_with('_') {
+                continue;
+            }
+            if name.ends_with(".x07spec.examples.jsonl") {
+                examples_paths.insert(path.to_path_buf());
+            }
+        }
+
+        // Best-effort: also bind any examples referenced from spec modules, even if they live
+        // outside spec_root_abs.
+        for spec_path in &spec_files {
+            let bytes = match std::fs::read(spec_path) {
+                Ok(bytes) => bytes,
+                Err(_) => continue,
+            };
+            let doc: Value = match serde_json::from_slice(&bytes) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let Some(ops) = doc.get("operations").and_then(Value::as_array) else {
+                continue;
+            };
+            for op in ops {
+                let Some(ex_ref) = op.get("examples_ref").and_then(Value::as_str) else {
+                    continue;
+                };
+                let ex_ref = ex_ref.trim();
+                if ex_ref.is_empty() {
+                    continue;
+                }
+                let ex_path = PathBuf::from(ex_ref);
+                let abs = if ex_path.is_absolute() {
+                    ex_path
+                } else {
+                    project_root.join(ex_ref)
+                };
+                examples_paths.insert(abs);
+            }
+        }
+
+        for path in examples_paths.iter().filter(|p| p.is_file()) {
+            examples_digests.push(file_digest_rel_value(project_root, path)?);
+        }
+    }
+
+    // Deterministic ordering for consumers.
+    spec_digests.sort_by(|a, b| {
+        let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+        let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+        ap.cmp(bp)
+    });
+    examples_digests.sort_by(|a, b| {
+        let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+        let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+        ap.cmp(bp)
+    });
+
+    let mut external_files: Vec<Value> = Vec::new();
+    for path in external_files_abs.iter().filter(|p| p.is_file()) {
+        external_files.push(file_digest_rel_value(project_root, path)?);
+    }
+    external_files.sort_by(|a, b| {
+        let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+        let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+        ap.cmp(bp)
+    });
+
+    let doc = json!({
+        "schema_version": CERT_BUNDLE_SCHEMA_VERSION,
+        "out_dir": out_dir_rel,
+        "spec_dir": spec_dir_rel,
+        "generated_at": "2000-01-01T00:00:00Z",
+        "ok": ok,
+        "entries": entry_rows,
+        "files": files,
+        "external_files": external_files,
+        "spec_digests": spec_digests,
+        "examples_digests": examples_digests,
+    });
+
+    let schema_diags = report_common::validate_schema(
+        CERT_BUNDLE_SCHEMA_BYTES,
+        "spec/x07.xtal.cert_bundle@0.1.0.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "internal error: xtal certify bundle manifest JSON is not schema-valid: {}",
+            schema_diags[0].message
+        );
+    }
+
+    Ok(doc)
+}
+
+fn collect_file_digests_under(
+    project_root: &Path,
+    root: &Path,
+    exclude: &Path,
+) -> Result<Vec<Value>> {
+    let mut out: Vec<Value> = Vec::new();
+    for entry in WalkDir::new(root).follow_links(false).into_iter().flatten() {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let p = entry.path();
+        if p == exclude {
+            continue;
+        }
+        out.push(file_digest_rel_value(project_root, p)?);
+    }
+    Ok(out)
+}
+
+fn file_digest_rel_value(project_root: &Path, path: &Path) -> Result<Value> {
+    let digest = crate::reporting::file_digest(path)
+        .with_context(|| format!("digest: {}", path.display()))?;
+    let rel = path
+        .strip_prefix(project_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    Ok(json!({
+        "path": rel,
+        "sha256": digest.sha256,
+        "bytes_len": digest.bytes_len,
+    }))
+}
+
+fn write_cert_bundle_manifest(
+    project_root: &Path,
+    out_dir: &Path,
+    spec_dir: &Path,
+    entries: &[String],
+    ok: bool,
+    external_files_abs: &[PathBuf],
+) -> Result<()> {
+    let out_dir_abs = project_root.join(out_dir);
+    std::fs::create_dir_all(&out_dir_abs)
+        .with_context(|| format!("mkdir: {}", out_dir_abs.display()))?;
+
+    let bundle_path = out_dir_abs.join("bundle.json");
+    let doc = build_cert_bundle_manifest_value(
+        project_root,
+        out_dir,
+        spec_dir,
+        entries,
+        ok,
+        &bundle_path,
+        external_files_abs,
+    )?;
+
+    let bytes = report_common::canonical_pretty_json_bytes(&doc)
+        .context("serialize xtal certify bundle manifest")?;
+    util::write_atomic(&bundle_path, &bytes)
+        .with_context(|| format!("write: {}", bundle_path.display()))?;
+    Ok(())
+}
+
+fn build_ingest_summary_value(
+    project_root: &Path,
+    out_dir: &Path,
+    input_kind: &str,
+    input_abs: &Path,
+    incident_id: &str,
+    violation_doc: &Value,
+    incident_dir_abs: &Path,
+) -> Result<Value> {
+    let out_dir_rel = out_dir.to_string_lossy().replace('\\', "/");
+    let out_dir_rel_trim = out_dir_rel.trim_end_matches('/');
+
+    let dir_rel = format!("{}/{}", out_dir_rel_trim, incident_id);
+    let violation_path = format!("{}/violation.json", dir_rel);
+    let repro_path = format!("{}/repro.json", dir_rel);
+
+    let input_path = input_abs
+        .strip_prefix(project_root)
+        .unwrap_or(input_abs)
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let clause_id = violation_doc
+        .get("clause_id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let world = violation_doc
+        .get("world")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    let mut files: Vec<Value> = Vec::new();
+    let violation_abs = incident_dir_abs.join("violation.json");
+    if violation_abs.is_file() {
+        files.push(file_digest_rel_value(project_root, &violation_abs)?);
+    }
+    let repro_abs = incident_dir_abs.join("repro.json");
+    if repro_abs.is_file() {
+        files.push(file_digest_rel_value(project_root, &repro_abs)?);
+    }
+    files.sort_by(|a, b| {
+        let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+        let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+        ap.cmp(bp)
+    });
+
+    let doc = json!({
+        "schema_version": INGEST_SUMMARY_SCHEMA_VERSION,
+        "generated_at": "2000-01-01T00:00:00Z",
+        "ok": true,
+        "input": {
+            "path": input_path,
+            "kind": input_kind,
+        },
+        "ingested": {
+            "id": incident_id,
+            "dir": dir_rel,
+            "violation_path": violation_path,
+            "repro_path": repro_path,
+            "clause_id": clause_id,
+            "world": world,
+        },
+        "files": files,
+    });
+
+    let schema_diags = report_common::validate_schema(
+        INGEST_SUMMARY_SCHEMA_BYTES,
+        "spec/x07.xtal.ingest_summary@0.1.0.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "internal error: xtal ingest summary JSON is not schema-valid: {}",
+            schema_diags[0].message
+        );
+    }
+
+    Ok(doc)
+}
+
+fn write_ingest_summary(project_root: &Path, out_dir: &Path, summary: &Value) -> Result<()> {
+    let out_dir_abs = project_root.join(out_dir);
+    std::fs::create_dir_all(&out_dir_abs)
+        .with_context(|| format!("mkdir: {}", out_dir_abs.display()))?;
+
+    let summary_path = out_dir_abs.join("summary.json");
+
+    let bytes = report_common::canonical_pretty_json_bytes(summary)
+        .context("serialize xtal ingest summary")?;
+    util::write_atomic(&summary_path, &bytes)
+        .with_context(|| format!("write: {}", summary_path.display()))?;
+    Ok(())
+}
+
+fn write_ingest_diag_report(project_root: &Path, report: &diagnostics::Report) -> Result<()> {
+    let report_path = project_root.join(DEFAULT_INGEST_DIAG_REPORT_PATH);
+    std::fs::create_dir_all(report_path.parent().unwrap_or(project_root)).with_context(|| {
+        format!(
+            "mkdir: {}",
+            report_path.parent().unwrap_or(project_root).display()
+        )
+    })?;
+
+    let mut report_bytes = serde_json::to_vec(report).context("serialize ingest diag report")?;
+    if report_bytes.last() != Some(&b'\n') {
+        report_bytes.push(b'\n');
+    }
+    util::write_atomic(&report_path, &report_bytes)
+        .with_context(|| format!("write: {}", report_path.display()))?;
     Ok(())
 }
 

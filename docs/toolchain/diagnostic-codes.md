@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 609
-- quickfix support (`sometimes` or `always`): 549
-- quickfix coverage: 90.15%
+- total codes: 610
+- quickfix support (`sometimes` or `always`): 550
+- quickfix coverage: 90.16%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -82,6 +82,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_IMPL_SYNC_REQUIRED` | x07 / lint / error | sometimes | Implementation sync is required. |
 | `EXTAL_IMPL_UNSUPPORTED_TY` | x07 / lower / error | sometimes | Unsupported type for generated implementation stubs. |
 | `EXTAL_IMPL_X07AST_PARSE` | x07 / parse / error | sometimes | Implementation module is not valid x07AST JSON. |
+| `EXTAL_INGEST_FAILED` | x07 / run / error | sometimes | XTAL ingest failed. |
 | `EXTAL_REPAIR_APPLY_FAILED` | x07 / run / error | never | XTAL repair patch application failed. |
 | `EXTAL_REPAIR_BASELINE_MISSING` | x07 / parse / error | never | XTAL repair baseline is missing. |
 | `EXTAL_REPAIR_MANIFEST_PARSE_FAILED` | x07 / parse / error | sometimes | XTAL repair manifest parse failed. |
@@ -2117,6 +2118,31 @@ Agent strategy:
 - Run `x07 fmt --write --path <module.x07.json>` to canonicalize and validate shape.
 - If the file is not meant to be x07AST JSON, replace it with a valid `*.x07.json` module.
 - Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_INGEST_FAILED`
+
+Summary: XTAL ingest failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `x07 xtal ingest` command failed to normalize the provided input into a canonical ingest workspace.
+
+Message: `xtal ingest failed: {details}`
+
+Agent strategy:
+
+- Confirm `--input` points to one of:
+  - a directory containing `violation.json` and `repro.json`,
+  - `violation.json` (`x07.xtal.violation@0.1.0`), or
+  - `repro.json` (`x07.contract.repro@0.1.0`).
+- If `violation.json` references a repro via `repro.path`, ensure that referenced file exists.
+- Re-run `x07 xtal ingest --input <path>` and inspect `target/xtal/xtal.ingest.diag.json`.
 
 
 ## `EXTAL_REPAIR_APPLY_FAILED`

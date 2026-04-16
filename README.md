@@ -87,6 +87,12 @@ x07 xtal certify
 x07 gen verify --index arch/gen/index.x07gen.json
 ```
 
+Incident intake (normalize runtime contract violations into a canonical workspace):
+
+```bash
+x07 xtal ingest --input target/xtal/violations/<id>
+```
+
 ### Use X07 with a coding agent
 
 Start with the [Agent Quickstart](https://x07lang.org/docs/getting-started/agent-quickstart). If your runtime supports MCP, install the official `io.x07/x07lang-mcp` server from [`x07lang/x07-mcp`](https://github.com/x07lang/x07-mcp). That server exposes token-efficient editing, package, WASM, device, app, and platform tooling through structured contracts instead of shell scraping.

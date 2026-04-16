@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.xtal.ingest_summary@0.1.0.schema.json",
+  "title": "x07.xtal.ingest_summary@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "ok",
+    "input",
+    "ingested",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.xtal.ingest_summary@0.1.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "input": {
+      "$ref": "#/$defs/input_ref"
+    },
+    "ingested": {
+      "$ref": "#/$defs/ingested_ref"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file_digest"
+      }
+    }
+  },
+  "$defs": {
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "file_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes_len"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256_hex"
+        },
+        "bytes_len": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "input_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["violation", "contract_repro"]
+        }
+      }
+    },
+    "ingested_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "dir",
+        "violation_path",
+        "repro_path",
+        "clause_id",
+        "world"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/sha256_hex"
+        },
+        "dir": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "violation_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "repro_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "clause_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "world": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}
