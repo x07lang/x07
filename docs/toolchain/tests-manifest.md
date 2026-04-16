@@ -16,6 +16,8 @@ Supported schema versions:
 }
 ```
 
+`tests[]` may be empty. By default, `x07 test` treats an empty `tests[]` array as an error; pass `--allow-empty` when you intentionally want “0 tests selected” to be a success (for example for generated manifests).
+
 ## Test entries (`tests[]`)
 
 Each entry in `tests[]` is an object with:

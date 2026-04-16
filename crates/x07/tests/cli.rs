@@ -5923,6 +5923,20 @@ fn write_verify_project_files(dir: &Path) {
     write_lockfile_for_project_bytes(dir, &project_bytes);
 }
 
+fn write_xtal_project_files(dir: &Path) {
+    let project_doc = serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src", "gen"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    });
+    let project_bytes = serde_json::to_vec(&project_doc).expect("serialize x07.json");
+    write_json(&dir.join("x07.json"), &project_doc);
+    write_lockfile_for_project_bytes(dir, &project_bytes);
+}
+
 fn write_lockfile_for_project_bytes(dir: &Path, project_bytes: &[u8]) {
     let project_path = dir.join("x07.json");
     let manifest = project::parse_project_manifest_bytes(project_bytes, &project_path)
@@ -14814,4 +14828,266 @@ fn x07_xtal_spec_extract_patchset_out_emits_patchset() {
     assert_eq!(operations.len(), 1);
     assert_eq!(operations[0]["id"], "op.main.v1");
     assert_eq!(operations[0]["name"], "toy.app.main");
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_xtal_verify_routes_nested_artifacts_under_target_xtal() {
+    let dir = fresh_os_tmp_dir("x07_xtal_verify_routes_artifacts");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    write_xtal_project_files(&dir);
+
+    std::fs::create_dir_all(dir.join("spec")).expect("create spec dir");
+    std::fs::create_dir_all(dir.join("src").join("toy")).expect("create src dir");
+
+    write_json(
+        &dir.join("spec").join("toy.app.x07spec.json"),
+        &serde_json::json!({
+            "schema_version": "x07.x07spec@0.1.0",
+            "module_id": "toy.app",
+            "operations": [
+                {
+                    "id": "op.echo.v1",
+                    "name": "toy.app.echo",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "examples_ref": "spec/toy.app.x07spec.examples.jsonl"
+                }
+            ]
+        }),
+    );
+    let example_line = serde_json::json!({
+        "schema_version": "x07.x07spec_examples@0.1.0",
+        "op": "op.echo.v1",
+        "args": { "x": 0 },
+        "expect": 0
+    });
+    let mut jsonl = serde_json::to_string(&example_line).expect("serialize example");
+    jsonl.push('\n');
+    write_bytes(
+        &dir.join("spec").join("toy.app.x07spec.examples.jsonl"),
+        jsonl.as_bytes(),
+    );
+
+    write_json(
+        &dir.join("src").join("toy").join("app.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "toy.app",
+            "imports": [],
+            "decls": [
+                {"kind": "export", "names": ["toy.app.echo"]},
+                {
+                    "kind": "defn",
+                    "name": "toy.app.echo",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": 0
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "xtal",
+            "spec",
+            "fmt",
+            "--input",
+            "spec/toy.app.x07spec.json",
+            "--write",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir(&dir, &["xtal", "tests", "gen-from-spec", "--write"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir_with_fake_prove_solvers(&dir, &["xtal", "verify"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
+
+    assert!(
+        dir.join("target")
+            .join("xtal")
+            .join("verify")
+            .join("_artifacts")
+            .join("verify")
+            .is_dir(),
+        "missing nested verify artifacts dir"
+    );
+    assert!(
+        dir.join("target")
+            .join("xtal")
+            .join("verify")
+            .join("summary.json")
+            .is_file(),
+        "missing xtal verify summary"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_xtal_repair_emits_patchset_and_summary() {
+    let dir = fresh_os_tmp_dir("x07_xtal_repair_emits_patchset");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    write_xtal_project_files(&dir);
+
+    std::fs::create_dir_all(dir.join("spec")).expect("create spec dir");
+    std::fs::create_dir_all(dir.join("src").join("toy")).expect("create src dir");
+
+    write_json(
+        &dir.join("spec").join("toy.app.x07spec.json"),
+        &serde_json::json!({
+            "schema_version": "x07.x07spec@0.1.0",
+            "module_id": "toy.app",
+            "operations": [
+                {
+                    "id": "op.echo.v1",
+                    "name": "toy.app.echo",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32"
+                }
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("src").join("toy").join("app.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "toy.app",
+            "imports": [],
+            "decls": [
+                {"kind": "export", "names": ["toy.app.echo"]},
+                {
+                    "kind": "defn",
+                    "name": "toy.app.echo",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": 0
+                }
+            ]
+        }),
+    );
+
+    write_json(
+        &dir.join("gen").join("xtal").join("tests.json"),
+        &serde_json::json!({
+            "schema_version": "x07.tests_manifest@0.2.0",
+            "tests": []
+        }),
+    );
+
+    write_json(
+        &dir.join("target")
+            .join("xtal")
+            .join("verify")
+            .join("summary.json"),
+        &serde_json::json!({
+            "schema_version": "x07.xtal.verify_summary@0.1.0",
+            "results": { "outcome": "fail" },
+            "entries": [
+                {
+                    "entry": "toy.app.echo",
+                    "op_id": "op.echo.v1",
+                    "spec_path": "spec/toy.app.x07spec.json",
+                    "coverage": { "outcome": "pass" },
+                    "prove": {
+                        "raw": "counterexample",
+                        "report": { "path": "target/xtal/verify/prove/toy/app/echo.report.json" }
+                    }
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir_with_fake_prove_solvers(&dir, &["xtal", "repair"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], false);
+
+    let patchset_path = dir
+        .join("target")
+        .join("xtal")
+        .join("repair")
+        .join("patchset.json");
+    assert!(patchset_path.is_file(), "missing repair patchset");
+    let patchset_bytes = std::fs::read(&patchset_path).expect("read patchset");
+    let patchset: Value = serde_json::from_slice(&patchset_bytes).expect("parse patchset JSON");
+    assert_eq!(patchset["schema_version"], X07_PATCHSET_SCHEMA_VERSION);
+    let patches = patchset["patches"].as_array().expect("patches[]");
+    assert_eq!(patches.len(), 1);
+    assert_eq!(patches[0]["path"], "src/toy/app.x07.json");
+    let ops = patches[0]["patch"].as_array().expect("patch ops[]");
+    assert_eq!(ops.len(), 1);
+    assert_eq!(ops[0]["op"], "replace");
+    assert_eq!(ops[0]["path"], "/decls/1/body");
+    assert_eq!(ops[0]["value"], "x");
+
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("repair")
+        .join("summary.json");
+    assert!(summary_path.is_file(), "missing repair summary");
+    let summary_bytes = std::fs::read(&summary_path).expect("read summary");
+    let summary: Value = serde_json::from_slice(&summary_bytes).expect("parse summary JSON");
+    assert_eq!(summary["schema_version"], "x07.xtal.repair_summary@0.1.0");
+    assert_eq!(summary["generated_at"], "2000-01-01T00:00:00Z");
+    assert_eq!(summary["baseline"]["verify_ok"], false);
+    assert_eq!(summary["result"]["status"], "patch_suggested");
 }

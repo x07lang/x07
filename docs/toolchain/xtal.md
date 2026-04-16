@@ -80,20 +80,38 @@ Each operation can declare `ensures_props[]` entries that reference a property f
   - Runs `x07 xtal impl check`.
 - `x07 xtal verify`
   - Runs `dev` prechecks.
+  - Requires a deterministic `solve-*` world by default (pass `--allow-os-world` to override).
   - Runs formal verification per spec operation entrypoint:
     - `x07 verify --coverage --entry <spec.operations[*].name>`
     - `x07 verify --prove --entry <spec.operations[*].name> --emit-proof <path>`
-  - Runs `x07 test --all --manifest gen/xtal/tests.json`.
+  - Runs `x07 test --all --manifest gen/xtal/tests.json --allow-empty`.
   - Writes:
     - `target/xtal/xtal.verify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
     - `target/xtal/verify/summary.json` (aggregate summary, `x07.xtal.verify_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.verify_summary@0.1.0.schema.json`)
     - `target/xtal/tests.report.json` (test report)
+    - `target/xtal/verify/_artifacts/` (nested artifacts for `x07 verify` and `x07 test`)
+      - `target/xtal/verify/_artifacts/verify/...` (proof counterexamples, solver inputs, CBMC/Z3 intermediates)
+      - `target/xtal/verify/_artifacts/test/...` (property-test repro cases and other test artifacts)
     - `target/xtal/verify/coverage/<module_path>/<local>.report.json` (per-entry coverage reports)
     - `target/xtal/verify/prove/<module_path>/<local>.report.json` (per-entry prove reports)
     - `target/xtal/verify/prove/<module_path>/<local>.proof.json` (proof objects, when emitted)
   - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
   - Proof runs require external tooling; see `docs/toolchain/formal-verification.md`.
+- `x07 xtal repair`
+  - Reads `target/xtal/verify/summary.json` (baseline) and attempts a bounded repair for one failing entry.
+  - Strategies:
+    - semantic attempt for `prove.raw == "counterexample"` entries (minimal AST edits, checked by `x07 verify --prove` + targeted `x07 test`)
+    - quickfix fallback via `x07 fix` when semantic repair is unavailable or fails
+  - If `--write` is set, applies the final patchset to the working tree and reruns `x07 xtal verify`.
+  - By default, only edits known stub bodies (pass `--allow-edit-non-stubs` to override).
+  - Flags: `--write`, `--max-rounds`, `--max-candidates`, `--entry`, `--stubs-only`, `--semantic-only`, `--quickfix-only`.
+  - Writes:
+    - `target/xtal/xtal.repair.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
+    - `target/xtal/repair/summary.json` (`x07.xtal.repair_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.repair_summary@0.1.0.schema.json`)
+    - `target/xtal/repair/patchset.json` (`x07.patchset@0.1.0`)
+    - `target/xtal/repair/diff.txt` (deterministic review diff)
+    - `target/xtal/repair/attempts/attempt-0001/...` (per-attempt evaluation artifacts)
 
 ## Output conventions
 

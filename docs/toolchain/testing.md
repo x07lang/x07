@@ -33,7 +33,7 @@ See also:
 - Filter by test id:
   - `x07 test --filter golden_prm_signed_200` (substring match)
   - `x07 test --filter golden_prm_signed_200 --exact` (exact id match)
-  - By default, filters that select 0 tests are an error; pass `--allow-empty` to treat “0 tests selected” as success.
+  - By default, selecting 0 tests is an error; pass `--allow-empty` to treat “0 tests selected” as success (including an empty `tests[]` manifest).
   - Use `--list` to print selected tests without running them.
 - Per-test fuel:
   - If a test fails with `fuel exhausted`, set `solve_fuel` on the test entry in the manifest.

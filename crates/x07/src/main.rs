@@ -544,6 +544,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["xtal"],
                 Some(xtal::XtalCommand::Dev(_)) => vec!["xtal", "dev"],
                 Some(xtal::XtalCommand::Verify(_)) => vec!["xtal", "verify"],
+                Some(xtal::XtalCommand::Repair(_)) => vec!["xtal", "repair"],
                 Some(xtal::XtalCommand::Impl(imp)) => match &imp.cmd {
                     None => vec!["xtal", "impl"],
                     Some(xtal::XtalImplCommand::Check(_)) => vec!["xtal", "impl", "check"],
@@ -668,7 +669,7 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
     }
     args.manifest = util::resolve_existing_path_upwards(&args.manifest);
 
-    let validated = match validate_manifest_json(&args.manifest) {
+    let validated = match validate_manifest_json(&args.manifest, args.allow_empty) {
         Ok(m) => m,
         Err(diags) => {
             for d in &diags {
@@ -2673,7 +2674,10 @@ struct ManifestDiag {
     path: String,
 }
 
-fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec<ManifestDiag>> {
+fn validate_manifest_json(
+    manifest_path: &Path,
+    allow_empty: bool,
+) -> Result<ValidatedManifest, Vec<ManifestDiag>> {
     let mut diags: Vec<ManifestDiag> = Vec::new();
 
     let bytes = match std::fs::read(manifest_path) {
@@ -2718,7 +2722,7 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
         });
     }
 
-    if raw.tests.is_empty() {
+    if raw.tests.is_empty() && !allow_empty {
         diags.push(ManifestDiag {
             code: "ETEST_TESTS_EMPTY",
             message: "tests array is empty".to_string(),

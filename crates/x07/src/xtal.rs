@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
+use x07_worlds::WorldId;
 use x07c::ast::Expr;
 use x07c::diagnostics;
 use x07c::x07ast;
@@ -34,10 +35,18 @@ const DEFAULT_GEN_INDEX_PATH: &str = "arch/gen/index.x07gen.json";
 const DEFAULT_IMPL_DIR: &str = "src";
 const DEFAULT_VERIFY_DIR: &str = "target/xtal";
 const DEFAULT_VERIFY_ARTIFACT_DIR: &str = "target/xtal/verify";
+const DEFAULT_VERIFY_NESTED_ARTIFACT_DIR: &str = "target/xtal/verify/_artifacts";
+const DEFAULT_VERIFY_NESTED_TEST_ARTIFACT_DIR: &str = "target/xtal/verify/_artifacts/test";
 const DEFAULT_VERIFY_TEST_REPORT_PATH: &str = "target/xtal/tests.report.json";
 const DEFAULT_VERIFY_DIAG_REPORT_PATH: &str = "target/xtal/xtal.verify.diag.json";
 const DEFAULT_VERIFY_SUMMARY_PATH: &str = "target/xtal/verify/summary.json";
-const XTAL_VERIFY_WORLD: &str = "solve-pure";
+const DEFAULT_REPAIR_DIR: &str = "target/xtal/repair";
+const DEFAULT_REPAIR_ATTEMPTS_DIR: &str = "target/xtal/repair/attempts";
+const DEFAULT_REPAIR_PATCHSET_PATH: &str = "target/xtal/repair/patchset.json";
+const DEFAULT_REPAIR_DIFF_PATH: &str = "target/xtal/repair/diff.txt";
+const DEFAULT_REPAIR_SUMMARY_PATH: &str = "target/xtal/repair/summary.json";
+const DEFAULT_REPAIR_DIAG_REPORT_PATH: &str = "target/xtal/xtal.repair.diag.json";
+const DEFAULT_REPAIR_BASELINE_DIR: &str = "target/xtal/repair/baseline";
 
 static TMP_N: AtomicU64 = AtomicU64::new(0);
 
@@ -53,6 +62,8 @@ pub enum XtalCommand {
     Dev(XtalDevArgs),
     /// Verify spec + generated tests + test execution.
     Verify(XtalVerifyArgs),
+    /// Attempt a bounded repair for a failing `x07 xtal verify`.
+    Repair(XtalRepairArgs),
     /// Work with spec modules.
     Spec(XtalSpecArgs),
     /// Work with generated tests from spec examples.
@@ -118,6 +129,10 @@ pub struct XtalVerifyArgs {
     #[arg(long, value_enum, default_value_t = ProofPolicy::Balanced)]
     pub proof_policy: ProofPolicy,
 
+    /// Permit OS-capable worlds (default: require solve-* worlds).
+    #[arg(long)]
+    pub allow_os_world: bool,
+
     /// Override loop unwind bound passed to `x07 verify`.
     #[arg(long, value_name = "N")]
     pub unwind: Option<u32>,
@@ -129,6 +144,45 @@ pub struct XtalVerifyArgs {
     /// Override the verification input encoding length (advanced; passed to `x07 verify`).
     #[arg(long, value_name = "N")]
     pub input_len_bytes: Option<u32>,
+}
+
+#[derive(Debug, Args)]
+pub struct XtalRepairArgs {
+    /// Project manifest path (defaults to searching upwards for x07.json).
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Apply the final patchset to the working tree after validation.
+    #[arg(long)]
+    pub write: bool,
+
+    /// Maximum repair rounds.
+    #[arg(long, value_name = "N", default_value_t = 3)]
+    pub max_rounds: u32,
+
+    /// Maximum semantic candidates per round.
+    #[arg(long, value_name = "N", default_value_t = 64)]
+    pub max_candidates: u32,
+
+    /// Restrict repair to one entrypoint.
+    #[arg(long, value_name = "SYM")]
+    pub entry: Option<String>,
+
+    /// Only edit functions that match known generated stub bodies (default: true).
+    #[arg(long, default_value_t = true, conflicts_with = "allow_edit_non_stubs")]
+    pub stubs_only: bool,
+
+    /// Permit editing non-stub implementations.
+    #[arg(long)]
+    pub allow_edit_non_stubs: bool,
+
+    /// Skip quickfix fallback attempts.
+    #[arg(long)]
+    pub semantic_only: bool,
+
+    /// Skip semantic repair attempts and only try quickfix repair.
+    #[arg(long)]
+    pub quickfix_only: bool,
 }
 
 #[derive(Debug, Args)]
@@ -337,6 +391,7 @@ pub fn cmd_xtal(
     match cmd {
         XtalCommand::Dev(args) => cmd_xtal_dev(machine, args),
         XtalCommand::Verify(args) => cmd_xtal_verify(machine, args),
+        XtalCommand::Repair(args) => cmd_xtal_repair(machine, args),
         XtalCommand::Spec(args) => cmd_xtal_spec(machine, args),
         XtalCommand::Tests(args) => cmd_xtal_tests(machine, args),
         XtalCommand::Impl(args) => cmd_xtal_impl(machine, args),
@@ -663,6 +718,39 @@ fn cmd_xtal_verify(
     let manifest_path = project_root.join(&args.manifest);
 
     let mut diagnostics = Vec::new();
+
+    let project_manifest_path = project_root.join("x07.json");
+    let mut project_world_str = "unknown".to_string();
+    let mut project_world_id: Option<WorldId> = None;
+    match x07c::project::load_project_manifest(&project_manifest_path) {
+        Ok(manifest) => {
+            project_world_str = manifest.world.trim().to_string();
+            project_world_id = WorldId::parse(&project_world_str);
+        }
+        Err(err) => {
+            diagnostics.push(diag_error(
+                "X07-INTERNAL-0001",
+                diagnostics::Stage::Parse,
+                format!(
+                    "cannot load project manifest for world validation ({}): {err:#}",
+                    project_manifest_path.display()
+                ),
+                None,
+            ));
+        }
+    }
+    let eval_world_ok = project_world_id.is_some_and(WorldId::is_eval_world);
+    if !eval_world_ok && !args.allow_os_world {
+        diagnostics.push(diag_error(
+            "EXTAL_VERIFY_WORLD_UNSAFE",
+            diagnostics::Stage::Lint,
+            format!(
+                "XTAL verify requires a deterministic solve-* world by default; found world={project_world_str:?} (pass --allow-os-world to override)."
+            ),
+            None,
+        ));
+    }
+
     let spec_files = collect_spec_files(&spec_root, &Vec::new(), &mut diagnostics);
     let mut merged_spec_digests: BTreeMap<String, Value> = BTreeMap::new();
     let mut merged_examples_digests: BTreeMap<String, Value> = BTreeMap::new();
@@ -851,6 +939,56 @@ fn cmd_xtal_verify(
         && gen_code == std::process::ExitCode::SUCCESS
         && impl_code == std::process::ExitCode::SUCCESS;
 
+    if manifest_path.is_file() {
+        match std::fs::read(&manifest_path) {
+            Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
+                Ok(doc) => {
+                    if let Some(entries) = doc.get("tests").and_then(Value::as_array) {
+                        for (idx, entry) in entries.iter().enumerate() {
+                            let world = entry.get("world").and_then(Value::as_str).unwrap_or("");
+                            let id = entry.get("id").and_then(Value::as_str).unwrap_or("");
+                            let world_ok =
+                                WorldId::parse(world).is_some_and(WorldId::is_eval_world);
+                            if !world_ok && !args.allow_os_world {
+                                diagnostics.push(diag_error(
+                                    "EXTAL_VERIFY_WORLD_UNSAFE",
+                                    diagnostics::Stage::Lint,
+                                    format!(
+                                        "XTAL verify requires deterministic solve-* tests by default; found test world={world:?} (id={id:?}, tests[{idx}] in {}).",
+                                        args.manifest.display()
+                                    ),
+                                    None,
+                                ));
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    diagnostics.push(diag_error(
+                        "X07-INTERNAL-0001",
+                        diagnostics::Stage::Parse,
+                        format!(
+                            "cannot parse generated tests manifest for world validation: {}: {err}",
+                            manifest_path.display()
+                        ),
+                        None,
+                    ));
+                }
+            },
+            Err(err) => {
+                diagnostics.push(diag_error(
+                    "X07-INTERNAL-0001",
+                    diagnostics::Stage::Parse,
+                    format!(
+                        "cannot read generated tests manifest for world validation: {}: {err}",
+                        manifest_path.display()
+                    ),
+                    None,
+                ));
+            }
+        }
+    }
+
     let stderr_1l = |stderr: &[u8]| -> String {
         let text = String::from_utf8_lossy(stderr);
         let line = text.lines().next().unwrap_or("").trim();
@@ -874,7 +1012,7 @@ fn cmd_xtal_verify(
 
     let policy_str = args.proof_policy.as_str();
 
-    if prechecks_ok {
+    if prechecks_ok && (eval_world_ok || args.allow_os_world) {
         std::fs::create_dir_all(project_root.join(DEFAULT_VERIFY_ARTIFACT_DIR)).with_context(
             || {
                 format!(
@@ -953,6 +1091,8 @@ fn cmd_xtal_verify(
                     entry.to_string(),
                     "--project".to_string(),
                     "x07.json".to_string(),
+                    "--artifact-dir".to_string(),
+                    DEFAULT_VERIFY_NESTED_ARTIFACT_DIR.to_string(),
                 ];
                 coverage_args.extend(bound_args.clone());
                 coverage_args.extend([
@@ -972,7 +1112,7 @@ fn cmd_xtal_verify(
                         "EXTAL_VERIFY_REPORT_MISSING",
                         diagnostics::Stage::Run,
                         format!(
-                            "Expected verify report was not produced for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\"): {coverage_report_rel}."
+                            "Expected verify report was not produced for \"{entry}\" (world={project_world_str:?}): {coverage_report_rel}."
                         ),
                         None,
                     ));
@@ -994,7 +1134,7 @@ fn cmd_xtal_verify(
                                             "EXTAL_VERIFY_COVERAGE_FAILED",
                                             diagnostics::Stage::Run,
                                             format!(
-                                                "Coverage verification failed for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\"). See report: {coverage_report_rel}."
+                                                "Coverage verification failed for \"{entry}\" (world={project_world_str:?}). See report: {coverage_report_rel}."
                                             ),
                                             None,
                                         ));
@@ -1048,6 +1188,8 @@ fn cmd_xtal_verify(
                     entry.to_string(),
                     "--project".to_string(),
                     "x07.json".to_string(),
+                    "--artifact-dir".to_string(),
+                    DEFAULT_VERIFY_NESTED_ARTIFACT_DIR.to_string(),
                 ];
                 prove_args.extend(bound_args.clone());
                 prove_args.extend([
@@ -1067,7 +1209,7 @@ fn cmd_xtal_verify(
                         "EXTAL_VERIFY_REPORT_MISSING",
                         diagnostics::Stage::Run,
                         format!(
-                            "Expected verify report was not produced for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\"): {prove_report_rel}."
+                            "Expected verify report was not produced for \"{entry}\" (world={project_world_str:?}): {prove_report_rel}."
                         ),
                         None,
                     ));
@@ -1226,7 +1368,7 @@ fn cmd_xtal_verify(
                         "EXTAL_VERIFY_PROVE_COUNTEREXAMPLE",
                         diag_stage,
                         format!(
-                            "Proof attempt found a counterexample for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\", policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                            "Proof attempt found a counterexample for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                         ),
                         None,
                     )),
@@ -1234,7 +1376,7 @@ fn cmd_xtal_verify(
                         "EXTAL_VERIFY_PROVE_TOOL_MISSING",
                         diag_stage,
                         format!(
-                            "Proof tool is missing or unavailable while proving \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\"). See report: {prove_report_rel}."
+                            "Proof tool is missing or unavailable while proving \"{entry}\" (world={project_world_str:?}). See report: {prove_report_rel}."
                         ),
                         None,
                     )),
@@ -1242,7 +1384,7 @@ fn cmd_xtal_verify(
                         "EXTAL_VERIFY_PROVE_ERROR",
                         diag_stage,
                         format!(
-                            "Proof attempt failed with an internal error for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\"). Exit code {}. See report: {prove_report_rel}. stderr: {}",
+                            "Proof attempt failed with an internal error for \"{entry}\" (world={project_world_str:?}). Exit code {}. See report: {prove_report_rel}. stderr: {}",
                             prove_run.exit_code,
                             stderr_1l(&prove_run.stderr),
                         ),
@@ -1254,7 +1396,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_UNSUPPORTED",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt is unsupported for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\", policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt is unsupported for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
@@ -1263,7 +1405,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_UNSUPPORTED",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt is unsupported for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\", policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt is unsupported for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
@@ -1276,7 +1418,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_TIMEOUT",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt hit the configured budget for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\", policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt hit the configured budget for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
@@ -1285,7 +1427,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_TIMEOUT",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt hit the configured budget for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\", policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt hit the configured budget for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
@@ -1298,7 +1440,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_INCONCLUSIVE",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt was inconclusive for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\", policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt was inconclusive for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
@@ -1307,7 +1449,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_INCONCLUSIVE",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt was inconclusive for \"{entry}\" (world=\"{XTAL_VERIFY_WORLD}\", policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt was inconclusive for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
@@ -1351,6 +1493,9 @@ fn cmd_xtal_verify(
             "--all".to_string(),
             "--manifest".to_string(),
             args.manifest.display().to_string(),
+            "--allow-empty".to_string(),
+            "--artifact-dir".to_string(),
+            DEFAULT_VERIFY_NESTED_TEST_ARTIFACT_DIR.to_string(),
             "--report-out".to_string(),
             DEFAULT_VERIFY_TEST_REPORT_PATH.to_string(),
             "--quiet-json".to_string(),
@@ -1417,7 +1562,7 @@ fn cmd_xtal_verify(
             "EXTAL_VERIFY_REPORT_MISSING",
             diagnostics::Stage::Run,
             format!(
-                "Expected verify report was not produced for \"x07 test\" (world=\"{XTAL_VERIFY_WORLD}\"): {DEFAULT_VERIFY_TEST_REPORT_PATH}."
+                "Expected verify report was not produced for \"x07 test\": {DEFAULT_VERIFY_TEST_REPORT_PATH}."
             ),
             None,
         ));
@@ -1709,7 +1854,7 @@ fn cmd_xtal_verify(
     });
 
     let mut settings = json!({
-        "world": XTAL_VERIFY_WORLD,
+        "world": project_world_str.clone(),
         "proof_policy": policy_str,
     });
     if args.unwind.is_some() || args.max_bytes_len.is_some() || args.input_len_bytes.is_some() {
@@ -1869,6 +2014,1401 @@ fn cmd_xtal_verify(
     } else {
         std::process::ExitCode::from(1)
     })
+}
+
+fn cmd_xtal_repair(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalRepairArgs,
+) -> Result<std::process::ExitCode> {
+    if args.semantic_only && args.quickfix_only {
+        anyhow::bail!("--semantic-only and --quickfix-only are mutually exclusive");
+    }
+    if args.max_rounds == 0 {
+        anyhow::bail!("--max-rounds must be >= 1");
+    }
+    if args.max_candidates == 0 {
+        anyhow::bail!("--max-candidates must be >= 1");
+    }
+
+    let project_root = resolve_project_root(args.project.as_deref(), None)?;
+    let verify_summary_path = project_root.join(DEFAULT_VERIFY_SUMMARY_PATH);
+    let verify_diag_path = project_root.join(DEFAULT_VERIFY_DIAG_REPORT_PATH);
+    let repair_root = project_root.join(DEFAULT_REPAIR_DIR);
+
+    std::fs::create_dir_all(&repair_root)
+        .with_context(|| format!("mkdir: {}", repair_root.display()))?;
+
+    let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
+
+    let baseline_summary_bytes = match std::fs::read(&verify_summary_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            diags.push(diag_error(
+                "EXTAL_REPAIR_BASELINE_MISSING",
+                diagnostics::Stage::Parse,
+                format!(
+                    "baseline verify summary is missing (run `x07 xtal verify`): {}: {err}",
+                    verify_summary_path.display()
+                ),
+                None,
+            ));
+            let mut report = diagnostics::Report::ok();
+            report = report.with_diagnostics(diags);
+            report.ok = false;
+            write_repair_artifacts(&project_root, None, &report, None, None, &[])?;
+            write_report(machine, &report)?;
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+
+    let baseline_summary: Value = match serde_json::from_slice(&baseline_summary_bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            diags.push(diag_error(
+                "EXTAL_REPAIR_BASELINE_MISSING",
+                diagnostics::Stage::Parse,
+                format!(
+                    "cannot parse baseline verify summary JSON (rerun `x07 xtal verify`): {}: {err}",
+                    verify_summary_path.display()
+                ),
+                None,
+            ));
+            let mut report = diagnostics::Report::ok();
+            report = report.with_diagnostics(diags);
+            report.ok = false;
+            write_repair_artifacts(&project_root, None, &report, None, None, &[])?;
+            write_report(machine, &report)?;
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+
+    let baseline_outcome = baseline_summary
+        .get("results")
+        .and_then(|r| r.get("outcome"))
+        .and_then(Value::as_str)
+        .unwrap_or("fail");
+    let baseline_verify_ok = baseline_outcome != "fail";
+
+    if baseline_verify_ok {
+        let mut report = diagnostics::Report::ok();
+        report = report.with_diagnostics(diags);
+        write_repair_artifacts(
+            &project_root,
+            Some(&baseline_summary),
+            &report,
+            None,
+            None,
+            &[],
+        )?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::SUCCESS);
+    }
+
+    let tests_manifest_path = read_baseline_tests_manifest_path(&verify_diag_path)
+        .unwrap_or_else(|| project_root.join(DEFAULT_MANIFEST_PATH));
+    let tests_manifest_rel = tests_manifest_path
+        .strip_prefix(&project_root)
+        .unwrap_or(&tests_manifest_path)
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let baseline_entries = baseline_verify_entries(&baseline_summary);
+    let tests_report_rel = baseline_tests_report_path_rel(&baseline_summary);
+    let failing_test_entries =
+        failing_xtal_entries_from_tests_report(&project_root, &tests_report_rel, &baseline_entries);
+
+    let entry_filter = args.entry.as_deref();
+    let target = if let Some(filter) = entry_filter {
+        baseline_entries.iter().find(|e| e.entry == filter).cloned()
+    } else {
+        let semantic_target = baseline_entries
+            .iter()
+            .find(|e| e.prove_raw == "counterexample")
+            .cloned();
+        let tests_target = failing_test_entries
+            .iter()
+            .next()
+            .and_then(|name| baseline_entries.iter().find(|e| &e.entry == name))
+            .cloned();
+        let coverage_target = baseline_entries
+            .iter()
+            .find(|e| e.coverage_outcome == "fail")
+            .cloned();
+        semantic_target.or(tests_target).or(coverage_target)
+    };
+
+    let Some(target) = target else {
+        let msg = if entry_filter.is_some() {
+            "baseline verify summary did not include the requested --entry"
+        } else {
+            "baseline verify failed, but no eligible entries were found for repair"
+        };
+        diags.push(diag_error(
+            "EXTAL_REPAIR_NO_ACTIONABLE_FAILURE",
+            diagnostics::Stage::Run,
+            msg.to_string(),
+            None,
+        ));
+        let mut report = diagnostics::Report::ok();
+        report = report.with_diagnostics(diags);
+        report.ok = false;
+        write_repair_artifacts(
+            &project_root,
+            Some(&baseline_summary),
+            &report,
+            None,
+            None,
+            &[],
+        )?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    };
+
+    let target_entry = target.entry;
+    let target_op_id = target.op_id;
+    let target_prove_report_rel = target.prove_report_path_rel;
+    let target_spec_path_rel = target.spec_path_rel;
+    let can_semantic = target.prove_raw == "counterexample";
+
+    let effective_stubs_only = args.stubs_only && !args.allow_edit_non_stubs;
+    let (module_id, _local) = parse_symbol_to_module_and_local(&target_entry)?;
+    let impl_path = module_id_to_impl_path(&project_root.join(DEFAULT_IMPL_DIR), &module_id);
+    if !impl_path.is_file() {
+        diags.push(diag_error(
+            "EXTAL_REPAIR_NO_ACTIONABLE_FAILURE",
+            diagnostics::Stage::Parse,
+            format!(
+                "implementation module is missing for {target_entry:?}: {}",
+                impl_path.display()
+            ),
+            None,
+        ));
+        let mut report = diagnostics::Report::ok();
+        report = report.with_diagnostics(diags);
+        report.ok = false;
+        write_repair_artifacts(
+            &project_root,
+            Some(&baseline_summary),
+            &report,
+            None,
+            None,
+            &[],
+        )?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    let (spec_op, _spec_path) = load_target_spec_op(
+        &project_root,
+        &target_spec_path_rel,
+        &target_entry,
+        &mut diags,
+    )?;
+
+    let file_bytes = std::fs::read(&impl_path)
+        .with_context(|| format!("read impl module: {}", impl_path.display()))?;
+    let mut file =
+        x07ast::parse_x07ast_json(&file_bytes).context("parse implementation module x07ast")?;
+    x07ast::canonicalize_x07ast_file(&mut file);
+    let decl_ptr = find_decl_body_ptr(&file, &target_entry).ok_or_else(|| {
+        anyhow::anyhow!(
+            "target entry {target_entry:?} was not found in {}",
+            impl_path.display()
+        )
+    })?;
+    let Some(defn_idx) = file.functions.iter().position(|f| f.name == target_entry) else {
+        anyhow::bail!(
+            "target entry {:?} is not a defn in {}",
+            target_entry,
+            impl_path.display()
+        );
+    };
+
+    let mut stub_diags = Vec::new();
+    let stub_body = default_body_for_ty(&spec_op.result, &mut stub_diags);
+    let is_stub_body = file.functions[defn_idx].body == stub_body;
+    if effective_stubs_only && !is_stub_body {
+        diags.push(diag_error(
+            "EXTAL_REPAIR_TARGET_NOT_ELIGIBLE",
+            diagnostics::Stage::Run,
+            format!(
+                "stubs-only repair refused to edit non-stub body for {target_entry:?} (pass --allow-edit-non-stubs to override)"
+            ),
+            None,
+        ));
+        let mut report = diagnostics::Report::ok();
+        report = report.with_diagnostics(diags);
+        report.ok = false;
+        write_repair_artifacts(
+            &project_root,
+            Some(&baseline_summary),
+            &report,
+            None,
+            None,
+            &[],
+        )?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    let module_roots = collect_project_module_roots(&project_root)?;
+    let op_test_filter = format!("xtal/{module_id}/{target_op_id}/");
+
+    let mut attempts: Vec<Value> = Vec::new();
+    let mut final_patchset: Option<PatchSet> = None;
+    let mut final_diff: Option<String> = None;
+
+    let mut attempt_no: u32 = 0;
+    if can_semantic && !args.quickfix_only {
+        attempt_no += 1;
+        let (patchset, diff_text, ok) = run_semantic_repair_attempt(
+            &project_root,
+            attempt_no,
+            args.max_candidates as usize,
+            &target_entry,
+            &decl_ptr,
+            &impl_path,
+            &file,
+            defn_idx,
+            &spec_op,
+            &module_roots,
+            &tests_manifest_rel,
+            &op_test_filter,
+            &baseline_summary,
+            &target_prove_report_rel,
+            &mut diags,
+        )?;
+        attempts.push(json!({
+            "attempt": attempt_no,
+            "strategy": "semantic_cegis",
+            "target_entry": target_entry,
+            "status": if ok { "succeeded" } else { "failed" },
+            "patchset_path": format!("{DEFAULT_REPAIR_ATTEMPTS_DIR}/attempt-{attempt_no:04}/patchset.json"),
+            "diff_path": format!("{DEFAULT_REPAIR_ATTEMPTS_DIR}/attempt-{attempt_no:04}/diff.txt"),
+            "evaluation": { "verify_ok": ok },
+        }));
+        if ok {
+            final_patchset = Some(patchset);
+            final_diff = Some(diff_text);
+        }
+    } else if !can_semantic && args.semantic_only {
+        diags.push(diag_error(
+            "EXTAL_REPAIR_NO_ACTIONABLE_FAILURE",
+            diagnostics::Stage::Run,
+            "semantic repair requires a prove counterexample baseline; pass --quickfix-only or rerun `x07 xtal verify` with proofs enabled".to_string(),
+            None,
+        ));
+        let mut report = diagnostics::Report::ok();
+        report = report.with_diagnostics(diags);
+        report.ok = false;
+        write_repair_artifacts(
+            &project_root,
+            Some(&baseline_summary),
+            &report,
+            None,
+            None,
+            &[],
+        )?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    if final_patchset.is_none() && !args.semantic_only && attempt_no < args.max_rounds {
+        attempt_no += 1;
+        let (patchset, diff_text, ok) = run_quickfix_repair_attempt(
+            &project_root,
+            attempt_no,
+            &target_entry,
+            &impl_path,
+            &module_roots,
+            &tests_manifest_rel,
+            &op_test_filter,
+            &baseline_summary,
+            &target_prove_report_rel,
+            &mut diags,
+        )?;
+        attempts.push(json!({
+            "attempt": attempt_no,
+            "strategy": "diag_quickfix",
+            "target_entry": target_entry,
+            "status": if ok { "succeeded" } else { "failed" },
+            "patchset_path": format!("{DEFAULT_REPAIR_ATTEMPTS_DIR}/attempt-{attempt_no:04}/patchset.json"),
+            "diff_path": format!("{DEFAULT_REPAIR_ATTEMPTS_DIR}/attempt-{attempt_no:04}/diff.txt"),
+            "evaluation": { "verify_ok": ok },
+        }));
+        if ok {
+            final_patchset = Some(patchset);
+            final_diff = Some(diff_text);
+        }
+    }
+
+    let (result_status, exit_code) = if let Some(patchset) = final_patchset.as_ref() {
+        let diff_text = final_diff.as_deref().unwrap_or("");
+        let patchset_path = project_root.join(DEFAULT_REPAIR_PATCHSET_PATH);
+        if let Err(err) = write_patchset(&patchset_path, patchset) {
+            diags.push(diag_error(
+                "EXTAL_REPAIR_PATCHSET_WRITE_FAILED",
+                diagnostics::Stage::Run,
+                format!(
+                    "cannot write patchset: {}: {err:#}",
+                    patchset_path.display()
+                ),
+                None,
+            ));
+        }
+        let diff_path = project_root.join(DEFAULT_REPAIR_DIFF_PATH);
+        if let Err(err) = util::write_atomic(&diff_path, diff_text.as_bytes()) {
+            diags.push(diag_error(
+                "EXTAL_REPAIR_PATCHSET_WRITE_FAILED",
+                diagnostics::Stage::Run,
+                format!("cannot write diff: {}: {err}", diff_path.display()),
+                None,
+            ));
+        }
+
+        if args.write {
+            let apply_out = run_self_command(
+                &project_root,
+                &[
+                    "patch".to_string(),
+                    "apply".to_string(),
+                    "--in".to_string(),
+                    DEFAULT_REPAIR_PATCHSET_PATH.to_string(),
+                    "--repo-root".to_string(),
+                    ".".to_string(),
+                    "--write".to_string(),
+                ],
+            )?;
+            if apply_out.exit_code != 0 {
+                diags.push(diag_error(
+                    "EXTAL_REPAIR_APPLY_FAILED",
+                    diagnostics::Stage::Run,
+                    format!(
+                        "patch application failed (exit_code={}): {}",
+                        apply_out.exit_code,
+                        stderr_summary(&apply_out.stderr)
+                    ),
+                    None,
+                ));
+                ("failed", std::process::ExitCode::from(1))
+            } else {
+                let verify_out = run_self_command(
+                    &project_root,
+                    &[
+                        "xtal".to_string(),
+                        "verify".to_string(),
+                        "--project".to_string(),
+                        "x07.json".to_string(),
+                        "--quiet-json".to_string(),
+                    ],
+                )?;
+                if verify_out.exit_code == 0 {
+                    ("patch_applied", std::process::ExitCode::SUCCESS)
+                } else {
+                    diags.push(diag_error(
+                        "EXTAL_REPAIR_VERIFY_FAILED",
+                        diagnostics::Stage::Run,
+                        format!(
+                            "post-apply verify failed (exit_code={}): {}",
+                            verify_out.exit_code,
+                            stderr_summary(&verify_out.stderr)
+                        ),
+                        None,
+                    ));
+                    ("failed", std::process::ExitCode::from(1))
+                }
+            }
+        } else {
+            ("patch_suggested", std::process::ExitCode::from(1))
+        }
+    } else {
+        diags.push(diag_error(
+            "EXTAL_REPAIR_NO_PATCH_FOUND",
+            diagnostics::Stage::Run,
+            format!("no patch found for {target_entry:?} after {attempt_no} attempt(s)"),
+            None,
+        ));
+        ("failed", std::process::ExitCode::from(1))
+    };
+
+    let mut report = diagnostics::Report::ok();
+    report = report.with_diagnostics(diags);
+    if result_status != "patch_applied" && result_status != "no_action_needed" {
+        report.ok = false;
+    }
+    report.meta.insert(
+        "project_root".to_string(),
+        Value::String(project_root.display().to_string()),
+    );
+    report.meta.insert(
+        "baseline_verify_summary".to_string(),
+        Value::String(
+            verify_summary_path
+                .strip_prefix(&project_root)
+                .unwrap_or(&verify_summary_path)
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+    );
+    report.meta.insert(
+        "tests_manifest".to_string(),
+        Value::String(tests_manifest_rel.clone()),
+    );
+    report.meta.insert(
+        "repair_summary_path".to_string(),
+        Value::String(DEFAULT_REPAIR_SUMMARY_PATH.to_string()),
+    );
+
+    let result_patchset_path = project_root.join(DEFAULT_REPAIR_PATCHSET_PATH);
+    let patchset_written = result_patchset_path.is_file();
+    let result_diff_path = project_root.join(DEFAULT_REPAIR_DIFF_PATH);
+    let diff_written = result_diff_path.is_file();
+
+    write_repair_artifacts(
+        &project_root,
+        Some(&baseline_summary),
+        &report,
+        Some(&attempts),
+        Some(result_status),
+        &[
+            ("patchset_written", Value::Bool(patchset_written)),
+            ("diff_written", Value::Bool(diff_written)),
+        ],
+    )?;
+
+    write_report(machine, &report)?;
+    Ok(exit_code)
+}
+
+fn read_baseline_tests_manifest_path(diag_path: &Path) -> Option<PathBuf> {
+    let bytes = std::fs::read(diag_path).ok()?;
+    let doc: Value = serde_json::from_slice(&bytes).ok()?;
+    let raw = doc
+        .get("meta")
+        .and_then(Value::as_object)
+        .and_then(|m| m.get("tests_manifest"))
+        .and_then(Value::as_str)?;
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let p = PathBuf::from(raw);
+    p.is_file().then_some(p)
+}
+
+#[derive(Debug, Clone)]
+struct BaselineVerifyEntry {
+    entry: String,
+    op_id: String,
+    spec_path_rel: String,
+    coverage_outcome: String,
+    prove_raw: String,
+    prove_report_path_rel: String,
+}
+
+fn baseline_verify_entries(baseline_summary: &Value) -> Vec<BaselineVerifyEntry> {
+    let Some(entries) = baseline_summary.get("entries").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in entries {
+        let entry_name = entry.get("entry").and_then(Value::as_str).unwrap_or("");
+        let op_id = entry.get("op_id").and_then(Value::as_str).unwrap_or("");
+        let spec_path_rel = entry.get("spec_path").and_then(Value::as_str).unwrap_or("");
+        if entry_name.trim().is_empty()
+            || op_id.trim().is_empty()
+            || spec_path_rel.trim().is_empty()
+        {
+            continue;
+        }
+        let coverage_outcome = entry
+            .get("coverage")
+            .and_then(|c| c.get("outcome"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let prove_raw = entry
+            .get("prove")
+            .and_then(|p| p.get("raw"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let prove_report_path_rel = entry
+            .get("prove")
+            .and_then(|p| p.get("report"))
+            .and_then(|r| r.get("path"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        out.push(BaselineVerifyEntry {
+            entry: entry_name.to_string(),
+            op_id: op_id.to_string(),
+            spec_path_rel: spec_path_rel.to_string(),
+            coverage_outcome,
+            prove_raw,
+            prove_report_path_rel,
+        });
+    }
+    out
+}
+
+fn baseline_tests_report_path_rel(baseline_summary: &Value) -> String {
+    baseline_summary
+        .get("results")
+        .and_then(|r| r.get("tests"))
+        .and_then(|t| t.get("report"))
+        .and_then(|r| r.get("path"))
+        .and_then(Value::as_str)
+        .unwrap_or(DEFAULT_VERIFY_TEST_REPORT_PATH)
+        .to_string()
+}
+
+fn failing_xtal_entries_from_tests_report(
+    project_root: &Path,
+    tests_report_path_rel: &str,
+    baseline_entries: &[BaselineVerifyEntry],
+) -> BTreeSet<String> {
+    let mut op_to_entry: BTreeMap<String, String> = BTreeMap::new();
+    for row in baseline_entries {
+        let Ok((module_id, _local)) = parse_symbol_to_module_and_local(&row.entry) else {
+            continue;
+        };
+        op_to_entry.insert(format!("{module_id}/{}", row.op_id), row.entry.clone());
+    }
+
+    let path = project_root.join(tests_report_path_rel);
+    let Ok(bytes) = std::fs::read(&path) else {
+        return BTreeSet::new();
+    };
+    let Ok(doc) = serde_json::from_slice::<Value>(&bytes) else {
+        return BTreeSet::new();
+    };
+    let Some(tests) = doc.get("tests").and_then(Value::as_array) else {
+        return BTreeSet::new();
+    };
+
+    let mut out: BTreeSet<String> = BTreeSet::new();
+    for test in tests {
+        let status = test.get("status").and_then(Value::as_str).unwrap_or("");
+        let is_failure = matches!(status, "fail" | "error" | "xfail_pass");
+        if !is_failure {
+            continue;
+        }
+        let id = test.get("id").and_then(Value::as_str).unwrap_or("");
+        let mut parts = id.split('/');
+        let Some(prefix) = parts.next() else { continue };
+        if prefix != "xtal" {
+            continue;
+        }
+        let Some(module_id) = parts.next() else {
+            continue;
+        };
+        let Some(op_id) = parts.next() else { continue };
+        let key = format!("{module_id}/{op_id}");
+        let Some(entry) = op_to_entry.get(&key) else {
+            continue;
+        };
+        out.insert(entry.clone());
+    }
+    out
+}
+
+fn load_target_spec_op(
+    project_root: &Path,
+    spec_path_rel: &str,
+    entry: &str,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(SpecOperation, PathBuf)> {
+    let spec_path = project_root.join(spec_path_rel);
+    let bytes = match std::fs::read(&spec_path) {
+        Ok(b) => b,
+        Err(err) => {
+            diags.push(diag_error(
+                "EXTAL_REPAIR_BASELINE_MISSING",
+                diagnostics::Stage::Parse,
+                format!("cannot read spec file {}: {err}", spec_path.display()),
+                None,
+            ));
+            anyhow::bail!("cannot read spec file {}", spec_path.display());
+        }
+    };
+    let spec: SpecFile = match serde_json::from_slice(&bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            diags.push(diag_error(
+                "EXTAL_REPAIR_BASELINE_MISSING",
+                diagnostics::Stage::Parse,
+                format!("cannot parse spec JSON {}: {err}", spec_path.display()),
+                None,
+            ));
+            anyhow::bail!("cannot parse spec JSON {}", spec_path.display());
+        }
+    };
+    let Some(op) = spec.operations.into_iter().find(|op| op.name == entry) else {
+        diags.push(diag_error(
+            "EXTAL_REPAIR_NO_ACTIONABLE_FAILURE",
+            diagnostics::Stage::Parse,
+            format!(
+                "spec operation {entry:?} was not found in {}",
+                spec_path.display()
+            ),
+            None,
+        ));
+        anyhow::bail!("spec operation missing");
+    };
+    Ok((op, spec_path))
+}
+
+fn find_decl_body_ptr(file: &x07ast::X07AstFile, entry: &str) -> Option<String> {
+    let doc = x07ast::x07ast_file_to_value(file);
+    let decls = doc.get("decls").and_then(Value::as_array)?;
+    for (idx, decl) in decls.iter().enumerate() {
+        let kind = decl.get("kind").and_then(Value::as_str).unwrap_or("");
+        if kind != "defn" {
+            continue;
+        }
+        if decl.get("name").and_then(Value::as_str) != Some(entry) {
+            continue;
+        }
+        return Some(format!("/decls/{idx}/body"));
+    }
+    None
+}
+
+fn collect_project_module_roots(project_root: &Path) -> Result<Vec<PathBuf>> {
+    let project_path = project_root.join("x07.json");
+    let manifest =
+        x07c::project::load_project_manifest(&project_path).context("load project manifest")?;
+    let lock_path = x07c::project::default_lockfile_path(&project_path, &manifest);
+    let lock_bytes = std::fs::read(&lock_path)
+        .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
+    let lock: x07c::project::Lockfile = serde_json::from_slice(&lock_bytes)
+        .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
+    x07c::project::verify_lockfile(&project_path, &manifest, &lock).context("verify lockfile")?;
+
+    let mut roots =
+        x07c::project::collect_module_roots(&project_path, &manifest, &lock).context("roots")?;
+    if !roots.contains(&project_root.to_path_buf()) {
+        roots.push(project_root.to_path_buf());
+    }
+    if let Some(toolchain_root) = util::detect_toolchain_root_best_effort(project_root) {
+        for root in util::toolchain_stdlib_module_roots(&toolchain_root) {
+            if !roots.contains(&root) {
+                roots.push(root);
+            }
+        }
+    }
+    Ok(roots)
+}
+
+fn write_patchset(path: &Path, patchset: &PatchSet) -> Result<()> {
+    let patchset_value = serde_json::to_value(patchset).context("patchset to value")?;
+    let bytes = report_common::canonical_pretty_json_bytes(&patchset_value)?;
+    util::write_atomic(path, &bytes).with_context(|| format!("write patchset: {}", path.display()))
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    if dst.exists() {
+        std::fs::remove_dir_all(dst).with_context(|| format!("rm -r: {}", dst.display()))?;
+    }
+    std::fs::create_dir_all(dst).with_context(|| format!("mkdir: {}", dst.display()))?;
+
+    for entry in WalkDir::new(src) {
+        let entry = entry.with_context(|| format!("walk: {}", src.display()))?;
+        let path = entry.path();
+        let rel = path
+            .strip_prefix(src)
+            .with_context(|| format!("strip prefix: {}", src.display()))?;
+        let out = dst.join(rel);
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&out).with_context(|| format!("mkdir: {}", out.display()))?;
+            continue;
+        }
+        if entry.file_type().is_file() {
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("mkdir: {}", parent.display()))?;
+            }
+            std::fs::copy(path, &out)
+                .with_context(|| format!("copy: {} -> {}", path.display(), out.display()))?;
+        }
+    }
+    Ok(())
+}
+
+fn prepare_attempt_module_roots(
+    attempt_dir: &Path,
+    module_roots: &[PathBuf],
+    impl_path: &Path,
+    module_rel: &str,
+) -> Result<(PathBuf, PathBuf, Vec<PathBuf>)> {
+    let shadow_root = attempt_dir.join("module_root");
+    let shadow_file = shadow_root.join(module_rel);
+
+    let root_to_shadow = module_roots
+        .iter()
+        .find(|root| root.join(module_rel) == impl_path)
+        .or_else(|| {
+            module_roots
+                .iter()
+                .find(|root| root.join(module_rel).is_file())
+        })
+        .cloned();
+
+    let attempt_roots = if let Some(root_to_shadow) = root_to_shadow {
+        copy_dir_recursive(&root_to_shadow, &shadow_root).with_context(|| {
+            format!(
+                "copy module root for attempt ({} -> {})",
+                root_to_shadow.display(),
+                shadow_root.display()
+            )
+        })?;
+
+        let mut out: Vec<PathBuf> = Vec::new();
+        for root in module_roots {
+            if root.join(module_rel).is_file() {
+                if *root == root_to_shadow {
+                    out.push(shadow_root.clone());
+                }
+                continue;
+            }
+            out.push(root.clone());
+        }
+        out
+    } else {
+        if let Some(parent) = shadow_file.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("mkdir: {}", parent.display()))?;
+        }
+        std::iter::once(shadow_root.clone())
+            .chain(module_roots.iter().cloned())
+            .collect()
+    };
+
+    Ok((shadow_root, shadow_file, attempt_roots))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_semantic_repair_attempt(
+    project_root: &Path,
+    attempt_no: u32,
+    max_candidates: usize,
+    target_entry: &str,
+    decl_ptr: &str,
+    impl_path: &Path,
+    file: &x07ast::X07AstFile,
+    defn_idx: usize,
+    spec_op: &SpecOperation,
+    module_roots: &[PathBuf],
+    tests_manifest_rel: &str,
+    op_test_filter: &str,
+    baseline_summary: &Value,
+    baseline_prove_report_rel: &str,
+    _diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(PatchSet, String, bool)> {
+    let attempt_dir = project_root
+        .join(DEFAULT_REPAIR_ATTEMPTS_DIR)
+        .join(format!("attempt-{attempt_no:04}"));
+    std::fs::create_dir_all(&attempt_dir)
+        .with_context(|| format!("mkdir: {}", attempt_dir.display()))?;
+
+    let patchset_path = attempt_dir.join("patchset.json");
+    let diff_path = attempt_dir.join("diff.txt");
+
+    let (module_id, _local) = parse_symbol_to_module_and_local(target_entry)?;
+    let module_rel = format!("{}.x07.json", module_id.replace('.', "/"));
+    let (_shadow_root, shadow_file, attempt_module_roots) =
+        prepare_attempt_module_roots(&attempt_dir, module_roots, impl_path, &module_rel)?;
+
+    let impl_rel = impl_path
+        .strip_prefix(project_root)
+        .unwrap_or(impl_path)
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let mut candidates: Vec<(String, Expr)> = Vec::new();
+    for p in &spec_op.params {
+        if p.ty.trim() == spec_op.result.trim() {
+            candidates.push((format!("identity({})", p.name), ident(&p.name)));
+            break;
+        }
+    }
+    if candidates.is_empty() {
+        candidates.push((
+            "no_candidates".to_string(),
+            file.functions[defn_idx].body.clone(),
+        ));
+    }
+    candidates.truncate(max_candidates);
+
+    let verify_bounds = baseline_summary
+        .get("settings")
+        .and_then(|s| s.get("verify_bounds"))
+        .and_then(Value::as_object);
+
+    let mut best_patchset = PatchSet {
+        schema_version: x07_contracts::X07_PATCHSET_SCHEMA_VERSION.to_string(),
+        patches: Vec::new(),
+    };
+    let mut best_diff = String::new();
+    let mut ok = false;
+
+    for (label, body) in candidates {
+        let mut patched = file.clone();
+        patched.functions[defn_idx].body = body.clone();
+        let (patched_value, patched_bytes) = canon_x07ast_file_value_and_text(&mut patched)?;
+        util::write_atomic(&shadow_file, &patched_bytes)
+            .with_context(|| format!("write shadow impl: {}", shadow_file.display()))?;
+
+        let attempt_artifacts = attempt_dir.join("_artifacts");
+        let attempt_test_artifacts = attempt_dir.join("_artifacts").join("test");
+        std::fs::create_dir_all(&attempt_artifacts)
+            .with_context(|| format!("mkdir: {}", attempt_artifacts.display()))?;
+        std::fs::create_dir_all(&attempt_test_artifacts)
+            .with_context(|| format!("mkdir: {}", attempt_test_artifacts.display()))?;
+
+        let prove_report_rel = attempt_dir
+            .join("prove.report.json")
+            .strip_prefix(project_root)
+            .unwrap_or(attempt_dir.join("prove.report.json").as_path())
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut prove_args = vec![
+            "verify".to_string(),
+            "--prove".to_string(),
+            "--entry".to_string(),
+            target_entry.to_string(),
+        ];
+        for root in attempt_module_roots.iter().map(PathBuf::as_path) {
+            prove_args.push("--module-root".to_string());
+            prove_args.push(root.display().to_string());
+        }
+        if let Some(bounds) = verify_bounds {
+            if let Some(n) = bounds.get("unwind").and_then(Value::as_u64) {
+                prove_args.push("--unwind".to_string());
+                prove_args.push(n.to_string());
+            }
+            if let Some(n) = bounds.get("max_bytes_len").and_then(Value::as_u64) {
+                prove_args.push("--max-bytes-len".to_string());
+                prove_args.push(n.to_string());
+            }
+            if let Some(n) = bounds.get("input_len_bytes").and_then(Value::as_u64) {
+                prove_args.push("--input-len-bytes".to_string());
+                prove_args.push(n.to_string());
+            }
+        }
+        prove_args.extend([
+            "--artifact-dir".to_string(),
+            attempt_artifacts
+                .strip_prefix(project_root)
+                .unwrap_or(attempt_artifacts.as_path())
+                .to_string_lossy()
+                .replace('\\', "/"),
+            "--report-out".to_string(),
+            prove_report_rel.clone(),
+            "--quiet-json".to_string(),
+        ]);
+        let prove_run = run_self_command(project_root, &prove_args)?;
+        let prove_ok = prove_run.exit_code == 0
+            && project_root.join(&prove_report_rel).is_file()
+            && std::fs::read(project_root.join(&prove_report_rel))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+                .and_then(|v| v.get("ok").and_then(Value::as_bool))
+                == Some(true);
+
+        let tests_report_rel = attempt_dir
+            .join("tests.report.json")
+            .strip_prefix(project_root)
+            .unwrap_or(attempt_dir.join("tests.report.json").as_path())
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut test_args = vec![
+            "test".to_string(),
+            "--all".to_string(),
+            "--manifest".to_string(),
+            tests_manifest_rel.to_string(),
+            "--filter".to_string(),
+            op_test_filter.to_string(),
+            "--allow-empty".to_string(),
+        ];
+        for root in attempt_module_roots.iter().map(PathBuf::as_path) {
+            test_args.push("--module-root".to_string());
+            test_args.push(root.display().to_string());
+        }
+        test_args.extend([
+            "--artifact-dir".to_string(),
+            attempt_test_artifacts
+                .strip_prefix(project_root)
+                .unwrap_or(attempt_test_artifacts.as_path())
+                .to_string_lossy()
+                .replace('\\', "/"),
+            "--report-out".to_string(),
+            tests_report_rel.clone(),
+            "--quiet-json".to_string(),
+        ]);
+        let test_run = run_self_command(project_root, &test_args)?;
+        let tests_ok = test_run.exit_code == 0;
+
+        if prove_ok && tests_ok {
+            let mut note = format!("xtal repair semantic candidate: {label}");
+            if let Some((contract_kind, clause_id)) =
+                prove_contract_location(project_root, baseline_prove_report_rel)
+            {
+                note.push_str(&format!(
+                    " (contract_kind={contract_kind}, clause_id={clause_id})"
+                ));
+            }
+            best_patchset = PatchSet {
+                schema_version: x07_contracts::X07_PATCHSET_SCHEMA_VERSION.to_string(),
+                patches: vec![PatchTarget {
+                    path: impl_rel.clone(),
+                    patch: vec![diagnostics::PatchOp::Replace {
+                        path: decl_ptr.to_string(),
+                        value: x07ast::expr_to_value(&body),
+                    }],
+                    note: Some(note),
+                }],
+            };
+            best_diff = unified_json_diff(
+                &impl_rel,
+                &x07ast::x07ast_file_to_value(file),
+                &patched_value,
+            )?;
+            ok = true;
+            break;
+        }
+    }
+
+    write_patchset(&patchset_path, &best_patchset)?;
+    util::write_atomic(&diff_path, best_diff.as_bytes())
+        .with_context(|| format!("write diff: {}", diff_path.display()))?;
+
+    Ok((best_patchset, best_diff, ok))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_quickfix_repair_attempt(
+    project_root: &Path,
+    attempt_no: u32,
+    target_entry: &str,
+    impl_path: &Path,
+    module_roots: &[PathBuf],
+    tests_manifest_rel: &str,
+    op_test_filter: &str,
+    baseline_summary: &Value,
+    baseline_prove_report_rel: &str,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(PatchSet, String, bool)> {
+    let attempt_dir = project_root
+        .join(DEFAULT_REPAIR_ATTEMPTS_DIR)
+        .join(format!("attempt-{attempt_no:04}"));
+    std::fs::create_dir_all(&attempt_dir)
+        .with_context(|| format!("mkdir: {}", attempt_dir.display()))?;
+
+    let patchset_path = attempt_dir.join("patchset.json");
+    let diff_path = attempt_dir.join("diff.txt");
+
+    let (module_id, _local) = parse_symbol_to_module_and_local(target_entry)?;
+    let module_rel = format!("{}.x07.json", module_id.replace('.', "/"));
+    let (_shadow_root, shadow_file, attempt_module_roots) =
+        prepare_attempt_module_roots(&attempt_dir, module_roots, impl_path, &module_rel)?;
+
+    let original_bytes = std::fs::read(impl_path)
+        .with_context(|| format!("read impl module: {}", impl_path.display()))?;
+    util::write_atomic(&shadow_file, &original_bytes)
+        .with_context(|| format!("write shadow impl: {}", shadow_file.display()))?;
+
+    let shadow_rel = shadow_file
+        .strip_prefix(project_root)
+        .unwrap_or(&shadow_file)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let fix_run = run_self_command(
+        project_root,
+        &[
+            "fix".to_string(),
+            "--input".to_string(),
+            shadow_rel.clone(),
+            "--write".to_string(),
+        ],
+    )?;
+
+    let fixed_bytes = std::fs::read(&shadow_file)
+        .with_context(|| format!("read fixed shadow impl: {}", shadow_file.display()))?;
+    let changed = fixed_bytes != original_bytes;
+    if changed {
+        diags.push(diag_warning(
+            "WXTAL_REPAIR_QUICKFIX_APPLIED",
+            diagnostics::Stage::Run,
+            format!(
+                "quickfix repair modified {} (fix_exit_code={})",
+                shadow_rel, fix_run.exit_code
+            ),
+            None,
+        ));
+    }
+
+    let mut best_patchset = PatchSet {
+        schema_version: x07_contracts::X07_PATCHSET_SCHEMA_VERSION.to_string(),
+        patches: Vec::new(),
+    };
+    let mut best_diff = String::new();
+    let mut ok = false;
+
+    if changed && fix_run.exit_code == 0 {
+        let mut original_file =
+            x07ast::parse_x07ast_json(&original_bytes).context("parse original x07ast")?;
+        x07ast::canonicalize_x07ast_file(&mut original_file);
+        let (original_value, _original_text) =
+            canon_x07ast_file_value_and_text(&mut original_file)?;
+
+        let mut fixed_file =
+            x07ast::parse_x07ast_json(&fixed_bytes).context("parse fixed x07ast")?;
+        x07ast::canonicalize_x07ast_file(&mut fixed_file);
+        let (fixed_value, _fixed_text) = canon_x07ast_file_value_and_text(&mut fixed_file)?;
+
+        let impl_rel = impl_path
+            .strip_prefix(project_root)
+            .unwrap_or(impl_path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        best_patchset = PatchSet {
+            schema_version: x07_contracts::X07_PATCHSET_SCHEMA_VERSION.to_string(),
+            patches: vec![PatchTarget {
+                path: impl_rel.clone(),
+                patch: vec![diagnostics::PatchOp::Replace {
+                    path: "".to_string(),
+                    value: fixed_value.clone(),
+                }],
+                note: Some("xtal repair quickfix attempt".to_string()),
+            }],
+        };
+        best_diff = unified_json_diff(&impl_rel, &original_value, &fixed_value)?;
+
+        let attempt_artifacts = attempt_dir.join("_artifacts");
+        let attempt_test_artifacts = attempt_dir.join("_artifacts").join("test");
+        std::fs::create_dir_all(&attempt_artifacts)
+            .with_context(|| format!("mkdir: {}", attempt_artifacts.display()))?;
+        std::fs::create_dir_all(&attempt_test_artifacts)
+            .with_context(|| format!("mkdir: {}", attempt_test_artifacts.display()))?;
+
+        let verify_bounds = baseline_summary
+            .get("settings")
+            .and_then(|s| s.get("verify_bounds"))
+            .and_then(Value::as_object);
+
+        let prove_report_rel = attempt_dir
+            .join("prove.report.json")
+            .strip_prefix(project_root)
+            .unwrap_or(attempt_dir.join("prove.report.json").as_path())
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut prove_args = vec![
+            "verify".to_string(),
+            "--prove".to_string(),
+            "--entry".to_string(),
+            target_entry.to_string(),
+        ];
+        for root in attempt_module_roots.iter().map(PathBuf::as_path) {
+            prove_args.push("--module-root".to_string());
+            prove_args.push(root.display().to_string());
+        }
+        if let Some(bounds) = verify_bounds {
+            if let Some(n) = bounds.get("unwind").and_then(Value::as_u64) {
+                prove_args.push("--unwind".to_string());
+                prove_args.push(n.to_string());
+            }
+            if let Some(n) = bounds.get("max_bytes_len").and_then(Value::as_u64) {
+                prove_args.push("--max-bytes-len".to_string());
+                prove_args.push(n.to_string());
+            }
+            if let Some(n) = bounds.get("input_len_bytes").and_then(Value::as_u64) {
+                prove_args.push("--input-len-bytes".to_string());
+                prove_args.push(n.to_string());
+            }
+        }
+        prove_args.extend([
+            "--artifact-dir".to_string(),
+            attempt_artifacts
+                .strip_prefix(project_root)
+                .unwrap_or(attempt_artifacts.as_path())
+                .to_string_lossy()
+                .replace('\\', "/"),
+            "--report-out".to_string(),
+            prove_report_rel.clone(),
+            "--quiet-json".to_string(),
+        ]);
+        let prove_run = run_self_command(project_root, &prove_args)?;
+        let prove_ok = prove_run.exit_code == 0;
+
+        let tests_report_rel = attempt_dir
+            .join("tests.report.json")
+            .strip_prefix(project_root)
+            .unwrap_or(attempt_dir.join("tests.report.json").as_path())
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut test_args = vec![
+            "test".to_string(),
+            "--all".to_string(),
+            "--manifest".to_string(),
+            tests_manifest_rel.to_string(),
+            "--filter".to_string(),
+            op_test_filter.to_string(),
+            "--allow-empty".to_string(),
+        ];
+        for root in attempt_module_roots.iter().map(PathBuf::as_path) {
+            test_args.push("--module-root".to_string());
+            test_args.push(root.display().to_string());
+        }
+        test_args.extend([
+            "--artifact-dir".to_string(),
+            attempt_test_artifacts
+                .strip_prefix(project_root)
+                .unwrap_or(attempt_test_artifacts.as_path())
+                .to_string_lossy()
+                .replace('\\', "/"),
+            "--report-out".to_string(),
+            tests_report_rel.clone(),
+            "--quiet-json".to_string(),
+        ]);
+        let test_run = run_self_command(project_root, &test_args)?;
+        let tests_ok = test_run.exit_code == 0;
+
+        if prove_ok && tests_ok {
+            ok = true;
+        }
+    }
+
+    if changed && !ok {
+        if let Some((contract_kind, clause_id)) =
+            prove_contract_location(project_root, baseline_prove_report_rel)
+        {
+            let _ = (contract_kind, clause_id);
+        }
+    }
+
+    write_patchset(&patchset_path, &best_patchset)?;
+    util::write_atomic(&diff_path, best_diff.as_bytes())
+        .with_context(|| format!("write diff: {}", diff_path.display()))?;
+
+    Ok((best_patchset, best_diff, ok))
+}
+
+fn prove_contract_location(
+    project_root: &Path,
+    prove_report_rel: &str,
+) -> Option<(String, String)> {
+    let path = project_root.join(prove_report_rel);
+    let bytes = std::fs::read(&path).ok()?;
+    let doc: Value = serde_json::from_slice(&bytes).ok()?;
+    let contract = doc
+        .get("result")
+        .and_then(|r| r.get("contract"))
+        .and_then(Value::as_object)?;
+    let kind = contract.get("contract_kind").and_then(Value::as_str)?;
+    let clause_id = contract.get("clause_id").and_then(Value::as_str)?;
+    Some((kind.to_string(), clause_id.to_string()))
+}
+
+fn unified_json_diff(path: &str, before: &Value, after: &Value) -> Result<String> {
+    fn pretty(v: &Value) -> Result<String> {
+        let bytes = report_common::canonical_pretty_json_bytes(v)?;
+        String::from_utf8(bytes).context("diff JSON must be UTF-8")
+    }
+
+    let before = pretty(before)?;
+    let after = pretty(after)?;
+    if before == after {
+        return Ok(String::new());
+    }
+
+    let before_lines: Vec<&str> = before.lines().collect();
+    let after_lines: Vec<&str> = after.lines().collect();
+
+    let mut start = 0usize;
+    while start < before_lines.len()
+        && start < after_lines.len()
+        && before_lines[start] == after_lines[start]
+    {
+        start += 1;
+    }
+
+    let mut end_before = before_lines.len();
+    let mut end_after = after_lines.len();
+    while end_before > start
+        && end_after > start
+        && before_lines[end_before - 1] == after_lines[end_after - 1]
+    {
+        end_before -= 1;
+        end_after -= 1;
+    }
+
+    let context = 3usize;
+    let ctx_start = start.saturating_sub(context);
+    let ctx_end_before = (end_before + context).min(before_lines.len());
+    let ctx_end_after = (end_after + context).min(after_lines.len());
+
+    let old_start = ctx_start + 1;
+    let old_count = ctx_end_before.saturating_sub(ctx_start);
+    let new_start = ctx_start + 1;
+    let new_count = ctx_end_after.saturating_sub(ctx_start);
+
+    let mut out = String::new();
+    out.push_str(&format!("--- a/{path}\n"));
+    out.push_str(&format!("+++ b/{path}\n"));
+    out.push_str(&format!(
+        "@@ -{old_start},{old_count} +{new_start},{new_count} @@\n"
+    ));
+
+    for line in &before_lines[ctx_start..start] {
+        out.push(' ');
+        out.push_str(line);
+        out.push('\n');
+    }
+    for line in &before_lines[start..end_before] {
+        out.push('-');
+        out.push_str(line);
+        out.push('\n');
+    }
+    for line in &after_lines[start..end_after] {
+        out.push('+');
+        out.push_str(line);
+        out.push('\n');
+    }
+    for line in &before_lines[end_before..ctx_end_before] {
+        out.push(' ');
+        out.push_str(line);
+        out.push('\n');
+    }
+    Ok(out)
+}
+
+fn write_repair_artifacts(
+    project_root: &Path,
+    baseline_summary: Option<&Value>,
+    report: &diagnostics::Report,
+    attempts: Option<&[Value]>,
+    result_status: Option<&str>,
+    extra_meta: &[(&str, Value)],
+) -> Result<()> {
+    let diag_path = project_root.join(DEFAULT_REPAIR_DIAG_REPORT_PATH);
+    if let Some(parent) = diag_path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("mkdir: {}", parent.display()))?;
+    }
+    let mut diag_bytes = serde_json::to_vec(report).context("serialize xtal repair report")?;
+    if diag_bytes.last() != Some(&b'\n') {
+        diag_bytes.push(b'\n');
+    }
+    util::write_atomic(&diag_path, &diag_bytes)
+        .with_context(|| format!("write: {}", diag_path.display()))?;
+
+    let baseline_dir = project_root.join(DEFAULT_REPAIR_BASELINE_DIR);
+    if let Some(summary) = baseline_summary {
+        std::fs::create_dir_all(&baseline_dir)
+            .with_context(|| format!("mkdir: {}", baseline_dir.display()))?;
+        let baseline_summary_path = baseline_dir.join("verify.summary.json");
+        let bytes = report_common::canonical_pretty_json_bytes(summary)?;
+        util::write_atomic(&baseline_summary_path, &bytes)
+            .with_context(|| format!("write: {}", baseline_summary_path.display()))?;
+    }
+
+    let mut failing_entries: Vec<Value> = Vec::new();
+    let mut baseline_verify_ok = false;
+    let mut baseline_summary_path = DEFAULT_VERIFY_SUMMARY_PATH.to_string();
+    if baseline_dir.join("verify.summary.json").is_file() {
+        baseline_summary_path = format!("{DEFAULT_REPAIR_BASELINE_DIR}/verify.summary.json");
+    }
+    if let Some(summary) = baseline_summary {
+        let baseline_entries = baseline_verify_entries(summary);
+        let outcome = summary
+            .get("results")
+            .and_then(|r| r.get("outcome"))
+            .and_then(Value::as_str)
+            .unwrap_or("fail");
+        baseline_verify_ok = outcome != "fail";
+        let tests_outcome = summary
+            .get("results")
+            .and_then(|r| r.get("tests"))
+            .and_then(|t| t.get("outcome"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let tests_report = baseline_tests_report_path_rel(summary);
+        let failing_test_entries = if tests_outcome == "fail" {
+            failing_xtal_entries_from_tests_report(project_root, &tests_report, &baseline_entries)
+        } else {
+            BTreeSet::new()
+        };
+
+        for row in &baseline_entries {
+            let reason = if row.prove_raw == "counterexample" {
+                Some("prove_counterexample")
+            } else if row.coverage_outcome == "fail" {
+                Some("coverage_failed")
+            } else if failing_test_entries.contains(&row.entry) {
+                Some("tests_failed")
+            } else {
+                None
+            };
+            let Some(reason) = reason else { continue };
+            let mut obj = json!({
+                "entry": row.entry,
+                "reason": reason,
+                "tests_report_path": tests_report,
+            });
+            if let Some(map) = obj.as_object_mut() {
+                if !row.prove_report_path_rel.trim().is_empty() {
+                    map.insert(
+                        "prove_report_path".to_string(),
+                        Value::String(row.prove_report_path_rel.clone()),
+                    );
+                }
+            }
+            failing_entries.push(obj);
+        }
+    }
+
+    let mut result_obj = json!({
+        "status": result_status.unwrap_or(if baseline_verify_ok { "no_action_needed" } else { "failed" }),
+        "patchset_path": DEFAULT_REPAIR_PATCHSET_PATH,
+        "diff_path": DEFAULT_REPAIR_DIFF_PATH,
+    });
+    if let Some(map) = result_obj.as_object_mut() {
+        for (k, v) in extra_meta {
+            map.insert(k.to_string(), v.clone());
+        }
+    }
+
+    let tool_argv: Vec<String> = std::env::args().collect();
+    let summary = json!({
+        "schema_version": "x07.xtal.repair_summary@0.1.0",
+        "generated_at": "2000-01-01T00:00:00Z",
+        "tool": {
+            "name": "x07",
+            "version": env!("CARGO_PKG_VERSION"),
+            "command": "xtal repair",
+            "argv": tool_argv,
+            "env": { "os": std::env::consts::OS, "arch": std::env::consts::ARCH }
+        },
+        "project": { "root": ".", "manifest": "x07.json" },
+        "baseline": {
+            "verify_summary_path": baseline_summary_path,
+            "verify_ok": baseline_verify_ok,
+            "failing_entries": failing_entries,
+        },
+        "attempts": attempts.unwrap_or(&[]),
+        "result": result_obj,
+    });
+
+    let summary_path = project_root.join(DEFAULT_REPAIR_SUMMARY_PATH);
+    if let Some(parent) = summary_path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("mkdir: {}", parent.display()))?;
+    }
+    let bytes = report_common::canonical_pretty_json_bytes(&summary)
+        .context("serialize xtal repair summary")?;
+    util::write_atomic(&summary_path, &bytes)
+        .with_context(|| format!("write: {}", summary_path.display()))?;
+    Ok(())
 }
 
 fn resolve_gen_index_path(project_root: &Path, arg: Option<&Path>) -> Option<PathBuf> {

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.xtal.repair_summary@0.1.0.schema.json",
+  "title": "x07.xtal.repair_summary@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "tool", "project", "baseline", "attempts", "result"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.xtal.repair_summary@0.1.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "command", "argv"],
+      "properties": {
+        "name": { "type": "string", "const": "x07" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "command": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "argv": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "minItems": 1
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "os": { "type": "string" },
+            "arch": { "type": "string" }
+          }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "manifest"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "manifest": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verify_summary_path", "verify_ok", "failing_entries"],
+      "properties": {
+        "verify_summary_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "verify_ok": { "type": "boolean" },
+        "failing_entries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/failing_entry" }
+        }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/attempt" }
+    },
+    "result": { "$ref": "#/$defs/result" }
+  },
+  "$defs": {
+    "failure_reason": {
+      "type": "string",
+      "enum": ["prove_counterexample", "tests_failed", "coverage_failed", "precheck_failed"]
+    },
+    "failing_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "reason", "tests_report_path"],
+      "properties": {
+        "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "reason": { "$ref": "#/$defs/failure_reason" },
+        "prove_report_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "tests_report_path": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "attempt_status": { "type": "string", "enum": ["succeeded", "failed"] },
+    "strategy": { "type": "string", "enum": ["semantic_cegis", "diag_quickfix"] },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt",
+        "strategy",
+        "target_entry",
+        "status",
+        "patchset_path",
+        "diff_path",
+        "evaluation"
+      ],
+      "properties": {
+        "attempt": { "type": "integer", "minimum": 1 },
+        "strategy": { "$ref": "#/$defs/strategy" },
+        "target_entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "status": { "$ref": "#/$defs/attempt_status" },
+        "patchset_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "diff_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verify_ok"],
+          "properties": {
+            "verify_ok": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "result_status": {
+      "type": "string",
+      "enum": ["no_action_needed", "patch_suggested", "patch_applied", "failed"]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "patchset_path", "diff_path"],
+      "properties": {
+        "status": { "$ref": "#/$defs/result_status" },
+        "patchset_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "diff_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "patchset_written": { "type": "boolean" },
+        "diff_written": { "type": "boolean" }
+      }
+    }
+  }
+}

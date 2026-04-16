@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 587
+- total codes: 596
 - quickfix support (`sometimes` or `always`): 540
-- quickfix coverage: 91.99%
+- quickfix coverage: 90.60%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -76,6 +76,13 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_IMPL_SYNC_REQUIRED` | x07 / lint / error | sometimes | Implementation sync is required. |
 | `EXTAL_IMPL_UNSUPPORTED_TY` | x07 / lower / error | sometimes | Unsupported type for generated implementation stubs. |
 | `EXTAL_IMPL_X07AST_PARSE` | x07 / parse / error | sometimes | Implementation module is not valid x07AST JSON. |
+| `EXTAL_REPAIR_APPLY_FAILED` | x07 / run / error | never | XTAL repair patch application failed. |
+| `EXTAL_REPAIR_BASELINE_MISSING` | x07 / parse / error | never | XTAL repair baseline is missing. |
+| `EXTAL_REPAIR_NO_ACTIONABLE_FAILURE` | x07 / run / error | never | XTAL repair could not find an actionable target. |
+| `EXTAL_REPAIR_NO_PATCH_FOUND` | x07 / run / error | never | XTAL repair exhausted its budget without finding a patch. |
+| `EXTAL_REPAIR_PATCHSET_WRITE_FAILED` | x07 / run / error | never | XTAL repair could not write patch artifacts. |
+| `EXTAL_REPAIR_TARGET_NOT_ELIGIBLE` | x07 / run / error | never | XTAL repair refused to edit a non-stub implementation. |
+| `EXTAL_REPAIR_VERIFY_FAILED` | x07 / run / error | never | XTAL repair patch did not pass verification after applying it. |
 | `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED` | x07 / type / error | sometimes | Contract clause uses a disallowed builtin/head. |
 | `EXTAL_SPEC_CONTRACT_EXPR_NOT_I32` | x07 / type / error | sometimes | Contract clause does not typecheck to i32. |
 | `EXTAL_SPEC_CONTRACT_EXPR_PARSE` | x07 / parse / error | sometimes | Contract clause expression is not valid XTAL JSON expr. |
@@ -115,6 +122,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_VERIFY_PROVE_TOOL_MISSING` | x07 / run / error | sometimes | Proof tool is missing or unavailable. |
 | `EXTAL_VERIFY_REPORT_MISSING` | x07 / run / error | sometimes | Expected verify report was not produced. |
 | `EXTAL_VERIFY_TESTS_FAILED` | x07 / run / error | sometimes | XTAL verify: x07 test failed. |
+| `EXTAL_VERIFY_WORLD_UNSAFE` | x07 / lint / error | never | XTAL verify requires a deterministic world by default. |
 | `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`. |
 | `E_ARCH_ARCHIVE_OP_UNKNOWN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_OP_UNKNOWN`. |
 | `E_ARCH_ARCHIVE_SCHEMA_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_SCHEMA_INVALID`. |
@@ -262,6 +270,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_GEN_RUN_FAILED` | x07 / run / error | sometimes | Generator command failed. |
 | `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
 | `WXTAL_IMPL_PARAM_NAME_MISMATCH` | x07 / lint / warning | sometimes | Implementation parameter names differ from the spec. |
+| `WXTAL_REPAIR_QUICKFIX_APPLIED` | x07 / run / warning | never | XTAL repair applied a quickfix fallback in an attempt workspace. |
 | `WXTAL_SPEC_NONCANONICAL_JSON` | x07 / rewrite / warning | always | Spec JSON is not in canonical form. |
 | `WXTAL_VERIFY_PROVE_INCONCLUSIVE` | x07 / run / warning | sometimes | Proof attempt was inconclusive. |
 | `WXTAL_VERIFY_PROVE_TIMEOUT` | x07 / run / warning | sometimes | Proof attempt hit the configured budget. |
@@ -1214,6 +1223,7 @@ Agent strategy:
 - Validate `tests/tests.json` fields and world requirements.
 - Apply canonical manifest edits (id/world/entry/expect/returns/paths).
 - Re-run `x07 test`.
+- If the manifest is intentionally empty, pass `--allow-empty`.
 
 
 ## `ETEST_TIMEOUT_INVALID`
@@ -1960,6 +1970,162 @@ Agent strategy:
 - Run `x07 fmt --write --path <module.x07.json>` to canonicalize and validate shape.
 - If the file is not meant to be x07AST JSON, replace it with a valid `*.x07.json` module.
 - Re-run `x07 xtal impl check`.
+
+
+## `EXTAL_REPAIR_APPLY_FAILED`
+
+Summary: XTAL repair patch application failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Patch application may require a clean tree or manual conflict resolution.
+
+Details:
+
+In `--write` mode, XTAL repair applies the suggested patchset via `x07 patch apply`.
+
+Message: `patch application failed (exit_code={code}): {stderr}`
+
+Agent strategy:
+
+- Inspect `target/xtal/repair/patchset.json` and apply it manually with `x07 patch apply`.
+- Re-run `x07 xtal verify`.
+
+
+## `EXTAL_REPAIR_BASELINE_MISSING`
+
+Summary: XTAL repair baseline is missing.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires baseline artifacts from x07 xtal verify (target/xtal/verify/summary.json).
+
+Details:
+
+XTAL repair consumes the baseline artifacts produced by `x07 xtal verify`.
+
+Message: `baseline verify summary is missing (run `x07 xtal verify`): {path}: {err}`
+
+Agent strategy:
+
+- Run `x07 xtal verify` to generate `target/xtal/verify/summary.json` and `target/xtal/xtal.verify.diag.json`.
+- Re-run `x07 xtal repair`.
+
+
+## `EXTAL_REPAIR_NO_ACTIONABLE_FAILURE`
+
+Summary: XTAL repair could not find an actionable target.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires additional evidence (prove counterexample / failing tests) or a selected --entry to target.
+
+Details:
+
+XTAL repair requires an eligible failing entry (for example a proof counterexample) to drive semantic repair, or an entry to target for quickfix fallback.
+
+Message: `baseline verify failed, but no eligible entries were found for repair`
+
+Agent strategy:
+
+- Re-run `x07 xtal verify` and ensure proof tooling is installed and enabled.
+- If the baseline has no proof counterexample entries, run `x07 xtal repair --quickfix-only` or pass `--entry <symbol>` to target one operation.
+- Inspect `target/xtal/verify/summary.json` for the available entries and failure modes.
+
+
+## `EXTAL_REPAIR_NO_PATCH_FOUND`
+
+Summary: XTAL repair exhausted its budget without finding a patch.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Bounded repair exhausted; may require new examples, larger budgets, or a manual fix.
+
+Details:
+
+XTAL repair is bounded and may fail to find a patch that satisfies verification + tests within the configured budget.
+
+Message: `no patch found for {entry} after {n} attempt(s)`
+
+Agent strategy:
+
+- Inspect `target/xtal/repair/attempts/` for attempt artifacts and the failing entry prove report.
+- Increase budgets (`--max-rounds`, `--max-candidates`) or allow editing non-stubs if appropriate.
+- Apply a manual fix and re-run `x07 xtal verify`.
+
+
+## `EXTAL_REPAIR_PATCHSET_WRITE_FAILED`
+
+Summary: XTAL repair could not write patch artifacts.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Filesystem I/O failure requires environment or permissions fixes.
+
+Details:
+
+XTAL repair writes patch and diff outputs under `target/xtal/repair/`.
+
+Message: `cannot write patchset/diff: {path}: {err}`
+
+Agent strategy:
+
+- Check filesystem permissions and available disk space for `target/`.
+- Re-run `x07 xtal repair`.
+
+
+## `EXTAL_REPAIR_TARGET_NOT_ELIGIBLE`
+
+Summary: XTAL repair refused to edit a non-stub implementation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires explicit opt-in to edit non-stub bodies (--allow-edit-non-stubs).
+
+Details:
+
+XTAL repair defaults to editing only known stub bodies to avoid surprising edits to existing implementations.
+
+Message: `stubs-only repair refused to edit non-stub body for {entry} (pass --allow-edit-non-stubs to override)`
+
+Agent strategy:
+
+- Re-run `x07 xtal repair --allow-edit-non-stubs` if the target is expected to be edited.
+- If the implementation should still be a stub, regenerate it with `x07 xtal impl sync --write`.
+
+
+## `EXTAL_REPAIR_VERIFY_FAILED`
+
+Summary: XTAL repair patch did not pass verification after applying it.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Post-apply verification failure requires further repair iterations or manual changes.
+
+Details:
+
+In `--write` mode, XTAL repair validates the applied patch by rerunning `x07 xtal verify`.
+
+Message: `post-apply verify failed (exit_code={code}): {stderr}`
+
+Agent strategy:
+
+- Inspect the post-apply `target/xtal/verify/` reports for the remaining failures.
+- Re-run `x07 xtal repair` with a larger budget or apply a manual fix.
 
 
 ## `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED`
@@ -2778,6 +2944,29 @@ This diagnostic is deterministic and intended to be actionable in the standard x
 Agent strategy:
 
 - Reproduce the diagnostic and apply the recommended fix.
+
+
+## `EXTAL_VERIFY_WORLD_UNSAFE`
+
+Summary: XTAL verify requires a deterministic world by default.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires an explicit world/capability decision (edit x07.json or pass --allow-os-world).
+
+Details:
+
+XTAL verification is deterministic by default and requires `solve-*` worlds unless explicitly overridden.
+
+Message: `XTAL verify requires a deterministic solve-* world by default; found world={world} (pass --allow-os-world to override).`
+
+Agent strategy:
+
+- Set `world` in `x07.json` to a `solve-*` world (for example `solve-pure` or `solve-full`).
+- Re-run `x07 xtal verify`.
+- If OS authority is required, pass `--allow-os-world` and accept nondeterminism.
 
 
 ## `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`
@@ -5745,6 +5934,25 @@ Agent strategy:
 
 - Rename implementation parameters to match the spec parameter names for consistency.
 - Re-run `x07 xtal impl check`.
+
+
+## `WXTAL_REPAIR_QUICKFIX_APPLIED`
+
+Summary: XTAL repair applied a quickfix fallback in an attempt workspace.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `never`
+No quickfix reason: Informational warning; not a fixable error condition.
+
+Details:
+
+XTAL repair may fall back to `x07 fix` for a targeted attempt when semantic repair is unavailable or fails.
+
+Agent strategy:
+
+- Review the attempt diff under `target/xtal/repair/attempts/` and decide whether to apply the suggested patchset.
 
 
 ## `WXTAL_SPEC_NONCANONICAL_JSON`

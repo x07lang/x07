@@ -1597,7 +1597,7 @@ fn cmd_verify_smt(
             )
         }
         "sat" => {
-            if plan.mode == Mode::Prove && plan.target.is_async {
+            if plan.mode == Mode::Prove {
                 let mut cbmc_args = vec![
                     plan.c_path.display().to_string(),
                     "--function".to_string(),
@@ -1611,7 +1611,7 @@ fn cmd_verify_smt(
                 maybe_disable_cbmc_standard_checks(&mut cbmc_args);
                 let (out, used_cbmc_args) = run_cbmc_with_object_bits_retry(
                     &cbmc_args,
-                    "run cbmc (async counterexample capture)",
+                    "run cbmc (prove counterexample capture)",
                 )?;
                 if !out.stderr.is_empty() && !cbmc_stderr_is_benign(&out.stderr) {
                     let msg = summarize_process_text(&out.stderr, PROCESS_SUMMARY_MAX_CHARS);
@@ -1685,7 +1685,11 @@ fn cmd_verify_smt(
                         .with_context(|| format!("write verify cex: {}", cex_path.display()))?;
                     artifacts.cex_path = Some(cex_path.display().to_string());
 
-                    let diag = async_counterexample_diag(&contract_failure.payload);
+                    let diag = if plan.target.is_async {
+                        async_counterexample_diag(&contract_failure.payload)
+                    } else {
+                        diag_verify("X07V_SMT_SAT", "solver reported SAT (counterexample found)")
+                    };
                     return write_report_and_exit(
                         machine,
                         attach_summary(VerifyReport {
