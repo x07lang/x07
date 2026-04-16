@@ -1,0 +1,47 @@
+{
+  "module_id": "fixture",
+  "operations": [
+    {
+      "ensures": [
+        {
+          "expr": [
+            "=",
+            "__result",
+            "x"
+          ],
+          "id": "e0"
+        }
+      ],
+      "ensures_props": [
+        {
+          "args": [
+            "x"
+          ],
+          "id": "prop_identity",
+          "prop": "fixture.props.prop_identity"
+        }
+      ],
+      "examples_ref": "spec/fixture.x07spec.examples.jsonl",
+      "id": "op.fixture.main.v1",
+      "name": "fixture.main",
+      "params": [
+        {
+          "name": "x",
+          "ty": "i32"
+        }
+      ],
+      "requires": [
+        {
+          "expr": [
+            "=",
+            "x",
+            "x"
+          ],
+          "id": "r0"
+        }
+      ],
+      "result": "i32"
+    }
+  ],
+  "schema_version": "x07.x07spec@0.1.0"
+}

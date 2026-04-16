@@ -11,14 +11,17 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - `x07 xtal tests gen-from-spec` for generating deterministic unit tests from spec examples and property checks from `ensures_props` under `gen/xtal/`.
   - `x07 xtal impl check|sync` for validating and synchronizing implementation exports/signatures/contracts against specs (including optional patch emission via `impl sync --patchset-out`).
   - `x07 xtal dev` and `x07 xtal verify` wrappers for a single-command XTAL loop (spec checks, generator drift checks, impl conformance checks, verification runs, and test execution).
-  - `x07 xtal repair` for a bounded repair loop that emits an `x07.patchset@0.1.0` + deterministic review diff under `target/xtal/repair/`.
+  - `x07 xtal repair` for a bounded repair loop that emits an `x07.patchset@0.1.0` + deterministic review diff under `target/xtal/repair/` (and can optionally emit a spec witness suggestion with `--suggest-spec-patch`).
+  - `x07 xtal certify` for producing a manifest-driven certification bundle via `x07 trust certify`, writing a summary under `target/xtal/cert/`.
 - Generator determinism gate:
   - `arch/gen/index.x07gen.json` (`x07.arch.gen.index@0.1.0`) for declaring generator outputs and pinned invocations.
   - `x07 gen verify|write` for byte-for-byte drift checks and (optional) double-run determinism verification across declared generators.
 - Schemas:
   - `x07.x07spec@0.1.0` and `x07.x07spec_examples@0.1.0` for XTAL spec and example artifacts.
+  - `x07.xtal.manifest@0.1.0` for `arch/xtal/xtal.json` (XTAL manifest).
   - `x07.xtal.verify_summary@0.1.0` for aggregate `x07 xtal verify` outputs (`target/xtal/verify/summary.json`).
   - `x07.xtal.repair_summary@0.1.0` for aggregate `x07 xtal repair` outputs (`target/xtal/repair/summary.json`).
+  - `x07.xtal.certify_summary@0.1.0` for aggregate `x07 xtal certify` outputs (`target/xtal/cert/summary.json`).
 - Formal verification:
   - `x07 verify --input-len-bytes` for overriding the verification input encoding length (advanced; used by wrappers that derive verification inputs).
 
@@ -27,12 +30,15 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 - `x07 xtal verify` now runs `x07 verify --coverage` and `x07 verify --prove` for each spec operation entrypoint (and records results under `target/xtal/verify/`).
 - `x07 xtal verify` now routes nested verification and test artifacts under `target/xtal/verify/_artifacts/` (and enforces solve-world determinism by default).
 - `x07 xtal impl check` now enforces that `ensures_props[*].prop` symbols exist, are exported, and have compatible signatures for the selected args.
+- `x07 xtal repair --write` now requires `arch/xtal/xtal.json` and enforces `autonomy.agent_write_paths[]` boundaries for patch targets.
+- `x07 trust certify` now supports `--fail-on` (trust report gates) and `--review-fail-on` (review diff gates) for CI posture enforcement, and writes `review.diff.txt` when a baseline is provided.
 
 ### Fixed
 
 - `x07 prove check` no longer spuriously rejects proofs when the proof run requires a larger verification-input encoding (now recorded and validated consistently during replay).
 - `x07 test --allow-empty` now accepts manifests with an empty `tests[]` array (useful for generated test manifests that intentionally select 0 tests).
 - `x07 xtal repair` no longer fails candidate evaluation with ambiguous module roots when overlaying patched modules.
+- `x07 xtal repair` semantic repair no longer performs unbounded expression enumeration at default budgets (avoids hangs when examples are weak).
 
 ## v0.2.3
 

@@ -356,6 +356,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("xtal.verify") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-verify.report.schema.json"
         )),
+        Some("xtal.certify") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-certify.report.schema.json"
+        )),
         Some("xtal.repair") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-repair.report.schema.json"
         )),

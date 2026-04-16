@@ -54,6 +54,9 @@ docs/examples/**/.x07/
 docs/examples/**/target/cert/
 docs/examples/**/out/
 
+# Fixture tool caches
+tests/fixtures/**/.x07/
+
 # OS helper binaries (built by scripts/build_os_helpers.sh)
 /deps/x07/x07-proc-echo
 /deps/x07/x07-proc-echo.exe

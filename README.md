@@ -83,6 +83,7 @@ Core gates:
 ```bash
 x07 xtal verify
 x07 xtal repair
+x07 xtal certify
 x07 gen verify --index arch/gen/index.x07gen.json
 ```
 

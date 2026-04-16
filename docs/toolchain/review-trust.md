@@ -210,6 +210,13 @@ x07 trust certify \
   --out-dir target/cert
 ```
 
+Gates:
+
+- `--fail-on <COND>` forwards to `x07 trust report --fail-on <COND>` (for example `allow-unsafe`, `net-enabled`).
+- `--review-fail-on <CATEGORY>` forwards to `x07 review diff --fail-on <CATEGORY>` when `--baseline <PATH>` is provided.
+  - If no `--review-fail-on` is provided, the default diff gates remain in effect.
+  - When a baseline is provided, `review.diff.txt` is written next to `review.diff.json`/`review.diff.html` as a stable 1-page summary.
+
 The certificate bundle includes:
 
 - `certificate.json`

@@ -22,6 +22,7 @@ use x07c::project;
 use crate::policy_overrides::{PolicyOverrides, PolicyResolution};
 use crate::report_common;
 use crate::reporting;
+use crate::review::ReviewFailOn;
 use crate::run;
 use crate::util;
 use crate::verify;
@@ -109,6 +110,20 @@ pub enum TrustFailOn {
     Nondeterminism,
     SbomMissing,
     DepsCapability,
+}
+
+impl TrustFailOn {
+    fn as_str(self) -> &'static str {
+        match self {
+            TrustFailOn::AllowUnsafe => "allow-unsafe",
+            TrustFailOn::AllowFfi => "allow-ffi",
+            TrustFailOn::NetEnabled => "net-enabled",
+            TrustFailOn::ProcessEnabled => "process-enabled",
+            TrustFailOn::Nondeterminism => "nondeterminism",
+            TrustFailOn::SbomMissing => "sbom-missing",
+            TrustFailOn::DepsCapability => "deps-capability",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -250,6 +265,14 @@ pub struct TrustCertifyArgs {
     /// Optional output path for the bundled native executable.
     #[arg(long, value_name = "PATH")]
     pub bundle_out: Option<PathBuf>,
+
+    /// CI gating: fail if any matching condition is true (forwarded to `x07 trust report`).
+    #[arg(long, value_enum)]
+    pub fail_on: Vec<TrustFailOn>,
+
+    /// CI gating: fail if any matching diff category occurs (forwarded to `x07 review diff`).
+    #[arg(long = "review-fail-on", value_enum)]
+    pub review_fail_on: Vec<ReviewFailOn>,
 
     /// Keep intermediate work directories.
     #[arg(long)]
@@ -2924,6 +2947,7 @@ fn cmd_trust_certify(
             project_path,
             profile.as_ref(),
             &out_dir,
+            &args.fail_on,
             &mut diagnostics,
         )?;
         let (compile_attestation_ref, bundle_path) = build_bundle_evidence(
@@ -2941,6 +2965,7 @@ fn cmd_trust_certify(
             args.baseline.as_deref(),
             &project_root,
             &out_dir,
+            &args.review_fail_on,
             &mut diagnostics,
         )?;
         let (dependency_closure, dependency_closure_ref, package_set_digest) =
@@ -4708,7 +4733,7 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
     {
         diags.push(trust_diag(
             "X07TP_NOT_CERTIFIABLE",
-            "trust profile is weaker than the Milestone A certification floor",
+            "trust profile does not meet the certification minimums",
         ));
     }
     diags
@@ -5801,12 +5826,13 @@ fn build_trust_report_evidence(
     project_path: &Path,
     profile: Option<&TrustProfile>,
     out_dir: &Path,
+    fail_on: &[TrustFailOn],
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
 ) -> Result<EvidenceRef> {
     let trust_report_path = out_dir.join("trust.report.json");
     let trust_report_html = out_dir.join("trust.report.html");
     let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
-    let args = vec![
+    let mut args = vec![
         "--out".to_string(),
         trust_report_path.display().to_string(),
         "trust".to_string(),
@@ -5816,6 +5842,10 @@ fn build_trust_report_evidence(
         "--html-out".to_string(),
         trust_report_html.display().to_string(),
     ];
+    for flag in fail_on {
+        args.push("--fail-on".to_string());
+        args.push(flag.as_str().to_string());
+    }
     let run = run_self_command(cwd, &args)?;
     if run.exit_code != 0 {
         diagnostics.push(trust_diag(
@@ -6038,6 +6068,7 @@ fn build_review_evidence(
     baseline: Option<&Path>,
     project_root: &Path,
     out_dir: &Path,
+    fail_on: &[ReviewFailOn],
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
 ) -> Result<Option<EvidenceRef>> {
     let Some(baseline) = baseline else {
@@ -6046,7 +6077,8 @@ fn build_review_evidence(
     let baseline = util::resolve_existing_path_upwards(baseline);
     let review_json = out_dir.join("review.diff.json");
     let review_html = out_dir.join("review.diff.html");
-    let args = vec![
+    let review_txt = out_dir.join("review.diff.txt");
+    let mut args = vec![
         "review".to_string(),
         "diff".to_string(),
         "--from".to_string(),
@@ -6055,17 +6087,30 @@ fn build_review_evidence(
         project_root.display().to_string(),
         "--mode".to_string(),
         "project".to_string(),
-        "--fail-on".to_string(),
-        "proof-coverage-decrease".to_string(),
-        "--fail-on".to_string(),
-        "boundary-relaxation".to_string(),
-        "--fail-on".to_string(),
-        "trusted-subset-expansion".to_string(),
+    ];
+    let default_fail_on = [
+        ReviewFailOn::ProofCoverageDecrease,
+        ReviewFailOn::BoundaryRelaxation,
+        ReviewFailOn::TrustedSubsetExpansion,
+    ];
+    let effective_fail_on = if fail_on.is_empty() {
+        default_fail_on.as_slice()
+    } else {
+        fail_on
+    };
+    for flag in effective_fail_on {
+        let Some(value) = flag.to_possible_value() else {
+            continue;
+        };
+        args.push("--fail-on".to_string());
+        args.push(value.get_name().to_string());
+    }
+    args.extend([
         "--json-out".to_string(),
         review_json.display().to_string(),
         "--html-out".to_string(),
         review_html.display().to_string(),
-    ];
+    ]);
     let run = run_self_command(project_root, &args)?;
     if run.exit_code != 0 {
         diagnostics.push(trust_diag(
@@ -6080,13 +6125,109 @@ fn build_review_evidence(
     if review_json.is_file() {
         let review_doc = report_common::read_json_file(&review_json)?;
         add_review_diff_diagnostics(&review_doc, diagnostics);
+        let text = render_review_diff_text(&review_doc, &baseline, project_root, effective_fail_on);
+        if let Err(err) = util::write_atomic(&review_txt, text.as_bytes()) {
+            diagnostics.push(trust_diag(
+                "X07TC_EDIFF_POSTURE",
+                format!("failed to write review diff text summary: {err}"),
+            ));
+        }
         Ok(Some(evidence_ref_for_path(&review_json)?))
     } else {
+        let text = format!(
+            "review diff did not emit a JSON report\nfrom: {}\nto: {}\n",
+            baseline.display(),
+            project_root.display()
+        );
+        let _ = util::write_atomic(&review_txt, text.as_bytes());
         Ok(Some(write_stub_artifact(
             &review_json,
             "review_diff",
             "review diff did not emit a JSON report",
         )?))
+    }
+}
+
+fn render_review_diff_text(
+    review_doc: &Value,
+    baseline: &Path,
+    project_root: &Path,
+    fail_on: &[ReviewFailOn],
+) -> String {
+    fn count(doc: &Value, ptr: &str) -> usize {
+        doc.pointer(ptr)
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0)
+    }
+
+    let mut lines = Vec::new();
+    lines.push("x07 review diff".to_string());
+    lines.push(format!("from: {}", baseline.display()));
+    lines.push(format!("to: {}", project_root.display()));
+    lines.push(String::new());
+
+    lines.push("highlights:".to_string());
+    for (label, ptr) in [
+        ("proof_changes", "/highlights/proof_changes"),
+        (
+            "recursive_proof_changes",
+            "/highlights/recursive_proof_changes",
+        ),
+        ("boundary_changes", "/highlights/boundary_changes"),
+        ("subset_changes", "/highlights/subset_changes"),
+        ("summary_changes", "/highlights/summary_changes"),
+        (
+            "network_policy_changes",
+            "/highlights/network_policy_changes",
+        ),
+        ("peer_policy_changes", "/highlights/peer_policy_changes"),
+        (
+            "capsule_network_changes",
+            "/highlights/capsule_network_changes",
+        ),
+        (
+            "dependency_closure_changes",
+            "/highlights/dependency_closure_changes",
+        ),
+    ] {
+        lines.push(format!("- {label}: {}", count(review_doc, ptr)));
+    }
+    lines.push(String::new());
+
+    if !fail_on.is_empty() {
+        lines.push("fail_on:".to_string());
+        for flag in fail_on {
+            if let Some(v) = flag.to_possible_value() {
+                lines.push(format!("- {}", v.get_name()));
+            }
+        }
+        lines.push(String::new());
+    }
+
+    if let Some(diags) = review_doc.get("diags").and_then(Value::as_array) {
+        if !diags.is_empty() {
+            lines.push("diags:".to_string());
+            for diag in diags {
+                let code = diag
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown");
+                let message = diag
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown");
+                lines.push(format!("- {code}: {message}"));
+            }
+            lines.push(String::new());
+        }
+    }
+
+    let text = lines.join("\n");
+    if text.ends_with('\n') {
+        text
+    } else {
+        format!("{text}\n")
     }
 }
 

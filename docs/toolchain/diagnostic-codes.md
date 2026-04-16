@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 596
-- quickfix support (`sometimes` or `always`): 540
-- quickfix coverage: 90.60%
+- total codes: 609
+- quickfix support (`sometimes` or `always`): 549
+- quickfix coverage: 90.15%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -41,6 +41,12 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `ETEST_TESTS_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TESTS_EMPTY`. |
 | `ETEST_TIMEOUT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TIMEOUT_INVALID`. |
 | `ETEST_WORLD_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_WORLD_INVALID`. |
+| `EXTAL_CERTIFY_ENTRY_REQUIRED` | x07 / parse / error | sometimes | XTAL certification requires an explicit entry selection. |
+| `EXTAL_CERTIFY_MANIFEST_MISSING` | x07 / parse / error | sometimes | XTAL certification manifest is required. |
+| `EXTAL_CERTIFY_MANIFEST_PARSE_FAILED` | x07 / parse / error | sometimes | XTAL certification manifest is invalid. |
+| `EXTAL_CERTIFY_NO_ENTRYPOINTS` | x07 / parse / error | sometimes | XTAL certification has no entrypoints. |
+| `EXTAL_CERTIFY_PRECHECKS_FAILED` | x07 / run / error | never | XTAL certification prechecks failed. |
+| `EXTAL_CERTIFY_TRUST_CERTIFY_FAILED` | x07 / run / error | sometimes | Trust certification failed for a certification entry. |
 | `EXTAL_DEV_NO_SPECS` | x07 / run / error | sometimes | XTAL dev pipeline found no spec modules. |
 | `EXTAL_EXAMPLES_ARGS_EXTRA` | x07 / lint / error | sometimes | Example provides an extra arg. |
 | `EXTAL_EXAMPLES_ARGS_MISSING` | x07 / lint / error | sometimes | Example is missing a required arg. |
@@ -78,11 +84,17 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_IMPL_X07AST_PARSE` | x07 / parse / error | sometimes | Implementation module is not valid x07AST JSON. |
 | `EXTAL_REPAIR_APPLY_FAILED` | x07 / run / error | never | XTAL repair patch application failed. |
 | `EXTAL_REPAIR_BASELINE_MISSING` | x07 / parse / error | never | XTAL repair baseline is missing. |
+| `EXTAL_REPAIR_MANIFEST_PARSE_FAILED` | x07 / parse / error | sometimes | XTAL repair manifest parse failed. |
 | `EXTAL_REPAIR_NO_ACTIONABLE_FAILURE` | x07 / run / error | never | XTAL repair could not find an actionable target. |
 | `EXTAL_REPAIR_NO_PATCH_FOUND` | x07 / run / error | never | XTAL repair exhausted its budget without finding a patch. |
 | `EXTAL_REPAIR_PATCHSET_WRITE_FAILED` | x07 / run / error | never | XTAL repair could not write patch artifacts. |
+| `EXTAL_REPAIR_PATCH_OUTSIDE_ALLOWED_PATHS` | x07 / run / error | never | XTAL repair patch violates autonomy boundaries. |
+| `EXTAL_REPAIR_SEMANTIC_NO_EXAMPLES` | x07 / run / error | sometimes | XTAL semantic repair requires examples. |
+| `EXTAL_REPAIR_SEMANTIC_SEARCH_EXHAUSTED` | x07 / run / error | sometimes | XTAL semantic repair exhausted its search budget. |
+| `EXTAL_REPAIR_SEMANTIC_UNSUPPORTED_RETURN_TYPE` | x07 / run / error | never | XTAL semantic repair does not support this return type. |
 | `EXTAL_REPAIR_TARGET_NOT_ELIGIBLE` | x07 / run / error | never | XTAL repair refused to edit a non-stub implementation. |
 | `EXTAL_REPAIR_VERIFY_FAILED` | x07 / run / error | never | XTAL repair patch did not pass verification after applying it. |
+| `EXTAL_REPAIR_WRITE_REQUIRES_MANIFEST` | x07 / parse / error | never | XTAL repair --write requires an explicit autonomy manifest. |
 | `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED` | x07 / type / error | sometimes | Contract clause uses a disallowed builtin/head. |
 | `EXTAL_SPEC_CONTRACT_EXPR_NOT_I32` | x07 / type / error | sometimes | Contract clause does not typecheck to i32. |
 | `EXTAL_SPEC_CONTRACT_EXPR_PARSE` | x07 / parse / error | sometimes | Contract clause expression is not valid XTAL JSON expr. |
@@ -271,6 +283,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
 | `WXTAL_IMPL_PARAM_NAME_MISMATCH` | x07 / lint / warning | sometimes | Implementation parameter names differ from the spec. |
 | `WXTAL_REPAIR_QUICKFIX_APPLIED` | x07 / run / warning | never | XTAL repair applied a quickfix fallback in an attempt workspace. |
+| `WXTAL_REPAIR_SPEC_PATCH_SUGGESTED` | x07 / run / warning | sometimes | XTAL emitted a spec patch suggestion for review. |
 | `WXTAL_SPEC_NONCANONICAL_JSON` | x07 / rewrite / warning | always | Spec JSON is not in canonical form. |
 | `WXTAL_VERIFY_PROVE_INCONCLUSIVE` | x07 / run / warning | sometimes | Proof attempt was inconclusive. |
 | `WXTAL_VERIFY_PROVE_TIMEOUT` | x07 / run / warning | sometimes | Proof attempt hit the configured budget. |
@@ -1266,6 +1279,140 @@ Agent strategy:
 - Re-run `x07 test`.
 
 
+## `EXTAL_CERTIFY_ENTRY_REQUIRED`
+
+Summary: XTAL certification requires an explicit entry selection.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The selected entry is missing or invalid.
+
+Messages:
+- `invalid --entry (expected a fully-qualified symbol)`
+- `multiple entrypoints configured; pass --entry or --all`
+
+Agent strategy:
+
+- If the manifest has multiple entrypoints, pass `--entry <SYM>` or `--all`.
+- Ensure `--entry` is a fully-qualified symbol (for example `app.main`).
+
+
+## `EXTAL_CERTIFY_MANIFEST_MISSING`
+
+Summary: XTAL certification manifest is required.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+x07 xtal certify requires `arch/xtal/xtal.json` to select entrypoints and trust settings.
+
+Message: `arch/xtal/xtal.json is required for certification`
+
+Agent strategy:
+
+- Add `arch/xtal/xtal.json` (schema: `x07.xtal.manifest@0.1.0`).
+- Re-run `x07 xtal certify`.
+
+
+## `EXTAL_CERTIFY_MANIFEST_PARSE_FAILED`
+
+Summary: XTAL certification manifest is invalid.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Failed to parse `arch/xtal/xtal.json` or a required referenced file.
+
+Messages:
+- `failed to parse arch/xtal/xtal.json: {error}`
+- `failed to parse arch/xtal/xtal.json: missing trust section`
+- `failed to parse arch/xtal/xtal.json: trust.cert_profile does not exist`
+
+Agent strategy:
+
+- Validate `arch/xtal/xtal.json` against `docs/spec/schemas/x07.xtal.manifest@0.1.0.schema.json`.
+- Ensure referenced files exist (for example `trust.cert_profile`).
+- Re-run `x07 xtal certify`.
+
+
+## `EXTAL_CERTIFY_NO_ENTRYPOINTS`
+
+Summary: XTAL certification has no entrypoints.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The XTAL manifest has an empty `entrypoints[]` list.
+
+Message: `no entrypoints configured in arch/xtal/xtal.json`
+
+Agent strategy:
+
+- Add at least one entry to `entrypoints[]` in `arch/xtal/xtal.json`.
+- Re-run `x07 xtal certify` (or pass `--entry` / `--all` after updating the manifest).
+
+
+## `EXTAL_CERTIFY_PRECHECKS_FAILED`
+
+Summary: XTAL certification prechecks failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires resolving xtal precheck failures (x07 xtal dev).
+
+Details:
+
+Certification runs `x07 xtal dev` prechecks by default to enforce spec/generator/impl hygiene.
+
+Message: `xtal prechecks failed; see diagnostics`
+
+Agent strategy:
+
+- Run `x07 xtal dev --project x07.json` and fix any reported diagnostics.
+- Re-run `x07 xtal certify` (or pass `--no-prechecks` if you must skip prechecks).
+
+
+## `EXTAL_CERTIFY_TRUST_CERTIFY_FAILED`
+
+Summary: Trust certification failed for a certification entry.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The underlying `x07 trust certify` invocation failed for a selected entrypoint.
+
+Message: `trust certification failed for entry '{entry}'; see {out_dir}`
+
+Agent strategy:
+
+- Inspect the per-entry output directory under `target/xtal/cert/<entry>/`.
+- Re-run the failing command directly (`x07 trust certify ...`) to reproduce with full logs.
+- Fix the reported issue (proof/test/trust gate) and re-run `x07 xtal certify`.
+
+
 ## `EXTAL_DEV_NO_SPECS`
 
 Summary: XTAL dev pipeline found no spec modules.
@@ -2016,6 +2163,27 @@ Agent strategy:
 - Re-run `x07 xtal repair`.
 
 
+## `EXTAL_REPAIR_MANIFEST_PARSE_FAILED`
+
+Summary: XTAL repair manifest parse failed.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL repair loads `arch/xtal/xtal.json` to enforce autonomy boundaries when applying or evaluating patches.
+
+Message: `failed to parse arch/xtal/xtal.json: {error}`
+
+Agent strategy:
+
+- Validate `arch/xtal/xtal.json` against `docs/spec/schemas/x07.xtal.manifest@0.1.0.schema.json`.
+- Fix JSON/schema issues and re-run `x07 xtal repair`.
+
+
 ## `EXTAL_REPAIR_NO_ACTIONABLE_FAILURE`
 
 Summary: XTAL repair could not find an actionable target.
@@ -2084,6 +2252,94 @@ Agent strategy:
 - Re-run `x07 xtal repair`.
 
 
+## `EXTAL_REPAIR_PATCH_OUTSIDE_ALLOWED_PATHS`
+
+Summary: XTAL repair patch violates autonomy boundaries.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires changing autonomy boundaries (agent_write_paths) or adjusting the patchset contents.
+
+Details:
+
+The selected patchset touches files outside `autonomy.agent_write_paths[]` from `arch/xtal/xtal.json`.
+
+Message: `repair patch touches files outside agent_write_paths: {paths}`
+
+Agent strategy:
+
+- Restrict the patch to allowed paths, or widen `autonomy.agent_write_paths[]` (requires human review).
+- Re-run `x07 xtal repair` to generate a new patchset.
+
+
+## `EXTAL_REPAIR_SEMANTIC_NO_EXAMPLES`
+
+Summary: XTAL semantic repair requires examples.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Semantic repair uses spec examples as a semantic oracle.
+
+Message: `semantic repair requires examples for entry '{entry}', but none were found in spec`
+
+Agent strategy:
+
+- Add `examples_ref` to the target operation and provide `*.x07spec.examples.jsonl` cases.
+- Re-run `x07 xtal verify` to regenerate `gen/xtal/` tests.
+- Re-run `x07 xtal repair`.
+
+
+## `EXTAL_REPAIR_SEMANTIC_SEARCH_EXHAUSTED`
+
+Summary: XTAL semantic repair exhausted its search budget.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The enumerative search did not find a candidate expression that passes examples and validation within the configured bounds.
+
+Message: `semantic repair exhausted its budget (max_candidates={n}, max_depth={d}) without finding a valid patch for '{entry}'`
+
+Agent strategy:
+
+- Increase `--max-candidates` and/or `--semantic-max-depth`.
+- Add more examples to constrain the search.
+- If needed, fall back to `x07 xtal repair --quickfix-only` or implement the fix manually.
+
+
+## `EXTAL_REPAIR_SEMANTIC_UNSUPPORTED_RETURN_TYPE`
+
+Summary: XTAL semantic repair does not support this return type.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Semantic repair does not support this return type in the current subset.
+
+Details:
+
+The semantic repair engine only supports a limited return-type subset.
+
+Message: `semantic repair does not support return type '{ty}' for entry '{entry}'`
+
+Agent strategy:
+
+- Use `x07 xtal repair --quickfix-only` for diagnostic quickfix repair.
+- Or implement the missing semantic repair support for the return type.
+
+
 ## `EXTAL_REPAIR_TARGET_NOT_ELIGIBLE`
 
 Summary: XTAL repair refused to edit a non-stub implementation.
@@ -2126,6 +2382,28 @@ Agent strategy:
 
 - Inspect the post-apply `target/xtal/verify/` reports for the remaining failures.
 - Re-run `x07 xtal repair` with a larger budget or apply a manual fix.
+
+
+## `EXTAL_REPAIR_WRITE_REQUIRES_MANIFEST`
+
+Summary: XTAL repair --write requires an explicit autonomy manifest.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires arch/xtal/xtal.json to define explicit autonomy boundaries for --write.
+
+Details:
+
+XTAL repair requires `arch/xtal/xtal.json` when `--write` is used so edit boundaries are explicit.
+
+Message: `--write requires arch/xtal/xtal.json so edit boundaries are explicit`
+
+Agent strategy:
+
+- Add `arch/xtal/xtal.json` with `autonomy.agent_write_paths[]`.
+- Re-run `x07 xtal repair --write`.
 
 
 ## `EXTAL_SPEC_CONTRACT_BUILTIN_DISALLOWED`
@@ -5953,6 +6231,27 @@ XTAL repair may fall back to `x07 fix` for a targeted attempt when semantic repa
 Agent strategy:
 
 - Review the attempt diff under `target/xtal/repair/attempts/` and decide whether to apply the suggested patchset.
+
+
+## `WXTAL_REPAIR_SPEC_PATCH_SUGGESTED`
+
+Summary: XTAL emitted a spec patch suggestion for review.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+No spec-preserving patch was found; XTAL emitted a spec witness suggestion patchset for review.
+
+Message: `no spec-preserving patch found; emitted a spec patch suggestion for review`
+
+Agent strategy:
+
+- Review the suggested patchset under `target/xtal/repair/attempts/`.
+- Apply it manually if it matches the intended behavior, then re-run `x07 xtal verify`.
 
 
 ## `WXTAL_SPEC_NONCANONICAL_JSON`

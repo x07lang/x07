@@ -1,0 +1,4 @@
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.fixture.main.v1","args":{"x":0},"expect":0}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.fixture.main.v1","args":{"x":7},"expect":7}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.fixture.main.v1","args":{"x":-3},"expect":-3}
+

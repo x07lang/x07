@@ -544,6 +544,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["xtal"],
                 Some(xtal::XtalCommand::Dev(_)) => vec!["xtal", "dev"],
                 Some(xtal::XtalCommand::Verify(_)) => vec!["xtal", "verify"],
+                Some(xtal::XtalCommand::Certify(_)) => vec!["xtal", "certify"],
                 Some(xtal::XtalCommand::Repair(_)) => vec!["xtal", "repair"],
                 Some(xtal::XtalCommand::Impl(imp)) => match &imp.cmd {
                     None => vec!["xtal", "impl"],

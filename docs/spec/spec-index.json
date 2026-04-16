@@ -1588,6 +1588,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-xtal-certify.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-xtal-certify.report.schema.json",
+      "schema_version": "x07.tool.xtal.certify.report@0.1.0",
+      "title": "x07.tool.xtal.certify.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-xtal-dev.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-xtal-dev.report.schema.json",
       "schema_version": "x07.tool.xtal.dev.report@0.1.0",
@@ -1865,6 +1872,20 @@
       "schema_id": "https://x07.io/spec/x07.x07spec_examples@0.1.0.schema.json",
       "schema_version": "x07.x07spec_examples@0.1.0",
       "title": "x07.x07spec_examples@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.xtal.certify_summary@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.xtal.certify_summary@0.1.0.schema.json",
+      "schema_version": "x07.xtal.certify_summary@0.1.0",
+      "title": "x07.xtal.certify_summary@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.xtal.manifest@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.xtal.manifest@0.1.0.schema.json",
+      "schema_version": "x07.xtal.manifest@0.1.0",
+      "title": "x07.xtal.manifest@0.1.0"
     },
     {
       "kind": "schema",

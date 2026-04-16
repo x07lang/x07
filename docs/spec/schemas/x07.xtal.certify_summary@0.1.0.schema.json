@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.xtal.certify_summary@0.1.0.schema.json",
+  "title": "x07.xtal.certify_summary@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project", "settings", "results", "ok", "generated_at"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.xtal.certify_summary@0.1.0"
+    },
+    "project": { "$ref": "#/$defs/project" },
+    "settings": { "$ref": "#/$defs/settings" },
+    "results": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/result" },
+      "default": []
+    },
+    "ok": { "type": "boolean" },
+    "generated_at": { "type": "string", "minLength": 1, "maxLength": 64 }
+  },
+  "$defs": {
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sha256_hex_or_null": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "path_or_null": { "type": ["string", "null"], "minLength": 1, "maxLength": 4096 },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "manifest_path",
+        "manifest_sha256",
+        "xtal_manifest_path",
+        "xtal_manifest_sha256",
+        "trust_profile_path",
+        "trust_profile_sha256",
+        "baseline_path",
+        "baseline_sha256"
+      ],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "manifest_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "manifest_sha256": { "$ref": "#/$defs/sha256_hex" },
+        "xtal_manifest_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "xtal_manifest_sha256": { "$ref": "#/$defs/sha256_hex_or_null" },
+        "trust_profile_path": { "$ref": "#/$defs/path_or_null" },
+        "trust_profile_sha256": { "$ref": "#/$defs/sha256_hex_or_null" },
+        "baseline_path": { "$ref": "#/$defs/path_or_null" },
+        "baseline_sha256": { "$ref": "#/$defs/sha256_hex_or_null" }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["out_dir", "entries", "all_entries", "run_prechecks", "review_gates"],
+      "properties": {
+        "out_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "entries": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "default": []
+        },
+        "all_entries": { "type": "boolean" },
+        "run_prechecks": { "type": "boolean" },
+        "review_gates": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "default": []
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry",
+        "out_dir",
+        "ok",
+        "certificate_path",
+        "certificate_sha256",
+        "trust_report_path",
+        "trust_report_sha256",
+        "review_diff_json_path",
+        "review_diff_txt_path"
+      ],
+      "properties": {
+        "entry": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "out_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "ok": { "type": "boolean" },
+        "certificate_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "certificate_sha256": { "$ref": "#/$defs/sha256_hex_or_null" },
+        "trust_report_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "trust_report_sha256": { "$ref": "#/$defs/sha256_hex_or_null" },
+        "review_diff_json_path": { "$ref": "#/$defs/path_or_null" },
+        "review_diff_txt_path": { "$ref": "#/$defs/path_or_null" }
+      }
+    }
+  }
+}

@@ -99,6 +99,7 @@ def jobs_for_profile(profile: str, root: Path) -> list[Job]:
         Job("cargo.fmt", ["cargo", "fmt", "--check"]),
         Job("cargo.test", ["cargo", "test"]),
         Job("cargo.clippy", ["cargo", "clippy", "--all-targets", "--", "-D", "warnings"]),
+        Job("xtal.certify", ["bash", "scripts/ci/check_xtal_certify.sh"]),
         Job("pkg.contracts", [python_bin, "scripts/check_pkg_contracts.py", "--check"]),
         Job("skills", ["bash", "scripts/ci/check_skills.sh"]),
         Job("external-packages.lock", ["bash", "scripts/ci/check_external_packages_lock.sh"]),

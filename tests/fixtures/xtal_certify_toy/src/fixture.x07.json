@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["fixture.main"]},{"body":"x","ensures":[{"expr":["=","__result","x"],"id":"e0"}],"kind":"defn","name":"fixture.main","params":[{"name":"x","ty":"i32"}],"requires":[{"expr":["=","x","x"],"id":"r0"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"fixture","schema_version":"x07.x07ast@0.8.0"}

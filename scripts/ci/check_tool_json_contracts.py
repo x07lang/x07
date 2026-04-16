@@ -108,6 +108,10 @@ def resolve_x07_bin() -> str:
     find_bin = REPO_ROOT / "scripts" / "ci" / "find_x07.sh"
     x07_bin = os.environ.get("X07_BIN")
     if not x07_bin:
+        proc = run_cmd(["cargo", "build", "-p", "x07"], REPO_ROOT)
+        if proc.returncode != 0:
+            sys.stderr.write(decode_utf8(proc.stderr, "cargo build -p x07"))
+            raise SystemExit(proc.returncode or 2)
         proc = run_cmd([str(find_bin)], REPO_ROOT)
         if proc.returncode != 0:
             sys.stderr.write(decode_utf8(proc.stderr, "find_x07.sh"))

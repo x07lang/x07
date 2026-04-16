@@ -14984,11 +14984,27 @@ fn x07_xtal_repair_emits_patchset_and_summary() {
                 {
                     "id": "op.echo.v1",
                     "name": "toy.app.echo",
+                    "examples_ref": "spec/toy.app.x07spec.examples.jsonl",
                     "params": [{"name": "x", "ty": "i32"}],
                     "result": "i32"
                 }
             ]
         }),
+    );
+
+    let example_line = serde_json::json!({
+        "schema_version": "x07.x07spec_examples@0.1.0",
+        "op": "op.echo.v1",
+        "args": { "x": 7 },
+        "expect": 7,
+        "tags": ["smoke"],
+        "doc": "echo",
+    });
+    let mut example_text = serde_json::to_string(&example_line).expect("serialize example JSON");
+    example_text.push('\n');
+    write_bytes(
+        &dir.join("spec").join("toy.app.x07spec.examples.jsonl"),
+        example_text.as_bytes(),
     );
     write_json(
         &dir.join("src").join("toy").join("app.x07.json"),

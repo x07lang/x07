@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.xtal.manifest@0.1.0.schema.json",
+  "title": "x07.xtal.manifest@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "xtal_version",
+    "spec_roots",
+    "impl_roots",
+    "entrypoints",
+    "profiles",
+    "trust",
+    "autonomy"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.xtal.manifest@0.1.0"
+    },
+    "xtal_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "spec_roots": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+      "minItems": 1
+    },
+    "impl_roots": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+      "minItems": 1
+    },
+    "entrypoints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entrypoint" },
+      "minItems": 1
+    },
+    "profiles": { "$ref": "#/$defs/profiles" },
+    "sandbox": { "$ref": "#/$defs/sandbox" },
+    "trust": { "$ref": "#/$defs/trust" },
+    "autonomy": { "$ref": "#/$defs/autonomy" }
+  },
+  "$defs": {
+    "entrypoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "kind": { "type": "string", "enum": ["defn", "defasync"] }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev_world", "ci_world", "prod_world"],
+      "properties": {
+        "dev_world": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "ci_world": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "prod_world": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "sandbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "backend"],
+      "properties": {
+        "policy": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "backend": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review_gates", "cert_profile"],
+      "properties": {
+        "review_gates": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "default": []
+        },
+        "cert_profile": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "autonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_write_paths", "agent_write_specs", "agent_write_arch"],
+      "properties": {
+        "agent_write_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "default": []
+        },
+        "agent_write_specs": { "type": "boolean" },
+        "agent_write_arch": { "type": "boolean" },
+        "max_repair_iters": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

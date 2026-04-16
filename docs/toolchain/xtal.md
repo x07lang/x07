@@ -10,6 +10,15 @@ Example project: `docs/examples/agent-gate/xtal/toy-sorter/`.
 
 ## Artifacts
 
+### XTAL manifest (`x07.xtal.manifest@0.1.0`)
+
+- Location: `arch/xtal/xtal.json`
+- Schema: `x07.xtal.manifest@0.1.0` (see `docs/spec/schemas/x07.xtal.manifest@0.1.0.schema.json`)
+- Provides:
+  - `entrypoints[]` for certification targets
+  - `trust.cert_profile` and `trust.review_gates[]` for certification review gates
+  - `autonomy.agent_write_paths[]` and `autonomy.agent_write_specs|agent_write_arch` for repair boundaries
+
 ### Spec modules (`x07.x07spec@0.1.0`)
 
 - Location: `spec/<module_id>.x07spec.json` (recommended)
@@ -98,14 +107,26 @@ Each operation can declare `ensures_props[]` entries that reference a property f
   - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
   - Proof runs require external tooling; see `docs/toolchain/formal-verification.md`.
+- `x07 xtal certify`
+  - Requires `arch/xtal/xtal.json`.
+  - Optionally runs `x07 xtal dev` prechecks (skip with `--no-prechecks`).
+  - Selects entrypoints from the XTAL manifest (pass `--entry` to pick one, or `--all` to certify all).
+  - For each entrypoint, runs `x07 trust certify` with:
+    - `--profile <trust.cert_profile>`
+    - `--baseline <path>` (optional, enables review diff outputs)
+    - `--review-fail-on <gate>` for each `trust.review_gates[]` entry
+  - Writes:
+    - `target/xtal/xtal.certify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
+    - `target/xtal/cert/summary.json` (`x07.xtal.certify_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.certify_summary@0.1.0.schema.json`)
+    - `target/xtal/cert/<entry>/...` (certificate bundles and trust artifacts from `x07 trust certify`)
 - `x07 xtal repair`
   - Reads `target/xtal/verify/summary.json` (baseline) and attempts a bounded repair for one failing entry.
   - Strategies:
-    - semantic attempt for `prove.raw == "counterexample"` entries (minimal AST edits, checked by `x07 verify --prove` + targeted `x07 test`)
+    - semantic attempt for `prove.raw == "counterexample"` entries (enumerative single-expression synthesis for `i32` results, pruned by spec examples and validated by targeted `x07 test` then `x07 verify --prove`)
     - quickfix fallback via `x07 fix` when semantic repair is unavailable or fails
-  - If `--write` is set, applies the final patchset to the working tree and reruns `x07 xtal verify`.
+  - If `--write` is set, requires `arch/xtal/xtal.json`, enforces `autonomy.agent_write_paths[]` for patch targets, applies the final patchset to the working tree, and reruns `x07 xtal verify`.
   - By default, only edits known stub bodies (pass `--allow-edit-non-stubs` to override).
-  - Flags: `--write`, `--max-rounds`, `--max-candidates`, `--entry`, `--stubs-only`, `--semantic-only`, `--quickfix-only`.
+  - Flags: `--write`, `--max-rounds`, `--max-candidates`, `--semantic-max-depth`, `--semantic-ops`, `--entry`, `--stubs-only`, `--semantic-only`, `--quickfix-only`, `--suggest-spec-patch`.
   - Writes:
     - `target/xtal/xtal.repair.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
     - `target/xtal/repair/summary.json` (`x07.xtal.repair_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.repair_summary@0.1.0.schema.json`)

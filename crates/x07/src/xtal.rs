@@ -27,6 +27,14 @@ const EXAMPLES_SCHEMA_VERSION: &str = "x07.x07spec_examples@0.1.0";
 const EXAMPLES_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.x07spec_examples@0.1.0.schema.json");
 
+const XTAL_MANIFEST_SCHEMA_VERSION: &str = "x07.xtal.manifest@0.1.0";
+const XTAL_MANIFEST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07.xtal.manifest@0.1.0.schema.json");
+
+const CERTIFY_SUMMARY_SCHEMA_VERSION: &str = "x07.xtal.certify_summary@0.1.0";
+const CERTIFY_SUMMARY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07.xtal.certify_summary@0.1.0.schema.json");
+
 const TESTS_MANIFEST_SCHEMA_VERSION: &str = "x07.tests_manifest@0.2.0";
 const DEFAULT_SPEC_DIR: &str = "spec";
 const DEFAULT_GEN_DIR: &str = "gen/xtal";
@@ -40,6 +48,8 @@ const DEFAULT_VERIFY_NESTED_TEST_ARTIFACT_DIR: &str = "target/xtal/verify/_artif
 const DEFAULT_VERIFY_TEST_REPORT_PATH: &str = "target/xtal/tests.report.json";
 const DEFAULT_VERIFY_DIAG_REPORT_PATH: &str = "target/xtal/xtal.verify.diag.json";
 const DEFAULT_VERIFY_SUMMARY_PATH: &str = "target/xtal/verify/summary.json";
+const DEFAULT_CERT_DIR: &str = "target/xtal/cert";
+const DEFAULT_CERT_DIAG_REPORT_PATH: &str = "target/xtal/xtal.certify.diag.json";
 const DEFAULT_REPAIR_DIR: &str = "target/xtal/repair";
 const DEFAULT_REPAIR_ATTEMPTS_DIR: &str = "target/xtal/repair/attempts";
 const DEFAULT_REPAIR_PATCHSET_PATH: &str = "target/xtal/repair/patchset.json";
@@ -62,6 +72,8 @@ pub enum XtalCommand {
     Dev(XtalDevArgs),
     /// Verify spec + generated tests + test execution.
     Verify(XtalVerifyArgs),
+    /// Emit a release certification bundle via `x07 trust certify`.
+    Certify(XtalCertifyArgs),
     /// Attempt a bounded repair for a failing `x07 xtal verify`.
     Repair(XtalRepairArgs),
     /// Work with spec modules.
@@ -164,6 +176,14 @@ pub struct XtalRepairArgs {
     #[arg(long, value_name = "N", default_value_t = 64)]
     pub max_candidates: u32,
 
+    /// Maximum depth for semantic expression enumeration.
+    #[arg(long, value_name = "N", default_value_t = 4)]
+    pub semantic_max_depth: u32,
+
+    /// Semantic operator preset for expression enumeration.
+    #[arg(long, value_enum, default_value_t = SemanticOpsPreset::Safe)]
+    pub semantic_ops: SemanticOpsPreset,
+
     /// Restrict repair to one entrypoint.
     #[arg(long, value_name = "SYM")]
     pub entry: Option<String>,
@@ -183,6 +203,44 @@ pub struct XtalRepairArgs {
     /// Skip semantic repair attempts and only try quickfix repair.
     #[arg(long)]
     pub quickfix_only: bool,
+
+    /// When no implementation patch is found, emit a spec patch suggestion for review.
+    #[arg(long)]
+    pub suggest_spec_patch: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[clap(rename_all = "kebab_case")]
+pub enum SemanticOpsPreset {
+    Safe,
+    Full,
+}
+
+#[derive(Debug, Args)]
+pub struct XtalCertifyArgs {
+    /// Project manifest path (defaults to searching upwards for x07.json).
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Output directory for certification artifacts (relative to project root).
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_CERT_DIR)]
+    pub out_dir: PathBuf,
+
+    /// Certify one entry symbol from the XTAL manifest.
+    #[arg(long, value_name = "SYM", conflicts_with = "all")]
+    pub entry: Option<String>,
+
+    /// Certify every entrypoint configured in the XTAL manifest.
+    #[arg(long)]
+    pub all: bool,
+
+    /// Optional review baseline path for review gating.
+    #[arg(long, value_name = "PATH")]
+    pub baseline: Option<PathBuf>,
+
+    /// Skip prechecks (`x07 xtal dev`).
+    #[arg(long)]
+    pub no_prechecks: bool,
 }
 
 #[derive(Debug, Args)]
@@ -391,11 +449,557 @@ pub fn cmd_xtal(
     match cmd {
         XtalCommand::Dev(args) => cmd_xtal_dev(machine, args),
         XtalCommand::Verify(args) => cmd_xtal_verify(machine, args),
+        XtalCommand::Certify(args) => cmd_xtal_certify(machine, args),
         XtalCommand::Repair(args) => cmd_xtal_repair(machine, args),
         XtalCommand::Spec(args) => cmd_xtal_spec(machine, args),
         XtalCommand::Tests(args) => cmd_xtal_tests(machine, args),
         XtalCommand::Impl(args) => cmd_xtal_impl(machine, args),
     }
+}
+
+fn cmd_xtal_certify(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalCertifyArgs,
+) -> Result<std::process::ExitCode> {
+    let project_root = resolve_project_root(args.project.as_deref(), None)?;
+    let out_dir_abs = project_root.join(&args.out_dir);
+    std::fs::create_dir_all(&out_dir_abs)
+        .with_context(|| format!("mkdir: {}", out_dir_abs.display()))?;
+
+    let mut diagnostics = Vec::new();
+
+    let xtal_manifest_path = project_root.join("arch").join("xtal").join("xtal.json");
+    let xtal_manifest = if xtal_manifest_path.is_file() {
+        load_xtal_manifest(
+            &xtal_manifest_path,
+            &mut diagnostics,
+            "EXTAL_CERTIFY_MANIFEST_PARSE_FAILED",
+        )?
+    } else {
+        diagnostics.push(diag_error(
+            "EXTAL_CERTIFY_MANIFEST_MISSING",
+            diagnostics::Stage::Parse,
+            "arch/xtal/xtal.json is required for certification",
+            None,
+        ));
+        None
+    };
+    let (entries, trust) = if let Some(manifest) = xtal_manifest.as_ref() {
+        let entries =
+            resolve_certify_entries(manifest, &args, &mut diagnostics).unwrap_or_default();
+        let trust = manifest.trust.as_ref();
+        if trust.is_none() {
+            diagnostics.push(diag_error(
+                "EXTAL_CERTIFY_MANIFEST_PARSE_FAILED",
+                diagnostics::Stage::Parse,
+                "failed to parse arch/xtal/xtal.json: missing trust section",
+                None,
+            ));
+        }
+        (entries, trust)
+    } else {
+        (Vec::new(), None)
+    };
+
+    if !args.no_prechecks {
+        let dev_args = XtalDevArgs {
+            project: Some(project_root.join("x07.json")),
+            spec_dir: PathBuf::from(DEFAULT_SPEC_DIR),
+            gen_index: None,
+        };
+        match capture_report_json("xtal_certify_dev", |m| cmd_xtal_dev(m, dev_args)) {
+            Ok((code, v)) => {
+                diagnostics
+                    .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
+                if code != std::process::ExitCode::SUCCESS {
+                    diagnostics.push(diag_error(
+                        "EXTAL_CERTIFY_PRECHECKS_FAILED",
+                        diagnostics::Stage::Run,
+                        "xtal prechecks failed; see diagnostics",
+                        None,
+                    ));
+                }
+            }
+            Err(err) => {
+                diagnostics.push(diag_error(
+                    "EXTAL_CERTIFY_PRECHECKS_FAILED",
+                    diagnostics::Stage::Run,
+                    format!("xtal prechecks failed: {err:#}"),
+                    None,
+                ));
+            }
+        }
+    }
+
+    let trust_profile_path = trust.map(|trust| project_root.join(&trust.cert_profile));
+    let trust_profile_exists = trust_profile_path.as_ref().is_some_and(|p| p.is_file());
+    if trust.is_some() && !trust_profile_exists {
+        diagnostics.push(diag_error(
+            "EXTAL_CERTIFY_MANIFEST_PARSE_FAILED",
+            diagnostics::Stage::Parse,
+            "failed to parse arch/xtal/xtal.json: trust.cert_profile does not exist",
+            None,
+        ));
+    }
+
+    let can_run_trust = diagnostics
+        .iter()
+        .all(|d| d.severity != diagnostics::Severity::Error)
+        && trust.is_some()
+        && trust_profile_exists
+        && !entries.is_empty();
+
+    let mut results: Vec<Value> = Vec::new();
+    if can_run_trust {
+        let trust = trust.expect("trust exists when can_run_trust");
+        for entry in &entries {
+            let entry_dir_name = safe_entry_dir_component(entry);
+            let entry_out_dir = out_dir_abs.join(&entry_dir_name);
+            std::fs::create_dir_all(&entry_out_dir)
+                .with_context(|| format!("mkdir: {}", entry_out_dir.display()))?;
+
+            let entry_out_rel = entry_out_dir
+                .strip_prefix(&project_root)
+                .unwrap_or(entry_out_dir.as_path())
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            let mut trust_args: Vec<String> = vec![
+                "trust".to_string(),
+                "certify".to_string(),
+                "--project".to_string(),
+                "x07.json".to_string(),
+                "--profile".to_string(),
+                trust.cert_profile.clone(),
+                "--entry".to_string(),
+                entry.to_string(),
+                "--out-dir".to_string(),
+                entry_out_rel.clone(),
+                "--tests-manifest".to_string(),
+                DEFAULT_MANIFEST_PATH.to_string(),
+            ];
+            if let Some(baseline) = args.baseline.as_deref() {
+                trust_args.push("--baseline".to_string());
+                trust_args.push(baseline.display().to_string());
+            }
+            for gate in &trust.review_gates {
+                if gate.trim().is_empty() {
+                    continue;
+                }
+                trust_args.push("--review-fail-on".to_string());
+                trust_args.push(gate.trim().to_string());
+            }
+
+            let trust_run = run_self_command(&project_root, &trust_args)?;
+            let trust_ok = trust_run.exit_code == 0;
+            if !trust_ok {
+                diagnostics.push(diag_error(
+                    "EXTAL_CERTIFY_TRUST_CERTIFY_FAILED",
+                    diagnostics::Stage::Run,
+                    format!(
+                        "trust certification failed for entry {entry:?}; see {}",
+                        entry_out_dir.display()
+                    ),
+                    None,
+                ));
+            }
+
+            let certificate_path = entry_out_dir.join("certificate.json");
+            let trust_report_path = entry_out_dir.join("trust.report.json");
+            let review_diff_json_path = entry_out_dir.join("review.diff.json");
+            let review_diff_txt_path = entry_out_dir.join("review.diff.txt");
+
+            let cert_sha256 = crate::reporting::file_digest(&certificate_path)
+                .ok()
+                .map(|d| d.sha256);
+            let trust_report_sha256 = crate::reporting::file_digest(&trust_report_path)
+                .ok()
+                .map(|d| d.sha256);
+
+            let cert_rel = certificate_path
+                .strip_prefix(&project_root)
+                .unwrap_or(certificate_path.as_path())
+                .to_string_lossy()
+                .replace('\\', "/");
+            let trust_rel = trust_report_path
+                .strip_prefix(&project_root)
+                .unwrap_or(trust_report_path.as_path())
+                .to_string_lossy()
+                .replace('\\', "/");
+            let review_json_rel = review_diff_json_path
+                .strip_prefix(&project_root)
+                .unwrap_or(review_diff_json_path.as_path())
+                .to_string_lossy()
+                .replace('\\', "/");
+            let review_txt_rel = review_diff_txt_path
+                .strip_prefix(&project_root)
+                .unwrap_or(review_diff_txt_path.as_path())
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            results.push(json!({
+                "entry": entry,
+                "out_dir": entry_out_rel,
+                "ok": trust_ok,
+                "certificate_path": cert_rel,
+                "certificate_sha256": cert_sha256,
+                "trust_report_path": trust_rel,
+                "trust_report_sha256": trust_report_sha256,
+                "review_diff_json_path": if args.baseline.is_some() { Value::String(review_json_rel) } else { Value::Null },
+                "review_diff_txt_path": if args.baseline.is_some() { Value::String(review_txt_rel) } else { Value::Null },
+            }));
+        }
+    }
+
+    let per_entry_ok = results
+        .iter()
+        .all(|r| r.get("ok").and_then(Value::as_bool).unwrap_or(false));
+    let overall_ok = per_entry_ok
+        && diagnostics
+            .iter()
+            .all(|d| d.severity != diagnostics::Severity::Error);
+
+    let review_gates: Vec<String> = trust
+        .map(|trust| trust.review_gates.clone())
+        .unwrap_or_default();
+
+    let summary = build_certify_summary_value(
+        &project_root,
+        &args,
+        Some(&xtal_manifest_path),
+        trust_profile_path.as_deref(),
+        args.baseline.as_deref(),
+        &entries,
+        &review_gates,
+        &results,
+        overall_ok,
+    )?;
+
+    let summary_path = out_dir_abs.join("summary.json");
+    let summary_rel = summary_path
+        .strip_prefix(&project_root)
+        .unwrap_or(summary_path.as_path())
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let mut report = diagnostics::Report::ok().with_diagnostics(diagnostics);
+    report.ok = overall_ok;
+    report.meta.insert(
+        "project_root".to_string(),
+        Value::String(project_root.display().to_string()),
+    );
+    report.meta.insert(
+        "certify_out_dir".to_string(),
+        Value::String(args.out_dir.to_string_lossy().replace('\\', "/")),
+    );
+    report.meta.insert(
+        "entries".to_string(),
+        Value::Array(entries.iter().cloned().map(Value::String).collect()),
+    );
+    report.meta.insert(
+        "review_gates".to_string(),
+        Value::Array(review_gates.iter().cloned().map(Value::String).collect()),
+    );
+    report.meta.insert(
+        "certify_summary_path".to_string(),
+        Value::String(summary_rel),
+    );
+    report.meta.insert(
+        "certify_diag_path".to_string(),
+        Value::String(DEFAULT_CERT_DIAG_REPORT_PATH.to_string()),
+    );
+
+    write_certify_diag_report(&project_root, &report)?;
+    write_certify_summary(&project_root, &args.out_dir, &summary)?;
+
+    write_report(machine, &report)?;
+
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(20)
+    })
+}
+
+fn safe_entry_dir_component(entry: &str) -> String {
+    let mut out = String::with_capacity(entry.len());
+    for ch in entry.chars() {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-') {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        "entry".to_string()
+    } else {
+        out
+    }
+}
+
+fn resolve_certify_entries(
+    manifest: &XtalManifest,
+    args: &XtalCertifyArgs,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Option<Vec<String>> {
+    let mut entries: Vec<String> = manifest
+        .entrypoints
+        .iter()
+        .map(|e| e.name.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    entries.sort();
+    entries.dedup();
+
+    if entries.is_empty() {
+        diags.push(diag_error(
+            "EXTAL_CERTIFY_NO_ENTRYPOINTS",
+            diagnostics::Stage::Parse,
+            "no entrypoints configured in arch/xtal/xtal.json",
+            None,
+        ));
+        return None;
+    }
+
+    if let Some(entry) = args.entry.as_deref() {
+        let entry = entry.trim();
+        if entry.is_empty() || x07c::validate::validate_symbol(entry).is_err() {
+            diags.push(diag_error(
+                "EXTAL_CERTIFY_ENTRY_REQUIRED",
+                diagnostics::Stage::Parse,
+                "invalid --entry (expected a fully-qualified symbol)",
+                None,
+            ));
+            return None;
+        }
+        return Some(vec![entry.to_string()]);
+    }
+
+    if args.all {
+        return Some(entries);
+    }
+
+    if entries.len() == 1 {
+        return Some(entries);
+    }
+
+    diags.push(diag_error(
+        "EXTAL_CERTIFY_ENTRY_REQUIRED",
+        diagnostics::Stage::Parse,
+        "multiple entrypoints configured; pass --entry or --all",
+        None,
+    ));
+    None
+}
+
+fn load_xtal_manifest(
+    path: &Path,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+    parse_code: &str,
+) -> Result<Option<XtalManifest>> {
+    let doc = match report_common::read_json_file(path) {
+        Ok(v) => v,
+        Err(err) => {
+            diags.push(diag_error(
+                parse_code,
+                diagnostics::Stage::Parse,
+                format!("failed to parse {}: {err:#}", path.display()),
+                None,
+            ));
+            return Ok(None);
+        }
+    };
+
+    let schema_diags = report_common::validate_schema(
+        XTAL_MANIFEST_SCHEMA_BYTES,
+        "spec/x07.xtal.manifest@0.1.0.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        diags.push(diag_error(
+            parse_code,
+            diagnostics::Stage::Parse,
+            format!(
+                "failed to parse {}: {}",
+                path.display(),
+                schema_diags[0].message
+            ),
+            None,
+        ));
+        return Ok(None);
+    }
+
+    let parsed: XtalManifest = match serde_json::from_value(doc) {
+        Ok(v) => v,
+        Err(err) => {
+            diags.push(diag_error(
+                parse_code,
+                diagnostics::Stage::Parse,
+                format!("failed to parse {}: {err}", path.display()),
+                None,
+            ));
+            return Ok(None);
+        }
+    };
+    if parsed.schema_version.trim() != XTAL_MANIFEST_SCHEMA_VERSION {
+        diags.push(diag_error(
+            parse_code,
+            diagnostics::Stage::Parse,
+            format!(
+                "failed to parse {}: expected schema_version={XTAL_MANIFEST_SCHEMA_VERSION:?}",
+                path.display()
+            ),
+            None,
+        ));
+        return Ok(None);
+    }
+
+    Ok(Some(parsed))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_certify_summary_value(
+    project_root: &Path,
+    args: &XtalCertifyArgs,
+    xtal_manifest_path: Option<&Path>,
+    trust_profile_path: Option<&Path>,
+    baseline_path: Option<&Path>,
+    entries: &[String],
+    review_gates: &[String],
+    results: &[Value],
+    ok: bool,
+) -> Result<Value> {
+    let manifest_path = project_root.join("x07.json");
+    let manifest_digest = crate::reporting::file_digest(&manifest_path)
+        .with_context(|| format!("digest: {}", manifest_path.display()))?
+        .sha256;
+
+    let xtal_manifest_rel = xtal_manifest_path.and_then(|p| {
+        p.strip_prefix(project_root)
+            .ok()
+            .map(|r| r.to_string_lossy().replace('\\', "/"))
+            .or_else(|| Some(p.display().to_string()))
+    });
+    let xtal_manifest_sha256 =
+        xtal_manifest_path.and_then(|p| crate::reporting::file_digest(p).ok().map(|d| d.sha256));
+
+    let trust_profile_rel = trust_profile_path.and_then(|p| {
+        p.strip_prefix(project_root)
+            .ok()
+            .map(|r| r.to_string_lossy().replace('\\', "/"))
+            .or_else(|| Some(p.display().to_string()))
+    });
+    let trust_profile_sha256 =
+        trust_profile_path.and_then(|p| crate::reporting::file_digest(p).ok().map(|d| d.sha256));
+
+    let baseline_abs =
+        baseline_path.map(|p| util::resolve_existing_path_upwards_from(project_root, p));
+    let baseline_rel = baseline_abs.as_ref().map(|p| {
+        p.strip_prefix(project_root)
+            .unwrap_or(p.as_path())
+            .to_string_lossy()
+            .replace('\\', "/")
+    });
+    let baseline_sha256 = baseline_abs
+        .as_ref()
+        .and_then(|p| snapshot_digest_hex(p).ok().flatten());
+
+    let out_dir_rel = args.out_dir.to_string_lossy().replace('\\', "/");
+
+    let summary = json!({
+        "schema_version": CERTIFY_SUMMARY_SCHEMA_VERSION,
+        "project": {
+            "root": ".",
+            "manifest_path": "x07.json",
+            "manifest_sha256": manifest_digest,
+            "xtal_manifest_path": xtal_manifest_rel,
+            "xtal_manifest_sha256": xtal_manifest_sha256,
+            "trust_profile_path": trust_profile_rel,
+            "trust_profile_sha256": trust_profile_sha256,
+            "baseline_path": baseline_rel,
+            "baseline_sha256": baseline_sha256,
+        },
+        "settings": {
+            "out_dir": out_dir_rel,
+            "entries": entries,
+            "all_entries": args.all,
+            "run_prechecks": !args.no_prechecks,
+            "review_gates": review_gates,
+        },
+        "results": results,
+        "ok": ok,
+        "generated_at": "2000-01-01T00:00:00Z"
+    });
+
+    let schema_diags = report_common::validate_schema(
+        CERTIFY_SUMMARY_SCHEMA_BYTES,
+        "spec/x07.xtal.certify_summary@0.1.0.schema.json",
+        &summary,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "internal error: xtal certify summary JSON is not schema-valid: {}",
+            schema_diags[0].message
+        );
+    }
+
+    Ok(summary)
+}
+
+fn snapshot_digest_hex(path: &Path) -> Result<Option<String>> {
+    if path.is_file() {
+        let bytes = std::fs::read(path).with_context(|| format!("read: {}", path.display()))?;
+        return Ok(Some(util::sha256_hex(&bytes)));
+    }
+    if !path.is_dir() {
+        return Ok(None);
+    }
+
+    let mut files: Vec<PathBuf> = Vec::new();
+    for entry in WalkDir::new(path).follow_links(false).into_iter().flatten() {
+        if entry.file_type().is_file() {
+            files.push(entry.path().to_path_buf());
+        }
+    }
+    files.sort();
+
+    let mut hasher = Sha256::new();
+    for file in files {
+        let rel = file.strip_prefix(path).unwrap_or(file.as_path());
+        hasher.update(rel.to_string_lossy().as_bytes());
+        hasher.update(b"\0");
+        if let Ok(bytes) = std::fs::read(&file) {
+            hasher.update(bytes);
+            hasher.update(b"\0");
+        }
+    }
+    Ok(Some(util::hex_lower(&hasher.finalize())))
+}
+
+fn write_certify_diag_report(project_root: &Path, report: &diagnostics::Report) -> Result<()> {
+    let diag_path = project_root.join(DEFAULT_CERT_DIAG_REPORT_PATH);
+    if let Some(parent) = diag_path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("mkdir: {}", parent.display()))?;
+    }
+    let mut bytes = serde_json::to_vec(report).context("serialize xtal certify report")?;
+    if bytes.last() != Some(&b'\n') {
+        bytes.push(b'\n');
+    }
+    util::write_atomic(&diag_path, &bytes)
+        .with_context(|| format!("write: {}", diag_path.display()))?;
+    Ok(())
+}
+
+fn write_certify_summary(project_root: &Path, out_dir: &Path, summary: &Value) -> Result<()> {
+    let out_dir_abs = project_root.join(out_dir);
+    std::fs::create_dir_all(&out_dir_abs)
+        .with_context(|| format!("mkdir: {}", out_dir_abs.display()))?;
+    let summary_path = out_dir_abs.join("summary.json");
+    let bytes = report_common::canonical_pretty_json_bytes(summary)
+        .context("serialize xtal certify summary")?;
+    util::write_atomic(&summary_path, &bytes)
+        .with_context(|| format!("write: {}", summary_path.display()))?;
+    Ok(())
 }
 
 fn cmd_xtal_impl(
@@ -2029,6 +2633,9 @@ fn cmd_xtal_repair(
     if args.max_candidates == 0 {
         anyhow::bail!("--max-candidates must be >= 1");
     }
+    if args.semantic_max_depth == 0 {
+        anyhow::bail!("--semantic-max-depth must be >= 1");
+    }
 
     let project_root = resolve_project_root(args.project.as_deref(), None)?;
     let verify_summary_path = project_root.join(DEFAULT_VERIFY_SUMMARY_PATH);
@@ -2102,6 +2709,38 @@ fn cmd_xtal_repair(
         )?;
         write_report(machine, &report)?;
         return Ok(std::process::ExitCode::SUCCESS);
+    }
+
+    let xtal_manifest_path = project_root.join("arch").join("xtal").join("xtal.json");
+    let xtal_manifest = if xtal_manifest_path.is_file() {
+        load_xtal_manifest(
+            &xtal_manifest_path,
+            &mut diags,
+            "EXTAL_REPAIR_MANIFEST_PARSE_FAILED",
+        )?
+    } else {
+        None
+    };
+    if args.write && xtal_manifest.is_none() {
+        diags.push(diag_error(
+            "EXTAL_REPAIR_WRITE_REQUIRES_MANIFEST",
+            diagnostics::Stage::Parse,
+            "--write requires arch/xtal/xtal.json so edit boundaries are explicit",
+            None,
+        ));
+        let mut report = diagnostics::Report::ok();
+        report = report.with_diagnostics(diags);
+        report.ok = false;
+        write_repair_artifacts(
+            &project_root,
+            Some(&baseline_summary),
+            &report,
+            None,
+            None,
+            &[],
+        )?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
     }
 
     let tests_manifest_path = read_baseline_tests_manifest_path(&verify_diag_path)
@@ -2257,15 +2896,20 @@ fn cmd_xtal_repair(
     let mut attempts: Vec<Value> = Vec::new();
     let mut final_patchset: Option<PatchSet> = None;
     let mut final_diff: Option<String> = None;
+    let mut spec_patch_suggestion: Option<String> = None;
 
     let mut attempt_no: u32 = 0;
     if can_semantic && !args.quickfix_only {
         attempt_no += 1;
-        let (patchset, diff_text, ok) = run_semantic_repair_attempt(
+        let (patchset, diff_text, mut ok) = run_semantic_repair_attempt(
             &project_root,
             attempt_no,
             args.max_candidates as usize,
+            args.semantic_max_depth as usize,
+            args.semantic_ops,
+            args.semantic_only,
             &target_entry,
+            &target_op_id,
             &decl_ptr,
             &impl_path,
             &file,
@@ -2278,6 +2922,23 @@ fn cmd_xtal_repair(
             &target_prove_report_rel,
             &mut diags,
         )?;
+        if ok {
+            if let Some(manifest) = xtal_manifest.as_ref() {
+                let disallowed = disallowed_patch_paths_from_manifest(&patchset, manifest);
+                if !disallowed.is_empty() {
+                    diags.push(diag_error(
+                        "EXTAL_REPAIR_PATCH_OUTSIDE_ALLOWED_PATHS",
+                        diagnostics::Stage::Run,
+                        format!(
+                            "repair patch touches files outside agent_write_paths: {}",
+                            disallowed.join(", ")
+                        ),
+                        None,
+                    ));
+                    ok = false;
+                }
+            }
+        }
         attempts.push(json!({
             "attempt": attempt_no,
             "strategy": "semantic_cegis",
@@ -2315,7 +2976,7 @@ fn cmd_xtal_repair(
 
     if final_patchset.is_none() && !args.semantic_only && attempt_no < args.max_rounds {
         attempt_no += 1;
-        let (patchset, diff_text, ok) = run_quickfix_repair_attempt(
+        let (patchset, diff_text, mut ok) = run_quickfix_repair_attempt(
             &project_root,
             attempt_no,
             &target_entry,
@@ -2327,6 +2988,23 @@ fn cmd_xtal_repair(
             &target_prove_report_rel,
             &mut diags,
         )?;
+        if ok {
+            if let Some(manifest) = xtal_manifest.as_ref() {
+                let disallowed = disallowed_patch_paths_from_manifest(&patchset, manifest);
+                if !disallowed.is_empty() {
+                    diags.push(diag_error(
+                        "EXTAL_REPAIR_PATCH_OUTSIDE_ALLOWED_PATHS",
+                        diagnostics::Stage::Run,
+                        format!(
+                            "repair patch touches files outside agent_write_paths: {}",
+                            disallowed.join(", ")
+                        ),
+                        None,
+                    ));
+                    ok = false;
+                }
+            }
+        }
         attempts.push(json!({
             "attempt": attempt_no,
             "strategy": "diag_quickfix",
@@ -2339,6 +3017,37 @@ fn cmd_xtal_repair(
         if ok {
             final_patchset = Some(patchset);
             final_diff = Some(diff_text);
+        }
+    }
+
+    if final_patchset.is_none() && args.suggest_spec_patch && can_semantic {
+        attempt_no += 1;
+        let (_patchset, _diff_text, ok) = run_spec_witness_suggestion_attempt(
+            &project_root,
+            attempt_no,
+            &target_entry,
+            &target_spec_path_rel,
+            &target_prove_report_rel,
+            &mut diags,
+        )?;
+        attempts.push(json!({
+            "attempt": attempt_no,
+            "strategy": "spec_witness_suggestion",
+            "target_entry": target_entry,
+            "status": if ok { "suggested" } else { "failed" },
+            "patchset_path": format!("{DEFAULT_REPAIR_ATTEMPTS_DIR}/attempt-{attempt_no:04}/patchset.json"),
+            "diff_path": format!("{DEFAULT_REPAIR_ATTEMPTS_DIR}/attempt-{attempt_no:04}/diff.txt"),
+        }));
+        if ok {
+            diags.push(diag_warning(
+                "WXTAL_REPAIR_SPEC_PATCH_SUGGESTED",
+                diagnostics::Stage::Run,
+                "no spec-preserving patch found; emitted a spec patch suggestion for review",
+                None,
+            ));
+            spec_patch_suggestion = Some(format!(
+                "{DEFAULT_REPAIR_ATTEMPTS_DIR}/attempt-{attempt_no:04}/patchset.json"
+            ));
         }
     }
 
@@ -2421,6 +3130,8 @@ fn cmd_xtal_repair(
         } else {
             ("patch_suggested", std::process::ExitCode::from(1))
         }
+    } else if spec_patch_suggestion.is_some() {
+        ("spec_patch_suggested", std::process::ExitCode::from(1))
     } else {
         diags.push(diag_error(
             "EXTAL_REPAIR_NO_PATCH_FOUND",
@@ -2458,6 +3169,12 @@ fn cmd_xtal_repair(
         "repair_summary_path".to_string(),
         Value::String(DEFAULT_REPAIR_SUMMARY_PATH.to_string()),
     );
+    if let Some(path) = spec_patch_suggestion.as_deref() {
+        report.meta.insert(
+            "spec_patch_suggestion".to_string(),
+            Value::String(path.to_string()),
+        );
+    }
 
     let result_patchset_path = project_root.join(DEFAULT_REPAIR_PATCHSET_PATH);
     let patchset_written = result_patchset_path.is_file();
@@ -2478,6 +3195,66 @@ fn cmd_xtal_repair(
 
     write_report(machine, &report)?;
     Ok(exit_code)
+}
+
+fn disallowed_patch_paths_from_manifest(
+    patchset: &PatchSet,
+    manifest: &XtalManifest,
+) -> Vec<String> {
+    let Some(autonomy) = manifest.autonomy.as_ref() else {
+        return patchset.patches.iter().map(|p| p.path.clone()).collect();
+    };
+
+    let allow_specs = autonomy.agent_write_specs;
+    let allow_arch = autonomy.agent_write_arch;
+    let allowed: Vec<PathBuf> = autonomy
+        .agent_write_paths
+        .iter()
+        .filter_map(|p| normalize_rel_path(p))
+        .collect();
+
+    let mut out = Vec::new();
+    for patch in &patchset.patches {
+        let Some(path) = normalize_rel_path(&patch.path) else {
+            out.push(patch.path.clone());
+            continue;
+        };
+
+        if !allow_specs && path.starts_with("spec") {
+            out.push(patch.path.clone());
+            continue;
+        }
+        if !allow_arch && path.starts_with("arch") {
+            out.push(patch.path.clone());
+            continue;
+        }
+        if allowed.is_empty() || !allowed.iter().any(|prefix| path.starts_with(prefix)) {
+            out.push(patch.path.clone());
+        }
+    }
+    out
+}
+
+fn normalize_rel_path(raw: &str) -> Option<PathBuf> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let raw = raw.replace('\\', "/");
+    let p = Path::new(&raw);
+    if p.is_absolute() {
+        return None;
+    }
+    let mut out = PathBuf::new();
+    for comp in p.components() {
+        match comp {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => return None,
+            std::path::Component::Normal(c) => out.push(c),
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => return None,
+        }
+    }
+    (!out.as_os_str().is_empty()).then_some(out)
 }
 
 fn read_baseline_tests_manifest_path(diag_path: &Path) -> Option<PathBuf> {
@@ -2788,12 +3565,187 @@ fn prepare_attempt_module_roots(
     Ok((shadow_root, shadow_file, attempt_roots))
 }
 
+fn run_spec_witness_suggestion_attempt(
+    project_root: &Path,
+    attempt_no: u32,
+    target_entry: &str,
+    spec_path_rel: &str,
+    baseline_prove_report_rel: &str,
+    _diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(PatchSet, String, bool)> {
+    let attempt_dir = project_root
+        .join(DEFAULT_REPAIR_ATTEMPTS_DIR)
+        .join(format!("attempt-{attempt_no:04}"));
+    std::fs::create_dir_all(&attempt_dir)
+        .with_context(|| format!("mkdir: {}", attempt_dir.display()))?;
+
+    let patchset_path = attempt_dir.join("patchset.json");
+    let diff_path = attempt_dir.join("diff.txt");
+
+    let mut out_patchset = PatchSet {
+        schema_version: x07_contracts::X07_PATCHSET_SCHEMA_VERSION.to_string(),
+        patches: Vec::new(),
+    };
+    let mut out_diff = String::new();
+    let mut ok = false;
+
+    let Some(contract) = read_prove_contract_payload(project_root, baseline_prove_report_rel)
+    else {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    };
+
+    if contract.witness.is_empty() {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    }
+
+    let kind_field = match contract.contract_kind.as_str() {
+        "requires" => "requires",
+        "ensures" => "ensures",
+        "invariant_entry" | "invariant_exit" => "invariant",
+        _ => {
+            write_patchset(&patchset_path, &out_patchset)?;
+            util::write_atomic(&diff_path, out_diff.as_bytes())
+                .with_context(|| format!("write diff: {}", diff_path.display()))?;
+            return Ok((out_patchset, out_diff, ok));
+        }
+    };
+
+    let spec_path_abs = project_root.join(spec_path_rel);
+    let spec_bytes = std::fs::read(&spec_path_abs)
+        .with_context(|| format!("read: {}", spec_path_abs.display()))?;
+    let before: Value =
+        serde_json::from_slice(&spec_bytes).context("parse spec JSON for witness suggestion")?;
+
+    let Some(ops) = before.get("operations").and_then(Value::as_array) else {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    };
+
+    let op_idx = ops.iter().position(|op| {
+        op.get("name")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name == target_entry)
+    });
+    let Some(op_idx) = op_idx else {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    };
+
+    let clauses_ptr = format!("/operations/{op_idx}/{kind_field}");
+    let Some(clauses) = before.pointer(&clauses_ptr).and_then(Value::as_array) else {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    };
+
+    let clause_idx = clauses.iter().position(|c| {
+        c.get("id")
+            .and_then(Value::as_str)
+            .is_some_and(|id| id == contract.clause_id)
+    });
+    let clause_idx = clause_idx.or(contract.clause_index);
+    let Some(clause_idx) = clause_idx else {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    };
+    if clause_idx >= clauses.len() {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    }
+
+    let witness_ptr = format!("/operations/{op_idx}/{kind_field}/{clause_idx}/witness");
+    let witness_before: Vec<Value> = before
+        .pointer(&witness_ptr)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut witness_out = witness_before.clone();
+    let mut seen: BTreeSet<Vec<u8>> = BTreeSet::new();
+    for w in &witness_out {
+        let key = util::canonical_jcs_bytes(w).unwrap_or_default();
+        seen.insert(key);
+    }
+    for w in contract.witness {
+        let key = util::canonical_jcs_bytes(&w).unwrap_or_default();
+        if seen.insert(key) {
+            witness_out.push(w);
+        }
+    }
+
+    if witness_out == witness_before {
+        write_patchset(&patchset_path, &out_patchset)?;
+        util::write_atomic(&diff_path, out_diff.as_bytes())
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((out_patchset, out_diff, ok));
+    }
+
+    let mut after = before.clone();
+    let clause_ptr = format!("/operations/{op_idx}/{kind_field}/{clause_idx}");
+    if let Some(obj) = after
+        .pointer_mut(&clause_ptr)
+        .and_then(Value::as_object_mut)
+    {
+        obj.insert("witness".to_string(), Value::Array(witness_out.clone()));
+    }
+
+    let op = if before.pointer(&witness_ptr).is_some() {
+        diagnostics::PatchOp::Replace {
+            path: witness_ptr.clone(),
+            value: Value::Array(witness_out),
+        }
+    } else {
+        diagnostics::PatchOp::Add {
+            path: witness_ptr.clone(),
+            value: Value::Array(witness_out),
+        }
+    };
+
+    let path_rel = spec_path_rel.replace('\\', "/");
+    out_patchset.patches.push(PatchTarget {
+        path: path_rel.clone(),
+        patch: vec![op],
+        note: Some(format!(
+            "spec witness suggestion: contract_kind={}, clause_id={}",
+            contract.contract_kind, contract.clause_id
+        )),
+    });
+
+    out_diff = unified_json_diff(&path_rel, &before, &after)?;
+    ok = true;
+
+    write_patchset(&patchset_path, &out_patchset)?;
+    util::write_atomic(&diff_path, out_diff.as_bytes())
+        .with_context(|| format!("write diff: {}", diff_path.display()))?;
+
+    Ok((out_patchset, out_diff, ok))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn run_semantic_repair_attempt(
     project_root: &Path,
     attempt_no: u32,
     max_candidates: usize,
+    max_depth: usize,
+    ops_preset: SemanticOpsPreset,
+    semantic_only: bool,
     target_entry: &str,
+    target_op_id: &str,
     decl_ptr: &str,
     impl_path: &Path,
     file: &x07ast::X07AstFile,
@@ -2804,7 +3756,7 @@ fn run_semantic_repair_attempt(
     op_test_filter: &str,
     baseline_summary: &Value,
     baseline_prove_report_rel: &str,
-    _diags: &mut Vec<diagnostics::Diagnostic>,
+    diags: &mut Vec<diagnostics::Diagnostic>,
 ) -> Result<(PatchSet, String, bool)> {
     let attempt_dir = project_root
         .join(DEFAULT_REPAIR_ATTEMPTS_DIR)
@@ -2826,20 +3778,57 @@ fn run_semantic_repair_attempt(
         .to_string_lossy()
         .replace('\\', "/");
 
-    let mut candidates: Vec<(String, Expr)> = Vec::new();
-    for p in &spec_op.params {
-        if p.ty.trim() == spec_op.result.trim() {
-            candidates.push((format!("identity({})", p.name), ident(&p.name)));
-            break;
-        }
-    }
-    if candidates.is_empty() {
-        candidates.push((
-            "no_candidates".to_string(),
-            file.functions[defn_idx].body.clone(),
+    let target_defn = &file.functions[defn_idx];
+    let examples =
+        load_examples_for_entry(project_root, spec_op, target_op_id, target_defn, diags)?;
+    if examples.is_empty() {
+        diags.push(semantic_repair_diag(
+            semantic_only,
+            "EXTAL_REPAIR_SEMANTIC_NO_EXAMPLES",
+            format!(
+                "semantic repair requires examples for entry '{target_entry}', but none were found in spec"
+            ),
         ));
+        let empty_patchset = PatchSet {
+            schema_version: x07_contracts::X07_PATCHSET_SCHEMA_VERSION.to_string(),
+            patches: Vec::new(),
+        };
+        write_patchset(&patchset_path, &empty_patchset)?;
+        util::write_atomic(&diff_path, &[])
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((empty_patchset, String::new(), false));
     }
-    candidates.truncate(max_candidates);
+    if spec_op.result.trim() != "i32" {
+        diags.push(semantic_repair_diag(
+            semantic_only,
+            "EXTAL_REPAIR_SEMANTIC_UNSUPPORTED_RETURN_TYPE",
+            format!(
+                "semantic repair does not support return type '{}' for entry '{target_entry}'",
+                spec_op.result.trim()
+            ),
+        ));
+        let empty_patchset = PatchSet {
+            schema_version: x07_contracts::X07_PATCHSET_SCHEMA_VERSION.to_string(),
+            patches: Vec::new(),
+        };
+        write_patchset(&patchset_path, &empty_patchset)?;
+        util::write_atomic(&diff_path, &[])
+            .with_context(|| format!("write diff: {}", diff_path.display()))?;
+        return Ok((empty_patchset, String::new(), false));
+    }
+
+    let max_nodes = semantic_max_nodes(max_depth);
+    let semantic_params = semantic_params_for_entry(spec_op, target_defn);
+    let mut candidates = gen_semantic_candidates(spec_op, file, defn_idx, max_candidates);
+    let enum_limit = max_candidates.saturating_mul(4);
+    for (idx, expr) in
+        enumerate_expr_candidates("i32", &semantic_params, max_depth, max_nodes, ops_preset)
+            .take(enum_limit)
+            .enumerate()
+    {
+        candidates.push((format!("enum_{idx:04}"), expr));
+    }
+    let candidates = normalize_semantic_candidates(candidates, max_candidates);
 
     let verify_bounds = baseline_summary
         .get("settings")
@@ -2854,6 +3843,9 @@ fn run_semantic_repair_attempt(
     let mut ok = false;
 
     for (label, body) in candidates {
+        if !semantic_expr_matches_examples(&body, &examples) {
+            continue;
+        }
         let mut patched = file.clone();
         patched.functions[defn_idx].body = body.clone();
         let (patched_value, patched_bytes) = canon_x07ast_file_value_and_text(&mut patched)?;
@@ -2866,6 +3858,43 @@ fn run_semantic_repair_attempt(
             .with_context(|| format!("mkdir: {}", attempt_artifacts.display()))?;
         std::fs::create_dir_all(&attempt_test_artifacts)
             .with_context(|| format!("mkdir: {}", attempt_test_artifacts.display()))?;
+
+        let tests_report_rel = attempt_dir
+            .join("tests.report.json")
+            .strip_prefix(project_root)
+            .unwrap_or(attempt_dir.join("tests.report.json").as_path())
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut test_args = vec![
+            "test".to_string(),
+            "--all".to_string(),
+            "--manifest".to_string(),
+            tests_manifest_rel.to_string(),
+            "--filter".to_string(),
+            op_test_filter.to_string(),
+            "--allow-empty".to_string(),
+        ];
+        for root in attempt_module_roots.iter().map(PathBuf::as_path) {
+            test_args.push("--module-root".to_string());
+            test_args.push(root.display().to_string());
+        }
+        test_args.extend([
+            "--artifact-dir".to_string(),
+            attempt_test_artifacts
+                .strip_prefix(project_root)
+                .unwrap_or(attempt_test_artifacts.as_path())
+                .to_string_lossy()
+                .replace('\\', "/"),
+            "--report-out".to_string(),
+            tests_report_rel.clone(),
+            "--quiet-json".to_string(),
+        ]);
+        let test_run = run_self_command(project_root, &test_args)?;
+        let tests_ok = test_run.exit_code == 0;
+
+        if !tests_ok {
+            continue;
+        }
 
         let prove_report_rel = attempt_dir
             .join("prove.report.json")
@@ -2917,39 +3946,6 @@ fn run_semantic_repair_attempt(
                 .and_then(|v| v.get("ok").and_then(Value::as_bool))
                 == Some(true);
 
-        let tests_report_rel = attempt_dir
-            .join("tests.report.json")
-            .strip_prefix(project_root)
-            .unwrap_or(attempt_dir.join("tests.report.json").as_path())
-            .to_string_lossy()
-            .replace('\\', "/");
-        let mut test_args = vec![
-            "test".to_string(),
-            "--all".to_string(),
-            "--manifest".to_string(),
-            tests_manifest_rel.to_string(),
-            "--filter".to_string(),
-            op_test_filter.to_string(),
-            "--allow-empty".to_string(),
-        ];
-        for root in attempt_module_roots.iter().map(PathBuf::as_path) {
-            test_args.push("--module-root".to_string());
-            test_args.push(root.display().to_string());
-        }
-        test_args.extend([
-            "--artifact-dir".to_string(),
-            attempt_test_artifacts
-                .strip_prefix(project_root)
-                .unwrap_or(attempt_test_artifacts.as_path())
-                .to_string_lossy()
-                .replace('\\', "/"),
-            "--report-out".to_string(),
-            tests_report_rel.clone(),
-            "--quiet-json".to_string(),
-        ]);
-        let test_run = run_self_command(project_root, &test_args)?;
-        let tests_ok = test_run.exit_code == 0;
-
         if prove_ok && tests_ok {
             let mut note = format!("xtal repair semantic candidate: {label}");
             if let Some((contract_kind, clause_id)) =
@@ -2980,11 +3976,788 @@ fn run_semantic_repair_attempt(
         }
     }
 
+    if !ok {
+        diags.push(semantic_repair_diag(
+            semantic_only,
+            "EXTAL_REPAIR_SEMANTIC_SEARCH_EXHAUSTED",
+            format!(
+                "semantic repair exhausted its budget (max_candidates={max_candidates}, max_depth={max_depth}) without finding a valid patch for '{target_entry}'"
+            ),
+        ));
+    }
+
     write_patchset(&patchset_path, &best_patchset)?;
     util::write_atomic(&diff_path, best_diff.as_bytes())
         .with_context(|| format!("write diff: {}", diff_path.display()))?;
 
     Ok((best_patchset, best_diff, ok))
+}
+
+fn semantic_repair_diag(
+    semantic_only: bool,
+    code: &str,
+    message: impl Into<String>,
+) -> diagnostics::Diagnostic {
+    if semantic_only {
+        diag_error(code, diagnostics::Stage::Run, message, None)
+    } else {
+        diag_warning(code, diagnostics::Stage::Run, message, None)
+    }
+}
+
+fn semantic_max_nodes(max_depth: usize) -> usize {
+    max_depth.saturating_mul(8).saturating_add(2).max(8)
+}
+
+#[derive(Debug, Clone)]
+struct SemanticParam {
+    name: String,
+    ty: String,
+}
+
+fn semantic_params_for_entry(
+    spec_op: &SpecOperation,
+    defn: &x07ast::AstFunctionDef,
+) -> Vec<SemanticParam> {
+    let mut out = Vec::new();
+    for (idx, sp) in spec_op.params.iter().enumerate() {
+        let Some(ip) = defn.params.get(idx) else {
+            break;
+        };
+        out.push(SemanticParam {
+            name: ip.name.clone(),
+            ty: sp.ty.clone(),
+        });
+    }
+    out
+}
+
+#[derive(Debug, Clone)]
+enum SemanticValue {
+    I32(i32),
+    Bytes(Vec<u8>),
+}
+
+#[derive(Debug, Clone)]
+struct SemanticExample {
+    args: BTreeMap<String, SemanticValue>,
+    expect: i32,
+}
+
+fn load_examples_for_entry(
+    project_root: &Path,
+    spec_op: &SpecOperation,
+    target_op_id: &str,
+    defn: &x07ast::AstFunctionDef,
+    diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<Vec<SemanticExample>> {
+    let Some(ex_ref) = spec_op.examples_ref.as_deref() else {
+        return Ok(Vec::new());
+    };
+    let ex_ref = ex_ref.trim();
+    if ex_ref.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let examples_path = project_root.join(ex_ref);
+    if !examples_path.is_file() {
+        return Ok(Vec::new());
+    }
+
+    let lines = read_examples_file(&examples_path, diags)?;
+    if lines.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut out = Vec::new();
+    for line in lines {
+        if line.op != target_op_id {
+            continue;
+        }
+        let mut args: BTreeMap<String, SemanticValue> = BTreeMap::new();
+        let mut ok = true;
+        for (idx, sp) in spec_op.params.iter().enumerate() {
+            let Some(ip) = defn.params.get(idx) else {
+                ok = false;
+                break;
+            };
+            let Some(v) = line.args.get(&sp.name) else {
+                ok = false;
+                break;
+            };
+            match sp.ty.trim() {
+                "i32" => match decode_i32_value(v) {
+                    Ok(n) => {
+                        args.insert(ip.name.clone(), SemanticValue::I32(n));
+                    }
+                    Err(_) => {
+                        ok = false;
+                        break;
+                    }
+                },
+                "bytes" | "bytes_view" => match decode_bytes_b64_value(v) {
+                    Ok(bytes) => {
+                        args.insert(ip.name.clone(), SemanticValue::Bytes(bytes));
+                    }
+                    Err(_) => {
+                        ok = false;
+                        break;
+                    }
+                },
+                _ => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if !ok {
+            continue;
+        }
+        let expect = match decode_i32_value(&line.expect) {
+            Ok(n) => n,
+            Err(_) => continue,
+        };
+        out.push(SemanticExample { args, expect });
+    }
+
+    Ok(out)
+}
+
+fn semantic_expr_matches_examples(expr: &Expr, examples: &[SemanticExample]) -> bool {
+    for ex in examples {
+        let Some(v) = eval_expr_on_example(expr, ex) else {
+            return false;
+        };
+        let Some(n) = v.as_i64().and_then(|n| i32::try_from(n).ok()) else {
+            return false;
+        };
+        if n != ex.expect {
+            return false;
+        }
+    }
+    true
+}
+
+fn eval_expr_on_example(expr: &Expr, example: &SemanticExample) -> Option<Value> {
+    let out = eval_semantic_expr(expr, &example.args)?;
+    match out {
+        SemanticValue::I32(n) => Some(Value::Number(n.into())),
+        SemanticValue::Bytes(_) => None,
+    }
+}
+
+fn eval_expr_to_i32(expr: &Expr, env: &BTreeMap<String, SemanticValue>) -> Option<i32> {
+    match eval_semantic_expr(expr, env)? {
+        SemanticValue::I32(n) => Some(n),
+        SemanticValue::Bytes(_) => None,
+    }
+}
+
+fn eval_semantic_expr(expr: &Expr, env: &BTreeMap<String, SemanticValue>) -> Option<SemanticValue> {
+    match expr {
+        Expr::Int { value, .. } => Some(SemanticValue::I32(*value)),
+        Expr::Ident { name, .. } => env.get(name).cloned(),
+        Expr::List { items, .. } => {
+            if items.is_empty() {
+                return None;
+            }
+            let op = items[0].as_ident()?;
+            match op {
+                "bytes.len" | "view.len" => {
+                    if items.len() != 2 {
+                        return None;
+                    }
+                    let SemanticValue::Bytes(bytes) = eval_semantic_expr(&items[1], env)? else {
+                        return None;
+                    };
+                    Some(SemanticValue::I32(
+                        i32::try_from(bytes.len()).unwrap_or(i32::MAX),
+                    ))
+                }
+                "+" => {
+                    if items.len() != 3 {
+                        return None;
+                    }
+                    let a = eval_expr_to_i32(&items[1], env)?;
+                    let b = eval_expr_to_i32(&items[2], env)?;
+                    Some(SemanticValue::I32(a.wrapping_add(b)))
+                }
+                "-" => {
+                    if items.len() != 3 {
+                        return None;
+                    }
+                    let a = eval_expr_to_i32(&items[1], env)?;
+                    let b = eval_expr_to_i32(&items[2], env)?;
+                    Some(SemanticValue::I32(a.wrapping_sub(b)))
+                }
+                "*" => {
+                    if items.len() != 3 {
+                        return None;
+                    }
+                    let a = eval_expr_to_i32(&items[1], env)?;
+                    let b = eval_expr_to_i32(&items[2], env)?;
+                    Some(SemanticValue::I32(a.wrapping_mul(b)))
+                }
+                "/" => {
+                    if items.len() != 3 {
+                        return None;
+                    }
+                    let a = eval_expr_to_i32(&items[1], env)?;
+                    let b = eval_expr_to_i32(&items[2], env)?;
+                    if b == 0 {
+                        return None;
+                    }
+                    let out = if a == i32::MIN && b == -1 {
+                        i32::MIN
+                    } else {
+                        a / b
+                    };
+                    Some(SemanticValue::I32(out))
+                }
+                "%" => {
+                    if items.len() != 3 {
+                        return None;
+                    }
+                    let a = eval_expr_to_i32(&items[1], env)?;
+                    let b = eval_expr_to_i32(&items[2], env)?;
+                    if b == 0 {
+                        return None;
+                    }
+                    let out = if a == i32::MIN && b == -1 { 0 } else { a % b };
+                    Some(SemanticValue::I32(out))
+                }
+                "=" => {
+                    if items.len() != 3 {
+                        return None;
+                    }
+                    let a = eval_expr_to_i32(&items[1], env)?;
+                    let b = eval_expr_to_i32(&items[2], env)?;
+                    Some(SemanticValue::I32(i32::from(a == b)))
+                }
+                "<" => {
+                    if items.len() != 3 {
+                        return None;
+                    }
+                    let a = eval_expr_to_i32(&items[1], env)?;
+                    let b = eval_expr_to_i32(&items[2], env)?;
+                    Some(SemanticValue::I32(i32::from(a < b)))
+                }
+                "if" => {
+                    if items.len() != 4 {
+                        return None;
+                    }
+                    let cond = eval_expr_to_i32(&items[1], env)?;
+                    if cond != 0 {
+                        eval_semantic_expr(&items[2], env)
+                    } else {
+                        eval_semantic_expr(&items[3], env)
+                    }
+                }
+                _ => None,
+            }
+        }
+    }
+}
+
+fn normalize_semantic_candidates(
+    candidates: Vec<(String, Expr)>,
+    max_candidates: usize,
+) -> Vec<(String, Expr)> {
+    #[derive(Clone)]
+    struct Item {
+        label: String,
+        expr: Expr,
+        key: Vec<u8>,
+        node_count: usize,
+    }
+
+    let mut seen: BTreeSet<Vec<u8>> = BTreeSet::new();
+    let mut out: Vec<Item> = Vec::new();
+    for (label, expr) in candidates {
+        let key = canonical_expr_key(&expr);
+        if !seen.insert(key.clone()) {
+            continue;
+        }
+        out.push(Item {
+            label,
+            node_count: expr.node_count(),
+            expr,
+            key,
+        });
+    }
+    out.sort_by(|a, b| {
+        a.node_count
+            .cmp(&b.node_count)
+            .then_with(|| a.key.cmp(&b.key))
+    });
+    out.truncate(max_candidates);
+    out.into_iter().map(|i| (i.label, i.expr)).collect()
+}
+
+#[derive(Clone)]
+struct SizedExpr {
+    expr: Expr,
+    key: Vec<u8>,
+    depth: usize,
+}
+
+struct ExprCandidateIter {
+    max_depth: usize,
+    max_nodes: usize,
+    binary_ops: Vec<(&'static str, bool)>,
+    by_size: Vec<Vec<SizedExpr>>,
+    seen: BTreeSet<Vec<u8>>,
+    current_size: usize,
+    current_index: usize,
+    prepared_up_to: usize,
+}
+
+impl ExprCandidateIter {
+    fn empty() -> Self {
+        Self {
+            max_depth: 0,
+            max_nodes: 0,
+            binary_ops: Vec::new(),
+            by_size: vec![Vec::new()],
+            seen: BTreeSet::new(),
+            current_size: 1,
+            current_index: 0,
+            prepared_up_to: 0,
+        }
+    }
+
+    fn new_i32(
+        params: &[SemanticParam],
+        max_depth: usize,
+        max_nodes: usize,
+        ops_preset: SemanticOpsPreset,
+    ) -> Self {
+        if max_depth == 0 || max_nodes == 0 {
+            return Self::empty();
+        }
+
+        let mut binary_ops: Vec<(&'static str, bool)> = vec![
+            ("+", true),
+            ("-", false),
+            ("*", true),
+            ("=", true),
+            ("<", false),
+        ];
+        if ops_preset == SemanticOpsPreset::Full {
+            binary_ops.extend([("/", false), ("%", false)]);
+        }
+
+        let mut by_size: Vec<Vec<SizedExpr>> = vec![Vec::new(); max_nodes + 1];
+        let mut seen: BTreeSet<Vec<u8>> = BTreeSet::new();
+
+        for n in [-1, 0, 1, 2] {
+            let expr = int_expr(n);
+            let key = canonical_expr_key(&expr);
+            if seen.insert(key.clone()) {
+                by_size[1].push(SizedExpr {
+                    expr,
+                    key,
+                    depth: 1,
+                });
+            }
+        }
+
+        for p in params {
+            match p.ty.trim() {
+                "i32" => {
+                    let expr = ident(p.name.clone());
+                    let key = canonical_expr_key(&expr);
+                    if seen.insert(key.clone()) {
+                        by_size[1].push(SizedExpr {
+                            expr,
+                            key,
+                            depth: 1,
+                        });
+                    }
+                }
+                "bytes" => {
+                    let expr = list_expr([ident("bytes.len"), ident(p.name.clone())]);
+                    let key = canonical_expr_key(&expr);
+                    if seen.insert(key.clone()) && 3 < by_size.len() {
+                        by_size[3].push(SizedExpr {
+                            expr,
+                            key,
+                            depth: 2,
+                        });
+                    }
+                }
+                "bytes_view" => {
+                    let expr = list_expr([ident("view.len"), ident(p.name.clone())]);
+                    let key = canonical_expr_key(&expr);
+                    if seen.insert(key.clone()) && 3 < by_size.len() {
+                        by_size[3].push(SizedExpr {
+                            expr,
+                            key,
+                            depth: 2,
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Self {
+            max_depth,
+            max_nodes,
+            binary_ops,
+            by_size,
+            seen,
+            current_size: 1,
+            current_index: 0,
+            prepared_up_to: 0,
+        }
+    }
+
+    fn prepare_size(&mut self, size: usize) {
+        if size == 0 || size >= self.by_size.len() {
+            return;
+        }
+
+        if size >= 4 {
+            let want_sum = size - 2;
+            for (op, commutative) in &self.binary_ops {
+                for a_size in 1..=(want_sum.saturating_sub(1)) {
+                    let b_size = want_sum - a_size;
+                    if b_size == 0 || a_size >= self.by_size.len() || b_size >= self.by_size.len() {
+                        continue;
+                    }
+                    let mut next_size: Vec<SizedExpr> = Vec::new();
+                    for a in &self.by_size[a_size] {
+                        for b in &self.by_size[b_size] {
+                            if *commutative && a.key > b.key {
+                                continue;
+                            }
+                            let depth = 1 + a.depth.max(b.depth);
+                            if depth > self.max_depth {
+                                continue;
+                            }
+                            let expr = list_expr([ident(*op), a.expr.clone(), b.expr.clone()]);
+                            let key = canonical_expr_key(&expr);
+                            if !self.seen.insert(key.clone()) {
+                                continue;
+                            }
+                            next_size.push(SizedExpr { expr, key, depth });
+                        }
+                    }
+                    self.by_size[size].extend(next_size);
+                }
+            }
+        }
+
+        if size >= 5 {
+            let want_sum = size - 2;
+            for cond_size in 1..=(want_sum.saturating_sub(2)) {
+                for then_size in 1..=(want_sum - cond_size).saturating_sub(1) {
+                    let else_size = want_sum - cond_size - then_size;
+                    if else_size == 0 {
+                        continue;
+                    }
+                    if cond_size >= self.by_size.len()
+                        || then_size >= self.by_size.len()
+                        || else_size >= self.by_size.len()
+                    {
+                        continue;
+                    }
+                    let mut next_size: Vec<SizedExpr> = Vec::new();
+                    for cond in &self.by_size[cond_size] {
+                        for then_expr in &self.by_size[then_size] {
+                            for else_expr in &self.by_size[else_size] {
+                                let depth =
+                                    1 + cond.depth.max(then_expr.depth).max(else_expr.depth);
+                                if depth > self.max_depth {
+                                    continue;
+                                }
+                                let expr = list_expr([
+                                    ident("if"),
+                                    cond.expr.clone(),
+                                    then_expr.expr.clone(),
+                                    else_expr.expr.clone(),
+                                ]);
+                                let key = canonical_expr_key(&expr);
+                                if !self.seen.insert(key.clone()) {
+                                    continue;
+                                }
+                                next_size.push(SizedExpr { expr, key, depth });
+                            }
+                        }
+                    }
+                    self.by_size[size].extend(next_size);
+                }
+            }
+        }
+
+        self.by_size[size].sort_by(|a, b| a.key.cmp(&b.key));
+    }
+}
+
+impl Iterator for ExprCandidateIter {
+    type Item = Expr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.current_size <= self.max_nodes {
+            if self.prepared_up_to < self.current_size {
+                self.prepare_size(self.current_size);
+                self.prepared_up_to = self.current_size;
+                self.current_index = 0;
+            }
+
+            let bucket = self.by_size.get(self.current_size)?;
+            if let Some(item) = bucket.get(self.current_index) {
+                self.current_index += 1;
+                return Some(item.expr.clone());
+            }
+
+            self.current_size += 1;
+            self.current_index = 0;
+        }
+        None
+    }
+}
+
+fn enumerate_expr_candidates(
+    return_ty: &str,
+    params: &[SemanticParam],
+    max_depth: usize,
+    max_nodes: usize,
+    ops_preset: SemanticOpsPreset,
+) -> ExprCandidateIter {
+    if return_ty.trim() != "i32" {
+        return ExprCandidateIter::empty();
+    }
+    ExprCandidateIter::new_i32(params, max_depth, max_nodes, ops_preset)
+}
+
+fn canonical_expr_key(expr: &Expr) -> Vec<u8> {
+    let key_val = x07ast::expr_to_value(expr);
+    util::canonical_jcs_bytes(&key_val)
+        .or_else(|_| serde_json::to_vec(&key_val).map_err(anyhow::Error::from))
+        .unwrap_or_default()
+}
+
+fn gen_semantic_candidates(
+    spec_op: &SpecOperation,
+    file: &x07ast::X07AstFile,
+    defn_idx: usize,
+    max_candidates: usize,
+) -> Vec<(String, Expr)> {
+    let target = &file.functions[defn_idx];
+
+    let mut spec_to_impl: BTreeMap<String, String> = BTreeMap::new();
+    for (i, sp) in spec_op.params.iter().enumerate() {
+        if let Some(ip) = target.params.get(i) {
+            if sp.name != ip.name {
+                spec_to_impl.insert(sp.name.clone(), ip.name.clone());
+            }
+        }
+    }
+
+    let spec_result_ty = spec_op.result.trim().to_string();
+    let spec_param_tys: Vec<String> = spec_op
+        .params
+        .iter()
+        .map(|p| p.ty.trim().to_string())
+        .collect();
+
+    let mut seen: BTreeSet<Vec<u8>> = BTreeSet::new();
+    let mut out: Vec<(String, Expr)> = Vec::new();
+
+    let push =
+        |label: String, expr: Expr, out: &mut Vec<(String, Expr)>, seen: &mut BTreeSet<Vec<u8>>| {
+            if out.len() >= max_candidates {
+                return;
+            }
+            let key_val = x07ast::expr_to_value(&expr);
+            let key = util::canonical_jcs_bytes(&key_val)
+                .or_else(|_| serde_json::to_vec(&key_val).map_err(anyhow::Error::from))
+                .unwrap_or_default();
+            if seen.insert(key) {
+                out.push((label, expr));
+            }
+        };
+
+    for clause in &spec_op.ensures {
+        if let Ok(expr) = x07c::ast::expr_from_json(&clause.expr) {
+            if let Some(rhs) = find_result_equality_rhs(&expr) {
+                let rhs = rewrite_idents(&rhs, &spec_to_impl);
+                let label = clause
+                    .id
+                    .as_deref()
+                    .map(|id| format!("ensures({id})"))
+                    .unwrap_or_else(|| "ensures".to_string());
+                push(label, rhs, &mut out, &mut seen);
+            }
+        }
+    }
+
+    for (i, ty) in spec_param_tys.iter().enumerate() {
+        if ty == &spec_result_ty {
+            if let Some(ip) = target.params.get(i) {
+                push(
+                    format!("identity({})", ip.name),
+                    ident(&ip.name),
+                    &mut out,
+                    &mut seen,
+                );
+            }
+        }
+    }
+
+    for (idx, f) in file.functions.iter().enumerate() {
+        if idx == defn_idx {
+            continue;
+        }
+        if !type_ref_matches_str(&f.result, &spec_result_ty) {
+            continue;
+        }
+        if f.params.len() != spec_param_tys.len() {
+            continue;
+        }
+        let mut sig_ok = true;
+        for (p, want) in f.params.iter().zip(spec_param_tys.iter()) {
+            if !type_ref_matches_str(&p.ty, want) {
+                sig_ok = false;
+                break;
+            }
+        }
+        if !sig_ok {
+            continue;
+        }
+
+        let mut items: Vec<Expr> = Vec::with_capacity(1 + target.params.len());
+        items.push(ident(&f.name));
+        for p in &target.params {
+            items.push(ident(&p.name));
+        }
+        push(
+            format!("delegate({})", f.name),
+            list_expr_vec(items),
+            &mut out,
+            &mut seen,
+        );
+    }
+
+    if spec_result_ty == "bytes" {
+        for (i, ty) in spec_param_tys.iter().enumerate() {
+            if ty == "bytes" {
+                if let Some(ip) = target.params.get(i) {
+                    let e = list_expr_vec(vec![
+                        ident("view.to_bytes"),
+                        list_expr_vec(vec![ident("bytes.view"), ident(&ip.name)]),
+                    ]);
+                    push(format!("clone({})", ip.name), e, &mut out, &mut seen);
+                }
+            } else if ty == "bytes_view" {
+                if let Some(ip) = target.params.get(i) {
+                    let e = list_expr_vec(vec![ident("view.to_bytes"), ident(&ip.name)]);
+                    push(format!("to_bytes({})", ip.name), e, &mut out, &mut seen);
+                }
+            }
+        }
+        push(
+            "bytes.empty".to_string(),
+            list_expr([ident("bytes.empty")]),
+            &mut out,
+            &mut seen,
+        );
+    } else if spec_result_ty == "bytes_view" {
+        for (i, ty) in spec_param_tys.iter().enumerate() {
+            if ty == "bytes" {
+                if let Some(ip) = target.params.get(i) {
+                    let e = list_expr([ident("bytes.view"), ident(&ip.name)]);
+                    push(format!("view({})", ip.name), e, &mut out, &mut seen);
+                }
+            }
+        }
+    } else if spec_result_ty == "i32" {
+        for (i, ty) in spec_param_tys.iter().enumerate() {
+            if ty == "i32" {
+                if let Some(ip) = target.params.get(i) {
+                    push(
+                        format!("identity({})", ip.name),
+                        ident(&ip.name),
+                        &mut out,
+                        &mut seen,
+                    );
+                }
+            } else if ty == "bytes" {
+                if let Some(ip) = target.params.get(i) {
+                    let e = list_expr([ident("bytes.len"), ident(&ip.name)]);
+                    push(format!("len({})", ip.name), e, &mut out, &mut seen);
+                }
+            } else if ty == "bytes_view" {
+                if let Some(ip) = target.params.get(i) {
+                    let e = list_expr([ident("view.len"), ident(&ip.name)]);
+                    push(format!("len({})", ip.name), e, &mut out, &mut seen);
+                }
+            }
+        }
+        push("0".to_string(), int_expr(0), &mut out, &mut seen);
+        push("1".to_string(), int_expr(1), &mut out, &mut seen);
+        push("-1".to_string(), int_expr(-1), &mut out, &mut seen);
+    }
+
+    if out.is_empty() {
+        out.push(("no_candidates".to_string(), target.body.clone()));
+    }
+
+    out.truncate(max_candidates);
+    out
+}
+
+fn type_ref_matches_str(ty: &x07ast::TypeRef, want: &str) -> bool {
+    match ty {
+        x07ast::TypeRef::Named(n) => n.trim() == want.trim(),
+        _ => false,
+    }
+}
+
+fn rewrite_idents(expr: &Expr, mapping: &BTreeMap<String, String>) -> Expr {
+    match expr {
+        Expr::Ident { name, .. } => mapping
+            .get(name)
+            .cloned()
+            .map(ident)
+            .unwrap_or_else(|| ident(name.clone())),
+        Expr::Int { value, .. } => int_expr(*value),
+        Expr::List { items, .. } => {
+            list_expr_vec(items.iter().map(|e| rewrite_idents(e, mapping)).collect())
+        }
+    }
+}
+
+fn find_result_equality_rhs(expr: &Expr) -> Option<Expr> {
+    if let Some(rhs) = direct_result_equality_rhs(expr) {
+        return Some(rhs);
+    }
+    match expr {
+        Expr::List { items, .. } => items.iter().find_map(find_result_equality_rhs),
+        _ => None,
+    }
+}
+
+fn direct_result_equality_rhs(expr: &Expr) -> Option<Expr> {
+    let Expr::List { items, .. } = expr else {
+        return None;
+    };
+    if items.len() != 3 {
+        return None;
+    }
+    let Expr::Ident { name: op, .. } = &items[0] else {
+        return None;
+    };
+    if op != "=" {
+        return None;
+    }
+    match (&items[1], &items[2]) {
+        (Expr::Ident { name: a, .. }, rhs) if a == "__result" => Some(rhs.clone()),
+        (lhs, Expr::Ident { name: b, .. }) if b == "__result" => Some(lhs.clone()),
+        _ => None,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3199,6 +4972,22 @@ fn prove_contract_location(
     project_root: &Path,
     prove_report_rel: &str,
 ) -> Option<(String, String)> {
+    let payload = read_prove_contract_payload(project_root, prove_report_rel)?;
+    Some((payload.contract_kind, payload.clause_id))
+}
+
+#[derive(Debug, Clone)]
+struct ProveContractPayload {
+    contract_kind: String,
+    clause_id: String,
+    clause_index: Option<usize>,
+    witness: Vec<Value>,
+}
+
+fn read_prove_contract_payload(
+    project_root: &Path,
+    prove_report_rel: &str,
+) -> Option<ProveContractPayload> {
     let path = project_root.join(prove_report_rel);
     let bytes = std::fs::read(&path).ok()?;
     let doc: Value = serde_json::from_slice(&bytes).ok()?;
@@ -3208,7 +4997,21 @@ fn prove_contract_location(
         .and_then(Value::as_object)?;
     let kind = contract.get("contract_kind").and_then(Value::as_str)?;
     let clause_id = contract.get("clause_id").and_then(Value::as_str)?;
-    Some((kind.to_string(), clause_id.to_string()))
+    let clause_index = contract
+        .get("clause_index")
+        .and_then(Value::as_u64)
+        .map(|n| n as usize);
+    let witness = contract
+        .get("witness")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    Some(ProveContractPayload {
+        contract_kind: kind.to_string(),
+        clause_id: clause_id.to_string(),
+        clause_index,
+        witness,
+    })
 }
 
 fn unified_json_diff(path: &str, before: &Value, after: &Value) -> Result<String> {
@@ -7785,6 +9588,80 @@ fn merge_meta_digests(report: &Value, meta_key: &str, out_by_path: &mut BTreeMap
             .entry(path.to_string())
             .or_insert_with(|| v.clone());
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XtalManifest {
+    schema_version: String,
+    #[allow(dead_code)]
+    #[serde(default)]
+    xtal_version: Option<String>,
+    #[allow(dead_code)]
+    #[serde(default)]
+    spec_roots: Vec<String>,
+    #[allow(dead_code)]
+    #[serde(default)]
+    impl_roots: Vec<String>,
+    #[serde(default)]
+    entrypoints: Vec<XtalEntrypoint>,
+    #[allow(dead_code)]
+    #[serde(default)]
+    profiles: Option<XtalProfiles>,
+    #[allow(dead_code)]
+    #[serde(default)]
+    sandbox: Option<XtalSandbox>,
+    #[serde(default)]
+    trust: Option<XtalTrust>,
+    #[serde(default)]
+    autonomy: Option<XtalAutonomy>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XtalEntrypoint {
+    name: String,
+    #[allow(dead_code)]
+    kind: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XtalProfiles {
+    dev_world: String,
+    ci_world: String,
+    prod_world: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XtalSandbox {
+    policy: String,
+    backend: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XtalTrust {
+    #[serde(default)]
+    review_gates: Vec<String>,
+    cert_profile: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XtalAutonomy {
+    #[serde(default)]
+    agent_write_paths: Vec<String>,
+    #[serde(default)]
+    agent_write_specs: bool,
+    #[serde(default)]
+    agent_write_arch: bool,
+    #[allow(dead_code)]
+    #[serde(default)]
+    max_repair_iters: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
