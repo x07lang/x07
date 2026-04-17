@@ -34,6 +34,10 @@ use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::json_patch;
 
+use crate::tasks_index::{
+    ArchTasksIndex, ArchTasksIndexTask, ARCH_TASKS_INDEX_SCHEMA_BYTES,
+    ARCH_TASKS_INDEX_SCHEMA_VERSION,
+};
 use crate::util;
 
 const X07_ARCH_MANIFEST_SCHEMA_BYTES: &[u8] =
@@ -58,9 +62,6 @@ const X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.stream-plugins.index.schema.json");
 const X07_ARCH_STREAM_PLUGIN_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.stream-plugin.schema.json");
-const X07_ARCH_TASKS_INDEX_SCHEMA_VERSION: &str = "x07.arch.tasks.index@0.1.0";
-const X07_ARCH_TASKS_INDEX_SCHEMA_BYTES: &[u8] =
-    include_bytes!("../../../spec/x07-arch.tasks.index.schema.json");
 const X07_BUDGET_PROFILE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-budget.profile.schema.json");
 const X07_SM_SPEC_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07-sm.spec.schema.json");
@@ -565,34 +566,6 @@ struct ArchBudgetsIndexProfile {
     selectors: Vec<ArchBudgetsIndexSelector>,
     #[serde(default)]
     worlds_allowed: Vec<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ArchTasksIndex {
-    schema_version: String,
-    #[serde(default)]
-    tasks: Vec<ArchTasksIndexTask>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ArchTasksIndexTask {
-    id: String,
-    #[serde(rename = "fn")]
-    fn_symbol: String,
-    #[serde(default)]
-    deps: Vec<String>,
-    policy: ArchTasksPolicy,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ArchTasksPolicy {
-    criticality: String,
-    on_failure: String,
-    #[serde(default)]
-    retry_max: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -7187,7 +7160,7 @@ fn check_contracts_v1(
             "E_ARCH_TASKS_INDEX_INVALID",
         )? {
             if index_doc.get("schema_version").and_then(Value::as_str)
-                != Some(X07_ARCH_TASKS_INDEX_SCHEMA_VERSION)
+                != Some(ARCH_TASKS_INDEX_SCHEMA_VERSION)
             {
                 push_contract_diag(
                     diags,
@@ -7201,7 +7174,7 @@ fn check_contracts_v1(
             } else {
                 let schema_diags = validate_schema(
                     "E_ARCH_TASKS_INDEX_INVALID",
-                    X07_ARCH_TASKS_INDEX_SCHEMA_BYTES,
+                    ARCH_TASKS_INDEX_SCHEMA_BYTES,
                     &index_doc,
                 )?;
                 for d in schema_diags {
@@ -7230,7 +7203,7 @@ fn check_contracts_v1(
                 }
             };
 
-            if index_obj.schema_version != X07_ARCH_TASKS_INDEX_SCHEMA_VERSION {
+            if index_obj.schema_version != ARCH_TASKS_INDEX_SCHEMA_VERSION {
                 push_contract_diag(
                     diags,
                     enforce,

@@ -10,11 +10,12 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - `x07 xtal spec fmt|lint|check|extract|scaffold` for authoring, validating, and extracting `*.x07spec.json` modules and `*.x07spec.examples.jsonl`.
   - `x07 xtal tests gen-from-spec` for generating deterministic unit tests from spec examples and property checks from `ensures_props` under `gen/xtal/`.
   - `x07 xtal impl check|sync` for validating and synchronizing implementation exports/signatures/contracts against specs (including optional patch emission via `impl sync --patchset-out`).
-  - `x07 xtal dev` and `x07 xtal verify` wrappers for a single-command XTAL loop (spec checks, generator drift checks, impl conformance checks, verification runs, and test execution).
+  - `x07 xtal dev` and `x07 xtal verify` wrappers for a single-command XTAL loop (spec checks, generator drift checks, impl conformance checks, verification runs, and test execution), with `x07 xtal dev --prechecks-only` and `x07 xtal dev --repair-on-fail`.
   - `x07 xtal repair` for a bounded repair loop that emits an `x07.patchset@0.1.0` + deterministic review diff under `target/xtal/repair/` (and can optionally emit a spec witness suggestion with `--suggest-spec-patch`).
   - `x07 xtal certify` for producing a manifest-driven certification bundle via `x07 trust certify`, writing a summary under `target/xtal/cert/`.
-  - `x07 xtal ingest` for normalizing runtime violation bundles (or contract repros) into a canonical workspace under `target/xtal/ingest/`.
+  - `x07 xtal ingest` for normalizing runtime violation bundles (or contract repros) into a canonical workspace under `target/xtal/ingest/` (and optionally running an improvement loop).
   - `x07 xtal improve` for consuming incidents (violation bundles, contract repros, or recovery event logs) and coordinating a bounded verify/repair/certify run under `target/xtal/`.
+  - `x07 xtal tasks run` for executing recovery tasks from `arch/tasks/index.x07tasks.json` for an incident input (and emitting optional recovery events under `target/xtal/events/`).
 - Generator determinism gate:
   - `arch/gen/index.x07gen.json` (`x07.arch.gen.index@0.1.0`) for declaring generator outputs and pinned invocations.
   - `x07 gen verify|write` for byte-for-byte drift checks and (optional) double-run determinism verification across declared generators.
@@ -32,16 +33,22 @@ All notable user-facing changes to the X07 toolchain are documented in this file
   - `x07.arch.tasks.index@0.1.0` for task policy graphs (`arch/tasks/index.x07tasks.json`).
 - Formal verification:
   - `x07 verify --input-len-bytes` for overriding the verification input encoding length (advanced; used by wrappers that derive verification inputs).
+  - `x07 verify --prove` proof caching keyed by declaration hash + imported proof-summary digests, storing summaries under `.x07/cache/verify/proof_summaries/` and (when `--emit-proof` is used) proof bundles under `.x07/cache/verify/proofs/`.
 
 ### Changed
 
+- `x07 xtal dev` now runs `x07 xtal verify` by default (pass `--prechecks-only` to stop after spec/gen/impl checks).
+- `x07 xtal ingest` now runs `x07 xtal improve` by default (pass `--normalize-only` to stop after normalization), and accepts `--improve-out-dir` to control improvement artifacts.
 - `x07 xtal verify` now runs `x07 verify --coverage` and `x07 verify --prove` for each spec operation entrypoint (and records results under `target/xtal/verify/`).
 - `x07 xtal verify` now routes nested verification and test artifacts under `target/xtal/verify/_artifacts/` (and enforces solve-world determinism by default).
+- `x07 xtal verify --proof-policy balanced` now treats missing proof tools as warnings (and verification continues); `--proof-policy strict` requires proven outcomes.
+- `x07 xtal verify` now writes per-entry proof bundles under `target/xtal/verify/prove/<module>/<local>/` to avoid proof object collisions across modules.
 - `x07 xtal impl check` now enforces that `ensures_props[*].prop` symbols exist, are exported, and have compatible signatures for the selected args.
 - `x07 xtal repair --write` now requires `arch/xtal/xtal.json` and enforces `autonomy.agent_write_paths[]` boundaries for patch targets.
 - `x07 xtal certify` now accepts `--spec-dir` and writes a certification bundle manifest to `target/xtal/cert/bundle.json` (binds output digests plus spec/example digests).
 - `x07 xtal ingest` now validates `violation.json` ↔ `repro.json` integrity and records contract/source/tool metadata (and can ingest `events.jsonl` inputs).
 - `x07 trust certify` now supports `--fail-on` (trust report gates) and `--review-fail-on` (review diff gates) for CI posture enforcement, and writes `review.diff.txt` when a baseline is provided.
+- Contract repros emitted from `x07 run` in `run-os*` worlds now prefer replayable `solve-rr` repros by capturing record/replay fixtures under `.x07/artifacts/contract/<id>/rr`.
 
 ### Fixed
 

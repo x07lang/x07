@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["fixture.tasks.noop_v1"]},{"body":["bytes.empty"],"kind":"defn","name":"fixture.tasks.noop_v1","params":[{"name":"data","ty":"bytes_view"}],"result":"bytes"}],"imports":[],"kind":"module","module_id":"fixture.tasks","schema_version":"x07.x07ast@0.8.0"}

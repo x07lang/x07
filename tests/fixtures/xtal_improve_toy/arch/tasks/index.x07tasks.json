@@ -1,0 +1,14 @@
+{
+  "schema_version": "x07.arch.tasks.index@0.1.0",
+  "tasks": [
+    {
+      "id": "noop_v1",
+      "fn": "fixture.tasks.noop_v1",
+      "deps": [],
+      "policy": {
+        "criticality": "critical_v1",
+        "on_failure": "fail_fast_v1"
+      }
+    }
+  ]
+}

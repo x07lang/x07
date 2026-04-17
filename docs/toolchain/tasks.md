@@ -49,3 +49,13 @@ Validation checks include:
 - no dependency cycles,
 - valid `fn` symbol shape, and
 - policy consistency (`retry_max` required for `retry_bounded_v1`).
+
+## Execution
+
+`x07 xtal tasks run` executes tasks in dependency order for an incident input:
+
+- `x07 xtal tasks run --input target/xtal/violations/<id>/violation.json`
+
+It generates small wrapper programs under `target/xtal/tasks/<id>/` and runs them via `x07 run` using the incident’s world + input.
+
+If recovery events are enabled (see `docs/toolchain/xtal.md`), it also appends `x07.xtal.recovery_event@0.1.0` entries under `target/xtal/events/<id>/events.jsonl`.

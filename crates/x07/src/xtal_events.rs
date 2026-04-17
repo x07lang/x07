@@ -12,71 +12,31 @@ pub(crate) const RECOVERY_EVENT_SCHEMA_VERSION: &str = "x07.xtal.recovery_event@
 const RECOVERY_EVENT_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.xtal.recovery_event@0.1.0.schema.json");
 
-pub(crate) fn resolve_events_root_dir(project_root: &Path) -> Option<PathBuf> {
-    if let Ok(raw) = std::env::var(ENV_X07_XTAL_EVENTS_DIR) {
-        let raw = raw.trim();
-        if !raw.is_empty() {
-            let p = PathBuf::from(raw);
-            return Some(if p.is_absolute() {
-                p
-            } else {
-                project_root.join(p)
-            });
-        }
-    }
-
-    if project_root
-        .join("arch")
-        .join("xtal")
-        .join("xtal.json")
-        .is_file()
-    {
-        return Some(project_root.join(DEFAULT_EVENTS_DIR));
-    }
-
-    None
-}
-
-pub(crate) fn maybe_write_task_failed_event_for_contract_violation(
+pub(crate) fn maybe_append_recovery_event(
     project_root: &Path,
     incident_id: &str,
-    repro_bytes: &[u8],
+    kind: &str,
+    world: &str,
+    source: &Value,
+    task_id: Option<&str>,
+    details: Value,
 ) -> Result<Option<PathBuf>> {
     let Some(root_dir) = resolve_events_root_dir(project_root) else {
         return Ok(None);
     };
 
-    let repro: Value = serde_json::from_slice(repro_bytes).context("parse contract repro JSON")?;
-    let world = repro
-        .get("world")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
-    let source = repro
-        .get("source")
-        .cloned()
-        .unwrap_or_else(|| json!({ "mode": "unknown" }));
-
-    let contract = repro.get("contract").cloned().unwrap_or(Value::Null);
-    let task_id = repro
-        .pointer("/contract/fn")
-        .and_then(Value::as_str)
-        .map(|s| s.to_string());
-
     let preimage = {
         let mut doc = json!({
             "schema_version": RECOVERY_EVENT_SCHEMA_VERSION,
-            "kind": "task_failed_v1",
+            "kind": kind,
             "world": world,
             "source": source,
             "related_violation_id": incident_id,
-            "details": {
-                "contract": contract
-            }
+            "details": details,
         });
         if let Some(task_id) = task_id {
             if let Some(obj) = doc.as_object_mut() {
-                obj.insert("task_id".to_string(), Value::String(task_id));
+                obj.insert("task_id".to_string(), Value::String(task_id.to_string()));
             }
         }
         doc
@@ -117,4 +77,62 @@ pub(crate) fn maybe_write_task_failed_event_for_contract_violation(
         .with_context(|| format!("append: {}", out_path.display()))?;
 
     Ok(Some(out_path))
+}
+
+pub(crate) fn resolve_events_root_dir(project_root: &Path) -> Option<PathBuf> {
+    if let Ok(raw) = std::env::var(ENV_X07_XTAL_EVENTS_DIR) {
+        let raw = raw.trim();
+        if !raw.is_empty() {
+            let p = PathBuf::from(raw);
+            return Some(if p.is_absolute() {
+                p
+            } else {
+                project_root.join(p)
+            });
+        }
+    }
+
+    if project_root
+        .join("arch")
+        .join("xtal")
+        .join("xtal.json")
+        .is_file()
+    {
+        return Some(project_root.join(DEFAULT_EVENTS_DIR));
+    }
+
+    None
+}
+
+pub(crate) fn maybe_write_task_failed_event_for_contract_violation(
+    project_root: &Path,
+    incident_id: &str,
+    repro_bytes: &[u8],
+) -> Result<Option<PathBuf>> {
+    let repro: Value = serde_json::from_slice(repro_bytes).context("parse contract repro JSON")?;
+    let world = repro
+        .get("world")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let source = repro
+        .get("source")
+        .cloned()
+        .unwrap_or_else(|| json!({ "mode": "unknown" }));
+
+    let contract = repro.get("contract").cloned().unwrap_or(Value::Null);
+    let task_id = repro
+        .pointer("/contract/fn")
+        .and_then(Value::as_str)
+        .map(|s| s.to_string());
+
+    maybe_append_recovery_event(
+        project_root,
+        incident_id,
+        "task_failed_v1",
+        &world,
+        &source,
+        task_id.as_deref(),
+        json!({ "contract": contract }),
+    )
 }

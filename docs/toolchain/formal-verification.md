@@ -51,6 +51,9 @@ flowchart LR
 - `x07 verify --coverage` is for planning and review. It does not create proof.
 - `x07 verify --prove` is for generating proof evidence.
 - `x07 verify --prove --emit-proof <dir>` adds a proof object and proof-check report.
+- Successful prove runs are cached when a project manifest is available:
+  - proof summaries: `.x07/cache/verify/proof_summaries/`
+  - proof bundles (when emitting proof objects): `.x07/cache/verify/proofs/`
 - `x07 prove check` is for independently replaying the proof object against the current source and solver inputs.
 - `x07 trust capsule` is for attesting effectful capsule boundaries.
 - `x07 pkg attest-closure` is for freezing the reviewed dependency closure into deterministic evidence.

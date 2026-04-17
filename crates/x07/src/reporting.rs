@@ -445,8 +445,10 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
         "sm" => &["check", "gen"],
         "gen" => &["verify", "write"],
         "xtal" => &[
-            "dev", "verify", "certify", "repair", "ingest", "improve", "spec", "tests", "impl",
+            "dev", "verify", "certify", "repair", "ingest", "improve", "tasks", "spec", "tests",
+            "impl",
         ],
+        "xtal.tasks" => &["run"],
         "xtal.spec" => &["fmt", "lint", "check", "extract", "scaffold"],
         "xtal.tests" => &["gen-from-spec"],
         "xtal.impl" => &["check", "sync"],

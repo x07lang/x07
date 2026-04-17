@@ -3221,6 +3221,161 @@ fn x07_run_contract_violation_emits_repro() {
 }
 
 #[test]
+fn x07_run_os_contract_violation_emits_rr_replayable_repro() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_os_contract_repro_rr");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(dir.join("src")).expect("create src dir");
+    std::fs::create_dir_all(dir.join("policy")).expect("create policy dir");
+
+    let policy_path = dir.join("policy").join("run-os.json");
+    write_json(
+        &policy_path,
+        &serde_json::json!({
+            "schema_version": "x07.run-os-policy@0.1.0",
+            "policy_id": "x07_run_os_contract_repro_rr",
+            "limits": {
+                "cpu_ms": 1000,
+                "wall_ms": 1000,
+                "mem_bytes": 1048576,
+                "fds": 16,
+                "procs": 8
+            },
+            "fs": {
+                "enabled": false,
+                "read_roots": [],
+                "write_roots": [],
+                "deny_hidden": true
+            },
+            "net": {
+                "enabled": false,
+                "allow_dns": false,
+                "allow_tcp": false,
+                "allow_udp": false,
+                "allow_hosts": []
+            },
+            "env": {
+                "enabled": false,
+                "allow_keys": [],
+                "deny_keys": []
+            },
+            "time": {
+                "enabled": false,
+                "allow_monotonic": false,
+                "allow_wall_clock": false,
+                "allow_sleep": false,
+                "max_sleep_ms": 0,
+                "allow_local_tzid": false
+            },
+            "process": {
+                "enabled": false,
+                "allow_spawn": false,
+                "max_live": 0,
+                "max_spawns": 0,
+                "allow_exec": false,
+                "allow_exit": false
+            },
+            "language": {
+                "allow_unsafe": false,
+                "allow_ffi": false
+            },
+            "threads": {
+                "enabled": false,
+                "max_workers": 0,
+                "max_blocking": 0,
+                "max_queue": 0
+            }
+        }),
+    );
+
+    let project_doc = serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "operational_entry_symbol": "main.contract_fail",
+        "module_roots": ["src", "."],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    });
+    let project_bytes = serde_json::to_vec(&project_doc).expect("serialize x07.json");
+    write_json(&dir.join("x07.json"), &project_doc);
+    write_lockfile_for_project_bytes(&dir, &project_bytes);
+
+    write_json(
+        &dir.join("src").join("main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": ["std.test"],
+            "decls": [
+                { "kind": "export", "names": ["main.contract_fail"] },
+                {
+                    "kind": "defn",
+                    "name": "main.contract_fail",
+                    "params": [],
+                    "result": "result_i32",
+                    "requires": [{ "id": "req1", "expr": 0, "witness": [42] }],
+                    "body": ["std.test.pass"]
+                }
+            ],
+            "solve": ["begin", ["main.contract_fail"], ["bytes.alloc", 0]]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "run",
+            "--project",
+            "x07.json",
+            "--world",
+            "run-os-sandboxed",
+            "--policy",
+            policy_path.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let clause_dir = format!("id_{}", sha256_hex("req1".as_bytes()));
+    let repro_path = dir
+        .join(".x07")
+        .join("artifacts")
+        .join("contract")
+        .join(&clause_dir)
+        .join("repro.json");
+    assert!(repro_path.is_file(), "missing {}", repro_path.display());
+
+    let repro_bytes = std::fs::read(&repro_path).expect("read repro.json");
+    let repro: Value = serde_json::from_slice(&repro_bytes).expect("parse repro.json");
+    assert_eq!(repro["schema_version"], X07_CONTRACT_REPRO_SCHEMA_VERSION);
+    assert_eq!(repro["world"], "solve-rr");
+    assert_eq!(repro["source"]["mode"], "x07run");
+    assert_eq!(repro["source"]["test_entry"], "main.contract_fail");
+    assert_eq!(
+        repro["runner"]["fixture_rr_dir"],
+        format!(".x07/artifacts/contract/{clause_dir}/rr")
+    );
+    assert!(
+        dir.join(format!(".x07/artifacts/contract/{clause_dir}/rr"))
+            .is_dir(),
+        "missing rr fixture dir"
+    );
+}
+
+#[test]
 fn x07_verify_bmc_missing_cbmc_emits_tool_missing_report() {
     let dir = fresh_os_tmp_dir("x07_verify_bmc_missing_cbmc");
     std::fs::create_dir_all(&dir).expect("create temp dir");

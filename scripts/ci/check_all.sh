@@ -132,6 +132,15 @@ step "verified core pure example release guard"
 step "verified core fixture release guard"
 ./scripts/ci/check_verified_core_fixture.sh
 
+step "xtal improve fixture"
+./scripts/ci/check_xtal_improve.sh
+
+step "xtal ingest fixture"
+./scripts/ci/check_xtal_ingest.sh
+
+step "xtal tasks run fixture"
+./scripts/ci/check_xtal_tasks_run.sh
+
 step "service bench harness dry smoke"
 ./scripts/ci/check_service_bench_harnesses.sh
 

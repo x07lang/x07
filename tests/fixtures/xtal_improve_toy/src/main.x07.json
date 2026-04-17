@@ -1,0 +1,1 @@
+{"decls":[],"imports":["fixture","std.codec"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.8.0","solve":["std.codec.write_u32_le",["fixture.main",7]]}

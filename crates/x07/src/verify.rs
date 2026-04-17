@@ -932,27 +932,35 @@ fn cmd_verify_inner(
         }
     };
 
-    let imported_summary_index = match load_imported_summary_index(&cwd, &args.summary) {
-        Ok(v) => v,
-        Err(diagnostics) => {
-            let d = diagnostics.first().cloned().unwrap_or_else(|| {
-                diag_verify(
-                    "X07V_SUMMARY_MISMATCH",
-                    "imported proof-summary validation failed",
-                )
-            });
-            return write_report_and_exit(
-                machine,
-                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1)
-                    .with_diagnostics(diagnostics),
-            );
-        }
-    };
-
     let artifact_base =
         resolve_artifact_base_dir(&cwd, project_root.as_deref(), args.artifact_dir.as_deref());
 
     if mode == Mode::Coverage {
+        let cache_paths = project_root
+            .as_deref()
+            .map(list_proof_cache_summary_paths)
+            .unwrap_or_default();
+        let imported_summary_index = match load_imported_summary_index_merged(
+            &cwd,
+            &args.summary,
+            &cache_paths,
+            &module_roots,
+        ) {
+            Ok(v) => v,
+            Err(diagnostics) => {
+                let d = diagnostics.first().cloned().unwrap_or_else(|| {
+                    diag_verify(
+                        "X07V_SUMMARY_MISMATCH",
+                        "imported proof-summary validation failed",
+                    )
+                });
+                return write_report_and_exit(
+                    machine,
+                    VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1)
+                        .with_diagnostics(diagnostics),
+                );
+            }
+        };
         return cmd_verify_coverage(
             machine,
             &args,
@@ -1043,6 +1051,46 @@ fn cmd_verify_inner(
         unwind: args.unwind,
         max_bytes_len: args.max_bytes_len,
         input_len_bytes,
+    };
+
+    if mode == Mode::Prove {
+        if let Some(code) = try_reuse_cached_prove_bundle(
+            machine,
+            &args,
+            &bounds,
+            &artifact_base,
+            &module_roots,
+            &target,
+            &recursion,
+            project_path.as_deref(),
+        )? {
+            return Ok(code);
+        }
+    }
+
+    let imported_summary_index = if mode == Mode::Prove {
+        let cache_paths = project_root
+            .as_deref()
+            .map(list_proof_cache_summary_paths)
+            .unwrap_or_default();
+        match load_imported_summary_index_merged(&cwd, &args.summary, &cache_paths, &module_roots) {
+            Ok(v) => v,
+            Err(diagnostics) => {
+                let d = diagnostics.first().cloned().unwrap_or_else(|| {
+                    diag_verify(
+                        "X07V_SUMMARY_MISMATCH",
+                        "imported proof-summary validation failed",
+                    )
+                });
+                return write_report_and_exit(
+                    machine,
+                    VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1)
+                        .with_diagnostics(diagnostics),
+                );
+            }
+        }
+    } else {
+        ImportedSummaryIndex::default()
     };
 
     let mut artifacts = Artifacts::default();
@@ -1567,6 +1615,25 @@ fn cmd_verify_smt(
                 Some(proof_summary_path.display().to_string())
             };
             artifacts.verify_proof_summary_path = proof_summary_path;
+
+            if let Some(project_path) = plan.project_path.as_deref() {
+                if let Some(summary_path) = artifacts.verify_proof_summary_path.as_deref() {
+                    let project_root = project_path.parent().unwrap_or_else(|| Path::new("."));
+                    let _ = update_proof_cache_summary(
+                        project_root,
+                        &args.entry,
+                        Path::new(summary_path),
+                    );
+                    if let Some(proof_path) = plan.emit_proof_path.as_deref() {
+                        let _ = update_proof_cache_bundle(
+                            project_root,
+                            &args.entry,
+                            &bounds,
+                            proof_path,
+                        );
+                    }
+                }
+            }
         }
         Ok(artifacts)
     };
@@ -2179,105 +2246,118 @@ fn decl_sha256_hex_for_value(value: &Value) -> Result<String> {
     Ok(util::sha256_hex(&bytes))
 }
 
+fn load_imported_summary(
+    cwd: &Path,
+    raw_path: &PathBuf,
+) -> std::result::Result<(String, ImportedSummaryFunction), Vec<x07c::diagnostics::Diagnostic>> {
+    let path = if raw_path.is_absolute() {
+        raw_path.clone()
+    } else {
+        cwd.join(raw_path)
+    };
+    let bytes = std::fs::read(&path).map_err(|err| {
+        vec![diag_verify(
+            "X07V_SUMMARY_MISMATCH",
+            format!("read verify proof summary {}: {err:#}", path.display()),
+        )]
+    })?;
+    let value: Value = serde_json::from_slice(&bytes).map_err(|err| {
+        vec![diag_verify(
+            "X07V_SUMMARY_MISMATCH",
+            format!(
+                "parse verify proof summary JSON {}: {err:#}",
+                path.display()
+            ),
+        )]
+    })?;
+    let diags = validate_verify_proof_summary_schema(&value).map_err(|err| {
+        vec![diag_verify(
+            "X07V_SUMMARY_MISMATCH",
+            format!(
+                "validate verify proof-summary schema {}: {err:#}",
+                path.display()
+            ),
+        )]
+    })?;
+    if !diags.is_empty() {
+        let coverage_diags = validate_verify_summary_schema(&value).map_err(|err| {
+            vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "validate verify coverage-summary schema {}: {err:#}",
+                    path.display()
+                ),
+            )]
+        })?;
+        if coverage_diags.is_empty() {
+            return Err(vec![
+                diag_verify_warning(
+                    "X07V_COVERAGE_NOT_PROOF",
+                    format!(
+                        "coverage/support summary {} is posture-only and does not count as proof evidence",
+                        path.display()
+                    ),
+                ),
+                diag_verify(
+                    "X07V_COVERAGE_SUMMARY_FORBIDDEN",
+                    format!(
+                        "coverage/support summary {} cannot be imported via --proof-summary; use a proof summary emitted by `x07 verify --prove`",
+                        path.display()
+                    ),
+                ),
+            ]);
+        }
+        return Err(vec![diag_verify(
+            "X07V_SUMMARY_MISMATCH",
+            format!(
+                "verify proof summary schema invalid for {}: {}",
+                path.display(),
+                diags[0].message
+            ),
+        )]);
+    }
+    let summary: VerifyProofSummaryArtifact = serde_json::from_value(value).map_err(|err| {
+        vec![diag_verify(
+            "X07V_SUMMARY_MISMATCH",
+            format!(
+                "decode verify proof summary JSON {}: {err:#}",
+                path.display()
+            ),
+        )]
+    })?;
+    if summary.schema_version != X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION {
+        return Err(vec![diag_verify(
+            "X07V_SUMMARY_MISMATCH",
+            format!(
+                "verify proof summary schema_version mismatch for {}: expected {:?} got {:?}",
+                path.display(),
+                X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION,
+                summary.schema_version
+            ),
+        )]);
+    }
+    let symbol = summary.symbol.clone();
+    let source = VerifyImportedSummaryRef {
+        path: path.display().to_string(),
+        sha256_hex: util::sha256_hex(&bytes),
+        symbols: vec![symbol.clone()],
+    };
+    Ok((
+        symbol,
+        ImportedSummaryFunction {
+            function: summary,
+            source,
+        },
+    ))
+}
+
 fn load_imported_summary_index(
     cwd: &Path,
     paths: &[PathBuf],
 ) -> std::result::Result<ImportedSummaryIndex, Vec<x07c::diagnostics::Diagnostic>> {
     let mut index = ImportedSummaryIndex::default();
     for raw_path in paths {
-        let path = if raw_path.is_absolute() {
-            raw_path.clone()
-        } else {
-            cwd.join(raw_path)
-        };
-        let bytes = std::fs::read(&path).map_err(|err| {
-            vec![diag_verify(
-                "X07V_SUMMARY_MISMATCH",
-                format!("read verify proof summary {}: {err:#}", path.display()),
-            )]
-        })?;
-        let value: Value = serde_json::from_slice(&bytes).map_err(|err| {
-            vec![diag_verify(
-                "X07V_SUMMARY_MISMATCH",
-                format!(
-                    "parse verify proof summary JSON {}: {err:#}",
-                    path.display()
-                ),
-            )]
-        })?;
-        let diags = validate_verify_proof_summary_schema(&value).map_err(|err| {
-            vec![diag_verify(
-                "X07V_SUMMARY_MISMATCH",
-                format!(
-                    "validate verify proof-summary schema {}: {err:#}",
-                    path.display()
-                ),
-            )]
-        })?;
-        if !diags.is_empty() {
-            let coverage_diags = validate_verify_summary_schema(&value).map_err(|err| {
-                vec![diag_verify(
-                    "X07V_SUMMARY_MISMATCH",
-                    format!(
-                        "validate verify coverage-summary schema {}: {err:#}",
-                        path.display()
-                    ),
-                )]
-            })?;
-            if coverage_diags.is_empty() {
-                return Err(vec![
-                    diag_verify_warning(
-                        "X07V_COVERAGE_NOT_PROOF",
-                        format!(
-                            "coverage/support summary {} is posture-only and does not count as proof evidence",
-                            path.display()
-                        ),
-                    ),
-                    diag_verify(
-                        "X07V_COVERAGE_SUMMARY_FORBIDDEN",
-                        format!(
-                            "coverage/support summary {} cannot be imported via --proof-summary; use a proof summary emitted by `x07 verify --prove`",
-                            path.display()
-                        ),
-                    ),
-                ]);
-            }
-            return Err(vec![diag_verify(
-                "X07V_SUMMARY_MISMATCH",
-                format!(
-                    "verify proof summary schema invalid for {}: {}",
-                    path.display(),
-                    diags[0].message
-                ),
-            )]);
-        }
-        let summary: VerifyProofSummaryArtifact = serde_json::from_value(value).map_err(|err| {
-            vec![diag_verify(
-                "X07V_SUMMARY_MISMATCH",
-                format!(
-                    "decode verify proof summary JSON {}: {err:#}",
-                    path.display()
-                ),
-            )]
-        })?;
-        if summary.schema_version != X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION {
-            return Err(vec![diag_verify(
-                "X07V_SUMMARY_MISMATCH",
-                format!(
-                    "verify proof summary schema_version mismatch for {}: expected {:?} got {:?}",
-                    path.display(),
-                    X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION,
-                    summary.schema_version
-                ),
-            )]);
-        }
-        let symbols = vec![summary.symbol.clone()];
-        let source = VerifyImportedSummaryRef {
-            path: path.display().to_string(),
-            sha256_hex: util::sha256_hex(&bytes),
-            symbols,
-        };
-        let symbol = summary.symbol.clone();
+        let (symbol, imported) = load_imported_summary(cwd, raw_path)?;
         if symbol.trim().is_empty() {
             continue;
         }
@@ -2286,23 +2366,77 @@ fn load_imported_summary_index(
                 "X07V_SUMMARY_MISMATCH",
                 format!(
                     "duplicate imported verify proof summary for symbol {:?} via {}",
-                    symbol,
-                    path.display()
+                    symbol, imported.source.path
                 ),
             )]);
         }
-        index.by_symbol.insert(
-            symbol,
-            ImportedSummaryFunction {
-                function: summary,
-                source: source.clone(),
-            },
-        );
-        index.inventory.push(source);
+        index.by_symbol.insert(symbol, imported.clone());
+        index.inventory.push(imported.source);
     }
     index.inventory.sort_by(|a, b| {
         (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str()))
     });
+    Ok(index)
+}
+
+fn load_imported_summary_index_merged(
+    cwd: &Path,
+    explicit_paths: &[PathBuf],
+    cache_paths: &[PathBuf],
+    module_roots: &[PathBuf],
+) -> std::result::Result<ImportedSummaryIndex, Vec<x07c::diagnostics::Diagnostic>> {
+    let mut index = ImportedSummaryIndex::default();
+
+    for raw_path in explicit_paths {
+        let (symbol, imported) = load_imported_summary(cwd, raw_path)?;
+        if symbol.trim().is_empty() {
+            continue;
+        }
+        if index.by_symbol.contains_key(&symbol) {
+            return Err(vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "duplicate imported verify proof summary for symbol {:?} via {}",
+                    symbol, imported.source.path
+                ),
+            )]);
+        }
+        index.by_symbol.insert(symbol, imported.clone());
+        index.inventory.push(imported.source);
+    }
+
+    let mut module_doc_cache = BTreeMap::new();
+    for raw_path in cache_paths {
+        let (symbol, imported) = match load_imported_summary(cwd, raw_path) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if symbol.trim().is_empty() || index.by_symbol.contains_key(&symbol) {
+            continue;
+        }
+        let (current_sha, current_is_async) = match current_decl_sha256_hex_for_symbol(
+            module_roots,
+            &symbol,
+            &mut module_doc_cache,
+        ) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if imported.function.decl_sha256_hex != current_sha {
+            continue;
+        }
+        let current_kind = if current_is_async { "defasync" } else { "defn" };
+        if imported.function.kind != current_kind {
+            continue;
+        }
+        index.by_symbol.insert(symbol, imported.clone());
+        index.inventory.push(imported.source);
+    }
+
+    index.inventory.sort_by(|a, b| {
+        (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str()))
+    });
+
     Ok(index)
 }
 
@@ -5364,6 +5498,504 @@ fn proof_check_report_path(proof_path: &Path) -> PathBuf {
         .and_then(|s| s.to_str())
         .unwrap_or("proof");
     proof_path.with_file_name(format!("{stem}.check.json"))
+}
+
+fn proof_cache_root(project_root: &Path) -> PathBuf {
+    project_root.join(".x07").join("cache").join("verify")
+}
+
+fn proof_cache_summaries_dir(project_root: &Path) -> PathBuf {
+    proof_cache_root(project_root).join("proof_summaries")
+}
+
+fn proof_cache_proofs_dir(project_root: &Path) -> PathBuf {
+    proof_cache_root(project_root).join("proofs")
+}
+
+fn proof_cache_summary_path(project_root: &Path, entry: &str) -> PathBuf {
+    proof_cache_summaries_dir(project_root)
+        .join(format!("{}.json", util::safe_artifact_dir_name(entry)))
+}
+
+fn proof_cache_entry_bundle_dir(project_root: &Path, entry: &str, bounds: &Bounds) -> PathBuf {
+    proof_cache_proofs_dir(project_root)
+        .join(util::safe_artifact_dir_name(entry))
+        .join(format!(
+            "unwind{}_maxbytes{}",
+            bounds.unwind, bounds.max_bytes_len
+        ))
+}
+
+fn proof_cache_entry_proof_object_path(
+    project_root: &Path,
+    entry: &str,
+    bounds: &Bounds,
+) -> PathBuf {
+    proof_cache_entry_bundle_dir(project_root, entry, bounds).join("proof.object.json")
+}
+
+fn list_proof_cache_summary_paths(project_root: &Path) -> Vec<PathBuf> {
+    let dir = proof_cache_summaries_dir(project_root);
+    let mut out = Vec::new();
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(_) => return out,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+            out.push(path);
+        }
+    }
+    out.sort();
+    out
+}
+
+fn copy_file_atomic(src: &Path, dest: &Path, label: &str) -> Result<()> {
+    let bytes = std::fs::read(src).with_context(|| format!("read {label}: {}", src.display()))?;
+    util::write_atomic(dest, &bytes).with_context(|| format!("write {label}: {}", dest.display()))
+}
+
+fn copy_dir_files_atomic(src: &Path, dest: &Path, label: &str) -> Result<()> {
+    if !src.is_dir() {
+        if dest.exists() {
+            std::fs::remove_dir_all(dest)
+                .with_context(|| format!("remove {label} dir: {}", dest.display()))?;
+        }
+        return Ok(());
+    }
+    if dest.exists() {
+        std::fs::remove_dir_all(dest)
+            .with_context(|| format!("remove {label} dir: {}", dest.display()))?;
+    }
+    std::fs::create_dir_all(dest)
+        .with_context(|| format!("create {label} dir: {}", dest.display()))?;
+    for entry in
+        std::fs::read_dir(src).with_context(|| format!("read {label} dir: {}", src.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        copy_file_atomic(&path, &dest.join(name), label)?;
+    }
+    Ok(())
+}
+
+fn update_proof_cache_summary(
+    project_root: &Path,
+    entry: &str,
+    proof_summary_path: &Path,
+) -> Result<()> {
+    let cache_path = proof_cache_summary_path(project_root, entry);
+    if let Some(parent) = cache_path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create proof cache dir: {}", parent.display()))?;
+    }
+    copy_file_atomic(proof_summary_path, &cache_path, "cached proof summary")
+}
+
+fn update_proof_cache_bundle(
+    project_root: &Path,
+    entry: &str,
+    bounds: &Bounds,
+    proof_object_path: &Path,
+) -> Result<()> {
+    let bundle_dir = proof_object_path.parent().unwrap_or_else(|| Path::new("."));
+    let cache_proof_object_path = proof_cache_entry_proof_object_path(project_root, entry, bounds);
+    let cache_bundle_dir = cache_proof_object_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(cache_bundle_dir)
+        .with_context(|| format!("create proof cache dir: {}", cache_bundle_dir.display()))?;
+
+    copy_file_atomic(
+        &proof_summary_bundle_path(bundle_dir),
+        &proof_summary_bundle_path(cache_bundle_dir),
+        "cached proof summary",
+    )?;
+    copy_file_atomic(
+        &proof_obligation_bundle_path(bundle_dir),
+        &proof_obligation_bundle_path(cache_bundle_dir),
+        "cached proof obligation",
+    )?;
+    copy_file_atomic(
+        &proof_solver_transcript_bundle_path(bundle_dir),
+        &proof_solver_transcript_bundle_path(cache_bundle_dir),
+        "cached proof solver transcript",
+    )?;
+    copy_dir_files_atomic(
+        &proof_imported_summaries_bundle_dir(bundle_dir),
+        &proof_imported_summaries_bundle_dir(cache_bundle_dir),
+        "cached imported proof summaries",
+    )?;
+    copy_file_atomic(
+        proof_object_path,
+        &cache_proof_object_path,
+        "cached proof object",
+    )?;
+
+    let check_report_path = proof_check_report_path(proof_object_path);
+    if check_report_path.is_file() {
+        copy_file_atomic(
+            &check_report_path,
+            &proof_check_report_path(&cache_proof_object_path),
+            "cached proof check report",
+        )?;
+    }
+
+    Ok(())
+}
+
+fn load_verify_proof_summary_artifact_path(
+    path: &Path,
+) -> Result<(Vec<u8>, VerifyProofSummaryArtifact)> {
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("read verify proof summary: {}", path.display()))?;
+    let value: Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse verify proof summary JSON: {}", path.display()))?;
+    let diags = validate_verify_proof_summary_schema(&value)
+        .with_context(|| format!("validate verify proof-summary schema: {}", path.display()))?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "verify proof summary schema invalid for {}: {}",
+            path.display(),
+            diags[0].message
+        );
+    }
+    let summary: VerifyProofSummaryArtifact = serde_json::from_value(value)
+        .with_context(|| format!("decode verify proof summary JSON: {}", path.display()))?;
+    if summary.schema_version != X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION {
+        anyhow::bail!(
+            "verify proof summary schema_version mismatch for {}: expected {:?} got {:?}",
+            path.display(),
+            X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION,
+            summary.schema_version
+        );
+    }
+    Ok((bytes, summary))
+}
+
+fn current_decl_sha256_hex_for_symbol(
+    module_roots: &[PathBuf],
+    symbol: &str,
+    module_doc_cache: &mut BTreeMap<String, Value>,
+) -> Result<(String, bool)> {
+    let (module_id, _) = symbol.rsplit_once('.').context("symbol missing '.'")?;
+    if !module_doc_cache.contains_key(module_id) {
+        let source =
+            x07c::module_source::load_module_source(module_id, WorldId::SolvePure, module_roots)
+                .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
+        let doc: Value = serde_json::from_str(&source.src)
+            .with_context(|| format!("parse module JSON for {module_id:?}"))?;
+        module_doc_cache.insert(module_id.to_string(), doc);
+    }
+    let doc = module_doc_cache
+        .get(module_id)
+        .expect("module doc inserted into cache");
+
+    let decls = doc
+        .get("decls")
+        .and_then(Value::as_array)
+        .context("module missing decls[]")?;
+    for d in decls {
+        let kind = d.get("kind").and_then(Value::as_str).unwrap_or("");
+        if kind != "defn" && kind != "defasync" {
+            continue;
+        }
+        let name = d.get("name").and_then(Value::as_str).unwrap_or("");
+        if name != symbol {
+            continue;
+        }
+        return Ok((decl_sha256_hex_for_value(d)?, kind == "defasync"));
+    }
+
+    anyhow::bail!(
+        "could not find function {:?} in resolved module {:?}",
+        symbol,
+        module_id
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn try_reuse_cached_prove_bundle(
+    machine: &crate::reporting::MachineArgs,
+    args: &VerifyArgs,
+    bounds: &Bounds,
+    artifact_base: &Path,
+    module_roots: &[PathBuf],
+    target: &TargetSig,
+    recursion: &RecursionSummary,
+    project_path: Option<&Path>,
+) -> Result<Option<std::process::ExitCode>> {
+    let Some(project_path) = project_path else {
+        return Ok(None);
+    };
+    let project_root = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let cache_proof_object_path =
+        proof_cache_entry_proof_object_path(project_root, &args.entry, bounds);
+    if !cache_proof_object_path.is_file() {
+        return Ok(None);
+    }
+
+    let (_digest, object) = match load_proof_object_path(&cache_proof_object_path) {
+        Ok(v) => v,
+        Err(_) => return Ok(None),
+    };
+    if object.entry_symbol != args.entry || object.symbol != args.entry {
+        return Ok(None);
+    }
+    let expected_kind = if target.is_async { "defasync" } else { "defn" };
+    if object.kind != expected_kind {
+        return Ok(None);
+    }
+    if object.decl_sha256_hex != target.decl_sha256_hex {
+        return Ok(None);
+    }
+    if object.unwind != bounds.unwind || object.max_bytes_len != bounds.max_bytes_len {
+        return Ok(None);
+    }
+    if object.verify_engine != "cbmc_z3" {
+        return Ok(None);
+    }
+    let expected_scheduler_model_digest = if target.is_async {
+        Some(verify_scheduler_model_digest())
+    } else {
+        None
+    };
+    if expected_scheduler_model_digest.as_deref() != object.scheduler_model_digest.as_deref() {
+        return Ok(None);
+    }
+
+    let manifest_digest = match project_manifest_digest(project_path) {
+        Ok(v) => v,
+        Err(_) => return Ok(None),
+    };
+    if object.project_manifest_digest != manifest_digest {
+        return Ok(None);
+    }
+    if object.primitive_manifest_digest != verify_primitive_manifest_digest() {
+        return Ok(None);
+    }
+
+    let cache_bundle_dir = cache_proof_object_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    let proof_summary_path = proof_summary_bundle_path(cache_bundle_dir);
+    let (proof_summary_bytes, proof_summary_artifact) =
+        match load_verify_proof_summary_artifact_path(&proof_summary_path) {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+    if prefixed_sha256(&proof_summary_bytes) != object.proof_summary_digest {
+        return Ok(None);
+    }
+    if proof_summary_artifact.symbol != args.entry
+        || proof_summary_artifact.kind != expected_kind
+        || proof_summary_artifact.decl_sha256_hex != target.decl_sha256_hex
+        || proof_summary_artifact.recursion_kind != recursion.kind_str()
+    {
+        return Ok(None);
+    }
+    if recursion.kind == RecursionKind::None
+        && proof_summary_artifact.recursion_bound_kind != "none"
+    {
+        return Ok(None);
+    }
+    if recursion.kind != RecursionKind::None
+        && proof_summary_artifact.recursion_bound_kind != "bounded_by_unwind"
+    {
+        return Ok(None);
+    }
+
+    let imported_summary_paths = match load_bundle_imported_summary_paths(cache_bundle_dir) {
+        Ok(v) => v,
+        Err(_) => return Ok(None),
+    };
+    let mut bundled_imported_digests = Vec::new();
+    for path in &imported_summary_paths {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(None),
+        };
+        bundled_imported_digests.push(prefixed_sha256(&bytes));
+    }
+    bundled_imported_digests.sort();
+    bundled_imported_digests.dedup();
+    let mut expected_imported_digests = object.imported_proof_summary_digests.clone();
+    expected_imported_digests.sort();
+    expected_imported_digests.dedup();
+    if bundled_imported_digests != expected_imported_digests {
+        return Ok(None);
+    }
+
+    let mut module_doc_cache = BTreeMap::new();
+    for path in &imported_summary_paths {
+        let (_bytes, summary) = match load_verify_proof_summary_artifact_path(path) {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+        let (current_sha, current_is_async) = match current_decl_sha256_hex_for_symbol(
+            module_roots,
+            &summary.symbol,
+            &mut module_doc_cache,
+        ) {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+        if summary.decl_sha256_hex != current_sha {
+            return Ok(None);
+        }
+        let current_kind = if current_is_async { "defasync" } else { "defn" };
+        if summary.kind != current_kind {
+            return Ok(None);
+        }
+    }
+
+    let work_dir = artifact_base
+        .join("verify")
+        .join("prove")
+        .join(util::safe_artifact_dir_name(&args.entry));
+    if std::fs::create_dir_all(&work_dir).is_err() {
+        return Ok(None);
+    }
+
+    if copy_file_atomic(
+        &proof_obligation_bundle_path(cache_bundle_dir),
+        &proof_obligation_bundle_path(&work_dir),
+        "proof obligation",
+    )
+    .is_err()
+    {
+        return Ok(None);
+    }
+    if copy_file_atomic(
+        &proof_solver_transcript_bundle_path(cache_bundle_dir),
+        &proof_solver_transcript_bundle_path(&work_dir),
+        "proof solver transcript",
+    )
+    .is_err()
+    {
+        return Ok(None);
+    }
+
+    let mut artifacts = Artifacts {
+        smt2_path: Some(
+            proof_obligation_bundle_path(&work_dir)
+                .display()
+                .to_string(),
+        ),
+        z3_out_path: Some(
+            proof_solver_transcript_bundle_path(&work_dir)
+                .display()
+                .to_string(),
+        ),
+        ..Artifacts::default()
+    };
+
+    if let Some(proof_path) = args.emit_proof.as_deref() {
+        let bundle_dir = proof_path.parent().unwrap_or_else(|| Path::new("."));
+        if std::fs::create_dir_all(bundle_dir).is_err() {
+            return Ok(None);
+        }
+
+        if copy_file_atomic(
+            &proof_summary_bundle_path(cache_bundle_dir),
+            &proof_summary_bundle_path(bundle_dir),
+            "proof summary",
+        )
+        .is_err()
+        {
+            return Ok(None);
+        }
+        if copy_file_atomic(
+            &proof_obligation_bundle_path(cache_bundle_dir),
+            &proof_obligation_bundle_path(bundle_dir),
+            "proof obligation",
+        )
+        .is_err()
+        {
+            return Ok(None);
+        }
+        if copy_file_atomic(
+            &proof_solver_transcript_bundle_path(cache_bundle_dir),
+            &proof_solver_transcript_bundle_path(bundle_dir),
+            "proof solver transcript",
+        )
+        .is_err()
+        {
+            return Ok(None);
+        }
+        if copy_dir_files_atomic(
+            &proof_imported_summaries_bundle_dir(cache_bundle_dir),
+            &proof_imported_summaries_bundle_dir(bundle_dir),
+            "imported proof summaries",
+        )
+        .is_err()
+        {
+            return Ok(None);
+        }
+        if copy_file_atomic(&cache_proof_object_path, proof_path, "proof object").is_err() {
+            return Ok(None);
+        }
+
+        let cache_check_report_path = proof_check_report_path(&cache_proof_object_path);
+        let dest_check_report_path = proof_check_report_path(proof_path);
+        if cache_check_report_path.is_file() {
+            let _ = copy_file_atomic(
+                &cache_check_report_path,
+                &dest_check_report_path,
+                "proof check report",
+            );
+            if dest_check_report_path.is_file() {
+                artifacts.proof_check_report_path =
+                    Some(dest_check_report_path.display().to_string());
+            }
+        }
+
+        artifacts.verify_proof_summary_path =
+            Some(proof_summary_bundle_path(bundle_dir).display().to_string());
+        artifacts.proof_object_path = Some(proof_path.display().to_string());
+    } else {
+        if copy_file_atomic(
+            &proof_summary_bundle_path(cache_bundle_dir),
+            &proof_summary_bundle_path(&work_dir),
+            "proof summary",
+        )
+        .is_err()
+        {
+            return Ok(None);
+        }
+        artifacts.verify_proof_summary_path =
+            Some(proof_summary_bundle_path(&work_dir).display().to_string());
+    }
+
+    let VerifyProofSummaryArtifact {
+        engine,
+        recursion_kind,
+        recursion_bound_kind,
+        dependency_symbols,
+        ..
+    } = proof_summary_artifact;
+    let proof_summary = VerifyProofSummary {
+        engine,
+        recursion_kind,
+        has_decreases: target.decreases_count != 0,
+        decreases_count: target.decreases_count as u64,
+        bounded_by_unwind: recursion.kind != RecursionKind::None,
+        recursion_bound_kind,
+        dependency_symbols,
+    };
+
+    Ok(Some(write_report_and_exit(
+        machine,
+        VerifyReport::proven(&args.entry, bounds.clone(), artifacts)
+            .with_proof_summary(proof_summary),
+    )?))
 }
 
 fn prefixed_sha256(bytes: &[u8]) -> String {

@@ -1,0 +1,13 @@
+{
+  "schema_version": "x07.project@0.4.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "operational_entry_symbol": "fixture.main",
+  "module_roots": [
+    "src",
+    "."
+  ],
+  "lockfile": "x07.lock.json",
+  "dependencies": []
+}
+

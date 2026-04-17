@@ -19,6 +19,8 @@
     "kind": {
       "type": "string",
       "enum": [
+        "task_started_v1",
+        "task_finished_v1",
         "task_skipped_v1",
         "task_retried_v1",
         "task_failed_v1",

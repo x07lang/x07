@@ -365,6 +365,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("xtal.improve") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-improve.report.schema.json"
         )),
+        Some("xtal.tasks") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-tasks.report.schema.json"
+        )),
+        Some("xtal.tasks.run") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-tasks-run.report.schema.json"
+        )),
         Some("xtal.repair") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-repair.report.schema.json"
         )),

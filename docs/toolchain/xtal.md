@@ -87,8 +87,10 @@ Each operation can declare `ensures_props[]` entries that reference a property f
   - If `arch/gen/index.x07gen.json` exists (or `--gen-index` is passed), runs `x07 gen verify`.
   - Otherwise, runs `x07 xtal tests gen-from-spec --check`.
   - Runs `x07 xtal impl check`.
+  - Unless `--prechecks-only` is set, runs `x07 xtal verify`.
+  - If verification fails and `--repair-on-fail` is set, runs `x07 xtal repair --write`.
 - `x07 xtal verify`
-  - Runs `dev` prechecks.
+  - Runs spec/gen/impl prechecks.
   - Requires a deterministic `solve-*` world by default (pass `--allow-os-world` to override).
   - Runs formal verification per spec operation entrypoint:
     - `x07 verify --coverage --entry <spec.operations[*].name>`
@@ -103,9 +105,14 @@ Each operation can declare `ensures_props[]` entries that reference a property f
       - `target/xtal/verify/_artifacts/test/...` (property-test repro cases and other test artifacts)
     - `target/xtal/verify/coverage/<module_path>/<local>.report.json` (per-entry coverage reports)
     - `target/xtal/verify/prove/<module_path>/<local>.report.json` (per-entry prove reports)
-    - `target/xtal/verify/prove/<module_path>/<local>.proof.json` (proof objects, when emitted)
+    - `target/xtal/verify/prove/<module_path>/<local>/proof.object.json` (proof objects, when emitted)
   - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
+    - Under `balanced`, missing proof tools produce warnings (and verification continues).
+    - Under `strict`, only `proven` outcomes pass.
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
+  - Proof caching is automatic when a project manifest is available:
+    - Successful `x07 verify --prove` runs cache proof summaries under `.x07/cache/verify/proof_summaries/`.
+    - When proof objects are emitted, proof bundles are cached under `.x07/cache/verify/proofs/` and may be reused on subsequent prove runs (even without solver tools present).
   - Proof runs require external tooling; see `docs/toolchain/formal-verification.md`.
 - `x07 xtal certify`
   - Requires `arch/xtal/xtal.json`.
@@ -156,6 +163,10 @@ Artifacts:
 - `target/xtal/violations/<id>/violation.json` (`x07.xtal.violation@0.1.0`)
 - `target/xtal/violations/<id>/repro.json` (`x07.contract.repro@0.1.0`)
 
+OS-world incidents: when a contract violation is captured from `run-os` or `run-os-sandboxed`, `x07 run` rewrites the emitted repro to `world: "solve-rr"` and captures `.x07_rr/` into `.x07/artifacts/contract/<clause_id>/rr/` (referenced via `runner.fixture_rr_dir`).
+
+See: `docs/worlds/record-replay.md`.
+
 ## Recovery events
 
 When a runtime violation is recorded, x07 can also emit a structured recovery event stream (JSONL).
@@ -170,9 +181,11 @@ See: [Task policy graph](tasks.md).
 
 ## `x07 xtal ingest`
 
-Normalize a violation (`x07.xtal.violation@0.1.0`) or a contract repro (`x07.contract.repro@0.1.0`) into a canonical ingest workspace. This is intended as the first step for automated repair flows.
+Normalize a violation (`x07.xtal.violation@0.1.0`) or a contract repro (`x07.contract.repro@0.1.0`) into a canonical ingest workspace (and, by default, run an improvement loop).
 
 Ingest validates that `violation.json` matches `repro.json` (content-addressed id, repro sha256, and repro bytes length), and records the check results in the ingest summary.
+
+By default, ingest also runs `x07 xtal improve` on the normalized workspace. To stop after normalization, pass `--normalize-only`.
 
 Artifacts:
 
@@ -187,7 +200,7 @@ Artifacts:
 Turn incident inputs (violation bundles, contract repros, or recovery event logs) into a bounded improvement run:
 
 - `x07 xtal improve --input <path>`
-- Optional: `--reduce-repro`, `--write`, `--allow-spec-change`, `--baseline <cert_dir>`, `--out-dir <dir>`
+- Optional: `--reduce-repro`, `--write`, `--allow-spec-change`, `--certify`, `--run-tasks`, `--baseline <cert_dir>`, `--out-dir <dir>`
 
 Artifacts:
 
@@ -195,3 +208,22 @@ Artifacts:
 - `target/xtal/improve/summary.json` (`x07.xtal.improve_summary@0.1.0`)
 - `target/xtal/improve/<id>/tests.shadow.json` (generated single-case tests manifest)
 - `target/xtal/improve/<id>/repro.min.json` and `target/xtal/improve/<id>/reduction.report.json` (optional; when `--reduce-repro` is supported)
+
+## `x07 xtal tasks run`
+
+Execute recovery tasks from `arch/tasks/index.x07tasks.json` for an incident input:
+
+- `x07 xtal tasks run --input target/xtal/violations/<id>/violation.json`
+
+Artifacts:
+
+- `target/xtal/xtal.tasks.diag.json` (`x07diag.report@0.3.0`)
+- `target/xtal/tasks/<id>/...` (generated wrappers + per-attempt stderr captures)
+- `target/xtal/events/<id>/events.jsonl` (optional; when recovery events are enabled)
+
+Execution conventions:
+
+- Each task must reference a `defn`/`defasync` symbol that returns `bytes`.
+- Supported task parameter shapes:
+  - 0 params
+  - 1 param: `bytes_view` (receives the built-in `input`) or `bytes` (receives `view.to_bytes(input)`).

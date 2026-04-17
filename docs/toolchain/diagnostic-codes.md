@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 629
-- quickfix support (`sometimes` or `always`): 569
-- quickfix coverage: 90.46%
+- total codes: 637
+- quickfix support (`sometimes` or `always`): 577
+- quickfix coverage: 90.58%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -92,6 +92,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_IMPROVE_NO_PATCH` | x07 / run / error | sometimes | XTAL improve produced no patchset. |
 | `EXTAL_IMPROVE_PATCH_APPLY_FAILED` | x07 / run / error | sometimes | XTAL improve failed to apply a patchset. |
 | `EXTAL_IMPROVE_SPEC_CHANGE_REQUIRES_FLAG` | x07 / run / error | sometimes | XTAL improve blocked a spec change. |
+| `EXTAL_IMPROVE_TASKS_FAILED` | x07 / run / error | sometimes | XTAL improve: recovery tasks failed. |
 | `EXTAL_IMPROVE_WRITE_REQUIRES_MANIFEST` | x07 / parse / error | sometimes | XTAL improve --write requires an XTAL manifest. |
 | `EXTAL_INGEST_FAILED` | x07 / run / error | sometimes | XTAL ingest failed. |
 | `EXTAL_INGEST_INPUT_SCHEMA_INVALID` | x07 / parse / error | sometimes | XTAL ingest input is invalid. |
@@ -146,6 +147,11 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_SPEC_RESULT_TY_UNSUPPORTED` | x07 / lint / error | sometimes | Spec result type is unsupported in the current XTAL subset. |
 | `EXTAL_SPEC_SCHEMA_INVALID` | x07 / parse / error | sometimes | Spec JSON violates the structural schema. |
 | `EXTAL_SPEC_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | Spec schema_version is unsupported. |
+| `EXTAL_TASKS_INDEX_INVALID` | x07 / parse / error | sometimes | Tasks index is invalid. |
+| `EXTAL_TASKS_INDEX_MISSING` | x07 / parse / error | sometimes | Tasks index not found. |
+| `EXTAL_TASKS_PROJECT_MISSING` | x07 / parse / error | sometimes | XTAL tasks run requires a project. |
+| `EXTAL_TASKS_TASK_FAILED` | x07 / run / error | sometimes | Recovery task failed. |
+| `EXTAL_TASKS_TASK_SKIPPED` | x07 / run / warning | sometimes | Recovery task was skipped. |
 | `EXTAL_VERIFY_COVERAGE_FAILED` | x07 / run / error | sometimes | Coverage verification failed. |
 | `EXTAL_VERIFY_PROVE_COUNTEREXAMPLE` | x07 / run / error | sometimes | Proof attempt found a counterexample. |
 | `EXTAL_VERIFY_PROVE_ERROR` | x07 / run / error | sometimes | Proof attempt failed with an internal error. |
@@ -302,11 +308,13 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_GEN_RUN_FAILED` | x07 / run / error | sometimes | Generator command failed. |
 | `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
 | `WXTAL_IMPL_PARAM_NAME_MISMATCH` | x07 / lint / warning | sometimes | Implementation parameter names differ from the spec. |
+| `WXTAL_IMPROVE_NO_PATCH` | x07 / run / warning | sometimes | XTAL improve produced no patchset. |
 | `WXTAL_REPAIR_QUICKFIX_APPLIED` | x07 / run / warning | never | XTAL repair applied a quickfix fallback in an attempt workspace. |
 | `WXTAL_REPAIR_SPEC_PATCH_SUGGESTED` | x07 / run / warning | sometimes | XTAL emitted a spec patch suggestion for review. |
 | `WXTAL_SPEC_NONCANONICAL_JSON` | x07 / rewrite / warning | always | Spec JSON is not in canonical form. |
 | `WXTAL_VERIFY_PROVE_INCONCLUSIVE` | x07 / run / warning | sometimes | Proof attempt was inconclusive. |
 | `WXTAL_VERIFY_PROVE_TIMEOUT` | x07 / run / warning | sometimes | Proof attempt hit the configured budget. |
+| `WXTAL_VERIFY_PROVE_TOOL_MISSING` | x07 / run / warning | sometimes | Proof tool is missing or unavailable. |
 | `WXTAL_VERIFY_PROVE_UNSUPPORTED` | x07 / run / warning | sometimes | Proof attempt is unsupported for this entry. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
 | `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
@@ -2333,6 +2341,28 @@ Agent strategy:
 - If the spec change is intended, re-run with `--allow-spec-change`.
 
 
+## `EXTAL_IMPROVE_TASKS_FAILED`
+
+Summary: XTAL improve: recovery tasks failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 xtal improve --run-tasks` invoked the recovery task executor and it returned a failing status.
+
+Inspect `target/xtal/xtal.tasks.diag.json` and the recovery events log under `target/xtal/events/<incident_id>/events.jsonl` for details.
+
+Agent strategy:
+
+- Inspect `target/xtal/xtal.tasks.diag.json` for the task failure diagnostics.
+- Inspect `target/xtal/events/<incident_id>/events.jsonl` to confirm which tasks ran, retried, skipped, or failed.
+- Fix the underlying task implementation or policy and re-run `x07 xtal improve --run-tasks`.
+
+
 ## `EXTAL_IMPROVE_WRITE_REQUIRES_MANIFEST`
 
 Summary: XTAL improve --write requires an XTAL manifest.
@@ -3478,6 +3508,107 @@ Agent strategy:
 - Run `x07 xtal spec fmt --write --input <spec.x07spec.json>` for canonical JSON.
 - Run `x07 xtal spec lint --input <spec.x07spec.json>` and `x07 xtal spec check --project x07.json --input <spec.x07spec.json>`.
 - Apply deterministic edits to fix reported pointers, then re-run.
+
+
+## `EXTAL_TASKS_INDEX_INVALID`
+
+Summary: Tasks index is invalid.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The tasks index document is not schema-valid or has an unsupported `schema_version`.
+
+Agent strategy:
+
+- Validate `arch/tasks/index.x07tasks.json` against `spec/x07-arch.tasks.index.schema.json`.
+- Ensure `schema_version` is exactly `x07.arch.tasks.index@0.1.0`.
+- Re-run `x07 xtal tasks run` after fixing the document.
+
+
+## `EXTAL_TASKS_INDEX_MISSING`
+
+Summary: Tasks index not found.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The recovery task executor requires a tasks index document (default `arch/tasks/index.x07tasks.json`).
+
+Agent strategy:
+
+- Create `arch/tasks/index.x07tasks.json` with `schema_version` set to `x07.arch.tasks.index@0.1.0`.
+- Or pass `--index <path>` to point at a different tasks index file.
+
+
+## `EXTAL_TASKS_PROJECT_MISSING`
+
+Summary: XTAL tasks run requires a project.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The recovery task executor requires a project root containing `x07.json`.
+
+Agent strategy:
+
+- Run the command from a project directory that contains `x07.json`.
+- Or pass `--project /path/to/x07.json`.
+
+
+## `EXTAL_TASKS_TASK_FAILED`
+
+Summary: Recovery task failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A recovery task subprocess exited with a non-zero status.
+
+Inspect `target/xtal/xtal.tasks.diag.json` and the recovery events log under `target/xtal/events/<incident_id>/events.jsonl`.
+
+Agent strategy:
+
+- Inspect `target/xtal/xtal.tasks.diag.json` for the failing task id and stderr summary.
+- Inspect `target/xtal/events/<incident_id>/events.jsonl` for task ordering and retries.
+- Fix the task function implementation or tighten budgets/policy, then re-run `x07 xtal tasks run`.
+
+
+## `EXTAL_TASKS_TASK_SKIPPED`
+
+Summary: Recovery task was skipped.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A recovery task was skipped because a dependency failed or retries were exhausted under policy.
+
+Inspect the recovery events log under `target/xtal/events/<incident_id>/events.jsonl` to see the skip reason.
+
+Agent strategy:
+
+- Inspect `target/xtal/events/<incident_id>/events.jsonl` to see why the task was skipped (dependency failure or retry exhaustion).
+- If the task is required, change its `criticality`/`on_failure` policy in `arch/tasks/index.x07tasks.json` and re-run.
 
 
 ## `EXTAL_VERIFY_COVERAGE_FAILED`
@@ -6634,6 +6765,25 @@ Agent strategy:
 - Re-run `x07 xtal impl check`.
 
 
+## `WXTAL_IMPROVE_NO_PATCH`
+
+Summary: XTAL improve produced no patchset.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The bounded repair step completed without producing a patchset. In this lane it is recorded as a warning and no edits are applied.
+
+Agent strategy:
+
+- Inspect `target/xtal/repair/summary.json` and `target/xtal/xtal.repair.diag.json`.
+- Retry with a smaller incident input or add a targeted regression test to improve localization.
+
+
 ## `WXTAL_REPAIR_QUICKFIX_APPLIED`
 
 Summary: XTAL repair applied a quickfix fallback in an attempt workspace.
@@ -6734,6 +6884,28 @@ Agent strategy:
 
 - Increase budgets (`--unwind`, `--max-bytes-len`, `--input-len-bytes`) and re-run `x07 xtal verify`.
 - If timeouts are expected, keep balanced policy so the lane remains usable.
+
+
+## `WXTAL_VERIFY_PROVE_TOOL_MISSING`
+
+Summary: Proof tool is missing or unavailable.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof engine required for `x07 verify --prove` is not available on this system. In balanced policy this is recorded as a warning; in strict policy it fails the command.
+
+Message: `Proof tool is missing or unavailable while proving "{entry}" (world="{world}", policy="{policy}"). See report: {report_path}.`
+
+Agent strategy:
+
+- Install the missing solver/toolchain dependency (for example `z3`).
+- Re-run `x07 xtal verify`.
+- If the environment cannot provide proof tools, keep balanced proof policy and rely on tests/runtime monitoring for that surface.
 
 
 ## `WXTAL_VERIFY_PROVE_UNSUPPORTED`

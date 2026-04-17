@@ -744,12 +744,59 @@ pub fn cmd_run(
                     let max_output_bytes_effective = max_output_bytes.unwrap_or(1024 * 1024);
                     let cpu_time_limit_seconds_effective = cpu_time_limit_seconds.unwrap_or(5);
 
+                    let test_entry = project_manifest
+                        .as_deref()
+                        .and_then(|p| project::load_project_manifest(p).ok())
+                        .and_then(|m| m.operational_entry_symbol);
+
+                    let (repro_world, repro_fixture_rr_dir) =
+                        if matches!(world, WorldId::RunOs | WorldId::RunOsSandboxed) {
+                            let root = project_root.as_deref().unwrap_or(&cwd);
+                            let rr_src_dir = root.join(".x07_rr");
+                            let clause_dir = crate::util::safe_artifact_dir_name(&info.clause_id);
+                            let rr_capture_rel = PathBuf::from(".x07")
+                                .join("artifacts")
+                                .join("contract")
+                                .join(&clause_dir)
+                                .join("rr");
+                            let rr_capture_abs = root.join(&rr_capture_rel);
+
+                            let _ = std::fs::remove_dir_all(&rr_capture_abs);
+                            if rr_src_dir.is_dir() {
+                                if let Err(err) =
+                                    x07_vm::copy_dir_recursive(&rr_src_dir, &rr_capture_abs)
+                                {
+                                    let msg = format!(
+                                        "x07 run: failed to copy .x07_rr into {}: {err}\n",
+                                        rr_capture_abs.display()
+                                    );
+                                    let _ = std::io::Write::write_all(
+                                        &mut std::io::stderr(),
+                                        msg.as_bytes(),
+                                    );
+                                }
+                            } else if let Err(err) = std::fs::create_dir_all(&rr_capture_abs) {
+                                let msg = format!(
+                                    "x07 run: failed to create rr fixture dir {}: {err}\n",
+                                    rr_capture_abs.display()
+                                );
+                                let _ = std::io::Write::write_all(
+                                    &mut std::io::stderr(),
+                                    msg.as_bytes(),
+                                );
+                            }
+
+                            (WorldId::SolveRr, Some(rr_capture_rel))
+                        } else {
+                            (world, fixtures.rr_dir.clone())
+                        };
+
                     let runner_cfg = RunnerConfig {
-                        world,
+                        world: repro_world,
                         fixture_fs_dir: fixtures.fs_dir.clone(),
                         fixture_fs_root: fixtures.fs_root.clone(),
                         fixture_fs_latency_index: fixtures.fs_latency_index.clone(),
-                        fixture_rr_dir: fixtures.rr_dir.clone(),
+                        fixture_rr_dir: repro_fixture_rr_dir,
                         fixture_kv_dir: fixtures.kv_dir.clone(),
                         fixture_kv_seed: fixtures.kv_seed.clone(),
                         solve_fuel,
@@ -768,13 +815,13 @@ pub fn cmd_run(
                         mode: "x07run".to_string(),
                         tests_manifest_path: None,
                         test_id: None,
-                        test_entry: None,
+                        test_entry,
                         target_kind: Some(target_kind.as_str().to_string()),
                         target_path: Some(target_path.display().to_string()),
                     };
                     if let Ok(repro_path) = crate::contract_repro::write_repro(
                         &repro_root,
-                        world.as_str(),
+                        repro_world.as_str(),
                         &runner_cfg,
                         &input_bytes,
                         info.payload,

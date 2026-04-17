@@ -56,6 +56,7 @@ mod service;
 mod service_genpack;
 mod service_validate;
 mod sm;
+mod tasks_index;
 mod tool_api;
 mod tool_report_schemas;
 mod toolchain;
@@ -550,6 +551,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(xtal::XtalCommand::Repair(_)) => vec!["xtal", "repair"],
                 Some(xtal::XtalCommand::Ingest(_)) => vec!["xtal", "ingest"],
                 Some(xtal::XtalCommand::Improve(_)) => vec!["xtal", "improve"],
+                Some(xtal::XtalCommand::Tasks(tasks)) => match &tasks.cmd {
+                    None => vec!["xtal", "tasks"],
+                    Some(xtal::XtalTasksCommand::Run(_)) => vec!["xtal", "tasks", "run"],
+                },
                 Some(xtal::XtalCommand::Impl(imp)) => match &imp.cmd {
                     None => vec!["xtal", "impl"],
                     Some(xtal::XtalImplCommand::Check(_)) => vec!["xtal", "impl", "check"],
@@ -2106,7 +2111,7 @@ fn run_one_test_os(
             .unwrap_or_else(|| PathBuf::from("."))
     };
 
-    cmd.current_dir(cmd_cwd);
+    cmd.current_dir(&cmd_cwd);
     cmd.arg("--world").arg(test.world.as_str());
     cmd.arg("--compat").arg(compat.to_string_lossy());
     cmd.arg("--program").arg(&driver_path);
@@ -2261,12 +2266,42 @@ fn run_one_test_os(
                         target_kind: None,
                         target_path: None,
                     };
+
+                    let clause_dir = util::safe_artifact_dir_name(&info.clause_id);
+                    let fixture_rr_dir = args
+                        .artifact_dir
+                        .join("contract")
+                        .join(&clause_dir)
+                        .join("rr");
+                    let fixture_rr_dir_abs = if fixture_rr_dir.is_absolute() {
+                        fixture_rr_dir.clone()
+                    } else {
+                        cwd.join(&fixture_rr_dir)
+                    };
+                    let rr_src_dir = cmd_cwd.join(".x07_rr");
+                    let _ = std::fs::remove_dir_all(&fixture_rr_dir_abs);
+                    if rr_src_dir.is_dir() {
+                        if let Err(err) =
+                            x07_vm::copy_dir_recursive(&rr_src_dir, &fixture_rr_dir_abs)
+                        {
+                            result.diags.push(Diag::new(
+                                "X07T_ECONTRACT_REPRO_WRITE",
+                                format!(
+                                    "failed to copy .x07_rr into {}: {err}",
+                                    fixture_rr_dir_abs.display()
+                                ),
+                            ));
+                        }
+                    } else {
+                        let _ = std::fs::create_dir_all(&fixture_rr_dir_abs);
+                    }
+
                     let runner_cfg = RunnerConfig {
-                        world: test.world,
+                        world: WorldId::SolveRr,
                         fixture_fs_dir: None,
                         fixture_fs_root: None,
                         fixture_fs_latency_index: None,
-                        fixture_rr_dir: None,
+                        fixture_rr_dir: Some(fixture_rr_dir),
                         fixture_kv_dir: None,
                         fixture_kv_seed: None,
                         solve_fuel: test.solve_fuel.unwrap_or(X07TEST_SOLVE_FUEL),
@@ -2278,7 +2313,7 @@ fn run_one_test_os(
 
                     match contract_repro::write_repro(
                         &args.artifact_dir,
-                        test.world.as_str(),
+                        WorldId::SolveRr.as_str(),
                         &runner_cfg,
                         &[],
                         info.payload,

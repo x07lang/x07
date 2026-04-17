@@ -158,6 +158,16 @@ Using `fixture_root: "."` with `cassette_path: ".x07_rr/smoke.rrbin"` — this f
 
 Note: In `solve-full`, `fixture_root` must contain an `rr/` directory (alongside `fs/` and/or `kv/` as needed). For `solve-rr`, `fixture_root` itself is treated as the rr fixture directory.
 
+## Automatic contract repro capture for OS worlds
+
+When a contract violation is captured from `run-os` or `run-os-sandboxed`, `x07 run` emits a repro that is replayable under `solve-rr` without manual fixture staging:
+
+- Copies `.x07_rr/` into `.x07/artifacts/contract/<clause_id>/rr/`.
+- Rewrites the emitted repro to `world: "solve-rr"`.
+- Sets `runner.fixture_rr_dir` in `repro.json` to the captured `rr/` directory.
+
+This makes incident inputs directly usable by `x07 xtal ingest`, `x07 xtal improve`, and `x07 xtal tasks run` (they copy the rr fixture into a local `rr/` directory next to the generated shadow tests manifest).
+
 ## Minimal `arch/rr/` example (copy/paste)
 
 For a schema-valid starting point, see:

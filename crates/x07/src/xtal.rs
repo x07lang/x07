@@ -18,6 +18,10 @@ use x07c::x07ast;
 use crate::gen::{GenArgs, GenCommand, GenVerifyArgs};
 use crate::patch::{PatchSet, PatchTarget};
 use crate::report_common;
+use crate::tasks_index::{
+    ArchTasksIndex, ArchTasksIndexTask, ARCH_TASKS_INDEX_SCHEMA_BYTES,
+    ARCH_TASKS_INDEX_SCHEMA_VERSION,
+};
 use crate::util;
 
 const SPEC_SCHEMA_VERSION: &str = "x07.x07spec@0.1.0";
@@ -80,6 +84,8 @@ const DEFAULT_REPAIR_DIFF_PATH: &str = "target/xtal/repair/diff.txt";
 const DEFAULT_REPAIR_SUMMARY_PATH: &str = "target/xtal/repair/summary.json";
 const DEFAULT_REPAIR_DIAG_REPORT_PATH: &str = "target/xtal/xtal.repair.diag.json";
 const DEFAULT_REPAIR_BASELINE_DIR: &str = "target/xtal/repair/baseline";
+const DEFAULT_TASKS_DIR: &str = "target/xtal/tasks";
+const DEFAULT_TASKS_DIAG_REPORT_PATH: &str = "target/xtal/xtal.tasks.diag.json";
 
 static TMP_N: AtomicU64 = AtomicU64::new(0);
 
@@ -91,7 +97,7 @@ pub struct XtalArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum XtalCommand {
-    /// Run the spec pipeline (fmt/lint/check).
+    /// Run the inner loop (prechecks + verify + optional repair-on-fail).
     Dev(XtalDevArgs),
     /// Verify spec + generated tests + test execution.
     Verify(XtalVerifyArgs),
@@ -99,10 +105,12 @@ pub enum XtalCommand {
     Certify(XtalCertifyArgs),
     /// Attempt a bounded repair for a failing `x07 xtal verify`.
     Repair(XtalRepairArgs),
-    /// Ingest a violation bundle or contract repro into a canonical workspace.
+    /// Ingest an incident input (and optionally run an improvement loop).
     Ingest(XtalIngestArgs),
     /// Turn an incident input into a bounded improvement run.
     Improve(XtalImproveArgs),
+    /// Run recovery tasks defined under `arch/tasks`.
+    Tasks(XtalTasksArgs),
     /// Work with spec modules.
     Spec(XtalSpecArgs),
     /// Work with generated tests from spec examples.
@@ -124,6 +132,49 @@ pub struct XtalDevArgs {
     /// Generator index path relative to the project root (defaults to `arch/gen/index.x07gen.json` if present).
     #[arg(long, value_name = "PATH")]
     pub gen_index: Option<PathBuf>,
+
+    /// Stop after spec/gen/impl prechecks (no verification).
+    #[arg(long)]
+    pub prechecks_only: bool,
+
+    /// If verification fails, apply a bounded repair and re-run verification.
+    #[arg(long)]
+    pub repair_on_fail: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct XtalIngestImproveArgs {
+    /// Optional review baseline path (passed through to `x07 xtal improve --baseline`).
+    #[arg(long, value_name = "PATH")]
+    pub baseline: Option<PathBuf>,
+
+    /// Apply the selected patchset to the working tree after validation.
+    #[arg(long)]
+    pub write: bool,
+
+    /// Permit applying patchsets that change `spec/**`.
+    #[arg(long)]
+    pub allow_spec_change: bool,
+
+    /// Attempt to reduce the repro input while preserving the failure.
+    #[arg(long)]
+    pub reduce_repro: bool,
+
+    /// Also run `x07 xtal certify` after applying a patchset.
+    #[arg(long)]
+    pub certify: bool,
+
+    /// Run recovery tasks from `arch/tasks/index.x07tasks.json` after a verified repair is applied.
+    #[arg(long)]
+    pub run_tasks: bool,
+
+    /// Output directory relative to the project root.
+    #[arg(
+        long = "improve-out-dir",
+        value_name = "DIR",
+        default_value = DEFAULT_IMPROVE_DIR
+    )]
+    pub improve_out_dir: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -139,6 +190,13 @@ pub struct XtalIngestArgs {
     /// Output directory relative to the project root.
     #[arg(long, value_name = "DIR", default_value = DEFAULT_INGEST_DIR)]
     pub out_dir: PathBuf,
+
+    /// Stop after normalization into the ingest workspace (no improvement run).
+    #[arg(long)]
+    pub normalize_only: bool,
+
+    #[command(flatten)]
+    pub improve: XtalIngestImproveArgs,
 }
 
 #[derive(Debug, Args)]
@@ -167,8 +225,52 @@ pub struct XtalImproveArgs {
     #[arg(long)]
     pub reduce_repro: bool,
 
+    /// Also run `x07 xtal certify` after applying a patchset.
+    #[arg(long)]
+    pub certify: bool,
+
+    /// Run recovery tasks from `arch/tasks/index.x07tasks.json` after a verified repair is applied.
+    #[arg(long)]
+    pub run_tasks: bool,
+
     /// Output directory relative to the project root.
     #[arg(long, value_name = "DIR", default_value = DEFAULT_IMPROVE_DIR)]
+    pub out_dir: PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub struct XtalTasksArgs {
+    #[command(subcommand)]
+    pub cmd: Option<XtalTasksCommand>,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum XtalTasksCommand {
+    /// Execute recovery tasks from the task policy graph.
+    Run(XtalTasksRunArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct XtalTasksRunArgs {
+    /// Project manifest path (defaults to searching upwards for x07.json).
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Path to a violation (`x07.xtal.violation@0.1.0`), contract repro (`x07.contract.repro@0.1.0`),
+    /// recovery events log, or a directory containing them.
+    #[arg(long, value_name = "PATH")]
+    pub input: PathBuf,
+
+    /// Task policy graph path relative to the project root.
+    #[arg(
+        long,
+        value_name = "PATH",
+        default_value = "arch/tasks/index.x07tasks.json"
+    )]
+    pub index: PathBuf,
+
+    /// Output directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_TASKS_DIR)]
     pub out_dir: PathBuf,
 }
 
@@ -530,6 +632,7 @@ pub fn cmd_xtal(
         XtalCommand::Repair(args) => cmd_xtal_repair(machine, args),
         XtalCommand::Ingest(args) => cmd_xtal_ingest(machine, args),
         XtalCommand::Improve(args) => cmd_xtal_improve(machine, args),
+        XtalCommand::Tasks(args) => cmd_xtal_tasks(machine, args),
         XtalCommand::Spec(args) => cmd_xtal_spec(machine, args),
         XtalCommand::Tests(args) => cmd_xtal_tests(machine, args),
         XtalCommand::Impl(args) => cmd_xtal_impl(machine, args),
@@ -585,6 +688,8 @@ fn cmd_xtal_certify(
             project: Some(project_root.join("x07.json")),
             spec_dir: args.spec_dir.clone(),
             gen_index: None,
+            prechecks_only: true,
+            repair_on_fail: false,
         };
         match capture_report_json("xtal_certify_dev", |m| cmd_xtal_dev(m, dev_args)) {
             Ok((code, v)) => {
@@ -1452,6 +1557,7 @@ fn cmd_xtal_ingest(
         Ok(loaded) => {
             let input_kind = loaded.input_kind.clone();
             let id = loaded.incident_id.clone();
+            let mut improve_ok = true;
 
             std::fs::create_dir_all(&out_root_abs)
                 .with_context(|| format!("mkdir: {}", out_root_abs.display()))?;
@@ -1513,6 +1619,57 @@ fn cmd_xtal_ingest(
                     Value::String(format!("{}/{}/events.jsonl", out_dir_rel_trim, id)),
                 );
             }
+
+            if !args.normalize_only {
+                let improve_args = XtalImproveArgs {
+                    project: Some(project_root.join("x07.json")),
+                    input: incident_dir_abs.clone(),
+                    baseline: args.improve.baseline.clone(),
+                    write: args.improve.write,
+                    allow_spec_change: args.improve.allow_spec_change,
+                    reduce_repro: args.improve.reduce_repro,
+                    certify: args.improve.certify,
+                    run_tasks: args.improve.run_tasks,
+                    out_dir: args.improve.improve_out_dir.clone(),
+                };
+
+                match capture_report_json("xtal_ingest_improve", |m| {
+                    cmd_xtal_improve(m, improve_args)
+                }) {
+                    Ok((code, v)) => {
+                        diagnostics.extend(
+                            crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default(),
+                        );
+                        if code != std::process::ExitCode::SUCCESS {
+                            improve_ok = false;
+                        }
+
+                        let improve_out_dir_rel = args
+                            .improve
+                            .improve_out_dir
+                            .to_string_lossy()
+                            .replace('\\', "/");
+                        let improve_out_dir_rel_trim = improve_out_dir_rel.trim_end_matches('/');
+                        report.meta.insert(
+                            "improve_summary_path".to_string(),
+                            Value::String(format!("{improve_out_dir_rel_trim}/summary.json")),
+                        );
+                    }
+                    Err(err) => {
+                        improve_ok = false;
+                        diagnostics.push(diag_error(
+                            "X07-INTERNAL-0001",
+                            diagnostics::Stage::Run,
+                            format!("xtal improve capture failed: {err:#}"),
+                            None,
+                        ));
+                    }
+                }
+            }
+
+            if !improve_ok {
+                report.ok = false;
+            }
         }
         Err(err) => {
             diagnostics.push(diag_error(err.code, err.stage, err.message, None));
@@ -1523,6 +1680,835 @@ fn cmd_xtal_ingest(
     report = report.with_diagnostics(diagnostics);
 
     write_ingest_diag_report(&project_root, &report)?;
+    write_report(machine, &report)?;
+
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
+}
+
+fn cmd_xtal_tasks(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalTasksArgs,
+) -> Result<std::process::ExitCode> {
+    let Some(cmd) = args.cmd else {
+        anyhow::bail!("missing xtal tasks subcommand (try --help)");
+    };
+    match cmd {
+        XtalTasksCommand::Run(args) => cmd_xtal_tasks_run(machine, args),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TaskOutcome {
+    Ok,
+    Skipped,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TaskFnKind {
+    Defn,
+    DefAsync,
+}
+
+#[derive(Debug, Clone)]
+struct TaskFnSig {
+    kind: TaskFnKind,
+    params: Vec<String>,
+    result: String,
+}
+
+fn cmd_xtal_tasks_run(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalTasksRunArgs,
+) -> Result<std::process::ExitCode> {
+    let cwd = std::env::current_dir().context("cwd")?;
+    let input_abs = if args.input.is_absolute() {
+        args.input.clone()
+    } else {
+        cwd.join(&args.input)
+    };
+
+    let project_root = resolve_project_root(args.project.as_deref(), Some(&input_abs))
+        .context("resolve project root")?;
+
+    let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
+    let mut report = diagnostics::Report::ok();
+
+    report.meta.insert(
+        "tasks_input_path".to_string(),
+        Value::String(
+            input_abs
+                .strip_prefix(&project_root)
+                .unwrap_or(&input_abs)
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+    );
+
+    let loaded = match load_ingest_inputs(&project_root, &input_abs) {
+        Ok(loaded) => loaded,
+        Err(err) => {
+            diags.push(diag_error(err.code, err.stage, err.message, None));
+            report.ok = false;
+            report = report.with_diagnostics(diags);
+            write_tasks_diag_report(&project_root, &report)?;
+            write_report(machine, &report)?;
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+
+    let incident_id = loaded.incident_id.clone();
+    report.meta.insert(
+        "tasks_incident_id".to_string(),
+        Value::String(incident_id.clone()),
+    );
+
+    let out_root_abs = project_root.join(&args.out_dir);
+    std::fs::create_dir_all(&out_root_abs)
+        .with_context(|| format!("mkdir: {}", out_root_abs.display()))?;
+    let incident_out_dir_abs = out_root_abs.join(&incident_id);
+    std::fs::create_dir_all(&incident_out_dir_abs)
+        .with_context(|| format!("mkdir: {}", incident_out_dir_abs.display()))?;
+
+    report.meta.insert(
+        "tasks_out_dir".to_string(),
+        Value::String(
+            incident_out_dir_abs
+                .strip_prefix(&project_root)
+                .unwrap_or(&incident_out_dir_abs)
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+    );
+
+    let repro_doc: Value =
+        serde_json::from_slice(&loaded.repro_bytes).context("parse repro JSON")?;
+    let world = repro_doc
+        .get("world")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let source = repro_doc
+        .get("source")
+        .cloned()
+        .unwrap_or_else(|| json!({ "mode": "unknown" }));
+
+    let world_id = x07c::world_config::parse_world_id(&world).context("parse repro world")?;
+
+    let input_b64 = repro_doc
+        .get("input_bytes_b64")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    #[derive(Debug, Clone)]
+    struct RunnerCfg {
+        solve_fuel: Option<u64>,
+        max_memory_bytes: Option<u64>,
+        max_output_bytes: Option<u64>,
+        cpu_time_limit_seconds: Option<u64>,
+        debug_borrow_checks: bool,
+        fixture_fs_dir: Option<String>,
+        fixture_fs_root: Option<String>,
+        fixture_fs_latency_index: Option<String>,
+        fixture_rr_dir: Option<String>,
+        fixture_kv_dir: Option<String>,
+        fixture_kv_seed: Option<String>,
+    }
+
+    let runner_cfg = {
+        let runner = repro_doc.get("runner").cloned().unwrap_or(Value::Null);
+        RunnerCfg {
+            solve_fuel: runner.get("solve_fuel").and_then(Value::as_u64),
+            max_memory_bytes: runner.get("max_memory_bytes").and_then(Value::as_u64),
+            max_output_bytes: runner.get("max_output_bytes").and_then(Value::as_u64),
+            cpu_time_limit_seconds: runner.get("cpu_time_limit_seconds").and_then(Value::as_u64),
+            debug_borrow_checks: runner
+                .get("debug_borrow_checks")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            fixture_fs_dir: runner
+                .get("fixture_fs_dir")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string()),
+            fixture_fs_root: runner
+                .get("fixture_fs_root")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string()),
+            fixture_fs_latency_index: runner
+                .get("fixture_fs_latency_index")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string()),
+            fixture_rr_dir: runner
+                .get("fixture_rr_dir")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string()),
+            fixture_kv_dir: runner
+                .get("fixture_kv_dir")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string()),
+            fixture_kv_seed: runner
+                .get("fixture_kv_seed")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string()),
+        }
+    };
+
+    let project_path = project_root.join("x07.json");
+    if !project_path.is_file() {
+        diags.push(diag_error(
+            "EXTAL_TASKS_PROJECT_MISSING",
+            diagnostics::Stage::Parse,
+            "x07.json is required for running recovery tasks",
+            None,
+        ));
+        report.ok = false;
+        report = report.with_diagnostics(diags);
+        write_tasks_diag_report(&project_root, &report)?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    let ctx = crate::project_ctx::load_project_ctx(&project_path, true)
+        .context("load project context")?;
+    let module_roots: Vec<PathBuf> = ctx
+        .module_roots
+        .iter()
+        .map(|p| {
+            if p.is_absolute() {
+                p.clone()
+            } else {
+                project_root.join(p)
+            }
+        })
+        .collect();
+
+    let index_abs = if args.index.is_absolute() {
+        args.index.clone()
+    } else {
+        project_root.join(&args.index)
+    };
+    if !index_abs.is_file() {
+        diags.push(diag_error(
+            "EXTAL_TASKS_INDEX_MISSING",
+            diagnostics::Stage::Parse,
+            format!("tasks index not found: {}", index_abs.display()),
+            None,
+        ));
+        report.ok = false;
+        report = report.with_diagnostics(diags);
+        write_tasks_diag_report(&project_root, &report)?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    let index_bytes =
+        std::fs::read(&index_abs).with_context(|| format!("read: {}", index_abs.display()))?;
+    let index_doc: Value =
+        serde_json::from_slice(&index_bytes).context("parse tasks index JSON")?;
+
+    if index_doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        != ARCH_TASKS_INDEX_SCHEMA_VERSION
+    {
+        diags.push(diag_error(
+            "EXTAL_TASKS_INDEX_INVALID",
+            diagnostics::Stage::Parse,
+            "schema_version mismatch for tasks index",
+            None,
+        ));
+        report.ok = false;
+    } else {
+        let schema_diags = report_common::validate_schema(
+            ARCH_TASKS_INDEX_SCHEMA_BYTES,
+            "spec/x07-arch.tasks.index.schema.json",
+            &index_doc,
+        )?;
+        if !schema_diags.is_empty() {
+            diags.push(diag_error(
+                "EXTAL_TASKS_INDEX_INVALID",
+                diagnostics::Stage::Parse,
+                format!(
+                    "tasks index is not schema-valid: {}",
+                    schema_diags[0].message
+                ),
+                None,
+            ));
+            report.ok = false;
+        }
+    }
+
+    let index_obj: ArchTasksIndex = match serde_json::from_value(index_doc.clone()) {
+        Ok(v) => v,
+        Err(err) => {
+            diags.push(diag_error(
+                "EXTAL_TASKS_INDEX_INVALID",
+                diagnostics::Stage::Parse,
+                format!("parse tasks index: {err}"),
+                None,
+            ));
+            report.ok = false;
+            ArchTasksIndex {
+                schema_version: "".to_string(),
+                tasks: Vec::new(),
+            }
+        }
+    };
+
+    if !report.ok {
+        report = report.with_diagnostics(diags);
+        write_tasks_diag_report(&project_root, &report)?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    fn topo_order_tasks(tasks: &[ArchTasksIndexTask]) -> Result<Vec<&ArchTasksIndexTask>> {
+        let mut by_id: BTreeMap<&str, &ArchTasksIndexTask> = BTreeMap::new();
+        for t in tasks {
+            if by_id.contains_key(t.id.as_str()) {
+                anyhow::bail!("duplicate task id in index: {:?}", t.id);
+            }
+            by_id.insert(t.id.as_str(), t);
+        }
+
+        let mut out = Vec::with_capacity(tasks.len());
+        let mut perm: BTreeSet<&str> = BTreeSet::new();
+        let mut temp: BTreeSet<&str> = BTreeSet::new();
+
+        fn visit<'a>(
+            id: &'a str,
+            by_id: &BTreeMap<&'a str, &'a ArchTasksIndexTask>,
+            perm: &mut BTreeSet<&'a str>,
+            temp: &mut BTreeSet<&'a str>,
+            out: &mut Vec<&'a ArchTasksIndexTask>,
+        ) -> Result<()> {
+            if perm.contains(id) {
+                return Ok(());
+            }
+            if temp.contains(id) {
+                anyhow::bail!("cycle detected in tasks index at {id:?}");
+            }
+            let Some(task) = by_id.get(id).copied() else {
+                anyhow::bail!("task dependency references missing id: {id:?}");
+            };
+            temp.insert(id);
+            for dep in &task.deps {
+                visit(dep, by_id, perm, temp, out)?;
+            }
+            temp.remove(id);
+            perm.insert(id);
+            out.push(task);
+            Ok(())
+        }
+
+        for id in by_id.keys().copied().collect::<Vec<_>>() {
+            visit(id, &by_id, &mut perm, &mut temp, &mut out)?;
+        }
+        Ok(out)
+    }
+
+    fn load_task_fn_sig(
+        module_roots: &[PathBuf],
+        world: WorldId,
+        fn_symbol: &str,
+    ) -> Result<TaskFnSig> {
+        let (module_id, _) = fn_symbol
+            .rsplit_once('.')
+            .context("task fn must contain '.'")?;
+        let source = x07c::module_source::load_module_source(module_id, world, module_roots)
+            .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
+        let doc: Value = serde_json::from_str(&source.src)
+            .with_context(|| format!("parse module JSON for {module_id:?}"))?;
+        let decls = doc
+            .get("decls")
+            .and_then(Value::as_array)
+            .context("module missing decls[]")?;
+        for d in decls {
+            let kind = d.get("kind").and_then(Value::as_str).unwrap_or("");
+            let sig_kind = match kind {
+                "defn" => TaskFnKind::Defn,
+                "defasync" => TaskFnKind::DefAsync,
+                _ => continue,
+            };
+            let name = d.get("name").and_then(Value::as_str).unwrap_or("");
+            if name != fn_symbol {
+                continue;
+            }
+            let params = d
+                .get("params")
+                .and_then(Value::as_array)
+                .context("defn missing params[]")?;
+            let mut out_params = Vec::with_capacity(params.len());
+            for p in params {
+                let ty = p
+                    .get("ty")
+                    .and_then(Value::as_str)
+                    .context("param missing ty")?;
+                out_params.push(ty.to_string());
+            }
+            let result = d
+                .get("result")
+                .and_then(Value::as_str)
+                .context("defn missing result")?
+                .to_string();
+            return Ok(TaskFnSig {
+                kind: sig_kind,
+                params: out_params,
+                result,
+            });
+        }
+        anyhow::bail!("task fn not found: {fn_symbol:?}");
+    }
+
+    fn build_task_wrapper(task: &ArchTasksIndexTask, sig: &TaskFnSig) -> Result<Value> {
+        if sig.result != "bytes" {
+            anyhow::bail!(
+                "unsupported task result type (expected bytes): {:?} -> {:?}",
+                task.fn_symbol,
+                sig.result
+            );
+        }
+
+        let mut args: Vec<Value> = Vec::new();
+        match sig.params.len() {
+            0 => {}
+            1 => {
+                let ty = sig.params[0].as_str();
+                match ty {
+                    "bytes_view" => args.push(Value::String("input".to_string())),
+                    "bytes" => args.push(Value::Array(vec![
+                        Value::String("view.to_bytes".to_string()),
+                        Value::String("input".to_string()),
+                    ])),
+                    _ => {
+                        anyhow::bail!(
+                            "unsupported task param type (expected bytes_view/bytes): {:?} param[0]={:?}",
+                            task.fn_symbol,
+                            ty
+                        );
+                    }
+                }
+            }
+            n => {
+                anyhow::bail!(
+                    "unsupported task signature (expected 0 or 1 params): {:?} params={n}",
+                    task.fn_symbol
+                );
+            }
+        }
+
+        let (module_id, _) = task
+            .fn_symbol
+            .rsplit_once('.')
+            .context("task fn must contain '.'")?;
+
+        let mut call_items: Vec<Value> = Vec::with_capacity(1 + args.len());
+        call_items.push(Value::String(task.fn_symbol.clone()));
+        call_items.extend(args);
+        let call = Value::Array(call_items);
+        let solve = match sig.kind {
+            TaskFnKind::Defn => call,
+            TaskFnKind::DefAsync => Value::Array(vec![Value::String("await".to_string()), call]),
+        };
+
+        Ok(json!({
+            "schema_version": "x07.x07ast@0.8.0",
+            "module_id": "main",
+            "kind": "entry",
+            "imports": [module_id],
+            "decls": [],
+            "solve": solve,
+        }))
+    }
+
+    let ordered = match topo_order_tasks(&index_obj.tasks) {
+        Ok(v) => v,
+        Err(err) => {
+            diags.push(diag_error(
+                "EXTAL_TASKS_INDEX_INVALID",
+                diagnostics::Stage::Parse,
+                format!("tasks index is not runnable: {err:#}"),
+                None,
+            ));
+            report.ok = false;
+            report = report.with_diagnostics(diags);
+            write_tasks_diag_report(&project_root, &report)?;
+            write_report(machine, &report)?;
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+
+    let mut outcomes: BTreeMap<String, TaskOutcome> = BTreeMap::new();
+    let mut overall_ok = true;
+    let mut fail_fast_triggered = false;
+
+    for task in ordered {
+        if fail_fast_triggered {
+            break;
+        }
+
+        let safe_task = safe_entry_dir_component(&task.id);
+        let task_out_dir_abs = incident_out_dir_abs.join(&safe_task);
+        std::fs::create_dir_all(&task_out_dir_abs)
+            .with_context(|| format!("mkdir: {}", task_out_dir_abs.display()))?;
+
+        let deps_ok = task
+            .deps
+            .iter()
+            .all(|dep| outcomes.get(dep).copied() == Some(TaskOutcome::Ok));
+        if !deps_ok {
+            let _ = crate::xtal_events::maybe_append_recovery_event(
+                &project_root,
+                &incident_id,
+                "task_skipped_v1",
+                &world,
+                &source,
+                Some(task.id.as_str()),
+                json!({
+                    "reason": "deps_not_ok",
+                    "deps": task.deps,
+                    "fn": task.fn_symbol,
+                }),
+            );
+
+            if task.policy.criticality == "critical_v1" {
+                overall_ok = false;
+            }
+            outcomes.insert(task.id.clone(), TaskOutcome::Skipped);
+            continue;
+        }
+
+        let retries = if task.policy.on_failure == "retry_bounded_v1" {
+            task.policy.retry_max.unwrap_or(0)
+        } else {
+            0
+        };
+        let max_attempts = retries.saturating_add(1);
+
+        let mut attempt = 1u32;
+        let mut success = false;
+        let mut last_err: Option<ToolRunOutcome> = None;
+
+        let _ = crate::xtal_events::maybe_append_recovery_event(
+            &project_root,
+            &incident_id,
+            "task_started_v1",
+            &world,
+            &source,
+            Some(task.id.as_str()),
+            json!({
+                "attempt": attempt,
+                "attempt_max": max_attempts,
+                "criticality": task.policy.criticality.as_str(),
+                "on_failure": task.policy.on_failure.as_str(),
+                "fn": task.fn_symbol.as_str(),
+            }),
+        );
+
+        while attempt <= max_attempts {
+            let sig = match load_task_fn_sig(&module_roots, world_id, &task.fn_symbol) {
+                Ok(v) => v,
+                Err(err) => {
+                    let _ = crate::xtal_events::maybe_append_recovery_event(
+                        &project_root,
+                        &incident_id,
+                        "fallback_used_v1",
+                        &world,
+                        &source,
+                        Some(task.id.as_str()),
+                        json!({
+                            "reason": "cannot_load_task_fn",
+                            "fn": task.fn_symbol,
+                            "error": format!("{err:#}"),
+                        }),
+                    );
+                    last_err = Some(ToolRunOutcome {
+                        exit_code: 1,
+                        stderr: format!("{err:#}").into_bytes(),
+                    });
+                    break;
+                }
+            };
+
+            let wrapper_doc = match build_task_wrapper(task, &sig) {
+                Ok(v) => v,
+                Err(err) => {
+                    let _ = crate::xtal_events::maybe_append_recovery_event(
+                        &project_root,
+                        &incident_id,
+                        "fallback_used_v1",
+                        &world,
+                        &source,
+                        Some(task.id.as_str()),
+                        json!({
+                            "reason": "unsupported_task_signature",
+                            "fn": task.fn_symbol,
+                            "error": format!("{err:#}"),
+                        }),
+                    );
+                    last_err = Some(ToolRunOutcome {
+                        exit_code: 1,
+                        stderr: format!("{err:#}").into_bytes(),
+                    });
+                    break;
+                }
+            };
+
+            let wrapper_path_abs = task_out_dir_abs.join("program.x07.json");
+            let wrapper_bytes = serde_json::to_vec(&wrapper_doc).context("serialize wrapper")?;
+            util::write_atomic(&wrapper_path_abs, &wrapper_bytes)
+                .with_context(|| format!("write: {}", wrapper_path_abs.display()))?;
+
+            let wrapper_rel = wrapper_path_abs
+                .strip_prefix(&project_root)
+                .unwrap_or(&wrapper_path_abs)
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            let mut argv: Vec<String> = vec![
+                "run".to_string(),
+                "--program".to_string(),
+                wrapper_rel,
+                "--world".to_string(),
+                world.clone(),
+            ];
+
+            for root in &module_roots {
+                argv.push("--module-root".to_string());
+                argv.push(root.display().to_string());
+            }
+
+            argv.push("--input-b64".to_string());
+            argv.push(input_b64.clone());
+
+            if let Some(v) = runner_cfg.solve_fuel {
+                argv.push("--solve-fuel".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.max_memory_bytes {
+                argv.push("--max-memory-bytes".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.max_output_bytes {
+                argv.push("--max-output-bytes".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.cpu_time_limit_seconds {
+                argv.push("--cpu-time-limit-seconds".to_string());
+                argv.push(v.to_string());
+            }
+            if runner_cfg.debug_borrow_checks {
+                argv.push("--debug-borrow-checks".to_string());
+            }
+
+            if let Some(v) = runner_cfg.fixture_fs_dir.as_deref() {
+                argv.push("--fixture-fs-dir".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.fixture_fs_root.as_deref() {
+                argv.push("--fixture-fs-root".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.fixture_fs_latency_index.as_deref() {
+                argv.push("--fixture-fs-latency-index".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.fixture_rr_dir.as_deref() {
+                argv.push("--fixture-rr-dir".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.fixture_kv_dir.as_deref() {
+                argv.push("--fixture-kv-dir".to_string());
+                argv.push(v.to_string());
+            }
+            if let Some(v) = runner_cfg.fixture_kv_seed.as_deref() {
+                argv.push("--fixture-kv-seed".to_string());
+                argv.push(v.to_string());
+            }
+
+            let out = run_self_command(&project_root, &argv)?;
+            let stderr_path = task_out_dir_abs.join(format!("attempt-{:04}.stderr.txt", attempt));
+            let _ = util::write_atomic(&stderr_path, &out.stderr);
+
+            if out.exit_code == 0 {
+                success = true;
+                break;
+            }
+
+            last_err = Some(out);
+            if task.policy.on_failure == "retry_bounded_v1" && attempt < max_attempts {
+                let next_attempt = attempt.saturating_add(1);
+                let _ = crate::xtal_events::maybe_append_recovery_event(
+                    &project_root,
+                    &incident_id,
+                    "task_retried_v1",
+                    &world,
+                    &source,
+                    Some(task.id.as_str()),
+                    json!({
+                        "attempt": next_attempt,
+                        "retry_max": retries,
+                        "fn": task.fn_symbol,
+                    }),
+                );
+                attempt = next_attempt;
+                continue;
+            }
+
+            break;
+        }
+
+        if success {
+            let _ = crate::xtal_events::maybe_append_recovery_event(
+                &project_root,
+                &incident_id,
+                "task_finished_v1",
+                &world,
+                &source,
+                Some(task.id.as_str()),
+                json!({
+                    "outcome": "ok",
+                    "attempts": attempt,
+                    "fn": task.fn_symbol.as_str(),
+                }),
+            );
+            outcomes.insert(task.id.clone(), TaskOutcome::Ok);
+            continue;
+        }
+
+        let err = last_err.unwrap_or(ToolRunOutcome {
+            exit_code: 1,
+            stderr: Vec::new(),
+        });
+
+        let _ = crate::xtal_events::maybe_append_recovery_event(
+            &project_root,
+            &incident_id,
+            "task_failed_v1",
+            &world,
+            &source,
+            Some(task.id.as_str()),
+            json!({
+                "exit_code": err.exit_code,
+                "stderr": stderr_summary(&err.stderr),
+                "fn": task.fn_symbol,
+            }),
+        );
+
+        match task.policy.on_failure.as_str() {
+            "skip_v1" => {
+                let _ = crate::xtal_events::maybe_append_recovery_event(
+                    &project_root,
+                    &incident_id,
+                    "task_skipped_v1",
+                    &world,
+                    &source,
+                    Some(task.id.as_str()),
+                    json!({
+                        "reason": "task_failed",
+                        "exit_code": err.exit_code,
+                        "fn": task.fn_symbol,
+                    }),
+                );
+                outcomes.insert(task.id.clone(), TaskOutcome::Skipped);
+            }
+            "retry_bounded_v1" => {
+                if task.policy.criticality == "optional_v1" {
+                    let _ = crate::xtal_events::maybe_append_recovery_event(
+                        &project_root,
+                        &incident_id,
+                        "task_skipped_v1",
+                        &world,
+                        &source,
+                        Some(task.id.as_str()),
+                        json!({
+                            "reason": "retry_exhausted",
+                            "retry_max": retries,
+                            "exit_code": err.exit_code,
+                            "fn": task.fn_symbol,
+                        }),
+                    );
+                    outcomes.insert(task.id.clone(), TaskOutcome::Skipped);
+                } else {
+                    outcomes.insert(task.id.clone(), TaskOutcome::Failed);
+                    overall_ok = false;
+                }
+            }
+            "fail_fast_v1" => {
+                outcomes.insert(task.id.clone(), TaskOutcome::Failed);
+                overall_ok = false;
+                fail_fast_triggered = true;
+            }
+            _ => {
+                outcomes.insert(task.id.clone(), TaskOutcome::Failed);
+                overall_ok = false;
+            }
+        }
+
+        let finished_outcome = match outcomes.get(&task.id) {
+            Some(TaskOutcome::Ok) => "ok",
+            Some(TaskOutcome::Skipped) => "skipped",
+            Some(TaskOutcome::Failed) => "failed",
+            None => "failed",
+        };
+        let _ = crate::xtal_events::maybe_append_recovery_event(
+            &project_root,
+            &incident_id,
+            "task_finished_v1",
+            &world,
+            &source,
+            Some(task.id.as_str()),
+            json!({
+                "outcome": finished_outcome,
+                "attempts": attempt,
+                "exit_code": err.exit_code,
+                "fn": task.fn_symbol.as_str(),
+            }),
+        );
+
+        if task.policy.criticality == "critical_v1"
+            && outcomes.get(&task.id) != Some(&TaskOutcome::Ok)
+        {
+            overall_ok = false;
+        }
+
+        if outcomes.get(&task.id) == Some(&TaskOutcome::Failed) {
+            diags.push(diag_error(
+                "EXTAL_TASKS_TASK_FAILED",
+                diagnostics::Stage::Run,
+                format!(
+                    "task {:?} failed (exit_code={}): {}",
+                    task.id,
+                    err.exit_code,
+                    stderr_summary(&err.stderr)
+                ),
+                None,
+            ));
+        } else {
+            diags.push(diag_warning(
+                "EXTAL_TASKS_TASK_SKIPPED",
+                diagnostics::Stage::Run,
+                format!(
+                    "task {:?} was skipped after failure (exit_code={}): {}",
+                    task.id,
+                    err.exit_code,
+                    stderr_summary(&err.stderr)
+                ),
+                None,
+            ));
+        }
+    }
+
+    report.ok = overall_ok;
+    report = report.with_diagnostics(diags);
+
+    write_tasks_diag_report(&project_root, &report)?;
     write_report(machine, &report)?;
 
     Ok(if report.ok {
@@ -1664,6 +2650,60 @@ fn write_shadow_tests_manifest(
         );
         obj.remove("input_path");
         obj.remove("pbt");
+
+        if obj.get("fixture_root").is_none()
+            && WorldId::parse(&world).is_some_and(|w| w == WorldId::SolveRr)
+        {
+            let raw = repro_doc
+                .pointer("/runner/fixture_rr_dir")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            if raw.is_empty() {
+                anyhow::bail!("solve-rr incident is missing runner.fixture_rr_dir in repro.json");
+            }
+            if raw.starts_with("\\\\") {
+                anyhow::bail!("unsupported runner.fixture_rr_dir in repro.json: {raw:?}");
+            }
+            let rr_src_abs = {
+                let p = PathBuf::from(raw);
+                if p.is_absolute() {
+                    p
+                } else if util::is_safe_rel_path(raw) {
+                    project_root.join(p)
+                } else {
+                    anyhow::bail!("unsupported runner.fixture_rr_dir in repro.json: {raw:?}");
+                }
+            };
+            let rr_src_abs_canon = rr_src_abs.canonicalize().unwrap_or(rr_src_abs.clone());
+            let project_root_canon = project_root
+                .canonicalize()
+                .unwrap_or_else(|_| project_root.to_path_buf());
+            if !rr_src_abs_canon.starts_with(&project_root_canon) {
+                anyhow::bail!("unsupported runner.fixture_rr_dir outside project root: {raw:?}");
+            }
+            if !rr_src_abs.is_dir() {
+                anyhow::bail!(
+                    "solve-rr rr fixture dir does not exist: {}",
+                    rr_src_abs.display()
+                );
+            }
+
+            let rr_dst_abs = out_path
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join("rr");
+            let _ = std::fs::remove_dir_all(&rr_dst_abs);
+            x07_vm::copy_dir_recursive(&rr_src_abs, &rr_dst_abs).with_context(|| {
+                format!(
+                    "copy rr fixture dir {} -> {}",
+                    rr_src_abs.display(),
+                    rr_dst_abs.display()
+                )
+            })?;
+
+            obj.insert("fixture_root".to_string(), Value::String("rr".to_string()));
+        }
     }
 
     let doc = json!({
@@ -2206,28 +3246,73 @@ fn cmd_xtal_improve(
                             };
 
                             if verify2_code == std::process::ExitCode::SUCCESS {
-                                let (certify_code, _) =
-                                    capture_report_json("xtal_improve_certify", |m| {
-                                        cmd_xtal_certify(
-                                            m,
-                                            XtalCertifyArgs {
-                                                project: Some(project_root.join("x07.json")),
-                                                spec_dir: PathBuf::from(DEFAULT_SPEC_DIR),
-                                                out_dir: PathBuf::from(DEFAULT_CERT_DIR),
-                                                entry: None,
-                                                all: true,
-                                                baseline: args.baseline.clone(),
-                                                no_prechecks: false,
-                                            },
-                                        )
-                                    })?;
+                                if args.run_tasks {
+                                    report.meta.insert(
+                                        "tasks_diag_path".to_string(),
+                                        Value::String(DEFAULT_TASKS_DIAG_REPORT_PATH.to_string()),
+                                    );
 
-                                certify_status = if certify_code == std::process::ExitCode::SUCCESS
-                                {
-                                    "ok".to_string()
-                                } else {
-                                    "failed".to_string()
-                                };
+                                    let tasks_args = XtalTasksRunArgs {
+                                        project: Some(project_root.join("x07.json")),
+                                        input: incidents[target_idx].input_file_abs.clone(),
+                                        index: PathBuf::from("arch/tasks/index.x07tasks.json"),
+                                        out_dir: PathBuf::from(DEFAULT_TASKS_DIR),
+                                    };
+
+                                    match capture_report_json("xtal_improve_tasks", |m| {
+                                        cmd_xtal_tasks_run(m, tasks_args)
+                                    }) {
+                                        Ok((code, v)) => {
+                                            diags.extend(
+                                                crate::tool_api::extract_diagnostics(Some(&v))
+                                                    .unwrap_or_default(),
+                                            );
+                                            if code != std::process::ExitCode::SUCCESS {
+                                                report.ok = false;
+                                                diags.push(diag_error(
+                                                    "EXTAL_IMPROVE_TASKS_FAILED",
+                                                    diagnostics::Stage::Run,
+                                                    "recovery tasks failed; see diagnostics",
+                                                    None,
+                                                ));
+                                            }
+                                        }
+                                        Err(err) => {
+                                            report.ok = false;
+                                            diags.push(diag_error(
+                                                "EXTAL_IMPROVE_TASKS_FAILED",
+                                                diagnostics::Stage::Run,
+                                                format!("recovery tasks failed: {err:#}"),
+                                                None,
+                                            ));
+                                        }
+                                    }
+                                }
+
+                                if args.certify {
+                                    let (certify_code, _) =
+                                        capture_report_json("xtal_improve_certify", |m| {
+                                            cmd_xtal_certify(
+                                                m,
+                                                XtalCertifyArgs {
+                                                    project: Some(project_root.join("x07.json")),
+                                                    spec_dir: PathBuf::from(DEFAULT_SPEC_DIR),
+                                                    out_dir: PathBuf::from(DEFAULT_CERT_DIR),
+                                                    entry: None,
+                                                    all: true,
+                                                    baseline: args.baseline.clone(),
+                                                    no_prechecks: false,
+                                                },
+                                            )
+                                        })?;
+
+                                    certify_status =
+                                        if certify_code == std::process::ExitCode::SUCCESS {
+                                            "ok".to_string()
+                                        } else {
+                                            "failed".to_string()
+                                        };
+                                }
                             }
                         }
                     }
@@ -2242,13 +3327,12 @@ fn cmd_xtal_improve(
                 report.ok = false;
             }
         } else {
-            diags.push(diag_error(
-                "EXTAL_IMPROVE_NO_PATCH",
+            diags.push(diag_warning(
+                "WXTAL_IMPROVE_NO_PATCH",
                 diagnostics::Stage::Run,
-                "no patchset was produced by `x07 xtal repair`",
+                "no patchset was produced by `x07 xtal repair`; nothing to apply",
                 None,
             ));
-            report.ok = false;
         }
     }
 
@@ -2303,7 +3387,7 @@ fn cmd_xtal_improve(
             &project_root.join(DEFAULT_REPAIR_SUMMARY_PATH),
         )?);
     }
-    if project_root.join("target/xtal/cert/summary.json").is_file() {
+    if certify_status != "skipped" && project_root.join("target/xtal/cert/summary.json").is_file() {
         files.push(file_digest_rel_value(
             &project_root,
             &project_root.join("target/xtal/cert/summary.json"),
@@ -2320,7 +3404,10 @@ fn cmd_xtal_improve(
 
     report = report.with_diagnostics(diags);
     if args.write {
-        if !applied || verify_status != "ok" || certify_status == "failed" {
+        if verify_status != "ok" || certify_status == "failed" {
+            report.ok = false;
+        }
+        if patchset.is_some() && !applied {
             report.ok = false;
         }
     } else if verify_status != "ok" || repair_status != "ok" {
@@ -3141,6 +4228,24 @@ fn write_ingest_diag_report(project_root: &Path, report: &diagnostics::Report) -
     Ok(())
 }
 
+fn write_tasks_diag_report(project_root: &Path, report: &diagnostics::Report) -> Result<()> {
+    let report_path = project_root.join(DEFAULT_TASKS_DIAG_REPORT_PATH);
+    std::fs::create_dir_all(report_path.parent().unwrap_or(project_root)).with_context(|| {
+        format!(
+            "mkdir: {}",
+            report_path.parent().unwrap_or(project_root).display()
+        )
+    })?;
+
+    let mut report_bytes = serde_json::to_vec(report).context("serialize tasks diag report")?;
+    if report_bytes.last() != Some(&b'\n') {
+        report_bytes.push(b'\n');
+    }
+    util::write_atomic(&report_path, &report_bytes)
+        .with_context(|| format!("write: {}", report_path.display()))?;
+    Ok(())
+}
+
 fn cmd_xtal_impl(
     machine: &crate::reporting::MachineArgs,
     args: XtalImplArgs,
@@ -3362,6 +4467,108 @@ fn cmd_xtal_dev(
         }
     }
 
+    let prechecks_ok = spec_fmt_ok
+        && spec_lint_ok
+        && spec_check_ok
+        && gen_ok
+        && impl_ok
+        && !diagnostics
+            .iter()
+            .any(|d| matches!(d.severity, diagnostics::Severity::Error));
+
+    let mut verify_status = "skipped".to_string();
+    let mut verify_report: Option<Value> = None;
+    let mut repair_status = "skipped".to_string();
+    let mut repair_report: Option<Value> = None;
+
+    if prechecks_ok && !args.prechecks_only {
+        let verify_args = XtalVerifyArgs {
+            project: Some(project_root.join("x07.json")),
+            spec_dir: args.spec_dir.clone(),
+            gen_index: args.gen_index.clone(),
+            gen_dir: PathBuf::from(DEFAULT_GEN_DIR),
+            manifest: PathBuf::from(DEFAULT_MANIFEST_PATH),
+            proof_policy: ProofPolicy::Balanced,
+            allow_os_world: false,
+            unwind: None,
+            max_bytes_len: None,
+            input_len_bytes: None,
+        };
+        let mut verify_ok = false;
+        match capture_report_json("xtal_dev_verify", |m| cmd_xtal_verify(m, verify_args)) {
+            Ok((code, v)) => {
+                verify_ok = code == std::process::ExitCode::SUCCESS;
+                verify_status = if verify_ok {
+                    "ok".to_string()
+                } else {
+                    "failed".to_string()
+                };
+                verify_report = Some(v);
+            }
+            Err(err) => {
+                verify_status = "failed".to_string();
+                diagnostics.push(diag_error(
+                    "X07-INTERNAL-0001",
+                    diagnostics::Stage::Run,
+                    format!("xtal verify capture failed: {err:#}"),
+                    None,
+                ));
+            }
+        }
+
+        if !verify_ok && args.repair_on_fail {
+            let repair_args = XtalRepairArgs {
+                project: Some(project_root.join("x07.json")),
+                write: true,
+                max_rounds: 3,
+                max_candidates: 64,
+                semantic_max_depth: 4,
+                semantic_ops: SemanticOpsPreset::Safe,
+                entry: None,
+                stubs_only: true,
+                allow_edit_non_stubs: false,
+                semantic_only: false,
+                quickfix_only: false,
+                suggest_spec_patch: false,
+            };
+            match capture_report_json("xtal_dev_repair", |m| cmd_xtal_repair(m, repair_args)) {
+                Ok((code, v)) => {
+                    let ok = code == std::process::ExitCode::SUCCESS;
+                    repair_status = if ok {
+                        "ok".to_string()
+                    } else {
+                        "failed".to_string()
+                    };
+                    repair_report = Some(v);
+                    if ok {
+                        verify_ok = true;
+                        verify_status = "ok".to_string();
+                    }
+                }
+                Err(err) => {
+                    repair_status = "failed".to_string();
+                    diagnostics.push(diag_error(
+                        "X07-INTERNAL-0001",
+                        diagnostics::Stage::Run,
+                        format!("xtal repair capture failed: {err:#}"),
+                        None,
+                    ));
+                }
+            }
+        }
+
+        if !verify_ok {
+            if let Some(v) = verify_report.as_ref() {
+                diagnostics
+                    .extend(crate::tool_api::extract_diagnostics(Some(v)).unwrap_or_default());
+            }
+            if let Some(v) = repair_report.as_ref() {
+                diagnostics
+                    .extend(crate::tool_api::extract_diagnostics(Some(v)).unwrap_or_default());
+            }
+        }
+    }
+
     let mut report = diagnostics::Report::ok();
     report = report.with_diagnostics(diagnostics);
     if !spec_fmt_ok {
@@ -3377,6 +4584,9 @@ fn cmd_xtal_dev(
         report.ok = false;
     }
     if !impl_ok {
+        report.ok = false;
+    }
+    if !args.prechecks_only && verify_status != "ok" {
         report.ok = false;
     }
     if report
@@ -3420,6 +4630,26 @@ fn cmd_xtal_dev(
     }
     if let Some(v) = impl_report {
         report.meta.insert("impl_check_report".to_string(), v);
+    }
+    report.meta.insert(
+        "prechecks_only".to_string(),
+        Value::Bool(args.prechecks_only),
+    );
+    report.meta.insert(
+        "repair_on_fail".to_string(),
+        Value::Bool(args.repair_on_fail),
+    );
+    report
+        .meta
+        .insert("verify_status".to_string(), Value::String(verify_status));
+    report
+        .meta
+        .insert("repair_status".to_string(), Value::String(repair_status));
+    if let Some(v) = verify_report {
+        report.meta.insert("verify_report".to_string(), v);
+    }
+    if let Some(v) = repair_report {
+        report.meta.insert("repair_report".to_string(), v);
     }
     write_report(machine, &report)?;
 
@@ -3822,8 +5052,9 @@ fn cmd_xtal_verify(
                 let prove_report_rel = format!(
                     "{DEFAULT_VERIFY_ARTIFACT_DIR}/prove/{module_path}/{local}.report.json"
                 );
-                let proof_object_rel =
-                    format!("{DEFAULT_VERIFY_ARTIFACT_DIR}/prove/{module_path}/{local}.proof.json");
+                let proof_object_rel = format!(
+                    "{DEFAULT_VERIFY_ARTIFACT_DIR}/prove/{module_path}/{local}/proof.object.json"
+                );
 
                 if let Some(parent) = project_root.join(&coverage_report_rel).parent() {
                     std::fs::create_dir_all(parent)
@@ -4090,7 +5321,7 @@ fn cmd_xtal_verify(
                 let policy_outcome = match args.proof_policy {
                     ProofPolicy::Balanced => match prove_raw {
                         "proven" => "pass",
-                        "unsupported" | "inconclusive" | "timeout" => "warn",
+                        "unsupported" | "inconclusive" | "timeout" | "tool_missing" => "warn",
                         _ => "fail",
                     },
                     ProofPolicy::Strict => {
@@ -4122,14 +5353,27 @@ fn cmd_xtal_verify(
                         ),
                         None,
                     )),
-                    "tool_missing" => diagnostics.push(diag_error(
-                        "EXTAL_VERIFY_PROVE_TOOL_MISSING",
-                        diag_stage,
-                        format!(
-                            "Proof tool is missing or unavailable while proving \"{entry}\" (world={project_world_str:?}). See report: {prove_report_rel}."
-                        ),
-                        None,
-                    )),
+                    "tool_missing" => {
+                        if policy_outcome == "fail" {
+                            diagnostics.push(diag_error(
+                                "EXTAL_VERIFY_PROVE_TOOL_MISSING",
+                                diag_stage,
+                                format!(
+                                    "Proof tool is missing or unavailable while proving \"{entry}\" (world={project_world_str:?}). See report: {prove_report_rel}."
+                                ),
+                                None,
+                            ));
+                        } else {
+                            diagnostics.push(diag_warning(
+                                "WXTAL_VERIFY_PROVE_TOOL_MISSING",
+                                diag_stage,
+                                format!(
+                                    "Proof tool is missing or unavailable while proving \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                ),
+                                None,
+                            ));
+                        }
+                    }
                     "error" => diagnostics.push(diag_error(
                         "EXTAL_VERIFY_PROVE_ERROR",
                         diag_stage,
@@ -4530,15 +5774,19 @@ fn cmd_xtal_verify(
     let prove_outcome = if entries_total == 0 {
         "skip"
     } else {
-        let warn = prove_inconclusive + prove_unsupported + prove_timeout;
+        let warn_base = prove_inconclusive + prove_unsupported + prove_timeout + prove_tool_missing;
         let fail = prove_counterexample
-            + prove_tool_missing
             + prove_error
             + if args.proof_policy == ProofPolicy::Strict {
-                warn
+                warn_base
             } else {
                 0
             };
+        let warn = if args.proof_policy == ProofPolicy::Strict {
+            0
+        } else {
+            warn_base
+        };
         if fail > 0 {
             "fail"
         } else if warn > 0 {

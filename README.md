@@ -78,19 +78,22 @@ Docs:
 - `docs/toolchain/xtal.md`
 - `docs/toolchain/generated-artifacts.md`
 
-Core gates:
+Canonical gates:
+
+```bash
+x07 xtal dev
+x07 xtal certify
+x07 xtal ingest --input target/xtal/violations/<id>
+x07 gen verify --index arch/gen/index.x07gen.json
+```
+
+Building blocks (advanced; used when you need to isolate a step):
 
 ```bash
 x07 xtal verify
 x07 xtal repair
-x07 xtal certify
-x07 gen verify --index arch/gen/index.x07gen.json
-```
-
-Incident intake (normalize runtime contract violations into a canonical workspace):
-
-```bash
-x07 xtal ingest --input target/xtal/violations/<id>
+x07 xtal improve
+x07 xtal tasks run --input target/xtal/violations/<id>/violation.json
 ```
 
 ### Use X07 with a coding agent
