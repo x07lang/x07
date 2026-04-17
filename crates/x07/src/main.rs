@@ -64,6 +64,7 @@ mod util;
 mod verify;
 mod x07ast_util;
 mod xtal;
+mod xtal_events;
 mod xtal_violation;
 
 #[derive(Parser, Debug)]
@@ -548,6 +549,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(xtal::XtalCommand::Certify(_)) => vec!["xtal", "certify"],
                 Some(xtal::XtalCommand::Repair(_)) => vec!["xtal", "repair"],
                 Some(xtal::XtalCommand::Ingest(_)) => vec!["xtal", "ingest"],
+                Some(xtal::XtalCommand::Improve(_)) => vec!["xtal", "improve"],
                 Some(xtal::XtalCommand::Impl(imp)) => match &imp.cmd {
                     None => vec!["xtal", "impl"],
                     Some(xtal::XtalImplCommand::Check(_)) => vec!["xtal", "impl", "check"],

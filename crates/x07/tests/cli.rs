@@ -1930,12 +1930,10 @@ fn x07_test_contract_violation_emits_repro_and_report_fields() {
     assert_eq!(repro["input_bytes_b64"], "");
 }
 
-#[test]
-fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
+fn emit_xtal_contract_violation_bundle(dir: &Path) -> (PathBuf, Vec<u8>, String) {
     let root = repo_root();
-    let dir = fresh_tmp_dir(&root, "test_contract_repro_xtal_violation_bundle");
-    std::fs::create_dir_all(&dir).expect("create tmp dir");
-    write_verify_project_files(&dir);
+
+    write_verify_project_files(dir);
 
     std::fs::create_dir_all(dir.join("arch").join("xtal")).expect("create arch/xtal dir");
     write_json(
@@ -2001,7 +1999,7 @@ fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
     ensure_runner_binaries_staged();
     let exe = env!("CARGO_BIN_EXE_x07");
     let out = Command::new(exe)
-        .current_dir(&dir)
+        .current_dir(dir)
         .env(ENV_SANDBOX_BACKEND, "os")
         .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
         .env_remove("X07_XTAL_VIOLATIONS_DIR")
@@ -2029,15 +2027,6 @@ fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let v = parse_json_stdout(&out);
-    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
-    assert_eq!(v["summary"]["run_failures"], 1);
-    assert_eq!(v["tests"].as_array().expect("tests[]").len(), 1);
-
-    let t = &v["tests"][0];
-    assert_eq!(t["status"], "error");
-    assert_eq!(t["failure_kind"], "contract_violation");
-
     let expected_repro_path = artifact_dir
         .join("contract")
         .join(format!("id_{}", sha256_hex("req1".as_bytes())))
@@ -2050,6 +2039,17 @@ fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
 
     let repro_bytes = std::fs::read(&expected_repro_path).expect("read repro.json");
     let incident_id = sha256_hex(&repro_bytes);
+
+    (expected_repro_path, repro_bytes, incident_id)
+}
+
+#[test]
+fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_contract_repro_xtal_violation_bundle");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    let (expected_repro_path, repro_bytes, incident_id) = emit_xtal_contract_violation_bundle(&dir);
+    let exe = env!("CARGO_BIN_EXE_x07");
 
     let violation_dir = dir
         .join("target")
@@ -2096,6 +2096,26 @@ fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
     );
     let copied_repro_bytes = std::fs::read(&violation_repro_path).expect("read copied repro.json");
     assert_eq!(copied_repro_bytes, repro_bytes);
+
+    let events_path = dir
+        .join("target")
+        .join("xtal")
+        .join("events")
+        .join(&incident_id)
+        .join("events.jsonl");
+    assert!(events_path.is_file(), "missing {}", events_path.display());
+    let events_bytes = std::fs::read(&events_path).expect("read events.jsonl");
+    let events_text = std::str::from_utf8(&events_bytes).expect("events.jsonl utf-8");
+    let first_line = events_text
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .expect("events.jsonl first line");
+    let event: Value = serde_json::from_str(first_line).expect("parse recovery event JSON");
+    assert_eq!(event["schema_version"], "x07.xtal.recovery_event@0.1.0");
+    assert_eq!(event["kind"], "task_failed_v1");
+    assert_eq!(event["related_violation_id"], incident_id.as_str());
+    assert_eq!(event["source"]["mode"], "x07test");
+    assert_eq!(event["task_id"], "contracts_fixture.contract_fail");
 
     let input_rel = format!("target/xtal/violations/{incident_id}");
     let out = Command::new(exe)
@@ -2149,6 +2169,36 @@ fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
     assert_eq!(summary["ingested"]["id"], incident_id.as_str());
     assert_eq!(summary["ingested"]["clause_id"], "req1");
     assert_eq!(summary["ingested"]["world"], "solve-pure");
+    assert_eq!(summary["integrity"]["ok"], true);
+    assert_eq!(
+        summary["integrity"]["expected_repro_sha256"],
+        incident_id.as_str()
+    );
+    assert_eq!(
+        summary["integrity"]["actual_repro_sha256"],
+        incident_id.as_str()
+    );
+    assert_eq!(
+        summary["ingested"]["contract"]["fn"],
+        "contracts_fixture.contract_fail"
+    );
+    assert_eq!(summary["ingested"]["contract"]["contract_kind"], "requires");
+    assert!(summary["ingested"]["contract"]["clause_ptr"].is_string());
+    assert_eq!(summary["ingested"]["contract"]["witness_count"], 1);
+    assert_eq!(summary["ingested"]["source"]["mode"], "x07test");
+    assert_eq!(
+        summary["ingested"]["source"]["test_id"],
+        "contracts/requires_violation"
+    );
+    assert_eq!(
+        summary["ingested"]["source"]["test_entry"],
+        "contracts_fixture.contract_fail"
+    );
+    assert!(summary["ingested"]["tool"]["x07_version"].is_string());
+    assert!(summary["input"]["violation"].is_object());
+    assert!(summary["input"]["repro"].is_object());
+    assert!(summary["ingested"]["violation"].is_object());
+    assert!(summary["ingested"]["repro"].is_object());
 
     let ingested_repro_path = dir
         .join("target")
@@ -2205,6 +2255,273 @@ fn x07_test_contract_violation_emits_xtal_violation_bundle_and_ingest() {
     assert_eq!(summary["schema_version"], "x07.xtal.ingest_summary@0.1.0");
     assert_eq!(summary["input"]["kind"], "contract_repro");
     assert_eq!(summary["ingested"]["id"], incident_id.as_str());
+    assert_eq!(summary["integrity"]["ok"], true);
+    assert_eq!(
+        summary["integrity"]["expected_repro_sha256"],
+        incident_id.as_str()
+    );
+    assert_eq!(
+        summary["integrity"]["actual_repro_sha256"],
+        incident_id.as_str()
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_xtal_ingest_fails_on_integrity_mismatch() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_xtal_ingest_integrity_mismatch");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (_repro_path, _repro_bytes, incident_id) = emit_xtal_contract_violation_bundle(&dir);
+
+    let violation_path = dir
+        .join("target")
+        .join("xtal")
+        .join("violations")
+        .join(&incident_id)
+        .join("violation.json");
+    assert!(
+        violation_path.is_file(),
+        "missing {}",
+        violation_path.display()
+    );
+
+    let mut violation: Value =
+        serde_json::from_slice(&std::fs::read(&violation_path).expect("read violation.json"))
+            .expect("parse violation.json");
+    violation["repro"]["sha256"] = Value::String("0".repeat(64));
+    write_json(&violation_path, &violation);
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let input_rel = format!("target/xtal/violations/{incident_id}");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env_remove("X07_XTAL_VIOLATIONS_DIR")
+        .args([
+            "xtal",
+            "ingest",
+            "--input",
+            &input_rel,
+            "--out-dir",
+            "target/xtal/ingest_bad",
+        ])
+        .output()
+        .expect("run x07 xtal ingest");
+
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], false);
+    assert!(
+        report["diagnostics"]
+            .as_array()
+            .expect("diagnostics[]")
+            .iter()
+            .any(|d| d["code"] == "EXTAL_INGEST_INTEGRITY_MISMATCH"),
+        "expected EXTAL_INGEST_INTEGRITY_MISMATCH; got:\n{}",
+        serde_json::to_string_pretty(&report["diagnostics"]).unwrap()
+    );
+
+    let ingest_diag_path = dir
+        .join("target")
+        .join("xtal")
+        .join("xtal.ingest.diag.json");
+    assert!(
+        ingest_diag_path.is_file(),
+        "missing {}",
+        ingest_diag_path.display()
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_xtal_ingest_accepts_recovery_events_jsonl() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_xtal_ingest_recovery_events");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (_repro_path, _repro_bytes, incident_id) = emit_xtal_contract_violation_bundle(&dir);
+
+    let events_rel = format!("target/xtal/events/{incident_id}/events.jsonl");
+    let events_path = dir.join(&events_rel);
+    assert!(events_path.is_file(), "missing {}", events_path.display());
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env_remove("X07_XTAL_VIOLATIONS_DIR")
+        .args([
+            "xtal",
+            "ingest",
+            "--input",
+            &events_rel,
+            "--out-dir",
+            "target/xtal/ingest_from_events",
+        ])
+        .output()
+        .expect("run x07 xtal ingest from events");
+
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
+
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("ingest_from_events")
+        .join("summary.json");
+    assert!(summary_path.is_file(), "missing {}", summary_path.display());
+    let summary_bytes = std::fs::read(&summary_path).expect("read summary.json");
+    let summary: Value = serde_json::from_slice(&summary_bytes).expect("parse summary.json");
+    assert_eq!(summary["schema_version"], "x07.xtal.ingest_summary@0.1.0");
+    assert_eq!(summary["ok"], true);
+    assert_eq!(summary["input"]["kind"], "recovery_events");
+    assert!(summary["input"]["events"].is_object());
+    assert!(summary["ingested"]["events"].is_object());
+
+    let ingested_events_path = dir
+        .join("target")
+        .join("xtal")
+        .join("ingest_from_events")
+        .join(&incident_id)
+        .join("events.jsonl");
+    assert!(
+        ingested_events_path.is_file(),
+        "missing {}",
+        ingested_events_path.display()
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_xtal_improve_smoke_writes_summary_and_reduction_artifacts() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_xtal_improve_smoke");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (_repro_path, _repro_bytes, incident_id) = emit_xtal_contract_violation_bundle(&dir);
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let input_rel = format!("target/xtal/violations/{incident_id}");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env_remove("X07_XTAL_VIOLATIONS_DIR")
+        .args([
+            "xtal",
+            "improve",
+            "--input",
+            &input_rel,
+            "--out-dir",
+            "target/xtal/improve_smoke",
+            "--reduce-repro",
+        ])
+        .output()
+        .expect("run x07 xtal improve");
+
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let improve_diag_path = dir
+        .join("target")
+        .join("xtal")
+        .join("xtal.improve.diag.json");
+    assert!(
+        improve_diag_path.is_file(),
+        "missing {}",
+        improve_diag_path.display()
+    );
+
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("improve_smoke")
+        .join("summary.json");
+    assert!(summary_path.is_file(), "missing {}", summary_path.display());
+    let summary_bytes = std::fs::read(&summary_path).expect("read summary.json");
+    let summary: Value = serde_json::from_slice(&summary_bytes).expect("parse summary.json");
+    assert_eq!(summary["schema_version"], "x07.xtal.improve_summary@0.1.0");
+    assert_eq!(summary["input"]["kind"], "violation");
+    assert_eq!(
+        summary["triage"]["contract"]["fn"],
+        "contracts_fixture.contract_fail"
+    );
+    assert_eq!(summary["reduction"]["status"], "ok");
+    assert_eq!(summary["governance"]["write_requested"], false);
+    assert_eq!(summary["governance"]["applied"], false);
+
+    let repro_min_rel = summary["reduction"]["repro_min_path"]
+        .as_str()
+        .expect("repro_min_path");
+    let report_rel = summary["reduction"]["report_path"]
+        .as_str()
+        .expect("report_path");
+    assert!(
+        dir.join(repro_min_rel).is_file(),
+        "missing {}",
+        dir.join(repro_min_rel).display()
+    );
+    assert!(
+        dir.join(report_rel).is_file(),
+        "missing {}",
+        dir.join(report_rel).display()
+    );
+
+    let shadow_manifest_path = dir
+        .join("target")
+        .join("xtal")
+        .join("improve_smoke")
+        .join(&incident_id)
+        .join("tests.shadow.json");
+    assert!(
+        shadow_manifest_path.is_file(),
+        "missing {}",
+        shadow_manifest_path.display()
+    );
 
     std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }

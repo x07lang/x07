@@ -156,9 +156,23 @@ Artifacts:
 - `target/xtal/violations/<id>/violation.json` (`x07.xtal.violation@0.1.0`)
 - `target/xtal/violations/<id>/repro.json` (`x07.contract.repro@0.1.0`)
 
+## Recovery events
+
+When a runtime violation is recorded, x07 can also emit a structured recovery event stream (JSONL).
+
+By default, this is enabled when the project has `arch/xtal/xtal.json`. To override the output directory (or to enable it for non-XTAL projects), set `X07_XTAL_EVENTS_DIR` (absolute, or relative to the project root).
+
+Artifacts:
+
+- `target/xtal/events/<id>/events.jsonl` (JSONL; each line is `x07.xtal.recovery_event@0.1.0`)
+
+See: [Task policy graph](tasks.md).
+
 ## `x07 xtal ingest`
 
 Normalize a violation (`x07.xtal.violation@0.1.0`) or a contract repro (`x07.contract.repro@0.1.0`) into a canonical ingest workspace. This is intended as the first step for automated repair flows.
+
+Ingest validates that `violation.json` matches `repro.json` (content-addressed id, repro sha256, and repro bytes length), and records the check results in the ingest summary.
 
 Artifacts:
 
@@ -166,3 +180,18 @@ Artifacts:
 - `target/xtal/ingest/summary.json` (`x07.xtal.ingest_summary@0.1.0`)
 - `target/xtal/ingest/<id>/violation.json` (`x07.xtal.violation@0.1.0`)
 - `target/xtal/ingest/<id>/repro.json` (`x07.contract.repro@0.1.0`)
+- `target/xtal/ingest/<id>/events.jsonl` (optional; copied when ingesting `events.jsonl`)
+
+## `x07 xtal improve`
+
+Turn incident inputs (violation bundles, contract repros, or recovery event logs) into a bounded improvement run:
+
+- `x07 xtal improve --input <path>`
+- Optional: `--reduce-repro`, `--write`, `--allow-spec-change`, `--baseline <cert_dir>`, `--out-dir <dir>`
+
+Artifacts:
+
+- `target/xtal/xtal.improve.diag.json` (`x07diag.report@0.3.0`)
+- `target/xtal/improve/summary.json` (`x07.xtal.improve_summary@0.1.0`)
+- `target/xtal/improve/<id>/tests.shadow.json` (generated single-case tests manifest)
+- `target/xtal/improve/<id>/repro.min.json` and `target/xtal/improve/<id>/reduction.report.json` (optional; when `--reduce-repro` is supported)

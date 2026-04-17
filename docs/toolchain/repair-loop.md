@@ -2,6 +2,8 @@
 
 X07 tooling is designed so agents can converge on a correct program by iterating over structured outputs (diagnostics, quickfixes, JSON Patch).
 
+For incident-driven repair in XTAL projects, prefer `x07 xtal improve --input ...`, which stages a bounded repair run under `target/xtal/`.
+
 ## Automatic repair (recommended)
 
 `x07 run`, `x07 build`, and `x07 bundle` run the repair loop automatically by default.

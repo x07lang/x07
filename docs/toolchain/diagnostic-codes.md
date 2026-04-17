@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 610
-- quickfix support (`sometimes` or `always`): 550
-- quickfix coverage: 90.16%
+- total codes: 629
+- quickfix support (`sometimes` or `always`): 569
+- quickfix coverage: 90.46%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -48,6 +48,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_CERTIFY_PRECHECKS_FAILED` | x07 / run / error | never | XTAL certification prechecks failed. |
 | `EXTAL_CERTIFY_TRUST_CERTIFY_FAILED` | x07 / run / error | sometimes | Trust certification failed for a certification entry. |
 | `EXTAL_DEV_NO_SPECS` | x07 / run / error | sometimes | XTAL dev pipeline found no spec modules. |
+| `EXTAL_EVENTS_INVALID` | x07 / parse / error | sometimes | Recovery events log is invalid. |
+| `EXTAL_EVENTS_IO` | x07 / parse / error | sometimes | Recovery events log I/O failed. |
+| `EXTAL_EVENTS_UNSUPPORTED_VERSION` | x07 / parse / error | sometimes | Recovery event schema_version is unsupported. |
 | `EXTAL_EXAMPLES_ARGS_EXTRA` | x07 / lint / error | sometimes | Example provides an extra arg. |
 | `EXTAL_EXAMPLES_ARGS_MISSING` | x07 / lint / error | sometimes | Example is missing a required arg. |
 | `EXTAL_EXAMPLES_ARG_KIND_UNSUPPORTED` | x07 / lint / error | sometimes | Example arg encoding kind is unsupported in the current XTAL subset. |
@@ -82,7 +85,21 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_IMPL_SYNC_REQUIRED` | x07 / lint / error | sometimes | Implementation sync is required. |
 | `EXTAL_IMPL_UNSUPPORTED_TY` | x07 / lower / error | sometimes | Unsupported type for generated implementation stubs. |
 | `EXTAL_IMPL_X07AST_PARSE` | x07 / parse / error | sometimes | Implementation module is not valid x07AST JSON. |
+| `EXTAL_IMPROVE_DISALLOWED_PATCH_PATHS` | x07 / run / error | sometimes | XTAL improve patchset touches disallowed paths. |
+| `EXTAL_IMPROVE_FAILED` | x07 / run / error | sometimes | XTAL improve failed. |
+| `EXTAL_IMPROVE_MANIFEST_PARSE_FAILED` | x07 / parse / error | sometimes | XTAL improve failed to parse arch/xtal/xtal.json. |
+| `EXTAL_IMPROVE_NO_INCIDENTS` | x07 / parse / error | sometimes | XTAL improve found no ingestable incidents at the provided input path. |
+| `EXTAL_IMPROVE_NO_PATCH` | x07 / run / error | sometimes | XTAL improve produced no patchset. |
+| `EXTAL_IMPROVE_PATCH_APPLY_FAILED` | x07 / run / error | sometimes | XTAL improve failed to apply a patchset. |
+| `EXTAL_IMPROVE_SPEC_CHANGE_REQUIRES_FLAG` | x07 / run / error | sometimes | XTAL improve blocked a spec change. |
+| `EXTAL_IMPROVE_WRITE_REQUIRES_MANIFEST` | x07 / parse / error | sometimes | XTAL improve --write requires an XTAL manifest. |
 | `EXTAL_INGEST_FAILED` | x07 / run / error | sometimes | XTAL ingest failed. |
+| `EXTAL_INGEST_INPUT_SCHEMA_INVALID` | x07 / parse / error | sometimes | XTAL ingest input is invalid. |
+| `EXTAL_INGEST_INPUT_SCHEMA_VERSION_UNSUPPORTED` | x07 / parse / error | sometimes | XTAL ingest input schema_version is unsupported. |
+| `EXTAL_INGEST_INTEGRITY_MISMATCH` | x07 / run / error | sometimes | XTAL ingest detected a mismatch between violation.json and repro.json. |
+| `EXTAL_INGEST_REPRO_NOT_FOUND` | x07 / parse / error | sometimes | XTAL ingest could not find the repro referenced by the violation bundle. |
+| `EXTAL_INGEST_REPRO_PATH_UNSAFE` | x07 / parse / error | sometimes | XTAL ingest refused an unsafe repro path in the violation bundle. |
+| `EXTAL_INGEST_REPRO_SCHEMA_INVALID` | x07 / parse / error | sometimes | XTAL ingest repro.json is not schema-valid. |
 | `EXTAL_REPAIR_APPLY_FAILED` | x07 / run / error | never | XTAL repair patch application failed. |
 | `EXTAL_REPAIR_BASELINE_MISSING` | x07 / parse / error | never | XTAL repair baseline is missing. |
 | `EXTAL_REPAIR_MANIFEST_PARSE_FAILED` | x07 / parse / error | sometimes | XTAL repair manifest parse failed. |
@@ -257,6 +274,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`. |
 | `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`. |
 | `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`. |
+| `E_ARCH_TASKS_INDEX_INVALID` | x07 / parse / error | sometimes | Architecture tasks index is invalid. |
+| `E_ARCH_TASKS_INDEX_MISSING` | x07 / parse / error | sometimes | Architecture tasks index is missing. |
 | `E_ARCH_TOOL_BUDGET_EXCEEDED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TOOL_BUDGET_EXCEEDED`. |
 | `E_ARCH_TRUST_ZONE_EDGE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TRUST_ZONE_EDGE`. |
 | `E_ARCH_VISIBILITY` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_VISIBILITY`. |
@@ -1434,6 +1453,64 @@ Agent strategy:
 - Reproduce the diagnostic and apply the recommended fix.
 
 
+## `EXTAL_EVENTS_INVALID`
+
+Summary: Recovery events log is invalid.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The recovery events input must be UTF-8 JSONL, where each non-empty line is a schema-valid `x07.xtal.recovery_event@0.1.0` document.
+
+Agent strategy:
+
+- Validate the file is UTF-8 and one JSON object per line.
+- Validate each line against `x07.xtal.recovery_event@0.1.0`.
+- Ensure the log can be associated with an incident id (directory name or `related_violation_id`).
+
+
+## `EXTAL_EVENTS_IO`
+
+Summary: Recovery events log I/O failed.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+x07 failed to read or digest the provided `events.jsonl` recovery events log.
+
+Agent strategy:
+
+- Confirm the `events.jsonl` path exists and is readable.
+- Re-run the command after fixing filesystem permissions or the path.
+
+
+## `EXTAL_EVENTS_UNSUPPORTED_VERSION`
+
+Summary: Recovery event schema_version is unsupported.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A line in `events.jsonl` has an unexpected `schema_version` value.
+
+Agent strategy:
+
+- Ensure each JSONL line is `x07.xtal.recovery_event@0.1.0`.
+- If the log was produced by an older toolchain, re-emit events with the current toolchain.
+
+
 ## `EXTAL_EXAMPLES_ARGS_EXTRA`
 
 Summary: Example provides an extra arg.
@@ -2120,6 +2197,161 @@ Agent strategy:
 - Re-run `x07 xtal impl check`.
 
 
+## `EXTAL_IMPROVE_DISALLOWED_PATCH_PATHS`
+
+Summary: XTAL improve patchset touches disallowed paths.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proposed patchset includes paths outside the allowed write set declared in `arch/xtal/xtal.json` (`autonomy.agent_write_paths[]`, `agent_write_specs`, and `agent_write_arch`).
+
+Agent strategy:
+
+- Review and tighten the patchset (or expand the allowed write set intentionally).
+- Re-run `x07 xtal improve`.
+
+
+## `EXTAL_IMPROVE_FAILED`
+
+Summary: XTAL improve failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL improve failed to construct a valid improvement run.
+
+Message: `{details}`
+
+Agent strategy:
+
+- Inspect `target/xtal/xtal.improve.diag.json` and `target/xtal/improve/summary.json`.
+- Fix the reported issue (missing inputs, invalid schemas, or unsupported configuration) and retry.
+
+
+## `EXTAL_IMPROVE_MANIFEST_PARSE_FAILED`
+
+Summary: XTAL improve failed to parse arch/xtal/xtal.json.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The XTAL manifest is missing required fields or is not schema-valid.
+
+Agent strategy:
+
+- Validate `arch/xtal/xtal.json` against `x07.xtal.manifest@0.1.0`.
+- Fix schema errors and re-run `x07 xtal improve`.
+
+
+## `EXTAL_IMPROVE_NO_INCIDENTS`
+
+Summary: XTAL improve found no ingestable incidents at the provided input path.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `x07 xtal improve` command requires an incident input (bundle/repro/events) or a directory containing incident bundles.
+
+Agent strategy:
+
+- Provide `--input` as a violation bundle dir, `violation.json`, `repro.json`, `events.jsonl`, or a directory containing incident bundle subdirectories.
+- Re-run `x07 xtal improve --input <path>`.
+
+
+## `EXTAL_IMPROVE_NO_PATCH`
+
+Summary: XTAL improve produced no patchset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The bounded repair step completed without producing a patchset.
+
+Agent strategy:
+
+- Inspect `target/xtal/repair/summary.json` and `target/xtal/xtal.repair.diag.json`.
+- Retry with a smaller incident input or add a targeted unit test to improve localization.
+
+
+## `EXTAL_IMPROVE_PATCH_APPLY_FAILED`
+
+Summary: XTAL improve failed to apply a patchset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+x07 failed while applying the patchset to the working tree.
+
+Agent strategy:
+
+- Inspect the patchset at `target/xtal/repair/patchset.json`.
+- Apply it manually with `x07 patch apply --in target/xtal/repair/patchset.json --write` to see the first failure.
+- Resolve conflicts or invalid patches and retry.
+
+
+## `EXTAL_IMPROVE_SPEC_CHANGE_REQUIRES_FLAG`
+
+Summary: XTAL improve blocked a spec change.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proposed patchset modifies `spec/**`, which requires explicit opt-in.
+
+Agent strategy:
+
+- Review the patchset under `target/xtal/repair/patchset.json`.
+- If the spec change is intended, re-run with `--allow-spec-change`.
+
+
+## `EXTAL_IMPROVE_WRITE_REQUIRES_MANIFEST`
+
+Summary: XTAL improve --write requires an XTAL manifest.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 xtal improve --write` requires `arch/xtal/xtal.json` so edit boundaries are explicit.
+
+Agent strategy:
+
+- Add `arch/xtal/xtal.json` to the project (XTAL manifest).
+- Re-run `x07 xtal improve --write ...`.
+
+
 ## `EXTAL_INGEST_FAILED`
 
 Summary: XTAL ingest failed.
@@ -2143,6 +2375,129 @@ Agent strategy:
   - `repro.json` (`x07.contract.repro@0.1.0`).
 - If `violation.json` references a repro via `repro.path`, ensure that referenced file exists.
 - Re-run `x07 xtal ingest --input <path>` and inspect `target/xtal/xtal.ingest.diag.json`.
+
+
+## `EXTAL_INGEST_INPUT_SCHEMA_INVALID`
+
+Summary: XTAL ingest input is invalid.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The ingest input could not be read, parsed as JSON, or validated against its schema.
+
+Agent strategy:
+
+- Confirm the file exists and is readable.
+- Confirm the file is valid JSON and matches the expected schema.
+- Re-run `x07 xtal ingest --input <path>` and inspect `target/xtal/xtal.ingest.diag.json`.
+
+
+## `EXTAL_INGEST_INPUT_SCHEMA_VERSION_UNSUPPORTED`
+
+Summary: XTAL ingest input schema_version is unsupported.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The input file has an unexpected `schema_version`. XTAL ingest accepts:
+
+- `x07.xtal.violation@0.1.0` (`violation.json`)
+- `x07.contract.repro@0.1.0` (`repro.json`)
+- `events.jsonl` where each line is `x07.xtal.recovery_event@0.1.0`
+
+Agent strategy:
+
+- Confirm `--input` points to a supported XTAL ingest input.
+- If ingesting `events.jsonl`, ensure each line is schema-valid `x07.xtal.recovery_event@0.1.0`.
+- Recreate the bundle using a current x07 toolchain and retry.
+
+
+## `EXTAL_INGEST_INTEGRITY_MISMATCH`
+
+Summary: XTAL ingest detected a mismatch between violation.json and repro.json.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+XTAL ingest validates that the violation bundle is internally consistent (content-addressed id, repro digest, and repro length).
+
+Message: `{details}`
+
+Agent strategy:
+
+- Treat violation bundles as immutable.
+- Recreate the bundle from the original `repro.json` (or re-export it from the source environment).
+- Retry `x07 xtal ingest --input <bundle_dir>`.
+
+
+## `EXTAL_INGEST_REPRO_NOT_FOUND`
+
+Summary: XTAL ingest could not find the repro referenced by the violation bundle.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `violation.json` file referenced a `repro.path` that does not exist on disk.
+
+Agent strategy:
+
+- Ensure the bundle directory contains the referenced repro file (usually `repro.json`).
+- If the bundle is incomplete, re-upload or re-export it from the source environment.
+
+
+## `EXTAL_INGEST_REPRO_PATH_UNSAFE`
+
+Summary: XTAL ingest refused an unsafe repro path in the violation bundle.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The violation bundle referenced a repro path that is not a safe relative path (for example it escapes the bundle directory).
+
+Agent strategy:
+
+- Do not hand-edit `violation.json`.
+- Recreate the bundle from the original `repro.json` using a current toolchain.
+
+
+## `EXTAL_INGEST_REPRO_SCHEMA_INVALID`
+
+Summary: XTAL ingest repro.json is not schema-valid.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The referenced repro file is not a valid `x07.contract.repro@0.1.0` document.
+
+Agent strategy:
+
+- Recreate `repro.json` using the toolchain that produced the contract trap (from `x07 test` / `x07 run`).
+- Avoid editing repro artifacts by hand; they are content-addressed inputs.
 
 
 ## `EXTAL_REPAIR_APPLY_FAILED`
@@ -5691,6 +6046,45 @@ Agent strategy:
 - Run `x07 arch check --write-lock`.
 - Apply suggested manifest/contracts updates.
 - Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_TASKS_INDEX_INVALID`
+
+Summary: Architecture tasks index is invalid.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The tasks index file is not schema-valid or violates semantic constraints (unique ids, acyclic deps, and policy consistency).
+
+Agent strategy:
+
+- Validate `arch/tasks/index.x07tasks.json` against `x07.arch.tasks.index@0.1.0`.
+- Fix invalid task ids, missing deps, or dependency cycles.
+- Re-run `x07 arch check`.
+
+
+## `E_ARCH_TASKS_INDEX_MISSING`
+
+Summary: Architecture tasks index is missing.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The architecture manifest referenced a tasks index file, but it was not found.
+
+Agent strategy:
+
+- Ensure `arch/tasks/index.x07tasks.json` exists (or update `contracts_v1.tasks.index_path`).
+- Re-run `x07 arch check`.
 
 
 ## `E_ARCH_TOOL_BUDGET_EXCEEDED`

@@ -79,6 +79,10 @@
       "gen_dir": "arch/stream/plugins",
       "require_registry_uptodate": true
     },
+    "tasks": {
+      "index_path": "arch/tasks/index.x07tasks.json",
+      "enforce": "error"
+    },
     "canonical_json": { "mode": "jcs_rfc8785_v1" }
   }
 }

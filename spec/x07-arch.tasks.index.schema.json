@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.tasks.index.schema.json",
+  "title": "x07.arch.tasks.index@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tasks"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.tasks.index@0.1.0" },
+    "tasks": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/task" }
+    }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fn", "deps", "policy"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "fn": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "deps": {
+          "type": "array",
+          "default": [],
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        },
+        "policy": { "$ref": "#/$defs/policy" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criticality", "on_failure"],
+      "properties": {
+        "criticality": { "type": "string", "enum": ["critical_v1", "optional_v1"] },
+        "on_failure": {
+          "type": "string",
+          "enum": ["fail_fast_v1", "skip_v1", "retry_bounded_v1"]
+        },
+        "retry_max": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

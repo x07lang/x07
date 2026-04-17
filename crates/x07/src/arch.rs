@@ -58,6 +58,9 @@ const X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.stream-plugins.index.schema.json");
 const X07_ARCH_STREAM_PLUGIN_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.stream-plugin.schema.json");
+const X07_ARCH_TASKS_INDEX_SCHEMA_VERSION: &str = "x07.arch.tasks.index@0.1.0";
+const X07_ARCH_TASKS_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.tasks.index.schema.json");
 const X07_BUDGET_PROFILE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-budget.profile.schema.json");
 const X07_SM_SPEC_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07-sm.spec.schema.json");
@@ -364,6 +367,8 @@ struct ArchContractsV1 {
     budgets: Option<ArchContractsBudgetsV1>,
     stream_plugins: Option<ArchContractsStreamPluginsV1>,
     #[serde(default)]
+    tasks: Option<ArchContractsIndexV1>,
+    #[serde(default)]
     web: Option<ArchContractsIndexV1>,
     #[serde(default)]
     crawl: Option<ArchContractsIndexV1>,
@@ -560,6 +565,34 @@ struct ArchBudgetsIndexProfile {
     selectors: Vec<ArchBudgetsIndexSelector>,
     #[serde(default)]
     worlds_allowed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchTasksIndex {
+    schema_version: String,
+    #[serde(default)]
+    tasks: Vec<ArchTasksIndexTask>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchTasksIndexTask {
+    id: String,
+    #[serde(rename = "fn")]
+    fn_symbol: String,
+    #[serde(default)]
+    deps: Vec<String>,
+    policy: ArchTasksPolicy,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchTasksPolicy {
+    criticality: String,
+    on_failure: String,
+    #[serde(default)]
+    retry_max: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -7136,6 +7169,227 @@ fn check_contracts_v1(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // tasks policy graph
+    if let Some(tasks_cfg) = &contracts.tasks {
+        let enforce = tasks_cfg.enforce.as_str();
+        if let Some((_index_path, index_rel, index_doc)) = load_contract_json_enforced(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            enforce,
+            &tasks_cfg.index_path,
+            "E_ARCH_TASKS_INDEX_MISSING",
+            "E_ARCH_TASKS_INDEX_INVALID",
+        )? {
+            if index_doc.get("schema_version").and_then(Value::as_str)
+                != Some(X07_ARCH_TASKS_INDEX_SCHEMA_VERSION)
+            {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        "E_ARCH_TASKS_INDEX_INVALID",
+                        "schema_version mismatch for tasks index",
+                        Some(&index_rel),
+                    ),
+                );
+            } else {
+                let schema_diags = validate_schema(
+                    "E_ARCH_TASKS_INDEX_INVALID",
+                    X07_ARCH_TASKS_INDEX_SCHEMA_BYTES,
+                    &index_doc,
+                )?;
+                for d in schema_diags {
+                    push_contract_diag(diags, enforce, d);
+                }
+            }
+
+            indexes.insert(index_rel.clone(), lock_entry_for_doc(&index_doc)?);
+
+            let index_obj: ArchTasksIndex = match serde_json::from_value(index_doc.clone()) {
+                Ok(v) => v,
+                Err(err) => {
+                    push_contract_diag(
+                        diags,
+                        enforce,
+                        diag_parse_error(
+                            "E_ARCH_TASKS_INDEX_INVALID",
+                            &format!("parse tasks index: {err}"),
+                            Some(&index_rel),
+                        ),
+                    );
+                    ArchTasksIndex {
+                        schema_version: "".to_string(),
+                        tasks: Vec::new(),
+                    }
+                }
+            };
+
+            if index_obj.schema_version != X07_ARCH_TASKS_INDEX_SCHEMA_VERSION {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        "E_ARCH_TASKS_INDEX_INVALID",
+                        "schema_version mismatch for tasks index",
+                        Some(&index_rel),
+                    ),
+                );
+            }
+
+            let mut tasks_by_id: BTreeMap<String, &ArchTasksIndexTask> = BTreeMap::new();
+            for task in &index_obj.tasks {
+                if tasks_by_id.contains_key(&task.id) {
+                    let mut data = BTreeMap::new();
+                    data.insert("task_id".to_string(), Value::String(task.id.clone()));
+                    push_contract_diag(
+                        diags,
+                        enforce,
+                        diag_lint_error(
+                            "E_ARCH_TASKS_INDEX_INVALID",
+                            "duplicate task id in tasks index",
+                            Some(&index_rel),
+                            data,
+                        ),
+                    );
+                    continue;
+                }
+
+                if let Err(msg) = x07c::validate::validate_symbol(&task.fn_symbol) {
+                    let mut data = BTreeMap::new();
+                    data.insert("task_id".to_string(), Value::String(task.id.clone()));
+                    data.insert("fn".to_string(), Value::String(task.fn_symbol.clone()));
+                    push_contract_diag(
+                        diags,
+                        enforce,
+                        diag_lint_error(
+                            "E_ARCH_TASKS_INDEX_INVALID",
+                            &format!("invalid task fn symbol: {msg}"),
+                            Some(&index_rel),
+                            data,
+                        ),
+                    );
+                }
+
+                let _ = task.policy.criticality.as_str();
+
+                if task.policy.on_failure == "retry_bounded_v1"
+                    && task.policy.retry_max.unwrap_or(0) == 0
+                {
+                    let mut data = BTreeMap::new();
+                    data.insert("task_id".to_string(), Value::String(task.id.clone()));
+                    push_contract_diag(
+                        diags,
+                        enforce,
+                        diag_lint_error(
+                            "E_ARCH_TASKS_INDEX_INVALID",
+                            "retry_bounded_v1 policy requires retry_max > 0",
+                            Some(&index_rel),
+                            data,
+                        ),
+                    );
+                }
+
+                tasks_by_id.insert(task.id.clone(), task);
+            }
+
+            for task in &index_obj.tasks {
+                for dep in &task.deps {
+                    if !tasks_by_id.contains_key(dep) {
+                        let mut data = BTreeMap::new();
+                        data.insert("task_id".to_string(), Value::String(task.id.clone()));
+                        data.insert("dep".to_string(), Value::String(dep.clone()));
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_lint_error(
+                                "E_ARCH_TASKS_INDEX_INVALID",
+                                "task dependency references missing task id",
+                                Some(&index_rel),
+                                data,
+                            ),
+                        );
+                    }
+                }
+            }
+
+            #[derive(Clone, Copy, PartialEq, Eq)]
+            enum Mark {
+                Temp,
+                Done,
+            }
+            let mut marks: BTreeMap<String, Mark> = BTreeMap::new();
+            let mut stack: Vec<String> = Vec::new();
+            let mut cycle: Option<Vec<String>> = None;
+
+            fn dfs(
+                id: &str,
+                tasks_by_id: &BTreeMap<String, &ArchTasksIndexTask>,
+                marks: &mut BTreeMap<String, Mark>,
+                stack: &mut Vec<String>,
+                cycle: &mut Option<Vec<String>>,
+            ) {
+                if cycle.is_some() {
+                    return;
+                }
+                match marks.get(id) {
+                    Some(Mark::Done) => return,
+                    Some(Mark::Temp) => {
+                        if let Some(pos) = stack.iter().position(|s| s == id) {
+                            let mut out: Vec<String> = stack[pos..].to_vec();
+                            out.push(id.to_string());
+                            *cycle = Some(out);
+                        } else {
+                            *cycle = Some(vec![id.to_string(), id.to_string()]);
+                        }
+                        return;
+                    }
+                    None => {}
+                }
+
+                marks.insert(id.to_string(), Mark::Temp);
+                stack.push(id.to_string());
+
+                if let Some(task) = tasks_by_id.get(id) {
+                    for dep in &task.deps {
+                        if tasks_by_id.contains_key(dep) {
+                            dfs(dep, tasks_by_id, marks, stack, cycle);
+                        }
+                    }
+                }
+
+                stack.pop();
+                marks.insert(id.to_string(), Mark::Done);
+            }
+
+            for id in tasks_by_id.keys() {
+                dfs(id, &tasks_by_id, &mut marks, &mut stack, &mut cycle);
+                if cycle.is_some() {
+                    break;
+                }
+            }
+
+            if let Some(cycle) = cycle {
+                let mut data = BTreeMap::new();
+                data.insert(
+                    "cycle".to_string(),
+                    Value::Array(cycle.into_iter().map(Value::String).collect()),
+                );
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_lint_error(
+                        "E_ARCH_TASKS_INDEX_INVALID",
+                        "cycle detected in tasks index dependency graph",
+                        Some(&index_rel),
+                        data,
+                    ),
+                );
             }
         }
     }

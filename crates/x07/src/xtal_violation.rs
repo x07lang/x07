@@ -9,10 +9,10 @@ pub(crate) const DEFAULT_VIOLATIONS_DIR: &str = "target/xtal/violations";
 pub(crate) const ENV_X07_XTAL_VIOLATIONS_DIR: &str = "X07_XTAL_VIOLATIONS_DIR";
 
 pub(crate) const VIOLATION_SCHEMA_VERSION: &str = "x07.xtal.violation@0.1.0";
-const VIOLATION_SCHEMA_BYTES: &[u8] =
+pub(crate) const VIOLATION_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.xtal.violation@0.1.0.schema.json");
 
-fn resolve_violation_root_dir(project_root: &Path) -> Option<PathBuf> {
+pub(crate) fn resolve_violation_root_dir(project_root: &Path) -> Option<PathBuf> {
     if let Ok(raw) = std::env::var(ENV_X07_XTAL_VIOLATIONS_DIR) {
         let raw = raw.trim();
         if !raw.is_empty() {
@@ -146,6 +146,12 @@ pub(crate) fn maybe_write_contract_violation_bundle(
 
     let out_dir = root_dir.join(&id);
     write_violation_bundle(&out_dir, &doc, &repro_bytes)?;
+
+    let _ = crate::xtal_events::maybe_write_task_failed_event_for_contract_violation(
+        project_root,
+        &id,
+        &repro_bytes,
+    );
 
     Ok(Some(out_dir.join("violation.json")))
 }

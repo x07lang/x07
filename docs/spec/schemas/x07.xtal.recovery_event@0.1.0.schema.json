@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.xtal.recovery_event@0.1.0.schema.json",
+  "title": "x07.xtal.recovery_event@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "kind",
+    "world",
+    "source",
+    "related_violation_id",
+    "details"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.xtal.recovery_event@0.1.0" },
+    "event_id": { "$ref": "#/$defs/sha256_hex" },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "task_skipped_v1",
+        "task_retried_v1",
+        "task_failed_v1",
+        "budget_exhausted_v1",
+        "fallback_used_v1"
+      ]
+    },
+    "world": { "$ref": "#/$defs/world" },
+    "task_id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "source": { "$ref": "#/$defs/source" },
+    "related_violation_id": {
+      "anyOf": [{ "$ref": "#/$defs/sha256_hex" }, { "type": "null" }]
+    },
+    "details": {}
+  },
+  "$defs": {
+    "sha256_hex": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "world": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["x07test", "x07run"] },
+        "tests_manifest_path": { "type": "string" },
+        "test_id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "test_entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "target_kind": { "type": "string", "enum": ["project", "program", "artifact"] },
+        "target_path": { "type": "string" }
+      }
+    }
+  }
+}

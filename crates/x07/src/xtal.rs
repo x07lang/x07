@@ -43,6 +43,17 @@ const INGEST_SUMMARY_SCHEMA_VERSION: &str = "x07.xtal.ingest_summary@0.1.0";
 const INGEST_SUMMARY_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.xtal.ingest_summary@0.1.0.schema.json");
 
+const IMPROVE_SUMMARY_SCHEMA_VERSION: &str = "x07.xtal.improve_summary@0.1.0";
+const IMPROVE_SUMMARY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07.xtal.improve_summary@0.1.0.schema.json");
+
+const CONTRACT_REPRO_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07.contract.repro@0.1.0.schema.json");
+
+const RECOVERY_EVENT_SCHEMA_VERSION: &str = "x07.xtal.recovery_event@0.1.0";
+const RECOVERY_EVENT_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07.xtal.recovery_event@0.1.0.schema.json");
+
 const TESTS_MANIFEST_SCHEMA_VERSION: &str = "x07.tests_manifest@0.2.0";
 const DEFAULT_SPEC_DIR: &str = "spec";
 const DEFAULT_GEN_DIR: &str = "gen/xtal";
@@ -60,6 +71,8 @@ const DEFAULT_CERT_DIR: &str = "target/xtal/cert";
 const DEFAULT_CERT_DIAG_REPORT_PATH: &str = "target/xtal/xtal.certify.diag.json";
 const DEFAULT_INGEST_DIR: &str = "target/xtal/ingest";
 const DEFAULT_INGEST_DIAG_REPORT_PATH: &str = "target/xtal/xtal.ingest.diag.json";
+const DEFAULT_IMPROVE_DIR: &str = "target/xtal/improve";
+const DEFAULT_IMPROVE_DIAG_REPORT_PATH: &str = "target/xtal/xtal.improve.diag.json";
 const DEFAULT_REPAIR_DIR: &str = "target/xtal/repair";
 const DEFAULT_REPAIR_ATTEMPTS_DIR: &str = "target/xtal/repair/attempts";
 const DEFAULT_REPAIR_PATCHSET_PATH: &str = "target/xtal/repair/patchset.json";
@@ -88,6 +101,8 @@ pub enum XtalCommand {
     Repair(XtalRepairArgs),
     /// Ingest a violation bundle or contract repro into a canonical workspace.
     Ingest(XtalIngestArgs),
+    /// Turn an incident input into a bounded improvement run.
+    Improve(XtalImproveArgs),
     /// Work with spec modules.
     Spec(XtalSpecArgs),
     /// Work with generated tests from spec examples.
@@ -123,6 +138,37 @@ pub struct XtalIngestArgs {
 
     /// Output directory relative to the project root.
     #[arg(long, value_name = "DIR", default_value = DEFAULT_INGEST_DIR)]
+    pub out_dir: PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub struct XtalImproveArgs {
+    /// Project manifest path (defaults to searching upwards for x07.json).
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Path to a violation bundle, a contract repro, a recovery events log, or a directory containing them.
+    #[arg(long, value_name = "PATH")]
+    pub input: PathBuf,
+
+    /// Optional review baseline path (passed through to `x07 xtal certify --baseline`).
+    #[arg(long, value_name = "PATH")]
+    pub baseline: Option<PathBuf>,
+
+    /// Apply the selected patchset to the working tree after validation.
+    #[arg(long)]
+    pub write: bool,
+
+    /// Permit applying patchsets that change `spec/**`.
+    #[arg(long)]
+    pub allow_spec_change: bool,
+
+    /// Attempt to reduce the repro input while preserving the failure.
+    #[arg(long)]
+    pub reduce_repro: bool,
+
+    /// Output directory relative to the project root.
+    #[arg(long, value_name = "DIR", default_value = DEFAULT_IMPROVE_DIR)]
     pub out_dir: PathBuf,
 }
 
@@ -483,6 +529,7 @@ pub fn cmd_xtal(
         XtalCommand::Certify(args) => cmd_xtal_certify(machine, args),
         XtalCommand::Repair(args) => cmd_xtal_repair(machine, args),
         XtalCommand::Ingest(args) => cmd_xtal_ingest(machine, args),
+        XtalCommand::Improve(args) => cmd_xtal_improve(machine, args),
         XtalCommand::Spec(args) => cmd_xtal_spec(machine, args),
         XtalCommand::Tests(args) => cmd_xtal_tests(machine, args),
         XtalCommand::Impl(args) => cmd_xtal_impl(machine, args),
@@ -797,6 +844,580 @@ fn cmd_xtal_certify(
     })
 }
 
+#[derive(Debug)]
+struct IngestLoadError {
+    code: &'static str,
+    stage: diagnostics::Stage,
+    message: String,
+}
+
+impl IngestLoadError {
+    fn new(code: &'static str, stage: diagnostics::Stage, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            stage,
+            message: message.into(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LoadedIngestInputs {
+    input_kind: String,
+    input_file_abs: PathBuf,
+    input_files: Vec<Value>,
+    integrity: Value,
+    violation_doc: Value,
+    repro_bytes: Vec<u8>,
+    incident_id: String,
+    events_file_abs: Option<PathBuf>,
+    events_bytes: Option<Vec<u8>>,
+}
+
+fn is_sha256_hex(s: &str) -> bool {
+    if s.len() != 64 {
+        return false;
+    }
+    s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+fn resolve_ingest_input_file(input_abs: &Path) -> std::result::Result<PathBuf, IngestLoadError> {
+    if input_abs.is_dir() {
+        let violation_json = input_abs.join("violation.json");
+        let repro_json = input_abs.join("repro.json");
+        let events_jsonl = input_abs.join("events.jsonl");
+        if violation_json.is_file() {
+            return Ok(violation_json);
+        }
+        if repro_json.is_file() {
+            return Ok(repro_json);
+        }
+        if events_jsonl.is_file() {
+            return Ok(events_jsonl);
+        }
+        return Err(IngestLoadError::new(
+            "EXTAL_INGEST_FAILED",
+            diagnostics::Stage::Parse,
+            format!(
+                "input dir does not contain violation.json, repro.json, or events.jsonl: {}",
+                input_abs.display()
+            ),
+        ));
+    }
+    Ok(input_abs.to_path_buf())
+}
+
+fn validate_recovery_events_jsonl(
+    events_file: &Path,
+    bytes: &[u8],
+) -> std::result::Result<Option<String>, IngestLoadError> {
+    let parent_id = events_file
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        .filter(|s| is_sha256_hex(s))
+        .map(|s| s.to_string());
+    if parent_id.is_some() {
+        // Still validate the file for schema correctness.
+    }
+
+    let text = std::str::from_utf8(bytes).map_err(|err| {
+        IngestLoadError::new(
+            "EXTAL_EVENTS_INVALID",
+            diagnostics::Stage::Parse,
+            format!(
+                "recovery events file is not valid UTF-8: {}: {err}",
+                events_file.display()
+            ),
+        )
+    })?;
+
+    let mut derived_id: Option<String> = parent_id;
+
+    for (i, raw_line) in text.lines().enumerate() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let doc: Value = serde_json::from_str(line).map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_EVENTS_INVALID",
+                diagnostics::Stage::Parse,
+                format!(
+                    "invalid recovery event JSON at line {} in {}: {err}",
+                    i + 1,
+                    events_file.display()
+                ),
+            )
+        })?;
+
+        let schema_version = doc
+            .get("schema_version")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if schema_version != RECOVERY_EVENT_SCHEMA_VERSION {
+            return Err(IngestLoadError::new(
+                "EXTAL_EVENTS_UNSUPPORTED_VERSION",
+                diagnostics::Stage::Parse,
+                format!(
+                    "unsupported recovery event schema_version at line {} in {} (expected {:?}): {:?}",
+                    i + 1,
+                    events_file.display(),
+                    RECOVERY_EVENT_SCHEMA_VERSION,
+                    schema_version
+                ),
+            ));
+        }
+
+        let schema_diags = report_common::validate_schema(
+            RECOVERY_EVENT_SCHEMA_BYTES,
+            "spec/x07.xtal.recovery_event@0.1.0.schema.json",
+            &doc,
+        )
+        .map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_EVENTS_INVALID",
+                diagnostics::Stage::Parse,
+                format!("internal error: cannot validate recovery event schema: {err:#}"),
+            )
+        })?;
+        if !schema_diags.is_empty() {
+            return Err(IngestLoadError::new(
+                "EXTAL_EVENTS_INVALID",
+                diagnostics::Stage::Parse,
+                format!(
+                    "invalid recovery event at line {} in {}: {}",
+                    i + 1,
+                    events_file.display(),
+                    schema_diags[0].message
+                ),
+            ));
+        }
+
+        if derived_id.is_none() {
+            if let Some(id) = doc.get("related_violation_id").and_then(Value::as_str) {
+                if is_sha256_hex(id) {
+                    derived_id = Some(id.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(derived_id)
+}
+
+fn load_ingest_inputs(
+    project_root: &Path,
+    input_abs: &Path,
+) -> std::result::Result<LoadedIngestInputs, IngestLoadError> {
+    let input_file_abs = resolve_ingest_input_file(input_abs)?;
+
+    if input_file_abs
+        .extension()
+        .and_then(|s| s.to_str())
+        .is_some_and(|ext| ext == "jsonl")
+        || input_file_abs
+            .file_name()
+            .and_then(|s| s.to_str())
+            .is_some_and(|n| n == "events.jsonl")
+    {
+        let events_bytes = std::fs::read(&input_file_abs).map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_EVENTS_IO",
+                diagnostics::Stage::Parse,
+                format!(
+                    "failed to read recovery events: {}: {err}",
+                    input_file_abs.display()
+                ),
+            )
+        })?;
+
+        let incident_id = validate_recovery_events_jsonl(&input_file_abs, &events_bytes)?
+            .ok_or_else(|| {
+                IngestLoadError::new(
+                    "EXTAL_EVENTS_INVALID",
+                    diagnostics::Stage::Parse,
+                    format!(
+                        "cannot determine related_violation_id for recovery events input (expected parent dir name or related_violation_id): {}",
+                        input_file_abs.display()
+                    ),
+                )
+            })?;
+
+        let violation_root = crate::xtal_violation::resolve_violation_root_dir(project_root)
+            .ok_or_else(|| {
+                IngestLoadError::new(
+                    "EXTAL_INGEST_FAILED",
+                    diagnostics::Stage::Parse,
+                    "cannot resolve violations directory for recovery events ingestion (set X07_XTAL_VIOLATIONS_DIR or add arch/xtal/xtal.json)",
+                )
+            })?;
+        let violation_dir = violation_root.join(&incident_id);
+        let violation_json = violation_dir.join("violation.json");
+        if !violation_json.is_file() {
+            return Err(IngestLoadError::new(
+                "EXTAL_INGEST_FAILED",
+                diagnostics::Stage::Parse,
+                format!(
+                    "cannot locate violation.json for incident {} (expected {}): {}",
+                    incident_id,
+                    violation_json.display(),
+                    input_file_abs.display()
+                ),
+            ));
+        }
+
+        let mut loaded = load_ingest_inputs(project_root, &violation_json)?;
+        loaded.input_kind = "recovery_events".to_string();
+        loaded.input_file_abs = input_file_abs.clone();
+        loaded.events_file_abs = Some(input_file_abs.clone());
+        loaded.events_bytes = Some(events_bytes);
+
+        loaded.input_files.push(
+            file_digest_rel_value(project_root, &input_file_abs).map_err(|err| {
+                IngestLoadError::new(
+                    "EXTAL_EVENTS_IO",
+                    diagnostics::Stage::Parse,
+                    format!("failed to digest recovery events: {err:#}"),
+                )
+            })?,
+        );
+        loaded.input_files.sort_by(|a, b| {
+            let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+            let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+            ap.cmp(bp)
+        });
+
+        if let Some(checks) = loaded
+            .integrity
+            .get_mut("checks")
+            .and_then(Value::as_array_mut)
+        {
+            checks.push(json!({ "name": "recovery_events_schema_valid", "ok": true }));
+        }
+
+        return Ok(loaded);
+    }
+
+    let bytes = std::fs::read(&input_file_abs).map_err(|err| {
+        IngestLoadError::new(
+            "EXTAL_INGEST_INPUT_SCHEMA_INVALID",
+            diagnostics::Stage::Parse,
+            format!("failed to read input: {}: {err}", input_file_abs.display()),
+        )
+    })?;
+    let doc: Value = serde_json::from_slice(&bytes).map_err(|err| {
+        IngestLoadError::new(
+            "EXTAL_INGEST_INPUT_SCHEMA_INVALID",
+            diagnostics::Stage::Parse,
+            format!("invalid JSON: {}: {err}", input_file_abs.display()),
+        )
+    })?;
+    let schema_version = doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+
+    if schema_version == crate::xtal_violation::VIOLATION_SCHEMA_VERSION {
+        let schema_diags = report_common::validate_schema(
+            crate::xtal_violation::VIOLATION_SCHEMA_BYTES,
+            "spec/x07.xtal.violation@0.1.0.schema.json",
+            &doc,
+        )
+        .map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_INGEST_INPUT_SCHEMA_INVALID",
+                diagnostics::Stage::Parse,
+                format!("internal error: cannot validate violation schema: {err:#}"),
+            )
+        })?;
+        if !schema_diags.is_empty() {
+            return Err(IngestLoadError::new(
+                "EXTAL_INGEST_INPUT_SCHEMA_INVALID",
+                diagnostics::Stage::Parse,
+                format!(
+                    "input violation is not schema-valid: {}",
+                    schema_diags[0].message
+                ),
+            ));
+        }
+
+        let violation_id = doc.get("id").and_then(Value::as_str).unwrap_or("");
+        let repro_rel = doc
+            .pointer("/repro/path")
+            .and_then(Value::as_str)
+            .unwrap_or("repro.json");
+        if !crate::util::is_safe_rel_path(repro_rel) {
+            return Err(IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_PATH_UNSAFE",
+                diagnostics::Stage::Parse,
+                format!(
+                    "unsafe repro path in violation bundle: {:?} (from {})",
+                    repro_rel,
+                    input_file_abs.display()
+                ),
+            ));
+        }
+
+        let repro_abs = input_file_abs
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(repro_rel);
+        if !repro_abs.is_file() {
+            return Err(IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_NOT_FOUND",
+                diagnostics::Stage::Parse,
+                format!(
+                    "repro file referenced by violation bundle was not found: {}",
+                    repro_abs.display()
+                ),
+            ));
+        }
+
+        let repro_bytes = std::fs::read(&repro_abs).map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_NOT_FOUND",
+                diagnostics::Stage::Parse,
+                format!("failed to read repro: {}: {err}", repro_abs.display()),
+            )
+        })?;
+
+        let repro_doc: Value = serde_json::from_slice(&repro_bytes).map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_SCHEMA_INVALID",
+                diagnostics::Stage::Parse,
+                format!("invalid JSON in repro: {}: {err}", repro_abs.display()),
+            )
+        })?;
+        let repro_schema_diags = report_common::validate_schema(
+            CONTRACT_REPRO_SCHEMA_BYTES,
+            "spec/x07.contract.repro@0.1.0.schema.json",
+            &repro_doc,
+        )
+        .map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_SCHEMA_INVALID",
+                diagnostics::Stage::Parse,
+                format!("internal error: cannot validate repro schema: {err:#}"),
+            )
+        })?;
+        if !repro_schema_diags.is_empty() {
+            return Err(IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_SCHEMA_INVALID",
+                diagnostics::Stage::Parse,
+                format!(
+                    "input repro is not schema-valid: {}",
+                    repro_schema_diags[0].message
+                ),
+            ));
+        }
+
+        let expected_id = util::sha256_hex(&repro_bytes);
+        let actual_repro_sha256 = util::sha256_hex(&repro_bytes);
+        let violation_repro_sha256 = doc
+            .pointer("/repro/sha256")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let violation_repro_bytes_len = doc
+            .pointer("/repro/bytes_len")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+
+        let checks: Vec<Value> = vec![
+            json!({ "name": "violation_schema_valid", "ok": true }),
+            json!({ "name": "repro_schema_valid", "ok": true }),
+            json!({
+                "name": "violation_id_matches_repro",
+                "ok": violation_id == expected_id,
+                "details": { "expected": expected_id, "actual": violation_id }
+            }),
+            json!({
+                "name": "violation_repro_sha256_matches",
+                "ok": violation_repro_sha256 == actual_repro_sha256,
+                "details": { "expected": actual_repro_sha256, "actual": violation_repro_sha256 }
+            }),
+            json!({
+                "name": "violation_repro_bytes_len_matches",
+                "ok": violation_repro_bytes_len == repro_bytes.len() as u64,
+                "details": { "expected": repro_bytes.len(), "actual": violation_repro_bytes_len }
+            }),
+        ];
+
+        let ok = checks
+            .iter()
+            .all(|c| c.get("ok").and_then(Value::as_bool) == Some(true));
+        if !ok {
+            let mut mismatches: Vec<String> = Vec::new();
+            if violation_id != expected_id {
+                mismatches.push(format!(
+                    "violation.id mismatch (expected {expected_id} got {violation_id})"
+                ));
+            }
+            if violation_repro_sha256 != actual_repro_sha256 {
+                mismatches.push(format!(
+                    "violation.repro.sha256 mismatch (expected {actual_repro_sha256} got {violation_repro_sha256})"
+                ));
+            }
+            if violation_repro_bytes_len != repro_bytes.len() as u64 {
+                mismatches.push(format!(
+                    "violation.repro.bytes_len mismatch (expected {} got {violation_repro_bytes_len})",
+                    repro_bytes.len()
+                ));
+            }
+            if mismatches.is_empty() {
+                mismatches.push("unknown integrity mismatch".to_string());
+            }
+            return Err(IngestLoadError::new(
+                "EXTAL_INGEST_INTEGRITY_MISMATCH",
+                diagnostics::Stage::Run,
+                mismatches.join("; "),
+            ));
+        }
+
+        let (id, mut violation_doc) =
+            crate::xtal_violation::build_contract_violation_doc(project_root, None, &repro_bytes)
+                .map_err(|err| {
+                IngestLoadError::new(
+                    "EXTAL_INGEST_FAILED",
+                    diagnostics::Stage::Run,
+                    format!("failed to normalize violation doc: {err:#}"),
+                )
+            })?;
+
+        if let Some(original_repro_path) = doc.get("original_repro_path").and_then(Value::as_str) {
+            if let Some(obj) = violation_doc.as_object_mut() {
+                obj.insert(
+                    "original_repro_path".to_string(),
+                    Value::String(original_repro_path.to_string()),
+                );
+            }
+        }
+
+        let mut input_files: Vec<Value> = vec![
+            file_digest_rel_value(project_root, &input_file_abs).map_err(|err| {
+                IngestLoadError::new(
+                    "EXTAL_INGEST_FAILED",
+                    diagnostics::Stage::Parse,
+                    format!("digest input violation: {err:#}"),
+                )
+            })?,
+            file_digest_rel_value(project_root, &repro_abs).map_err(|err| {
+                IngestLoadError::new(
+                    "EXTAL_INGEST_FAILED",
+                    diagnostics::Stage::Parse,
+                    format!("digest input repro: {err:#}"),
+                )
+            })?,
+        ];
+        input_files.sort_by(|a, b| {
+            let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+            let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+            ap.cmp(bp)
+        });
+
+        let integrity = json!({
+            "ok": true,
+            "expected_repro_sha256": expected_id,
+            "actual_repro_sha256": actual_repro_sha256,
+            "checks": checks,
+        });
+
+        Ok(LoadedIngestInputs {
+            input_kind: "violation".to_string(),
+            input_file_abs,
+            input_files,
+            integrity,
+            violation_doc,
+            repro_bytes,
+            incident_id: id,
+            events_file_abs: None,
+            events_bytes: None,
+        })
+    } else if schema_version == x07_contracts::X07_CONTRACT_REPRO_SCHEMA_VERSION {
+        let schema_diags = report_common::validate_schema(
+            CONTRACT_REPRO_SCHEMA_BYTES,
+            "spec/x07.contract.repro@0.1.0.schema.json",
+            &doc,
+        )
+        .map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_SCHEMA_INVALID",
+                diagnostics::Stage::Parse,
+                format!("internal error: cannot validate repro schema: {err:#}"),
+            )
+        })?;
+        if !schema_diags.is_empty() {
+            return Err(IngestLoadError::new(
+                "EXTAL_INGEST_REPRO_SCHEMA_INVALID",
+                diagnostics::Stage::Parse,
+                format!(
+                    "input repro is not schema-valid: {}",
+                    schema_diags[0].message
+                ),
+            ));
+        }
+
+        let repro_bytes = bytes;
+        let sha = util::sha256_hex(&repro_bytes);
+
+        let (id, violation_doc) = crate::xtal_violation::build_contract_violation_doc(
+            project_root,
+            Some(&input_file_abs),
+            &repro_bytes,
+        )
+        .map_err(|err| {
+            IngestLoadError::new(
+                "EXTAL_INGEST_FAILED",
+                diagnostics::Stage::Run,
+                format!("failed to build violation doc from repro: {err:#}"),
+            )
+        })?;
+
+        let input_files = vec![
+            file_digest_rel_value(project_root, &input_file_abs).map_err(|err| {
+                IngestLoadError::new(
+                    "EXTAL_INGEST_FAILED",
+                    diagnostics::Stage::Parse,
+                    format!("digest input repro: {err:#}"),
+                )
+            })?,
+        ];
+
+        let integrity = json!({
+            "ok": true,
+            "expected_repro_sha256": sha,
+            "actual_repro_sha256": sha,
+            "checks": [
+                { "name": "repro_schema_valid", "ok": true },
+                { "name": "repro_sha256_computed", "ok": true, "details": { "sha256": sha } }
+            ]
+        });
+
+        Ok(LoadedIngestInputs {
+            input_kind: "contract_repro".to_string(),
+            input_file_abs,
+            input_files,
+            integrity,
+            violation_doc,
+            repro_bytes,
+            incident_id: id,
+            events_file_abs: None,
+            events_bytes: None,
+        })
+    } else {
+        Err(IngestLoadError::new(
+            "EXTAL_INGEST_INPUT_SCHEMA_VERSION_UNSUPPORTED",
+            diagnostics::Stage::Parse,
+            format!(
+                "unsupported input schema_version {:?} (expected {:?} or {:?})",
+                schema_version,
+                crate::xtal_violation::VIOLATION_SCHEMA_VERSION,
+                x07_contracts::X07_CONTRACT_REPRO_SCHEMA_VERSION
+            ),
+        ))
+    }
+}
+
 fn cmd_xtal_ingest(
     machine: &crate::reporting::MachineArgs,
     args: XtalIngestArgs,
@@ -815,86 +1436,6 @@ fn cmd_xtal_ingest(
 
     let mut diagnostics: Vec<diagnostics::Diagnostic> = Vec::new();
 
-    let ingest_res: Result<(String, Value, Vec<u8>, String)> = (|| {
-        // Resolve directories by convention.
-        let mut input_file = input_abs.clone();
-        if input_file.is_dir() {
-            let violation_json = input_file.join("violation.json");
-            let repro_json = input_file.join("repro.json");
-            if violation_json.is_file() {
-                input_file = violation_json;
-            } else if repro_json.is_file() {
-                input_file = repro_json;
-            } else {
-                anyhow::bail!(
-                    "input dir does not contain violation.json or repro.json: {}",
-                    input_abs.display()
-                );
-            }
-        }
-
-        let bytes = std::fs::read(&input_file)
-            .with_context(|| format!("read: {}", input_file.display()))?;
-        let doc: Value = serde_json::from_slice(&bytes)
-            .with_context(|| format!("parse JSON: {}", input_file.display()))?;
-        let schema_version = doc
-            .get("schema_version")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-
-        if schema_version == crate::xtal_violation::VIOLATION_SCHEMA_VERSION {
-            // Input is a violation record; resolve the referenced repro.
-            let repro_rel = doc
-                .pointer("/repro/path")
-                .and_then(Value::as_str)
-                .unwrap_or("repro.json");
-            let repro_abs = input_file
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .join(repro_rel);
-            let repro_bytes = std::fs::read(&repro_abs)
-                .with_context(|| format!("read: {}", repro_abs.display()))?;
-
-            let original_repro_path = doc
-                .get("original_repro_path")
-                .and_then(Value::as_str)
-                .map(|s| s.to_string());
-
-            let (id, mut violation) = crate::xtal_violation::build_contract_violation_doc(
-                &project_root,
-                None,
-                &repro_bytes,
-            )?;
-
-            if let Some(original_repro_path) = original_repro_path {
-                if let Some(obj) = violation.as_object_mut() {
-                    obj.insert(
-                        "original_repro_path".to_string(),
-                        Value::String(original_repro_path),
-                    );
-                }
-            }
-
-            Ok(("violation".to_string(), violation, repro_bytes, id))
-        } else if schema_version == x07_contracts::X07_CONTRACT_REPRO_SCHEMA_VERSION {
-            // Input is a contract repro.
-            let repro_bytes = bytes;
-            let (id, violation) = crate::xtal_violation::build_contract_violation_doc(
-                &project_root,
-                Some(&input_file),
-                &repro_bytes,
-            )?;
-            Ok(("contract_repro".to_string(), violation, repro_bytes, id))
-        } else {
-            anyhow::bail!(
-                "unsupported input schema_version '{}' (expected '{}' or '{}')",
-                schema_version,
-                crate::xtal_violation::VIOLATION_SCHEMA_VERSION,
-                x07_contracts::X07_CONTRACT_REPRO_SCHEMA_VERSION
-            )
-        }
-    })();
-
     let mut report = diagnostics::Report::ok();
     report.meta.insert(
         "ingest_input_path".to_string(),
@@ -907,26 +1448,33 @@ fn cmd_xtal_ingest(
         ),
     );
 
-    match ingest_res {
-        Ok((input_kind, violation_doc, repro_bytes, id)) => {
+    match load_ingest_inputs(&project_root, &input_abs) {
+        Ok(loaded) => {
+            let input_kind = loaded.input_kind.clone();
+            let id = loaded.incident_id.clone();
+
             std::fs::create_dir_all(&out_root_abs)
                 .with_context(|| format!("mkdir: {}", out_root_abs.display()))?;
 
             let incident_dir_abs = out_root_abs.join(&id);
             crate::xtal_violation::write_violation_bundle(
                 &incident_dir_abs,
-                &violation_doc,
-                &repro_bytes,
+                &loaded.violation_doc,
+                &loaded.repro_bytes,
             )
             .context("write ingest violation bundle")?;
+
+            if let Some(events_bytes) = loaded.events_bytes.as_deref() {
+                let out_path = incident_dir_abs.join("events.jsonl");
+                util::write_atomic(&out_path, events_bytes)
+                    .with_context(|| format!("write: {}", out_path.display()))?;
+            }
 
             let summary = build_ingest_summary_value(
                 &project_root,
                 &args.out_dir,
-                &input_kind,
                 &input_abs,
-                &id,
-                &violation_doc,
+                &loaded,
                 &incident_dir_abs,
             )?;
             write_ingest_summary(&project_root, &args.out_dir, &summary)?;
@@ -957,14 +1505,17 @@ fn cmd_xtal_ingest(
                 "ingest_repro_path".to_string(),
                 Value::String(format!("{}/{}/repro.json", out_dir_rel_trim, id)),
             );
+
+            let events_abs = incident_dir_abs.join("events.jsonl");
+            if events_abs.is_file() {
+                report.meta.insert(
+                    "ingest_events_path".to_string(),
+                    Value::String(format!("{}/{}/events.jsonl", out_dir_rel_trim, id)),
+                );
+            }
         }
         Err(err) => {
-            diagnostics.push(diag_error(
-                "EXTAL_INGEST_FAILED",
-                diagnostics::Stage::Run,
-                format!("xtal ingest failed: {err:#}"),
-                None,
-            ));
+            diagnostics.push(diag_error(err.code, err.stage, err.message, None));
             report.ok = false;
         }
     }
@@ -972,6 +1523,914 @@ fn cmd_xtal_ingest(
     report = report.with_diagnostics(diagnostics);
 
     write_ingest_diag_report(&project_root, &report)?;
+    write_report(machine, &report)?;
+
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
+}
+
+fn write_improve_diag_report(project_root: &Path, report: &diagnostics::Report) -> Result<()> {
+    let report_path = project_root.join(DEFAULT_IMPROVE_DIAG_REPORT_PATH);
+    std::fs::create_dir_all(report_path.parent().unwrap_or(project_root)).with_context(|| {
+        format!(
+            "mkdir: {}",
+            report_path.parent().unwrap_or(project_root).display()
+        )
+    })?;
+
+    let mut report_bytes = serde_json::to_vec(report).context("serialize improve diag report")?;
+    if report_bytes.last() != Some(&b'\n') {
+        report_bytes.push(b'\n');
+    }
+    util::write_atomic(&report_path, &report_bytes)
+        .with_context(|| format!("write: {}", report_path.display()))?;
+    Ok(())
+}
+
+fn write_improve_summary(project_root: &Path, out_dir: &Path, summary: &Value) -> Result<()> {
+    let out_dir_abs = project_root.join(out_dir);
+    std::fs::create_dir_all(&out_dir_abs)
+        .with_context(|| format!("mkdir: {}", out_dir_abs.display()))?;
+
+    let summary_path = out_dir_abs.join("summary.json");
+    let bytes = report_common::canonical_pretty_json_bytes(summary)
+        .context("serialize xtal improve summary")?;
+    util::write_atomic(&summary_path, &bytes)
+        .with_context(|| format!("write: {}", summary_path.display()))?;
+    Ok(())
+}
+
+fn contract_ref_from_repro_doc(repro_doc: &Value) -> Option<Value> {
+    let contract = repro_doc.pointer("/contract").and_then(Value::as_object)?;
+    let witness_count = contract
+        .get("witness")
+        .and_then(Value::as_array)
+        .map(|w| w.len() as u64)
+        .unwrap_or(0);
+    Some(json!({
+        "fn": contract.get("fn").cloned().unwrap_or(Value::Null),
+        "contract_kind": contract.get("contract_kind").cloned().unwrap_or(Value::Null),
+        "clause_id": contract.get("clause_id").cloned().unwrap_or(Value::Null),
+        "clause_ptr": contract.get("clause_ptr").cloned().unwrap_or(Value::Null),
+        "witness_count": witness_count,
+    }))
+}
+
+fn resolve_manifest_path_for_repro(
+    project_root: &Path,
+    repro_doc: &Value,
+) -> std::result::Result<Option<PathBuf>, String> {
+    let raw = repro_doc
+        .pointer("/source/tests_manifest_path")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if raw.is_empty() {
+        return Ok(None);
+    }
+    if raw.starts_with("\\\\") {
+        return Err(format!("unsupported tests_manifest_path: {raw:?}"));
+    }
+    let p = PathBuf::from(raw);
+    if p.is_absolute() {
+        return Ok(Some(p));
+    }
+    if !util::is_safe_rel_path(raw) {
+        return Err(format!("unsafe tests_manifest_path: {raw:?}"));
+    }
+    Ok(Some(project_root.join(p)))
+}
+
+fn test_entry_from_manifest(manifest_path: &Path, test_id: &str) -> Result<Option<Value>> {
+    let bytes = std::fs::read(manifest_path)
+        .with_context(|| format!("read tests manifest: {}", manifest_path.display()))?;
+    let doc: Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse tests manifest JSON: {}", manifest_path.display()))?;
+    let Some(tests) = doc.get("tests").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+    for t in tests {
+        let id = t.get("id").and_then(Value::as_str).unwrap_or("");
+        if id == test_id {
+            return Ok(Some(t.clone()));
+        }
+    }
+    Ok(None)
+}
+
+fn write_shadow_tests_manifest(
+    project_root: &Path,
+    out_path: &Path,
+    repro_doc: &Value,
+    input_bytes_b64: &str,
+) -> Result<()> {
+    let world = repro_doc
+        .get("world")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let test_id = repro_doc
+        .pointer("/source/test_id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let test_entry = repro_doc
+        .pointer("/source/test_entry")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    let mut entry_obj: Value = if test_id.is_empty() {
+        json!({ "id": "xtal/improve/incident", "entry": test_entry, "world": world })
+    } else {
+        let from_manifest = match resolve_manifest_path_for_repro(project_root, repro_doc) {
+            Ok(Some(manifest_path)) if manifest_path.is_file() => {
+                test_entry_from_manifest(&manifest_path, &test_id)?
+            }
+            Ok(_) => None,
+            Err(_) => None,
+        };
+        from_manifest
+            .unwrap_or_else(|| json!({ "id": test_id, "entry": test_entry, "world": world }))
+    };
+
+    if let Some(obj) = entry_obj.as_object_mut() {
+        obj.insert(
+            "input_b64".to_string(),
+            Value::String(input_bytes_b64.to_string()),
+        );
+        obj.remove("input_path");
+        obj.remove("pbt");
+    }
+
+    let doc = json!({
+        "schema_version": TESTS_MANIFEST_SCHEMA_VERSION,
+        "tests": [entry_obj],
+    });
+
+    let mut bytes = serde_json::to_vec_pretty(&doc).context("serialize shadow tests manifest")?;
+    if bytes.last() != Some(&b'\n') {
+        bytes.push(b'\n');
+    }
+
+    util::write_atomic(out_path, &bytes)
+        .with_context(|| format!("write: {}", out_path.display()))?;
+    Ok(())
+}
+
+fn reduction_predicate_x07test(
+    project_root: &Path,
+    scratch_dir: &Path,
+    repro_doc: &Value,
+    input_bytes: &[u8],
+    expected_clause_id: &str,
+    attempt_no: u64,
+) -> Result<bool> {
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let input_b64 = b64.encode(input_bytes);
+
+    let attempt_dir = scratch_dir.join(format!("attempt-{attempt_no:04}"));
+    let manifest_path = attempt_dir.join("tests.json");
+    let artifact_dir = attempt_dir.join("_artifacts");
+    let report_path = attempt_dir.join("tests.report.json");
+    let violations_dir = attempt_dir.join("violations");
+    let events_dir = attempt_dir.join("events");
+
+    std::fs::create_dir_all(&attempt_dir)
+        .with_context(|| format!("mkdir: {}", attempt_dir.display()))?;
+
+    write_shadow_tests_manifest(project_root, &manifest_path, repro_doc, &input_b64)?;
+
+    let exe = std::env::current_exe().context("resolve x07 executable")?;
+    let argv: Vec<String> = vec![
+        "test".to_string(),
+        "--all".to_string(),
+        "--manifest".to_string(),
+        manifest_path.display().to_string(),
+        "--artifact-dir".to_string(),
+        artifact_dir.display().to_string(),
+        "--report-out".to_string(),
+        report_path.display().to_string(),
+        "--quiet-json".to_string(),
+        "--json=canon".to_string(),
+    ];
+    let _output = Command::new(exe)
+        .current_dir(project_root)
+        .env("X07_TOOL_API_CHILD", "1")
+        .env(
+            crate::xtal_violation::ENV_X07_XTAL_VIOLATIONS_DIR,
+            &violations_dir,
+        )
+        .env(crate::xtal_events::ENV_X07_XTAL_EVENTS_DIR, &events_dir)
+        .args(&argv)
+        .output()
+        .with_context(|| format!("run x07 test in {}", project_root.display()))?;
+
+    if !violations_dir.is_dir() {
+        return Ok(false);
+    }
+    for entry in std::fs::read_dir(&violations_dir)
+        .with_context(|| format!("read dir: {}", violations_dir.display()))?
+    {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let violation_json = entry.path().join("violation.json");
+        if !violation_json.is_file() {
+            continue;
+        }
+        let bytes = std::fs::read(&violation_json)
+            .with_context(|| format!("read: {}", violation_json.display()))?;
+        let doc: Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse JSON: {}", violation_json.display()))?;
+        let clause_id = doc.get("clause_id").and_then(Value::as_str).unwrap_or("");
+        if clause_id == expected_clause_id {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn ddmin_reduce_bytes<F>(original: &[u8], max_runs: u64, mut predicate: F) -> Result<(Vec<u8>, u64)>
+where
+    F: FnMut(&[u8], u64) -> Result<bool>,
+{
+    if original.len() <= 1 {
+        return Ok((original.to_vec(), 0));
+    }
+
+    let mut runs = 0u64;
+    let mut current: Vec<u8> = original.to_vec();
+    let mut n = 2usize;
+
+    while current.len() >= 2 && runs < max_runs {
+        let len = current.len();
+        let chunk = len.div_ceil(n);
+        let mut reduced = None;
+        for i in 0..n {
+            if runs >= max_runs {
+                break;
+            }
+            let start = i * chunk;
+            if start >= len {
+                break;
+            }
+            let end = ((i + 1) * chunk).min(len);
+            if start == 0 && end == len {
+                continue;
+            }
+            let mut candidate = Vec::with_capacity(len - (end - start));
+            candidate.extend_from_slice(&current[..start]);
+            candidate.extend_from_slice(&current[end..]);
+
+            runs += 1;
+            if predicate(&candidate, runs)? {
+                reduced = Some(candidate);
+                break;
+            }
+        }
+
+        if let Some(next) = reduced {
+            current = next;
+            n = n.saturating_sub(1).max(2);
+        } else {
+            if n >= len {
+                break;
+            }
+            n = (n * 2).min(len);
+        }
+    }
+
+    Ok((current, runs))
+}
+
+fn cmd_xtal_improve(
+    machine: &crate::reporting::MachineArgs,
+    args: XtalImproveArgs,
+) -> Result<std::process::ExitCode> {
+    let project_root =
+        resolve_project_root(args.project.as_deref(), None).context("resolve project root")?;
+
+    let cwd = std::env::current_dir().context("cwd")?;
+    let input_abs = if args.input.is_absolute() {
+        args.input.clone()
+    } else {
+        cwd.join(&args.input)
+    };
+
+    let out_root_abs = project_root.join(&args.out_dir);
+    std::fs::create_dir_all(&out_root_abs)
+        .with_context(|| format!("mkdir: {}", out_root_abs.display()))?;
+
+    let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
+    let mut report = diagnostics::Report::ok();
+
+    report.meta.insert(
+        "improve_input_path".to_string(),
+        Value::String(
+            input_abs
+                .strip_prefix(&project_root)
+                .unwrap_or(&input_abs)
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+    );
+
+    let mut incidents: Vec<LoadedIngestInputs> = Vec::new();
+    let mut input_kind = "unknown".to_string();
+
+    if input_abs.is_dir() {
+        let is_single = input_abs.join("violation.json").is_file()
+            || input_abs.join("repro.json").is_file()
+            || input_abs.join("events.jsonl").is_file();
+        if is_single {
+            match load_ingest_inputs(&project_root, &input_abs) {
+                Ok(loaded) => {
+                    input_kind = loaded.input_kind.clone();
+                    incidents.push(loaded);
+                }
+                Err(err) => {
+                    diags.push(diag_error(err.code, err.stage, err.message, None));
+                    report.ok = false;
+                }
+            }
+        } else {
+            input_kind = "dir".to_string();
+            let mut children: Vec<PathBuf> = Vec::new();
+            for entry in std::fs::read_dir(&input_abs)
+                .with_context(|| format!("read dir: {}", input_abs.display()))?
+            {
+                let entry = entry?;
+                if entry.file_type()?.is_dir() {
+                    children.push(entry.path());
+                }
+            }
+            children.sort();
+            for child in children {
+                let is_bundle = child.join("violation.json").is_file()
+                    || child.join("repro.json").is_file()
+                    || child.join("events.jsonl").is_file();
+                if !is_bundle {
+                    continue;
+                }
+                match load_ingest_inputs(&project_root, &child) {
+                    Ok(loaded) => incidents.push(loaded),
+                    Err(err) => {
+                        diags.push(diag_warning(err.code, err.stage, err.message, None));
+                    }
+                }
+            }
+        }
+    } else {
+        match load_ingest_inputs(&project_root, &input_abs) {
+            Ok(loaded) => {
+                input_kind = loaded.input_kind.clone();
+                incidents.push(loaded);
+            }
+            Err(err) => {
+                diags.push(diag_error(err.code, err.stage, err.message, None));
+                report.ok = false;
+            }
+        }
+    }
+
+    if incidents.is_empty() {
+        diags.push(diag_error(
+            "EXTAL_IMPROVE_NO_INCIDENTS",
+            diagnostics::Stage::Parse,
+            "no ingestable incidents were found under the provided --input",
+            None,
+        ));
+        report.ok = false;
+        report = report.with_diagnostics(diags);
+        write_improve_diag_report(&project_root, &report)?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    incidents.sort_by(|a, b| a.incident_id.cmp(&b.incident_id));
+    let target_idx = 0usize;
+
+    let target_id = incidents[target_idx].incident_id.clone();
+    let target_repro_bytes = incidents[target_idx].repro_bytes.clone();
+    let target_repro_doc: Value =
+        serde_json::from_slice(&target_repro_bytes).context("parse repro JSON")?;
+
+    let Some(target_contract_ref) = contract_ref_from_repro_doc(&target_repro_doc) else {
+        diags.push(diag_error(
+            "EXTAL_IMPROVE_FAILED",
+            diagnostics::Stage::Parse,
+            "incident repro is missing contract metadata",
+            None,
+        ));
+        report.ok = false;
+        report = report.with_diagnostics(diags);
+        write_improve_diag_report(&project_root, &report)?;
+        write_report(machine, &report)?;
+        return Ok(std::process::ExitCode::from(1));
+    };
+
+    let target_source_ref = target_repro_doc
+        .get("source")
+        .cloned()
+        .unwrap_or_else(|| json!({ "mode": "unknown" }));
+
+    let expected_clause_id = target_contract_ref
+        .get("clause_id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let original_input_b64 = target_repro_doc
+        .get("input_bytes_b64")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let original_input_bytes = b64
+        .decode(original_input_b64.as_bytes())
+        .context("decode repro input_bytes_b64")?;
+
+    let incident_out_dir_abs = out_root_abs.join(&target_id);
+    std::fs::create_dir_all(&incident_out_dir_abs)
+        .with_context(|| format!("mkdir: {}", incident_out_dir_abs.display()))?;
+
+    let mut effective_input_bytes = original_input_bytes.clone();
+    let mut reduction_status = "skipped".to_string();
+    let mut repro_min_path_rel: Option<String> = None;
+    let mut reduction_report_path_rel: Option<String> = None;
+
+    if args.reduce_repro {
+        let world = target_repro_doc
+            .get("world")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let mode = target_repro_doc
+            .pointer("/source/mode")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+
+        let scratch_dir = incident_out_dir_abs.join("reduction");
+        std::fs::create_dir_all(&scratch_dir)
+            .with_context(|| format!("mkdir: {}", scratch_dir.display()))?;
+
+        if mode == "x07test" && world == "solve-pure" && !expected_clause_id.is_empty() {
+            let (min_bytes, runs) = ddmin_reduce_bytes(&original_input_bytes, 64, |cand, n| {
+                reduction_predicate_x07test(
+                    &project_root,
+                    &scratch_dir,
+                    &target_repro_doc,
+                    cand,
+                    &expected_clause_id,
+                    n,
+                )
+            })?;
+
+            effective_input_bytes = min_bytes;
+            reduction_status = "ok".to_string();
+
+            let mut repro_min_doc = target_repro_doc.clone();
+            if let Some(obj) = repro_min_doc.as_object_mut() {
+                obj.insert(
+                    "input_bytes_b64".to_string(),
+                    Value::String(b64.encode(&effective_input_bytes)),
+                );
+            }
+            let schema_diags = report_common::validate_schema(
+                CONTRACT_REPRO_SCHEMA_BYTES,
+                "spec/x07.contract.repro@0.1.0.schema.json",
+                &repro_min_doc,
+            )?;
+            if !schema_diags.is_empty() {
+                anyhow::bail!(
+                    "internal error: reduced repro is not schema-valid: {}",
+                    schema_diags[0].message
+                );
+            }
+
+            let repro_min_path_abs = incident_out_dir_abs.join("repro.min.json");
+            let repro_min_bytes = report_common::canonical_pretty_json_bytes(&repro_min_doc)?;
+            util::write_atomic(&repro_min_path_abs, &repro_min_bytes)
+                .with_context(|| format!("write: {}", repro_min_path_abs.display()))?;
+            repro_min_path_rel = Some(
+                repro_min_path_abs
+                    .strip_prefix(&project_root)
+                    .unwrap_or(&repro_min_path_abs)
+                    .to_string_lossy()
+                    .replace('\\', "/"),
+            );
+
+            let report_doc = json!({
+                "schema_version": "x07.xtal.repro_reduction@0.1.0",
+                "ok": true,
+                "predicate_runs": runs,
+                "original_bytes_len": original_input_bytes.len(),
+                "min_bytes_len": effective_input_bytes.len(),
+            });
+            let report_bytes = report_common::canonical_pretty_json_bytes(&report_doc)?;
+            let reduction_report_abs = incident_out_dir_abs.join("reduction.report.json");
+            util::write_atomic(&reduction_report_abs, &report_bytes)
+                .with_context(|| format!("write: {}", reduction_report_abs.display()))?;
+            reduction_report_path_rel = Some(
+                reduction_report_abs
+                    .strip_prefix(&project_root)
+                    .unwrap_or(&reduction_report_abs)
+                    .to_string_lossy()
+                    .replace('\\', "/"),
+            );
+        } else {
+            reduction_status = "unsupported".to_string();
+        }
+    }
+
+    let effective_input_b64 = b64.encode(&effective_input_bytes);
+    let shadow_manifest_abs = incident_out_dir_abs.join("tests.shadow.json");
+    write_shadow_tests_manifest(
+        &project_root,
+        &shadow_manifest_abs,
+        &target_repro_doc,
+        &effective_input_b64,
+    )?;
+    let shadow_manifest_rel = shadow_manifest_abs
+        .strip_prefix(&project_root)
+        .unwrap_or(&shadow_manifest_abs)
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let verify_manifest_rel = PathBuf::from(shadow_manifest_rel.clone());
+
+    let build_verify_args = || XtalVerifyArgs {
+        project: Some(project_root.join("x07.json")),
+        spec_dir: PathBuf::from(DEFAULT_SPEC_DIR),
+        gen_index: None,
+        gen_dir: PathBuf::from(DEFAULT_GEN_DIR),
+        manifest: verify_manifest_rel.clone(),
+        proof_policy: ProofPolicy::Balanced,
+        allow_os_world: false,
+        unwind: None,
+        max_bytes_len: None,
+        input_len_bytes: None,
+    };
+
+    let (verify_code, _) = capture_report_json("xtal_improve_verify", |m| {
+        cmd_xtal_verify(m, build_verify_args())
+    })?;
+    let mut verify_status = if verify_code == std::process::ExitCode::SUCCESS {
+        "ok".to_string()
+    } else {
+        "failed".to_string()
+    };
+
+    let (repair_code, _) = capture_report_json("xtal_improve_repair", |m| {
+        cmd_xtal_repair(
+            m,
+            XtalRepairArgs {
+                project: Some(project_root.join("x07.json")),
+                write: false,
+                max_rounds: 3,
+                max_candidates: 64,
+                semantic_max_depth: 4,
+                semantic_ops: SemanticOpsPreset::Safe,
+                entry: None,
+                stubs_only: true,
+                allow_edit_non_stubs: false,
+                semantic_only: false,
+                quickfix_only: false,
+                suggest_spec_patch: true,
+            },
+        )
+    })?;
+
+    let patchset_path_abs = project_root.join(DEFAULT_REPAIR_PATCHSET_PATH);
+    let mut patchset: Option<PatchSet> = None;
+    if patchset_path_abs.is_file() {
+        let bytes = std::fs::read(&patchset_path_abs)
+            .with_context(|| format!("read: {}", patchset_path_abs.display()))?;
+        if let Ok(v) = serde_json::from_slice::<PatchSet>(&bytes) {
+            patchset = Some(v);
+        }
+    }
+
+    let repair_status = if patchset.is_some() || repair_code == std::process::ExitCode::SUCCESS {
+        "ok".to_string()
+    } else {
+        "failed".to_string()
+    };
+
+    let spec_change_detected = patchset.as_ref().is_some_and(|ps| {
+        ps.patches
+            .iter()
+            .any(|p| normalize_rel_path(&p.path).is_some_and(|path| path.starts_with("spec")))
+    });
+
+    let mut applied = false;
+    let mut certify_status = "skipped".to_string();
+
+    if args.write {
+        if let Some(patchset) = patchset.as_ref() {
+            let xtal_manifest_path = project_root.join("arch").join("xtal").join("xtal.json");
+            let xtal_manifest = if xtal_manifest_path.is_file() {
+                load_xtal_manifest(
+                    &xtal_manifest_path,
+                    &mut diags,
+                    "EXTAL_IMPROVE_MANIFEST_PARSE_FAILED",
+                )?
+            } else {
+                None
+            };
+
+            if let Some(xtal_manifest) = xtal_manifest.as_ref() {
+                if spec_change_detected && !args.allow_spec_change {
+                    diags.push(diag_error(
+                        "EXTAL_IMPROVE_SPEC_CHANGE_REQUIRES_FLAG",
+                        diagnostics::Stage::Run,
+                        "patchset changes spec/** (pass --allow-spec-change to permit applying it)",
+                        None,
+                    ));
+                    report.ok = false;
+                } else {
+                    let disallowed = disallowed_patch_paths_from_manifest(patchset, xtal_manifest);
+                    if !disallowed.is_empty() {
+                        diags.push(diag_error(
+                            "EXTAL_IMPROVE_DISALLOWED_PATCH_PATHS",
+                            diagnostics::Stage::Run,
+                            format!(
+                                "patchset touches disallowed paths: {}",
+                                disallowed.join(", ")
+                            ),
+                            None,
+                        ));
+                        report.ok = false;
+                    } else {
+                        let apply_out = run_self_command(
+                            &project_root,
+                            &[
+                                "patch".to_string(),
+                                "apply".to_string(),
+                                "--in".to_string(),
+                                DEFAULT_REPAIR_PATCHSET_PATH.to_string(),
+                                "--repo-root".to_string(),
+                                ".".to_string(),
+                                "--write".to_string(),
+                                "--quiet-json".to_string(),
+                            ],
+                        )?;
+                        if apply_out.exit_code != 0 {
+                            diags.push(diag_error(
+                                "EXTAL_IMPROVE_PATCH_APPLY_FAILED",
+                                diagnostics::Stage::Run,
+                                format!(
+                                    "failed to apply patchset (exit_code={}): {}",
+                                    apply_out.exit_code,
+                                    stderr_summary(&apply_out.stderr)
+                                ),
+                                None,
+                            ));
+                            report.ok = false;
+                        } else {
+                            applied = true;
+
+                            let (verify2_code, _) =
+                                capture_report_json("xtal_improve_verify_post_apply", |m| {
+                                    cmd_xtal_verify(m, build_verify_args())
+                                })?;
+                            verify_status = if verify2_code == std::process::ExitCode::SUCCESS {
+                                "ok".to_string()
+                            } else {
+                                "failed".to_string()
+                            };
+
+                            if verify2_code == std::process::ExitCode::SUCCESS {
+                                let (certify_code, _) =
+                                    capture_report_json("xtal_improve_certify", |m| {
+                                        cmd_xtal_certify(
+                                            m,
+                                            XtalCertifyArgs {
+                                                project: Some(project_root.join("x07.json")),
+                                                spec_dir: PathBuf::from(DEFAULT_SPEC_DIR),
+                                                out_dir: PathBuf::from(DEFAULT_CERT_DIR),
+                                                entry: None,
+                                                all: true,
+                                                baseline: args.baseline.clone(),
+                                                no_prechecks: false,
+                                            },
+                                        )
+                                    })?;
+
+                                certify_status = if certify_code == std::process::ExitCode::SUCCESS
+                                {
+                                    "ok".to_string()
+                                } else {
+                                    "failed".to_string()
+                                };
+                            }
+                        }
+                    }
+                }
+            } else {
+                diags.push(diag_error(
+                    "EXTAL_IMPROVE_WRITE_REQUIRES_MANIFEST",
+                    diagnostics::Stage::Parse,
+                    "--write requires arch/xtal/xtal.json so edit boundaries are explicit",
+                    None,
+                ));
+                report.ok = false;
+            }
+        } else {
+            diags.push(diag_error(
+                "EXTAL_IMPROVE_NO_PATCH",
+                diagnostics::Stage::Run,
+                "no patchset was produced by `x07 xtal repair`",
+                None,
+            ));
+            report.ok = false;
+        }
+    }
+
+    let mut incident_refs: Vec<Value> = Vec::new();
+    for inc in &incidents {
+        let repro_doc: Value = serde_json::from_slice(&inc.repro_bytes)
+            .with_context(|| format!("parse repro JSON for incident {}", inc.incident_id))?;
+        let contract_ref = match contract_ref_from_repro_doc(&repro_doc) {
+            Some(v) => v,
+            None => continue,
+        };
+        let clause_id = inc
+            .violation_doc
+            .get("clause_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let world = inc
+            .violation_doc
+            .get("world")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        incident_refs.push(json!({
+            "id": inc.incident_id,
+            "clause_id": clause_id,
+            "world": world,
+            "contract": contract_ref,
+        }));
+    }
+
+    let mut files: Vec<Value> = Vec::new();
+    files.push(file_digest_rel_value(&project_root, &shadow_manifest_abs)?);
+    if let Some(p) = repro_min_path_rel.as_deref() {
+        files.push(file_digest_rel_value(&project_root, &project_root.join(p))?);
+    }
+    if let Some(p) = reduction_report_path_rel.as_deref() {
+        files.push(file_digest_rel_value(&project_root, &project_root.join(p))?);
+    }
+    if patchset_path_abs.is_file() {
+        files.push(file_digest_rel_value(&project_root, &patchset_path_abs)?);
+    }
+    if project_root.join(DEFAULT_VERIFY_SUMMARY_PATH).is_file() {
+        files.push(file_digest_rel_value(
+            &project_root,
+            &project_root.join(DEFAULT_VERIFY_SUMMARY_PATH),
+        )?);
+    }
+    if project_root.join(DEFAULT_REPAIR_SUMMARY_PATH).is_file() {
+        files.push(file_digest_rel_value(
+            &project_root,
+            &project_root.join(DEFAULT_REPAIR_SUMMARY_PATH),
+        )?);
+    }
+    if project_root.join("target/xtal/cert/summary.json").is_file() {
+        files.push(file_digest_rel_value(
+            &project_root,
+            &project_root.join("target/xtal/cert/summary.json"),
+        )?);
+    }
+    files.sort_by(|a, b| {
+        let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
+        let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
+        ap.cmp(bp)
+    });
+    files.dedup_by(|a, b| {
+        a.get("path").and_then(Value::as_str) == b.get("path").and_then(Value::as_str)
+    });
+
+    report = report.with_diagnostics(diags);
+    if args.write {
+        if !applied || verify_status != "ok" || certify_status == "failed" {
+            report.ok = false;
+        }
+    } else if verify_status != "ok" || repair_status != "ok" {
+        report.ok = false;
+    }
+
+    let mut summary = json!({
+        "schema_version": IMPROVE_SUMMARY_SCHEMA_VERSION,
+        "generated_at": "2000-01-01T00:00:00Z",
+        "ok": report.ok,
+        "input": {
+            "path": input_abs.strip_prefix(&project_root).unwrap_or(&input_abs).to_string_lossy().replace('\\', "/"),
+            "kind": input_kind,
+        },
+        "incidents": incident_refs,
+        "triage": {
+            "source": target_source_ref,
+            "contract": target_contract_ref,
+        },
+        "reduction": {
+            "status": reduction_status,
+        },
+        "verify": {
+            "status": verify_status,
+            "diag_path": DEFAULT_VERIFY_DIAG_REPORT_PATH,
+            "summary_path": DEFAULT_VERIFY_SUMMARY_PATH,
+        },
+        "repair": {
+            "status": repair_status,
+            "diag_path": DEFAULT_REPAIR_DIAG_REPORT_PATH,
+            "summary_path": DEFAULT_REPAIR_SUMMARY_PATH,
+            "patchset_path": DEFAULT_REPAIR_PATCHSET_PATH,
+        },
+        "certify": {
+            "status": certify_status,
+        },
+        "governance": {
+            "write_requested": args.write,
+            "spec_change_detected": spec_change_detected,
+            "spec_change_allowed": args.allow_spec_change,
+            "applied": applied,
+        },
+        "files": files,
+    });
+
+    if let Some(obj) = summary.get_mut("reduction").and_then(Value::as_object_mut) {
+        if let Some(path) = repro_min_path_rel.clone() {
+            obj.insert("repro_min_path".to_string(), Value::String(path));
+        }
+        if let Some(path) = reduction_report_path_rel.clone() {
+            obj.insert("report_path".to_string(), Value::String(path));
+        }
+    }
+
+    if certify_status != "skipped" {
+        if let Some(obj) = summary.get_mut("certify").and_then(Value::as_object_mut) {
+            obj.insert(
+                "diag_path".to_string(),
+                Value::String(DEFAULT_CERT_DIAG_REPORT_PATH.to_string()),
+            );
+            obj.insert(
+                "summary_path".to_string(),
+                Value::String("target/xtal/cert/summary.json".to_string()),
+            );
+            obj.insert(
+                "bundle_path".to_string(),
+                Value::String("target/xtal/cert/bundle.json".to_string()),
+            );
+        }
+    }
+
+    let schema_diags = report_common::validate_schema(
+        IMPROVE_SUMMARY_SCHEMA_BYTES,
+        "spec/x07.xtal.improve_summary@0.1.0.schema.json",
+        &summary,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "internal error: xtal improve summary JSON is not schema-valid: {}",
+            schema_diags[0].message
+        );
+    }
+
+    write_improve_summary(&project_root, &args.out_dir, &summary)?;
+
+    report.meta.insert(
+        "improve_out_dir".to_string(),
+        Value::String(args.out_dir.display().to_string()),
+    );
+    report.meta.insert(
+        "improve_summary_path".to_string(),
+        Value::String(
+            project_root
+                .join(&args.out_dir)
+                .join("summary.json")
+                .strip_prefix(&project_root)
+                .unwrap_or(&project_root.join(&args.out_dir).join("summary.json"))
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+    );
+    report
+        .meta
+        .insert("improve_incident_id".to_string(), Value::String(target_id));
+    report.meta.insert(
+        "shadow_manifest".to_string(),
+        Value::String(shadow_manifest_rel),
+    );
+
+    write_improve_diag_report(&project_root, &report)?;
     write_report(machine, &report)?;
 
     Ok(if report.ok {
@@ -1480,12 +2939,17 @@ fn write_cert_bundle_manifest(
 fn build_ingest_summary_value(
     project_root: &Path,
     out_dir: &Path,
-    input_kind: &str,
     input_abs: &Path,
-    incident_id: &str,
-    violation_doc: &Value,
+    loaded: &LoadedIngestInputs,
     incident_dir_abs: &Path,
 ) -> Result<Value> {
+    let input_kind = loaded.input_kind.as_str();
+    let input_files = loaded.input_files.as_slice();
+    let integrity = &loaded.integrity;
+    let incident_id = loaded.incident_id.as_str();
+    let violation_doc = &loaded.violation_doc;
+    let repro_bytes = loaded.repro_bytes.as_slice();
+
     let out_dir_rel = out_dir.to_string_lossy().replace('\\', "/");
     let out_dir_rel_trim = out_dir_rel.trim_end_matches('/');
 
@@ -1519,13 +2983,65 @@ fn build_ingest_summary_value(
     if repro_abs.is_file() {
         files.push(file_digest_rel_value(project_root, &repro_abs)?);
     }
+    let events_abs = incident_dir_abs.join("events.jsonl");
+    if events_abs.is_file() {
+        files.push(file_digest_rel_value(project_root, &events_abs)?);
+    }
     files.sort_by(|a, b| {
         let ap = a.get("path").and_then(Value::as_str).unwrap_or("");
         let bp = b.get("path").and_then(Value::as_str).unwrap_or("");
         ap.cmp(bp)
     });
 
-    let doc = json!({
+    let mut input_violation_digest: Option<Value> = None;
+    let mut input_repro_digest: Option<Value> = None;
+    let mut input_events_digest: Option<Value> = None;
+    for d in input_files {
+        let p = d.get("path").and_then(Value::as_str).unwrap_or("");
+        if p.ends_with("/violation.json") || p == "violation.json" {
+            input_violation_digest = Some(d.clone());
+        } else if p.ends_with("/repro.json") || p == "repro.json" {
+            input_repro_digest = Some(d.clone());
+        } else if p.ends_with("/events.jsonl") || p == "events.jsonl" {
+            input_events_digest = Some(d.clone());
+        }
+    }
+
+    let mut ingested_violation_digest: Option<Value> = None;
+    let mut ingested_repro_digest: Option<Value> = None;
+    let mut ingested_events_digest: Option<Value> = None;
+    for d in &files {
+        let p = d.get("path").and_then(Value::as_str).unwrap_or("");
+        if p.ends_with("/violation.json") || p == "violation.json" {
+            ingested_violation_digest = Some(d.clone());
+        } else if p.ends_with("/repro.json") || p == "repro.json" {
+            ingested_repro_digest = Some(d.clone());
+        } else if p.ends_with("/events.jsonl") || p == "events.jsonl" {
+            ingested_events_digest = Some(d.clone());
+        }
+    }
+
+    let repro_doc: Value = serde_json::from_slice(repro_bytes).context("parse repro bytes")?;
+    let tool_ref = repro_doc.get("tool").cloned();
+    let source_ref = repro_doc.get("source").cloned();
+    let contract_ref = repro_doc
+        .pointer("/contract")
+        .and_then(Value::as_object)
+        .map(|c| {
+            let witness_count = c
+                .get("witness")
+                .and_then(Value::as_array)
+                .map(|w| w.len() as u64)
+                .unwrap_or(0);
+            json!({
+                "fn": c.get("fn").cloned().unwrap_or(Value::Null),
+                "contract_kind": c.get("contract_kind").cloned().unwrap_or(Value::Null),
+                "clause_ptr": c.get("clause_ptr").cloned().unwrap_or(Value::Null),
+                "witness_count": witness_count,
+            })
+        });
+
+    let mut doc = json!({
         "schema_version": INGEST_SUMMARY_SCHEMA_VERSION,
         "generated_at": "2000-01-01T00:00:00Z",
         "ok": true,
@@ -1542,7 +3058,41 @@ fn build_ingest_summary_value(
             "world": world,
         },
         "files": files,
+        "integrity": integrity,
     });
+
+    if let Some(obj) = doc.get_mut("input").and_then(Value::as_object_mut) {
+        if let Some(v) = input_violation_digest {
+            obj.insert("violation".to_string(), v);
+        }
+        if let Some(r) = input_repro_digest {
+            obj.insert("repro".to_string(), r);
+        }
+        if let Some(e) = input_events_digest {
+            obj.insert("events".to_string(), e);
+        }
+    }
+
+    if let Some(obj) = doc.get_mut("ingested").and_then(Value::as_object_mut) {
+        if let Some(v) = ingested_violation_digest {
+            obj.insert("violation".to_string(), v);
+        }
+        if let Some(r) = ingested_repro_digest {
+            obj.insert("repro".to_string(), r);
+        }
+        if let Some(e) = ingested_events_digest {
+            obj.insert("events".to_string(), e);
+        }
+        if let Some(t) = tool_ref {
+            obj.insert("tool".to_string(), t);
+        }
+        if let Some(s) = source_ref {
+            obj.insert("source".to_string(), s);
+        }
+        if let Some(c) = contract_ref {
+            obj.insert("contract".to_string(), c);
+        }
+    }
 
     let schema_diags = report_common::validate_schema(
         INGEST_SUMMARY_SCHEMA_BYTES,
@@ -1827,6 +3377,13 @@ fn cmd_xtal_dev(
         report.ok = false;
     }
     if !impl_ok {
+        report.ok = false;
+    }
+    if report
+        .diagnostics
+        .iter()
+        .any(|d| matches!(d.severity, diagnostics::Severity::Error))
+    {
         report.ok = false;
     }
     report.meta.insert(
