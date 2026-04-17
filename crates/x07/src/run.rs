@@ -736,48 +736,36 @@ pub fn cmd_run(
 
     if exit_code != 0 {
         if let Ok(report) = serde_json::from_slice::<Value>(&output.stdout) {
-            if let Some(trap) = extract_trap_from_runner_report(&report) {
-                if let Ok(Some(info)) = crate::contract_repro::try_parse_contract_trap(trap) {
-                    let input_bytes =
-                        read_input_bytes_for_repro(&cwd, input_path_for_repro.as_deref())
-                            .unwrap_or_default();
-                    let max_output_bytes_effective = max_output_bytes.unwrap_or(1024 * 1024);
-                    let cpu_time_limit_seconds_effective = cpu_time_limit_seconds.unwrap_or(5);
+            if let Some(info) = extract_contract_trap_info_from_runner_report(&report) {
+                let input_bytes = read_input_bytes_for_repro(&cwd, input_path_for_repro.as_deref())
+                    .unwrap_or_default();
+                let max_output_bytes_effective = max_output_bytes.unwrap_or(1024 * 1024);
+                let cpu_time_limit_seconds_effective = cpu_time_limit_seconds.unwrap_or(5);
 
-                    let test_entry = project_manifest
-                        .as_deref()
-                        .and_then(|p| project::load_project_manifest(p).ok())
-                        .and_then(|m| m.operational_entry_symbol);
+                let test_entry = project_manifest
+                    .as_deref()
+                    .and_then(|p| project::load_project_manifest(p).ok())
+                    .and_then(|m| m.operational_entry_symbol);
 
-                    let (repro_world, repro_fixture_rr_dir) =
-                        if matches!(world, WorldId::RunOs | WorldId::RunOsSandboxed) {
-                            let root = project_root.as_deref().unwrap_or(&cwd);
-                            let rr_src_dir = root.join(".x07_rr");
-                            let clause_dir = crate::util::safe_artifact_dir_name(&info.clause_id);
-                            let rr_capture_rel = PathBuf::from(".x07")
-                                .join("artifacts")
-                                .join("contract")
-                                .join(&clause_dir)
-                                .join("rr");
-                            let rr_capture_abs = root.join(&rr_capture_rel);
+                let (repro_world, repro_fixture_rr_dir) =
+                    if matches!(world, WorldId::RunOs | WorldId::RunOsSandboxed) {
+                        let root = project_root.as_deref().unwrap_or(&cwd);
+                        let rr_src_dir = root.join(".x07_rr");
+                        let clause_dir = crate::util::safe_artifact_dir_name(&info.clause_id);
+                        let rr_capture_rel = PathBuf::from(".x07")
+                            .join("artifacts")
+                            .join("contract")
+                            .join(&clause_dir)
+                            .join("rr");
+                        let rr_capture_abs = root.join(&rr_capture_rel);
 
-                            let _ = std::fs::remove_dir_all(&rr_capture_abs);
-                            if rr_src_dir.is_dir() {
-                                if let Err(err) =
-                                    x07_vm::copy_dir_recursive(&rr_src_dir, &rr_capture_abs)
-                                {
-                                    let msg = format!(
-                                        "x07 run: failed to copy .x07_rr into {}: {err}\n",
-                                        rr_capture_abs.display()
-                                    );
-                                    let _ = std::io::Write::write_all(
-                                        &mut std::io::stderr(),
-                                        msg.as_bytes(),
-                                    );
-                                }
-                            } else if let Err(err) = std::fs::create_dir_all(&rr_capture_abs) {
+                        let _ = std::fs::remove_dir_all(&rr_capture_abs);
+                        if rr_src_dir.is_dir() {
+                            if let Err(err) =
+                                x07_vm::copy_dir_recursive(&rr_src_dir, &rr_capture_abs)
+                            {
                                 let msg = format!(
-                                    "x07 run: failed to create rr fixture dir {}: {err}\n",
+                                    "x07 run: failed to copy .x07_rr into {}: {err}\n",
                                     rr_capture_abs.display()
                                 );
                                 let _ = std::io::Write::write_all(
@@ -785,55 +773,62 @@ pub fn cmd_run(
                                     msg.as_bytes(),
                                 );
                             }
+                        } else if let Err(err) = std::fs::create_dir_all(&rr_capture_abs) {
+                            let msg = format!(
+                                "x07 run: failed to create rr fixture dir {}: {err}\n",
+                                rr_capture_abs.display()
+                            );
+                            let _ =
+                                std::io::Write::write_all(&mut std::io::stderr(), msg.as_bytes());
+                        }
 
-                            (WorldId::SolveRr, Some(rr_capture_rel))
-                        } else {
-                            (world, fixtures.rr_dir.clone())
-                        };
-
-                    let runner_cfg = RunnerConfig {
-                        world: repro_world,
-                        fixture_fs_dir: fixtures.fs_dir.clone(),
-                        fixture_fs_root: fixtures.fs_root.clone(),
-                        fixture_fs_latency_index: fixtures.fs_latency_index.clone(),
-                        fixture_rr_dir: repro_fixture_rr_dir,
-                        fixture_kv_dir: fixtures.kv_dir.clone(),
-                        fixture_kv_seed: fixtures.kv_seed.clone(),
-                        solve_fuel,
-                        max_memory_bytes,
-                        max_output_bytes: max_output_bytes_effective,
-                        cpu_time_limit_seconds: cpu_time_limit_seconds_effective,
-                        debug_borrow_checks: args.debug_borrow_checks,
+                        (WorldId::SolveRr, Some(rr_capture_rel))
+                    } else {
+                        (world, fixtures.rr_dir.clone())
                     };
 
-                    let repro_root = project_root
-                        .as_deref()
-                        .unwrap_or(&cwd)
-                        .join(".x07")
-                        .join("artifacts");
-                    let source = crate::contract_repro::SourceInfo {
-                        mode: "x07run".to_string(),
-                        tests_manifest_path: None,
-                        test_id: None,
-                        test_entry,
-                        target_kind: Some(target_kind.as_str().to_string()),
-                        target_path: Some(target_path.display().to_string()),
-                    };
-                    if let Ok(repro_path) = crate::contract_repro::write_repro(
-                        &repro_root,
-                        repro_world.as_str(),
-                        &runner_cfg,
-                        &input_bytes,
-                        info.payload,
-                        source,
-                        &info.clause_id,
-                    ) {
-                        let root = project_root.as_deref().unwrap_or(&cwd);
-                        let _ = crate::xtal_violation::maybe_write_contract_violation_bundle(
-                            root,
-                            &repro_path,
-                        );
-                    }
+                let runner_cfg = RunnerConfig {
+                    world: repro_world,
+                    fixture_fs_dir: fixtures.fs_dir.clone(),
+                    fixture_fs_root: fixtures.fs_root.clone(),
+                    fixture_fs_latency_index: fixtures.fs_latency_index.clone(),
+                    fixture_rr_dir: repro_fixture_rr_dir,
+                    fixture_kv_dir: fixtures.kv_dir.clone(),
+                    fixture_kv_seed: fixtures.kv_seed.clone(),
+                    solve_fuel,
+                    max_memory_bytes,
+                    max_output_bytes: max_output_bytes_effective,
+                    cpu_time_limit_seconds: cpu_time_limit_seconds_effective,
+                    debug_borrow_checks: args.debug_borrow_checks,
+                };
+
+                let repro_root = project_root
+                    .as_deref()
+                    .unwrap_or(&cwd)
+                    .join(".x07")
+                    .join("artifacts");
+                let source = crate::contract_repro::SourceInfo {
+                    mode: "x07run".to_string(),
+                    tests_manifest_path: None,
+                    test_id: None,
+                    test_entry,
+                    target_kind: Some(target_kind.as_str().to_string()),
+                    target_path: Some(target_path.display().to_string()),
+                };
+                if let Ok(repro_path) = crate::contract_repro::write_repro(
+                    &repro_root,
+                    repro_world.as_str(),
+                    &runner_cfg,
+                    &input_bytes,
+                    info.payload,
+                    source,
+                    &info.clause_id,
+                ) {
+                    let root = project_root.as_deref().unwrap_or(&cwd);
+                    let _ = crate::xtal_violation::maybe_write_contract_violation_bundle(
+                        root,
+                        &repro_path,
+                    );
                 }
             }
         }
@@ -1626,6 +1621,68 @@ fn extract_trap_from_runner_report(report: &Value) -> Option<&str> {
         .and_then(Value::as_str)
 }
 
+fn extract_contract_trap_info_from_runner_report(
+    report: &Value,
+) -> Option<crate::contract_repro::ContractTrapInfo> {
+    if let Some(trap) = extract_trap_from_runner_report(report) {
+        if let Ok(Some(info)) = crate::contract_repro::try_parse_contract_trap(trap) {
+            return Some(info);
+        }
+    }
+
+    let candidates = [
+        report.get("stderr_b64").and_then(Value::as_str),
+        report
+            .get("solve")
+            .and_then(|solve| solve.get("stderr_b64"))
+            .and_then(Value::as_str),
+        report
+            .get("compile")
+            .and_then(|compile| compile.get("stderr_b64"))
+            .and_then(Value::as_str),
+    ];
+    for b64 in candidates.into_iter().flatten() {
+        let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64) else {
+            continue;
+        };
+        let Some(trap_line) = extract_contract_trap_line_from_stderr(&bytes) else {
+            continue;
+        };
+        if let Ok(Some(info)) = crate::contract_repro::try_parse_contract_trap(&trap_line) {
+            return Some(info);
+        }
+    }
+
+    None
+}
+
+fn extract_contract_trap_line_from_stderr(stderr: &[u8]) -> Option<String> {
+    const PREFIX: &[u8] = b"X07T_CONTRACT_V1 ";
+    let Some(start) = stderr
+        .windows(PREFIX.len())
+        .position(|window| window == PREFIX)
+    else {
+        return None;
+    };
+
+    let mut end = stderr[start..]
+        .iter()
+        .position(|&b| b == b'\n')
+        .map(|offset| start + offset)
+        .unwrap_or(stderr.len());
+    if end > start && stderr[end - 1] == b'\r' {
+        end -= 1;
+    }
+
+    let line = std::str::from_utf8(&stderr[start..end]).ok()?;
+    let line = line.trim();
+    if line.is_empty() {
+        None
+    } else {
+        Some(line.to_string())
+    }
+}
+
 fn parse_compile_error_from_runner_stdout(stdout: &[u8]) -> Option<String> {
     let doc: Value = serde_json::from_slice(stdout).ok()?;
     doc.get("compile")?
@@ -1757,5 +1814,27 @@ fn collect_pointers<'a>(message: &'a str, key: &str, out: &mut Vec<&'a str>) {
             out.push(ptr);
         }
         rest = &rest[end..];
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine;
+
+    #[test]
+    fn extract_contract_trap_info_falls_back_to_stderr_b64() {
+        let stderr_bytes = b"noise\nX07T_CONTRACT_V1 {\"clause_id\":\"req1\"}\nmore noise\n";
+        let stderr_b64 = base64::engine::general_purpose::STANDARD.encode(stderr_bytes);
+        let report = serde_json::json!({
+            "solve": {
+                "trap": "runtime trap",
+                "stderr_b64": stderr_b64,
+            }
+        });
+
+        let info =
+            extract_contract_trap_info_from_runner_report(&report).expect("expected trap info");
+        assert_eq!(info.clause_id, "req1");
     }
 }
