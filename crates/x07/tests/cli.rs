@@ -3239,7 +3239,7 @@ fn x07_run_os_contract_violation_emits_rr_replayable_repro() {
             "limits": {
                 "cpu_ms": 1000,
                 "wall_ms": 1000,
-                "mem_bytes": 1048576,
+                "mem_bytes": 67108864,
                 "fds": 16,
                 "procs": 8
             },
