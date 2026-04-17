@@ -1658,12 +1658,9 @@ fn extract_contract_trap_info_from_runner_report(
 
 fn extract_contract_trap_line_from_stderr(stderr: &[u8]) -> Option<String> {
     const PREFIX: &[u8] = b"X07T_CONTRACT_V1 ";
-    let Some(start) = stderr
+    let start = stderr
         .windows(PREFIX.len())
-        .position(|window| window == PREFIX)
-    else {
-        return None;
-    };
+        .position(|window| window == PREFIX)?;
 
     let mut end = stderr[start..]
         .iter()
