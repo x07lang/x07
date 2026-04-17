@@ -3228,67 +3228,6 @@ fn x07_run_os_contract_violation_emits_rr_replayable_repro() {
         std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
     }
     std::fs::create_dir_all(dir.join("src")).expect("create src dir");
-    std::fs::create_dir_all(dir.join("policy")).expect("create policy dir");
-
-    let policy_path = dir.join("policy").join("run-os.json");
-    write_json(
-        &policy_path,
-        &serde_json::json!({
-            "schema_version": "x07.run-os-policy@0.1.0",
-            "policy_id": "x07_run_os_contract_repro_rr",
-            "limits": {
-                "cpu_ms": 1000,
-                "wall_ms": 1000,
-                "mem_bytes": 67108864,
-                "fds": 16,
-                "procs": 8
-            },
-            "fs": {
-                "enabled": false,
-                "read_roots": [],
-                "write_roots": [],
-                "deny_hidden": true
-            },
-            "net": {
-                "enabled": false,
-                "allow_dns": false,
-                "allow_tcp": false,
-                "allow_udp": false,
-                "allow_hosts": []
-            },
-            "env": {
-                "enabled": false,
-                "allow_keys": [],
-                "deny_keys": []
-            },
-            "time": {
-                "enabled": false,
-                "allow_monotonic": false,
-                "allow_wall_clock": false,
-                "allow_sleep": false,
-                "max_sleep_ms": 0,
-                "allow_local_tzid": false
-            },
-            "process": {
-                "enabled": false,
-                "allow_spawn": false,
-                "max_live": 0,
-                "max_spawns": 0,
-                "allow_exec": false,
-                "allow_exit": false
-            },
-            "language": {
-                "allow_unsafe": false,
-                "allow_ffi": false
-            },
-            "threads": {
-                "enabled": false,
-                "max_workers": 0,
-                "max_blocking": 0,
-                "max_queue": 0
-            }
-        }),
-    );
 
     let project_doc = serde_json::json!({
         "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
@@ -3302,6 +3241,16 @@ fn x07_run_os_contract_violation_emits_rr_replayable_repro() {
     let project_bytes = serde_json::to_vec(&project_doc).expect("serialize x07.json");
     write_json(&dir.join("x07.json"), &project_doc);
     write_lockfile_for_project_bytes(&dir, &project_bytes);
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "cli"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let policy_path = dir.join(".x07/policies/base/cli.sandbox.base.policy.json");
 
     write_json(
         &dir.join("src").join("main.x07.json"),
