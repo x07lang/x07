@@ -6,6 +6,14 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## v0.2.4
+
+### Added
+
 - XTAL tooling:
   - `x07 xtal spec fmt|lint|check|extract|scaffold` for authoring, validating, and extracting `*.x07spec.json` modules and `*.x07spec.examples.jsonl`.
   - `x07 xtal tests gen-from-spec` for generating deterministic unit tests from spec examples and property checks from `ensures_props` under `gen/xtal/`.
