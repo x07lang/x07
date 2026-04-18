@@ -1,0 +1,20 @@
+{
+  "clause_id": "e0",
+  "generated_at": "2000-01-01T00:00:00Z",
+  "id": "e45dfa369b1cb2de397cdb98ae32c8b94c4ee832bf4bfeb5b05dbbd9dfebb12b",
+  "kind": "contract_violation",
+  "original_repro_path": "target/x07test/contract/id_5c88e7a226e11ad1204cb8d30cd5d6ff6cba69bc32da73134928e17c90c54086/repro.json",
+  "repro": {
+    "bytes_len": 853,
+    "path": "repro.json",
+    "sha256": "e45dfa369b1cb2de397cdb98ae32c8b94c4ee832bf4bfeb5b05dbbd9dfebb12b"
+  },
+  "schema_version": "x07.xtal.violation@0.1.0",
+  "source": {
+    "mode": "x07test",
+    "test_entry": "gen.xtal.fixture.tests.ex_0001",
+    "test_id": "xtal/fixture/op.fixture.main.v1/ex0001",
+    "tests_manifest_path": "/private/var/folders/wl/hvyvdld118598zmpz_pgn2v00000gp/T/x07_xtal_improve_toy.WrW5njI8pM/xtal_improve_toy_bug/gen/xtal/tests.json"
+  },
+  "world": "solve-pure"
+}

@@ -1,0 +1,30 @@
+{
+  "contract": {
+    "clause_id": "e0",
+    "clause_index": 0,
+    "clause_ptr": "/decls/1/ensures/0/expr",
+    "contract_kind": "ensures",
+    "fn": "fixture.main",
+    "witness": []
+  },
+  "input_bytes_b64": "",
+  "runner": {
+    "cpu_time_limit_seconds": 5,
+    "debug_borrow_checks": false,
+    "max_memory_bytes": 67108864,
+    "max_output_bytes": 1048576,
+    "solve_fuel": 400000000
+  },
+  "schema_version": "x07.contract.repro@0.1.0",
+  "source": {
+    "mode": "x07test",
+    "test_entry": "gen.xtal.fixture.tests.ex_0001",
+    "test_id": "xtal/fixture/op.fixture.main.v1/ex0001",
+    "tests_manifest_path": "/private/var/folders/wl/hvyvdld118598zmpz_pgn2v00000gp/T/x07_xtal_improve_toy.WrW5njI8pM/xtal_improve_toy_bug/gen/xtal/tests.json"
+  },
+  "tool": {
+    "x07_version": "0.2.3",
+    "x07c_version": "0.2.3"
+  },
+  "world": "solve-pure"
+}
