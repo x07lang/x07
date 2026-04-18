@@ -10,6 +10,10 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+## v0.2.5
+
+### Fixed
+
 - `x07 run` now emits contract repro artifacts for `run-os*` worlds even when the runner trap field is non-contract output (by extracting `X07T_CONTRACT_V1 ...` from captured stderr when needed).
 
 ## v0.2.4
