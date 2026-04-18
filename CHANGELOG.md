@@ -10,6 +10,14 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+## v0.2.8
+
+### Fixed
+
+- Release CI now includes the XTAL improve fixture incident bundle used by `scripts/ci/check_xtal_improve.sh`.
+- `scripts/bump_toolchain_version.py` now refreshes `ci/fixtures/**/x07.lock.json` lockfiles during version bumps so canary lock checks stay consistent.
+- `scripts/ci/check_threads_smoke.sh` now prints `x07 pkg lock --check` output on failure to speed up debugging.
+
 ## v0.2.7
 
 ### Fixed
