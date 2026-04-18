@@ -2389,12 +2389,14 @@ fn render_catalog_markdown(catalog: &CatalogDoc) -> String {
 
         if !entry.doc.details_md.trim().is_empty() {
             out.push_str("Details:\n\n");
-            out.push_str(entry.doc.details_md.trim());
+            out.push_str(&render_doc_markdown_mdx_safe(entry.doc.details_md.trim()));
             out.push_str("\n\n");
         }
         if !entry.doc.agent_strategy_md.trim().is_empty() {
             out.push_str("Agent strategy:\n\n");
-            out.push_str(entry.doc.agent_strategy_md.trim());
+            out.push_str(&render_doc_markdown_mdx_safe(
+                entry.doc.agent_strategy_md.trim(),
+            ));
             out.push_str("\n\n");
         }
         if !entry.examples.is_empty() {
@@ -2412,8 +2414,72 @@ fn render_catalog_markdown(catalog: &CatalogDoc) -> String {
     out
 }
 
+fn render_doc_markdown_mdx_safe(doc: &str) -> String {
+    doc.lines()
+        .map(render_doc_markdown_mdx_safe_line)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn render_doc_markdown_mdx_safe_line(line: &str) -> String {
+    const TRIGGERS: [&str; 4] = [
+        "Valid form:",
+        "Valid forms:",
+        "Rewrite to the binary form:",
+        "nest left-associatively:",
+    ];
+    if !TRIGGERS.iter().any(|trigger| line.contains(trigger)) {
+        return line.to_string();
+    }
+    let Some(open_bracket) = line.find('[') else {
+        return line.to_string();
+    };
+
+    let (prefix, suffix) = line.split_at(open_bracket);
+    if prefix.ends_with('`') {
+        return line.to_string();
+    }
+    if !suffix.contains('<') {
+        return line.to_string();
+    }
+
+    format!("{prefix}`{suffix}`")
+}
+
 fn escape_md_table(input: &str) -> String {
     input.replace('|', "\\|").replace('\n', "<br/>")
+}
+
+#[cfg(test)]
+mod mdx_safe_tests {
+    use super::{render_doc_markdown_mdx_safe, render_doc_markdown_mdx_safe_line};
+
+    #[test]
+    fn mdx_safe_line_wraps_valid_form_suffix_in_code_span() {
+        assert_eq!(
+            render_doc_markdown_mdx_safe_line("Valid form: [\"<op>\", <a>, <b>]."),
+            "Valid form: `[\"<op>\", <a>, <b>].`"
+        );
+        assert_eq!(
+            render_doc_markdown_mdx_safe_line(
+                "- For n-ary uses, nest left-associatively: [\"<op>\", [\"<op>\", a, b], c]."
+            ),
+            "- For n-ary uses, nest left-associatively: `[\"<op>\", [\"<op>\", a, b], c].`"
+        );
+    }
+
+    #[test]
+    fn mdx_safe_line_is_idempotent_for_already_wrapped_forms() {
+        assert_eq!(
+            render_doc_markdown_mdx_safe_line("Valid form: `[\"<op>\", <a>, <b>].`"),
+            "Valid form: `[\"<op>\", <a>, <b>].`"
+        );
+    }
+
+    #[test]
+    fn mdx_safe_doc_preserves_newlines() {
+        assert_eq!(render_doc_markdown_mdx_safe("a\nb\n"), "a\nb");
+    }
 }
 
 fn parse_severity_filter(raw: &str) -> Result<BTreeSet<CatalogSeverity>> {
