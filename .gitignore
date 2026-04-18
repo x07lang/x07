@@ -57,6 +57,7 @@ docs/examples/**/target/cert/
 docs/examples/**/out/
 
 # Fixture tool caches
+ci/fixtures/**/.x07/
 tests/fixtures/**/.x07/
 crates/**/tests/fixtures/**/.x07/
 

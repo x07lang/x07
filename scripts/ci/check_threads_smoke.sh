@@ -125,7 +125,16 @@ rm -rf .x07/deps/ext-curl-c/0.1.3
 mkdir -p .x07/deps/ext-curl-c
 cp -R "$root/packages/ext/x07-ext-curl-c/0.1.3" .x07/deps/ext-curl-c/0.1.3
 
-"$x07_bin" pkg lock --check --offline --project x07.json >/dev/null
+lock_stdout="$tmp_dir/pkg.lock.stdout.log"
+lock_stderr="$tmp_dir/pkg.lock.stderr.log"
+if ! "$x07_bin" pkg lock --check --offline --project x07.json >"$lock_stdout" 2>"$lock_stderr"; then
+  echo "ERROR: pkg lock --check --offline failed for threads-http-barrier fixture" >&2
+  echo "=== x07 pkg lock stdout ===" >&2
+  cat "$lock_stdout" >&2 || true
+  echo "=== x07 pkg lock stderr ===" >&2
+  cat "$lock_stderr" >&2 || true
+  exit 1
+fi
 
 "$x07_bin" policy init \
   --project x07.json \

@@ -288,9 +288,45 @@ def ensure_docs_example_lockfiles(repo_root: Path, *, new_version: str, check: b
     mismatched = [str(p.relative_to(repo_root)) for p in lockfiles if is_mismatched(p)]
     if check:
         return mismatched
+    if not mismatched:
+        return []
 
     subprocess.run(
         [sys.executable, "scripts/upgrade_docs_example_lockfiles.py", "--write"],
+        cwd=repo_root,
+        check=True,
+    )
+    return mismatched
+
+
+def ensure_ci_fixture_lockfiles(repo_root: Path, *, new_version: str, check: bool) -> list[str]:
+    fixtures_root = repo_root / "ci" / "fixtures"
+    if not fixtures_root.is_dir():
+        return []
+    lockfiles = sorted(fixtures_root.rglob("x07.lock.json"))
+    if not lockfiles:
+        return []
+
+    def is_mismatched(path: Path) -> bool:
+        try:
+            doc = read_json(path)
+        except json.JSONDecodeError:
+            return True
+        if not isinstance(doc, dict):
+            return True
+        toolchain = doc.get("toolchain")
+        if not isinstance(toolchain, dict):
+            return True
+        return toolchain.get("x07_version") != new_version or toolchain.get("x07c_version") != new_version
+
+    mismatched = [str(p.relative_to(repo_root)) for p in lockfiles if is_mismatched(p)]
+    if check:
+        return mismatched
+    if not mismatched:
+        return []
+
+    subprocess.run(
+        [sys.executable, "scripts/upgrade_docs_example_lockfiles.py", "--root", "ci/fixtures", "--write"],
         cwd=repo_root,
         check=True,
     )
@@ -372,6 +408,7 @@ def main(argv: list[str]) -> int:
     changed.extend(rel for rel in release_metadata_updates if rel is not None)
 
     changed.extend(ensure_docs_example_lockfiles(repo_root, new_version=new_version, check=args.check))
+    changed.extend(ensure_ci_fixture_lockfiles(repo_root, new_version=new_version, check=args.check))
 
     registry_repo_root = repo_root.parent / "x07-registry"
     registry_cargo = registry_repo_root / "Cargo.toml"
