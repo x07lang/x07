@@ -265,6 +265,38 @@ def ensure_generated_versions_json(repo_root: Path, *, new_version: str, check: 
     return rel
 
 
+def ensure_docs_example_lockfiles(repo_root: Path, *, new_version: str, check: bool) -> list[str]:
+    docs_root = repo_root / "docs" / "examples"
+    if not docs_root.is_dir():
+        return []
+    lockfiles = sorted(docs_root.rglob("x07.lock.json"))
+    if not lockfiles:
+        return []
+
+    def is_mismatched(path: Path) -> bool:
+        try:
+            doc = read_json(path)
+        except json.JSONDecodeError:
+            return True
+        if not isinstance(doc, dict):
+            return True
+        toolchain = doc.get("toolchain")
+        if not isinstance(toolchain, dict):
+            return True
+        return toolchain.get("x07_version") != new_version or toolchain.get("x07c_version") != new_version
+
+    mismatched = [str(p.relative_to(repo_root)) for p in lockfiles if is_mismatched(p)]
+    if check:
+        return mismatched
+
+    subprocess.run(
+        [sys.executable, "scripts/upgrade_docs_example_lockfiles.py", "--write"],
+        cwd=repo_root,
+        check=True,
+    )
+    return mismatched
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True, help="New release tag (for example: v0.0.21)")
@@ -338,6 +370,8 @@ def main(argv: list[str]) -> int:
         ensure_generated_versions_json(repo_root, new_version=new_version, check=args.check),
     ]
     changed.extend(rel for rel in release_metadata_updates if rel is not None)
+
+    changed.extend(ensure_docs_example_lockfiles(repo_root, new_version=new_version, check=args.check))
 
     registry_repo_root = repo_root.parent / "x07-registry"
     registry_cargo = registry_repo_root / "Cargo.toml"

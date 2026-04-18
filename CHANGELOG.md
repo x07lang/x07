@@ -10,6 +10,12 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+## v0.2.7
+
+### Fixed
+
+- `docs/examples/**/x07.lock.json` lockfiles are now refreshed during version bumps so `x07 pkg lock --check` stays consistent for docs projects.
+
 ## v0.2.6
 
 ### Fixed
