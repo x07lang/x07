@@ -10,6 +10,13 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+## v0.2.9
+
+### Fixed
+
+- Formal verification perf budgets refreshed for `verified_core_fixture.prove` so release-readiness CI stays consistent.
+- `labs/scripts/ci/check_formal_verification_perf.py` now supports `--enforce` and `--scenario` for faster local CI reproduction.
+
 ## v0.2.8
 
 ### Fixed
