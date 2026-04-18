@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use clap::Args;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -257,6 +257,8 @@ pub enum PkgCommand {
     CheckSemver(CheckSemverArgs),
     /// List available packages from a local `file://` sparse index mirror.
     List(ListArgs),
+    /// Emit a local toolchain inventory (stdlib + official ext packages).
+    Inventory(InventoryArgs),
     /// Pack a local package directory into a publishable archive.
     Pack(PackArgs),
     /// Resolve project dependencies and write `x07.lock.json`.
@@ -397,6 +399,13 @@ pub struct ListArgs {
     /// Disallow network access (requires a `file://` registry index).
     #[arg(long)]
     pub offline: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct InventoryArgs {
+    /// Toolchain root directory (defaults to auto-detect).
+    #[arg(long, value_name = "DIR")]
+    pub toolchain_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -698,6 +707,7 @@ pub fn cmd_pkg(
         PkgCommand::Verify(args) => cmd_pkg_verify(args),
         PkgCommand::CheckSemver(args) => cmd_pkg_check_semver(args),
         PkgCommand::List(args) => cmd_pkg_list(args),
+        PkgCommand::Inventory(args) => cmd_pkg_inventory(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(machine, args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
         PkgCommand::Tree(args) => cmd_pkg_tree(args),
@@ -2069,6 +2079,219 @@ fn pkg_list_report(args: &ListArgs) -> Result<(std::process::ExitCode, PkgReport
         error: None,
     };
     Ok((std::process::ExitCode::SUCCESS, report))
+}
+
+#[derive(Debug, Deserialize)]
+struct PackageManifestLite {
+    name: String,
+    version: String,
+    module_root: String,
+    #[serde(default)]
+    modules: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct InventoryItem {
+    kind: &'static str,
+    name: String,
+    version: String,
+    module_root: String,
+    module_count: usize,
+    modules: Vec<String>,
+    path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    versions_available: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize)]
+struct InventoryCounts {
+    stdlib_package_versions: usize,
+    ext_packages: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct InventoryError {
+    code: String,
+    message: String,
+}
+
+#[derive(Debug, Serialize)]
+struct InventoryReport {
+    schema_version: &'static str,
+    ok: bool,
+    toolchain_root: String,
+    stdlib_versions: Vec<InventoryItem>,
+    ext_latest: Vec<InventoryItem>,
+    counts: InventoryCounts,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<InventoryError>,
+}
+
+fn cmd_pkg_inventory(args: InventoryArgs) -> Result<std::process::ExitCode> {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let toolchain_root = if let Some(root) = args.toolchain_root.as_deref() {
+        util::resolve_existing_path_upwards(root)
+    } else {
+        match util::detect_toolchain_root_best_effort(&cwd) {
+            Some(v) => v,
+            None => {
+                let report = InventoryReport {
+                    schema_version: "x07.pkg.inventory@0.1.0",
+                    ok: false,
+                    toolchain_root: "unknown".to_string(),
+                    stdlib_versions: Vec::new(),
+                    ext_latest: Vec::new(),
+                    counts: InventoryCounts {
+                        stdlib_package_versions: 0,
+                        ext_packages: 0,
+                    },
+                    error: Some(InventoryError {
+                        code: "X07PKG_INVENTORY_TOOLCHAIN_ROOT".to_string(),
+                        message: "could not auto-detect toolchain root (expected stdlib.lock)"
+                            .to_string(),
+                    }),
+                };
+                println!("{}", serde_json::to_string(&report)?);
+                return Ok(std::process::ExitCode::from(20));
+            }
+        }
+    };
+
+    let toolchain_root_display = toolchain_root.display().to_string();
+    let stdlib_dir = toolchain_root.join("stdlib");
+    let ext_dir = toolchain_root.join("packages").join("ext");
+    if !stdlib_dir.is_dir() || !ext_dir.is_dir() {
+        let report = InventoryReport {
+            schema_version: "x07.pkg.inventory@0.1.0",
+            ok: false,
+            toolchain_root: toolchain_root_display,
+            stdlib_versions: Vec::new(),
+            ext_latest: Vec::new(),
+            counts: InventoryCounts {
+                stdlib_package_versions: 0,
+                ext_packages: 0,
+            },
+            error: Some(InventoryError {
+                code: "X07PKG_INVENTORY_LAYOUT".to_string(),
+                message: format!(
+                    "expected toolchain layout under {} (missing stdlib/ or packages/ext/)",
+                    toolchain_root.display()
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let mut stdlib_versions: Vec<InventoryItem> = Vec::new();
+    let mut ext_latest: Vec<InventoryItem> = Vec::new();
+
+    let mut stdlib_families: Vec<PathBuf> = std::fs::read_dir(&stdlib_dir)
+        .with_context(|| format!("read dir: {}", stdlib_dir.display()))?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    stdlib_families.sort();
+    for family_dir in stdlib_families {
+        let family_name = family_dir
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        for version_dir in util::semver_dirs_sorted_desc(&family_dir).into_iter().rev() {
+            let manifest_path = version_dir.join("x07-package.json");
+            if !manifest_path.is_file() {
+                continue;
+            }
+            let doc: PackageManifestLite = serde_json::from_slice(&std::fs::read(&manifest_path)?)
+                .with_context(|| format!("parse {}", manifest_path.display()))?;
+            let rel = manifest_path
+                .strip_prefix(&toolchain_root)
+                .unwrap_or(manifest_path.as_path())
+                .to_string_lossy()
+                .replace('\\', "/");
+            let mut modules = doc.modules;
+            modules.sort();
+            modules.dedup();
+            stdlib_versions.push(InventoryItem {
+                kind: "stdlib",
+                name: doc.name,
+                version: doc.version,
+                module_root: doc.module_root,
+                module_count: modules.len(),
+                modules,
+                path: rel,
+                versions_available: None,
+            });
+        }
+        if family_name.is_empty() {
+            continue;
+        }
+    }
+
+    let mut ext_families: Vec<PathBuf> = std::fs::read_dir(&ext_dir)
+        .with_context(|| format!("read dir: {}", ext_dir.display()))?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    ext_families.sort();
+    for family_dir in ext_families {
+        let versions_available = util::semver_dirs_sorted_desc(&family_dir)
+            .into_iter()
+            .map(|p| {
+                p.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        if versions_available.is_empty() {
+            continue;
+        }
+        let latest_dir = family_dir.join(&versions_available[0]);
+        let manifest_path = latest_dir.join("x07-package.json");
+        if !manifest_path.is_file() {
+            continue;
+        }
+        let doc: PackageManifestLite = serde_json::from_slice(&std::fs::read(&manifest_path)?)
+            .with_context(|| format!("parse {}", manifest_path.display()))?;
+        let rel = manifest_path
+            .strip_prefix(&toolchain_root)
+            .unwrap_or(manifest_path.as_path())
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut modules = doc.modules;
+        modules.sort();
+        modules.dedup();
+        let mut versions_available_sorted = versions_available;
+        versions_available_sorted.sort_by_key(|v| util::parse_semver_triplet(v));
+        ext_latest.push(InventoryItem {
+            kind: "ext",
+            name: doc.name,
+            version: doc.version,
+            module_root: doc.module_root,
+            module_count: modules.len(),
+            modules,
+            path: rel,
+            versions_available: Some(versions_available_sorted),
+        });
+    }
+
+    let report = InventoryReport {
+        schema_version: "x07.pkg.inventory@0.1.0",
+        ok: true,
+        toolchain_root: toolchain_root_display,
+        counts: InventoryCounts {
+            stdlib_package_versions: stdlib_versions.len(),
+            ext_packages: ext_latest.len(),
+        },
+        stdlib_versions,
+        ext_latest,
+        error: None,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 fn collect_packages_from_index_dir(index_dir: &Path) -> Result<Vec<String>> {

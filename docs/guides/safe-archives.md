@@ -78,7 +78,7 @@ Before writing any extracted data to disk:
 
 ## Expert appendix
 
-### Corpus regression suite (M4)
+### Corpus regression suite
 
 The repo includes a small security corpus under `tests/corpora/archive/` and a CI gate:
 

@@ -18,6 +18,8 @@ The key point is that X07 does not make a vague promise that "the source is form
 - the operational entry that profile is certifying
 - the exact evidence that profile requires
 
+Quick subset reference: `docs/toolchain/proof-subset.md`.
+
 ## The model
 
 ```mermaid
@@ -106,9 +108,9 @@ Read the current certifiable subset like this:
 
 - Coverage statuses such as `supported`, `supported_async`, and `imported_proof_summary` tell you what x07 can analyze. They do not count as proof by themselves.
 - Pure self-recursive `defn` targets are certifiable when they declare `decreases[]`. Proof artifacts expose `recursion_kind` and `recursion_bound_kind`, so bounded recursion cannot hide behind a generic success bit.
-- Direct prove inputs currently accept unbranded `bytes`, `bytes_view`, and `vec_u8`; first-order `option_*` and `result_*`; and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
-- That means schema-derived record and tagged-union documents can sit directly on the proof boundary as `bytes_view@brand`: the generated verify driver validates first and only then materializes the branded view seen by the proof target.
-- Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
+- Direct prove inputs accept unbranded `bytes`, `bytes_view`, and `vec_u8`; first-order `option_*` and `result_*`; and branded byte carriers (`bytes@B`, `bytes_view@B`, `option_bytes*@B`, `result_bytes*@B`) whose brand resolves through reachable `meta.brands_v1.validate`.
+- That means schema-derived record and tagged-union documents can sit directly on the proof boundary as `bytes_view@brand` (preferred): the generated verify driver validates first and only then materializes the branded view seen by the proof target.
+- Owned branded `bytes` carriers are supported, but `bytes_view@brand` inputs are usually the most proof-friendly shape for public APIs.
 - When a reviewed callee sits outside the currently loaded graph, emit a proof summary from a successful `x07 verify --prove` run and pass it back with `x07 verify --proof-summary <path>`. The deprecated `--summary <path>` alias still maps to `--proof-summary`.
 - Imported primitive stubs are developer-only. Proof runs that depend on `imported_stub` assumptions require `--allow-imported-stubs`, and strong trust profiles reject those assumptions even if a local prove run succeeded.
 - Async coverage distinguishes `supported_async`, `trusted_scheduler_model`, and `capsule_boundary`. Unsupported shapes are rejected with explicit diagnostics instead of being silently treated as trusted.

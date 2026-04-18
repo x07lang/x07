@@ -1,0 +1,3 @@
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.workflow.graph.has_cycle_u32.v1","args":{"n":4,"edges":{"kind":"bytes_b64","b64":"AAAAAAEAAAAAAAAAAgAAAAEAAAADAAAAAgAAAAMAAAA="}},"expect":0,"tags":["smoke","dag"],"doc":"Diamond DAG is acyclic."}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.workflow.graph.has_cycle_u32.v1","args":{"n":3,"edges":{"kind":"bytes_b64","b64":"AAAAAAEAAAABAAAAAgAAAAIAAAAAAAAA"}},"expect":1,"tags":["cycle"],"doc":"Three-cycle is cyclic."}
+{"schema_version":"x07.x07spec_examples@0.1.0","op":"op.workflow.graph.has_cycle_u32.v1","args":{"n":0,"edges":{"kind":"bytes_b64","b64":""}},"expect":0,"tags":["edge"],"doc":"Empty graph is acyclic."}

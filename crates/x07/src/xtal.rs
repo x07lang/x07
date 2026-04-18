@@ -420,6 +420,10 @@ pub struct XtalCertifyArgs {
     /// Skip prechecks (`x07 xtal dev`).
     #[arg(long)]
     pub no_prechecks: bool,
+
+    /// Preserve full test signal after the first failure.
+    #[arg(long)]
+    pub no_fail_fast: bool,
 }
 
 #[derive(Debug, Args)]
@@ -765,6 +769,9 @@ fn cmd_xtal_certify(
             if let Some(baseline) = args.baseline.as_deref() {
                 trust_args.push("--baseline".to_string());
                 trust_args.push(baseline.display().to_string());
+            }
+            if args.no_fail_fast {
+                trust_args.push("--no-fail-fast".to_string());
             }
             for gate in &trust.review_gates {
                 if gate.trim().is_empty() {
@@ -3302,6 +3309,7 @@ fn cmd_xtal_improve(
                                                     all: true,
                                                     baseline: args.baseline.clone(),
                                                     no_prechecks: false,
+                                                    no_fail_fast: false,
                                                 },
                                             )
                                         })?;
@@ -4989,6 +4997,7 @@ fn cmd_xtal_verify(
     let mut prove_timeout: u64 = 0;
     let mut prove_error: u64 = 0;
     let mut prove_tool_missing: u64 = 0;
+    let mut prove_reason_rows: Vec<(String, String, String)> = Vec::new();
 
     let policy_str = args.proof_policy.as_str();
 
@@ -5210,20 +5219,38 @@ fn cmd_xtal_verify(
                                         .and_then(|v| v.get("kind"))
                                         .and_then(Value::as_str)
                                         .unwrap_or("");
-                                    let diag0_code = v
+                                    let result_details = v
+                                        .get("result")
+                                        .and_then(|r| r.get("details"))
+                                        .and_then(Value::as_str)
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let (diag0_code, diag0_message) = v
                                         .get("diagnostics")
                                         .and_then(Value::as_array)
                                         .and_then(|arr| arr.first())
-                                        .and_then(|d| d.get("code"))
-                                        .and_then(Value::as_str)
-                                        .unwrap_or("");
+                                        .map(|d| {
+                                            let code = d
+                                                .get("code")
+                                                .and_then(Value::as_str)
+                                                .unwrap_or("")
+                                                .to_string();
+                                            let message = d
+                                                .get("message")
+                                                .and_then(Value::as_str)
+                                                .unwrap_or("")
+                                                .to_string();
+                                            (code, message)
+                                        })
+                                        .unwrap_or_else(|| (String::new(), String::new()));
+                                    let diag0_code_str = diag0_code.as_str();
                                     prove_raw = match prove_kind {
                                         "proven" => "proven",
                                         "counterexample_found" => "counterexample",
                                         "tool_missing" => "tool_missing",
                                         "unsupported" => "unsupported",
                                         "error" => "error",
-                                        "inconclusive" => match diag0_code {
+                                        "inconclusive" => match diag0_code_str {
                                             "X07V_SMT_TIMEOUT" => "timeout",
                                             "X07V_EZ3_MISSING" | "X07V_ECBMC_MISSING" => {
                                                 "tool_missing"
@@ -5232,6 +5259,24 @@ fn cmd_xtal_verify(
                                         },
                                         _ => "error",
                                     };
+                                    if matches!(
+                                        prove_raw,
+                                        "unsupported" | "tool_missing" | "timeout" | "inconclusive"
+                                    ) {
+                                        let code = if diag0_code.is_empty() {
+                                            prove_kind.to_string()
+                                        } else {
+                                            diag0_code
+                                        };
+                                        let msg = if diag0_message.is_empty() {
+                                            result_details
+                                        } else {
+                                            diag0_message
+                                        };
+                                        if !code.is_empty() || !msg.is_empty() {
+                                            prove_reason_rows.push((entry.to_string(), code, msg));
+                                        }
+                                    }
                                 }
                                 Err(err) => {
                                     diagnostics.push(diag_error(
@@ -5476,6 +5521,26 @@ fn cmd_xtal_verify(
                 }));
             }
         }
+    }
+
+    if !prove_reason_rows.is_empty() {
+        let mut msg = String::from("Proof support summary (first diagnostic per entry):");
+        msg.push_str("\nentry | code | message");
+        for (entry, code, message) in &prove_reason_rows {
+            let code = if code.is_empty() {
+                "unknown"
+            } else {
+                code.as_str()
+            };
+            let message = message.replace('\n', " ").trim().to_string();
+            msg.push_str(&format!("\n{entry} | {code} | {message}"));
+        }
+        diagnostics.push(diag_warning(
+            "WXTAL_VERIFY_PROVE_SUPPORT",
+            diagnostics::Stage::Run,
+            msg,
+            None,
+        ));
     }
 
     std::fs::create_dir_all(project_root.join(DEFAULT_VERIFY_DIR))

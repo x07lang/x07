@@ -24,6 +24,7 @@ mod assets_cmd;
 mod ast;
 mod ast_slice_engine;
 mod bench;
+mod brands;
 mod bundle;
 mod cli;
 mod contract_repro;
@@ -487,6 +488,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Verify(_)) => vec!["pkg", "verify"],
                 Some(pkg::PkgCommand::CheckSemver(_)) => vec!["pkg", "check-semver"],
                 Some(pkg::PkgCommand::List(_)) => vec!["pkg", "list"],
+                Some(pkg::PkgCommand::Inventory(_)) => vec!["pkg", "inventory"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
                 Some(pkg::PkgCommand::Tree(_)) => vec!["pkg", "tree"],
@@ -931,6 +933,12 @@ struct ResolvedTestEntry {
     result: String,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedTestEntryParam {
+    pub(crate) ty: String,
+    pub(crate) brand: Option<String>,
+}
+
 fn resolve_test_entry(module_roots: &[PathBuf], entry: &str) -> Result<ResolvedTestEntry> {
     let (module_id, _) = entry
         .rsplit_once('.')
@@ -962,6 +970,53 @@ fn resolve_test_entry(module_roots: &[PathBuf], entry: &str) -> Result<ResolvedT
                 .unwrap_or("")
                 .to_string();
             return Ok(ResolvedTestEntry { kind, result });
+        }
+    }
+    anyhow::bail!("entry {entry:?} was not found under the resolved module roots");
+}
+
+pub(crate) fn resolve_test_entry_params(
+    module_roots: &[PathBuf],
+    entry: &str,
+) -> Result<Vec<ResolvedTestEntryParam>> {
+    let (module_id, _) = entry
+        .rsplit_once('.')
+        .context("test entry must contain '.'")?;
+    let rel = format!("{}.x07.json", module_id.replace('.', "/"));
+    for root in module_roots {
+        let path = root.join(&rel);
+        if !path.is_file() {
+            continue;
+        }
+        let doc = report_common::read_json_file(&path)
+            .with_context(|| format!("read test entry module: {}", path.display()))?;
+        let decls = doc
+            .get("decls")
+            .and_then(Value::as_array)
+            .context("test entry module is missing decls[]")?;
+        for decl in decls {
+            if decl.get("name").and_then(Value::as_str) != Some(entry) {
+                continue;
+            }
+            let params = decl
+                .get("params")
+                .and_then(Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            let mut out = Vec::with_capacity(params.len());
+            for param in params {
+                let ty = param
+                    .get("ty")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let brand = param
+                    .get("brand")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                out.push(ResolvedTestEntryParam { ty, brand });
+            }
+            return Ok(out);
         }
     }
     anyhow::bail!("entry {entry:?} was not found under the resolved module roots");
@@ -1678,7 +1733,65 @@ fn run_one_pbt_test(
         pbt_decl.params.iter().map(|p| p.gen.ty()).collect()
     };
 
-    let driver_src = pbt::build_case_driver_x07ast_json(&test.entry, &tys, pbt_decl.budget_scope)?;
+    let entry_params = resolve_test_entry_params(module_roots, &test.entry)
+        .with_context(|| format!("resolve PBT entry signature: {:?}", test.entry))?;
+    if entry_params.len() != tys.len() {
+        anyhow::bail!(
+            "PBT param count mismatch for {:?}: manifest has {} params but entry has {}",
+            test.entry,
+            tys.len(),
+            entry_params.len()
+        );
+    }
+    let mut driver_params = Vec::with_capacity(tys.len());
+    let mut needs_unsafe = false;
+    for ((idx, ty), param) in tys
+        .iter()
+        .enumerate()
+        .map(|(idx, ty)| (idx, *ty))
+        .zip(entry_params)
+    {
+        let expected_kind = match param.ty.as_str() {
+            "i32" => Some(pbt::PbtTy::I32),
+            "bytes" | "bytes_view" => Some(pbt::PbtTy::Bytes),
+            _ => None,
+        };
+        if expected_kind != Some(ty) {
+            anyhow::bail!(
+                "PBT param type mismatch for {:?} (arg {}): manifest has {:?} but entry expects {:?}",
+                test.entry,
+                idx,
+                ty,
+                param.ty
+            );
+        }
+        let brand = match param.brand {
+            None => None,
+            Some(brand_id) => {
+                if ty != pbt::PbtTy::Bytes {
+                    anyhow::bail!(
+                        "PBT brand mismatch for {:?} (arg {}): brands require bytes/bytes_view, got {:?}",
+                        test.entry,
+                        idx,
+                        ty
+                    );
+                }
+                let validator =
+                    brands::try_resolve_brand_validator(module_roots, &test.entry, &brand_id)?;
+                if validator.is_none() {
+                    needs_unsafe = true;
+                }
+                Some(pbt::PbtDriverParamBrand {
+                    brand_id,
+                    validator_symbol: validator,
+                })
+            }
+        };
+        driver_params.push(pbt::PbtDriverParam { ty, brand });
+    }
+
+    let driver_src =
+        pbt::build_case_driver_x07ast_json(&test.entry, &driver_params, pbt_decl.budget_scope)?;
 
     let out_dir = args
         .artifact_dir
@@ -1701,6 +1814,10 @@ fn run_one_pbt_test(
     let mut compile_options =
         x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
     compile_options.compat = compat;
+    compile_options.allow_internal_only_heads_in_entry = true;
+    if needs_unsafe {
+        compile_options.allow_unsafe = Some(true);
+    }
     compile_options.arch_root = infer_arch_root_from_manifest(&args.manifest)
         .or_else(|| args.manifest.parent().map(|p| p.to_path_buf()))
         .or_else(|| std::env::current_dir().ok());

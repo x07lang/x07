@@ -423,6 +423,7 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "verify",
             "check-semver",
             "list",
+            "inventory",
             "pack",
             "lock",
             "tree",

@@ -48,7 +48,7 @@ my-package/
 
 This example imports a small, deterministic hex encoder/decoder.
 
-### A1. Create the skeleton
+### Step 1: Create the skeleton
 
 ```bash
 mkdir ext-hex-rs-demo
@@ -62,7 +62,7 @@ rm -rf modules
 mkdir -p modules/ext/hex
 ```
 
-### A2. Add a restricted Rust source file
+### Step 2: Add a restricted Rust source file
 
 Create `import_sources/rust/hex.rs`:
 
@@ -166,7 +166,7 @@ pub fn hex_get_bytes(doc: BytesView) -> Bytes {
 }
 ```
 
-### A3. Run the importer
+### Step 3: Run the importer
 
 ```bash
 x07import-cli rust \
@@ -179,7 +179,7 @@ Expected output:
 
 - `modules/ext/hex.x07.json`
 
-### A4. Add a handwritten tests module
+### Step 4: Add a handwritten tests module
 
 Create `modules/ext/hex/tests.x07.json`:
 
@@ -214,7 +214,7 @@ Create `modules/ext/hex/tests.x07.json`:
 }
 ```
 
-### A5. Write `x07-package.json` and `x07.json`
+### Step 5: Write `x07-package.json` and `x07.json`
 
 Replace `x07-package.json` with:
 
@@ -249,7 +249,7 @@ Create `x07.json` for local tests:
 }
 ```
 
-### A6. Add a test manifest and run it
+### Step 6: Add a test manifest and run it
 
 Create `tests/tests.json`:
 

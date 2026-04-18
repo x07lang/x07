@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["workflow.graph.tasks.capture_incident_v1"]},{"body":["std.bytes.copy","data"],"kind":"defn","name":"workflow.graph.tasks.capture_incident_v1","params":[{"name":"data","ty":"bytes_view"}],"result":"bytes"}],"imports":["std.bytes"],"kind":"module","module_id":"workflow.graph.tasks","schema_version":"x07.x07ast@0.8.0"}

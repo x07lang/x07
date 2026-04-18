@@ -57,6 +57,7 @@ See: [Compatibility contract](../reference/compat.md) and `x07 migrate` in [Tool
 - **Loop forms (`for`)**: valid form is `["for","i",<start:i32>,<end:i32>,<body:any>]` (`X07-FOR-0001`). Wrap multi-statement bodies in `begin`.
 - **`bytes.view` literals/temporaries**: `bytes.view` requires an identifier owner; use `bytes.view_lit` for literals and `let tmp = <expr>` for temporaries (`X07-BORROW-0001`, often auto-fixable via `x07 fix`).
 - **Borrow-union returns**: returning `bytes_view` from `if`/option/result branches that borrow from different owners is usually rejected; return owned `bytes` (copy) instead.
+- **XTAL brands**: when a public byte boundary is branded in `src/*.x07.json`, the corresponding `spec/*.x07spec.json` operation signature must also carry the same `brand` / `result_brand` ids (and generated property wrappers will inherit them). See `docs/toolchain/xtal.md` and `docs/examples/agent-gate/xtal/workflow-graph/`.
 - **Dependency roots**: module-not-found errors are usually missing `module_roots` or missing/stale locks; use `x07 pkg tree` / `x07 pkg provides` and re-run `x07 pkg lock --check --offline`.
 
 ## 1) Install and verify the toolchain
@@ -156,8 +157,8 @@ x07 init
 - `x07.lock.json`
 - `x07-toolchain.toml` (pins `stable` and declares `docs` + `skills`)
 - `AGENT.md` (self-recovery guide + canonical commands)
-- `.agent/docs/` (offline docs; linked to the installed toolchain when available)
-- `.agent/skills/` (skills pack; linked to the installed toolchain when available)
+- `.agent/docs/` (offline docs; copied from the toolchain when init ran)
+- `.agent/skills/` (skills pack; copied from the toolchain when init ran)
 - `src/` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)
 

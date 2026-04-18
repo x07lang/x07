@@ -45,4 +45,4 @@ The governance scope covers these official companion repositories:
 
 The project roadmap includes moving from founder-led governance to multi-maintainer,
 multi-organization governance.
-See the public roadmap for the current milestones and growth metrics.
+See the public roadmap for the current checkpoints and growth metrics.

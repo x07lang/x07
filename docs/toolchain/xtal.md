@@ -6,7 +6,10 @@ XTAL provides a spec-first surface for X07 projects:
 - Optional `*.x07spec.examples.jsonl` example cases provide a minimum semantic oracle.
 - A deterministic generator converts examples and declared properties into normal X07 tests under `gen/xtal/`.
 
-Example project: `docs/examples/agent-gate/xtal/toy-sorter/`.
+Example projects:
+
+- Smallest end-to-end: `docs/examples/agent-gate/xtal/toy-sorter/`
+- Branded multi-operation library surface: `docs/examples/agent-gate/xtal/workflow-graph/`
 
 ## Artifacts
 
@@ -18,6 +21,7 @@ Example project: `docs/examples/agent-gate/xtal/toy-sorter/`.
   - `entrypoints[]` for certification targets
   - `trust.cert_profile` and `trust.review_gates[]` for certification review gates
   - `autonomy.agent_write_paths[]` and `autonomy.agent_write_specs|agent_write_arch` for repair boundaries
+- See also: `docs/toolchain/xtal-targets.md`.
 
 ### Spec modules (`x07.x07spec@0.1.0`)
 
@@ -43,6 +47,24 @@ Each operation can declare `ensures_props[]` entries that reference a property f
 - The property function MUST return a `bytes_status_v1` payload (see `std.test.status_ok` / `std.test.status_fail`).
 - `ensures_props[*].args[]` selects which operation parameters are passed to the property function.
 - `x07 xtal impl check` enforces that the referenced function exists, is exported, has a compatible signature for the selected args (including brands), and returns `bytes`.
+
+## Branded bytes (canonical example)
+
+If you use brands on public byte boundaries, keep the brand ids aligned across:
+
+- `spec/*.x07spec.json`: `operations[*].params[*].brand` and `operations[*].result_brand`
+- `src/*.x07.json`: `defn.params[*].brand` and `defn.result_brand`
+- generated property wrappers: `gen/xtal/**/tests.x07.json` (generated from spec)
+- boundary index: `arch/boundaries/index.x07boundary.json`
+
+Concrete reference: `docs/examples/agent-gate/xtal/workflow-graph/`.
+
+Key files:
+
+- Spec brands: `docs/examples/agent-gate/xtal/workflow-graph/spec/workflow.graph.x07spec.json`
+- Impl brands: `docs/examples/agent-gate/xtal/workflow-graph/src/workflow/graph.x07.json`
+- Generated wrappers: `docs/examples/agent-gate/xtal/workflow-graph/gen/xtal/workflow/graph/tests.x07.json`
+- Boundary brands: `docs/examples/agent-gate/xtal/workflow-graph/arch/boundaries/index.x07boundary.json`
 
 ## Commands
 
@@ -109,6 +131,7 @@ Each operation can declare `ensures_props[]` entries that reference a property f
   - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
     - Under `balanced`, missing proof tools produce warnings (and verification continues).
     - Under `strict`, only `proven` outcomes pass.
+  - When proofs are unsupported or inconclusive, the wrapper emits a compact per-entry reason summary in the XTAL diagnostics (for example: unsupported loop forms or unsupported branded input shapes).
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
   - Proof caching is automatic when a project manifest is available:
     - Successful `x07 verify --prove` runs cache proof summaries under `.x07/cache/verify/proof_summaries/`.
@@ -123,6 +146,7 @@ Each operation can declare `ensures_props[]` entries that reference a property f
     - `--profile <trust.cert_profile>`
     - `--baseline <path>` (optional, enables review diff outputs)
     - `--review-fail-on <gate>` for each `trust.review_gates[]` entry
+    - `--no-fail-fast` (optional; preserve full test signal after the first failure)
   - Writes:
     - `target/xtal/xtal.certify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
     - `target/xtal/cert/summary.json` (`x07.xtal.certify_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.certify_summary@0.1.0.schema.json`)

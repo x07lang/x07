@@ -2358,8 +2358,8 @@ fn init_notes() -> Vec<String> {
     vec![
         "Agent kit: AGENT.md (self-recovery + canonical commands)".to_string(),
         format!("Toolchain pin: {X07_TOOLCHAIN_TOML} (channel=stable; components=docs+skills)"),
-        format!("Project docs: {X07_AGENT_DIR}/docs/ (linked to toolchain docs)"),
-        format!("Project skills: {X07_AGENT_DIR}/skills/ (linked to toolchain skills)"),
+        format!("Project docs: {X07_AGENT_DIR}/docs/ (copied from toolchain docs)"),
+        format!("Project skills: {X07_AGENT_DIR}/skills/ (copied from toolchain skills)"),
         "Offline docs: x07up docs path --json".to_string(),
         "Skills status: x07up skills status --json".to_string(),
     ]
@@ -2404,7 +2404,7 @@ fn init_agent_kit(root: &Path, paths: &AgentKitPaths, created: &mut Vec<String>)
         .with_context(|| format!("create dir: {}", paths.agent_dir.display()))?;
 
     let docs_src = toolchain_agent_docs_link_src(&toolchain_root, "stable");
-    link_dir_or_copy(&docs_src, &paths.agent_docs_dir).with_context(|| {
+    copy_dir_recursive_filtered(&docs_src, &paths.agent_docs_dir).with_context(|| {
         format!(
             "install docs {} -> {}",
             docs_src.display(),
@@ -2415,7 +2415,7 @@ fn init_agent_kit(root: &Path, paths: &AgentKitPaths, created: &mut Vec<String>)
 
     let skills_src =
         toolchain_agent_skills_link_src(&toolchain_root, "stable").context("locate skills pack")?;
-    link_dir_or_copy(&skills_src, &paths.agent_skills_dir).with_context(|| {
+    copy_dir_recursive_filtered(&skills_src, &paths.agent_skills_dir).with_context(|| {
         format!(
             "install skills {} -> {}",
             skills_src.display(),
@@ -2528,30 +2528,6 @@ fn toolchain_agent_skills_link_src(toolchain_root: &Path, channel: &str) -> Resu
     resolve_skills_pack_root(toolchain_root)
 }
 
-fn link_dir_or_copy(src: &Path, dst: &Path) -> Result<()> {
-    if create_dir_link(src, dst).is_ok() {
-        return Ok(());
-    }
-    copy_dir_recursive_filtered(src, dst)
-}
-
-fn create_dir_link(target: &Path, link: &Path) -> Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::symlink;
-        symlink(target, link)
-            .with_context(|| format!("symlink {} -> {}", link.display(), target.display()))?;
-        Ok(())
-    }
-
-    #[cfg(not(unix))]
-    {
-        let _ = target;
-        let _ = link;
-        anyhow::bail!("create_dir_link: unsupported platform");
-    }
-}
-
 fn resolve_skills_pack_root(toolchain_root: &Path) -> Result<PathBuf> {
     let agent_skills = toolchain_root.join(X07_AGENT_DIR).join("skills");
     if agent_skills.is_dir() {
@@ -2610,6 +2586,25 @@ fn copy_dir_recursive_filtered(src: &Path, dst: &Path) -> Result<()> {
                 )
             })?;
             continue;
+        }
+
+        if file_type.is_symlink() {
+            let meta = std::fs::metadata(&src_path)
+                .with_context(|| format!("read symlink target metadata: {}", src_path.display()))?;
+            if meta.is_dir() {
+                copy_dir_recursive_filtered(&src_path, &dst_path)?;
+                continue;
+            }
+            if meta.is_file() {
+                std::fs::copy(&src_path, &dst_path).with_context(|| {
+                    format!(
+                        "copy symlink target: {} -> {}",
+                        src_path.display(),
+                        dst_path.display()
+                    )
+                })?;
+                continue;
+            }
         }
 
         anyhow::bail!(

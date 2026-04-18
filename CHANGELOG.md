@@ -6,9 +6,25 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Added
 
+- `x07 pkg inventory` for emitting an offline inventory of stdlib + official external packages shipped in the current toolchain bundle.
+- XTAL docs:
+  - `docs/toolchain/xtal-targets.md` (certification target semantics)
+  - `docs/toolchain/proof-subset.md` (compact proof-supported subset guide)
+  - `docs/packages/inventory.md` (offline package inventory entry point)
+- XTAL example project: `docs/examples/agent-gate/xtal/workflow-graph/` (branded multi-operation pure library surface).
+
 ### Changed
 
+- `x07 init` now copies `.agent/docs/` and `.agent/skills/` into the project for portability (instead of creating toolchain-path symlinks).
+- `x07 arch check` now accepts `--project <x07.json|dir>` as an alternative to `--repo-root`.
+- `x07 trust certify` and `x07 xtal certify` now accept `--no-fail-fast` to preserve full test signal in the certification test lane.
+
 ### Fixed
+
+- XTAL generated PBT driver generation no longer emits duplicate local bindings for mixed and multi-bytes signatures (for example `(i32, bytes)` and `(i32, bytes, bytes)`).
+- Branded PBT inputs are now validated via brand casts and treated as skipped when invalid (instead of being counted as passing cases).
+- `x07 xtal verify` now emits a compact per-entry proof support summary (first diagnostic code/message) when proofs are unsupported or inconclusive.
+- `x07 verify --prove` no longer rejects `for` loops solely because their bounds are non-literal.
 
 ## v0.2.9
 

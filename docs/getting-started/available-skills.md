@@ -4,7 +4,7 @@ The X07 toolchain ships an optional “skills pack” for coding agents. Skills 
 
 ## Install
 
-If you ran `x07 init`, the skills pack is made available under `.agent/skills/` (linked to the installed toolchain when available).
+If you ran `x07 init`, the skills pack is made available under `.agent/skills/` (copied from the toolchain when init ran).
 
 To install the skills pack with `x07up`:
 

@@ -6210,7 +6210,7 @@ static uint32_t x07_nondet_u32(void) {
   return value;
 }
 static void x07_verify_harness(void) {
-  uint8_t arena_mem[65536];
+  uint8_t arena_mem[4096];
   ctx_t ctx;
   memset(&ctx, 0, sizeof(ctx));
   ctx.fuel_init = (uint64_t)(X07_FUEL_INIT);

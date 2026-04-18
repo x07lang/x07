@@ -179,6 +179,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("pkg.list") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-list.report.schema.json"
         )),
+        Some("pkg.inventory") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-inventory.report.schema.json"
+        )),
         Some("pkg.lock") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-lock.report.schema.json"
         )),

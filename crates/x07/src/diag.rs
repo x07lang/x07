@@ -1272,7 +1272,7 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             Some("Requires a certification policy decision (change the entry vs widen the profile)."),
         )),
         "X07TP_NOT_CERTIFIABLE" => Some(mk(
-            "Trust profile is weaker than the Milestone A certification floor.",
+            "Trust profile is weaker than the verified-core certification floor.",
             "The profile relaxes one or more requirements needed for `verified_core_pure_v1` certification.",
             "- Tighten the profile to the verified-core floor instead of weakening the certificate contract.\n- Keep the profile immutable once it is published.\n- Re-run `x07 trust profile check`.",
             QuickfixSupport::Never,
@@ -1281,7 +1281,7 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
         )),
         "X07TP_NETWORK_PROFILE_REQUIRED" => Some(mk(
             "Networked trusted-program profile is missing required network certification posture.",
-            "The Milestone C networked trust profile must require the allowlist-backed network posture, attested network capsules, and matching runtime network evidence semantics.",
+            "Networked trust profiles must require the allowlist-backed network posture, attested network capsules, and matching runtime network evidence semantics.",
             "- Keep `sandbox_requirements.network_mode=\"allowlist\"` and `sandbox_requirements.network_enforcement=\"vm_boundary_allowlist\"`.\n- Set `evidence_requirements.require_network_capsules=true`.\n- Re-run `x07 trust profile check`.",
             QuickfixSupport::Never,
             &[],
@@ -1289,7 +1289,7 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
         )),
         "X07TP_BACKEND_NOT_CERTIFIABLE" => Some(mk(
             "Networked trusted-program profile allows a backend posture that is not certifiable.",
-            "Milestone C networked certification requires VM-backed sandboxing, forbids weaker isolation, and rejects project worlds outside the certifiable sandbox line.",
+            "Networked certification requires VM-backed sandboxing, forbids weaker isolation, and rejects project worlds outside the certifiable sandbox line.",
             "- Keep `worlds_allowed` free of `run-os`.\n- Set `sandbox_requirements.sandbox_backend=\"vm\"` and `sandbox_requirements.forbid_weaker_isolation=true`.\n- Re-run `x07 trust profile check`.",
             QuickfixSupport::Never,
             &[],
@@ -1329,7 +1329,7 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
         )),
         "X07TP_NETWORK_MODE_FORBIDDEN" => Some(mk(
             "Sandboxed local trusted-program profile allows networking where it should not.",
-            "The Milestone B local sandbox profile keeps networking disabled until VM-boundary allowlist enforcement is fully supported across backends.",
+            "The sandboxed local profile keeps networking disabled until VM-boundary allowlist enforcement is fully supported across backends.",
             "- Keep `sandbox_requirements.network_mode=\"none\"`.\n- Ensure the selected sandbox policy sets `net.enabled=false`.\n- Re-run `x07 trust profile check`.",
             QuickfixSupport::Never,
             &[],

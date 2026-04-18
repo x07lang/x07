@@ -111,7 +111,11 @@ def prepare_project_work(
     if work_dir.exists():
         shutil.rmtree(work_dir)
     work_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(project_dir, work_dir)
+    shutil.copytree(
+        project_dir,
+        work_dir,
+        ignore=shutil.ignore_patterns(".x07", "target", "dist", "artifacts", "node_modules"),
+    )
 
     shutil.rmtree(work_dir / ".x07", ignore_errors=True)
     missing = seed_official_deps(root, work_dir, allow_missing=allow_network_if_missing)

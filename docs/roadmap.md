@@ -31,7 +31,7 @@ software engineering.
 - document maintainer nomination and release delegation
 - grow the public RFC process and issue backlog
 
-## Target milestones
+## Targets
 
 ### Q2 2026
 
@@ -48,7 +48,7 @@ software engineering.
 
 ### Q4 2026
 
-- expand public roadmap and milestone tracking
+- expand public roadmap tracking
 - demonstrate multi-organization contributions
 - assess readiness for broader foundation and ecosystem partnerships
 

@@ -1,0 +1,386 @@
+{
+  "module_id": "workflow.graph",
+  "operations": [
+    {
+      "doc": "Stable topological order for a byte-encoded DAG of u32 node ids and u32le edge pairs.",
+      "ensures": [
+        {
+          "expr": [
+            "=",
+            [
+              "%",
+              [
+                "bytes.len",
+                "__result"
+              ],
+              4
+            ],
+            0
+          ],
+          "id": "result_word_aligned"
+        },
+        {
+          "expr": [
+            "<=",
+            [
+              "bytes.len",
+              "__result"
+            ],
+            [
+              "*",
+              "n",
+              4
+            ]
+          ],
+          "id": "result_bounded"
+        }
+      ],
+      "ensures_props": [
+        {
+          "args": [
+            "n",
+            "edges"
+          ],
+          "id": "prop_toposort_valid",
+          "prop": "workflow.graph.props.prop_toposort_valid"
+        }
+      ],
+      "examples_ref": "spec/workflow.graph.toposort.examples.jsonl",
+      "id": "op.workflow.graph.toposort_u32.v1",
+      "name": "workflow.graph.toposort_u32",
+      "params": [
+        {
+          "name": "n",
+          "ty": "i32"
+        },
+        {
+          "brand": "workflow.graph.edge_pairs_u32_v1",
+          "name": "edges",
+          "ty": "bytes"
+        }
+      ],
+      "requires": [
+        {
+          "expr": [
+            "<=",
+            0,
+            "n"
+          ],
+          "id": "n_non_negative"
+        },
+        {
+          "expr": [
+            "<=",
+            "n",
+            8
+          ],
+          "id": "n_bounded"
+        },
+        {
+          "expr": [
+            "=",
+            [
+              "%",
+              [
+                "bytes.len",
+                "edges"
+              ],
+              8
+            ],
+            0
+          ],
+          "id": "edges_word_aligned"
+        }
+      ],
+      "result": "bytes",
+      "result_brand": "workflow.graph.node_order_u32_v1"
+    },
+    {
+      "doc": "Return 1 when the graph contains a cycle, otherwise 0.",
+      "ensures": [
+        {
+          "expr": [
+            "<=",
+            0,
+            "__result"
+          ],
+          "id": "cycle_lower"
+        },
+        {
+          "expr": [
+            "<=",
+            "__result",
+            1
+          ],
+          "id": "cycle_upper"
+        }
+      ],
+      "ensures_props": [
+        {
+          "args": [
+            "n",
+            "edges"
+          ],
+          "id": "prop_has_cycle_consistent",
+          "prop": "workflow.graph.props.prop_has_cycle_consistent"
+        }
+      ],
+      "examples_ref": "spec/workflow.graph.has_cycle.examples.jsonl",
+      "id": "op.workflow.graph.has_cycle_u32.v1",
+      "name": "workflow.graph.has_cycle_u32",
+      "params": [
+        {
+          "name": "n",
+          "ty": "i32"
+        },
+        {
+          "brand": "workflow.graph.edge_pairs_u32_v1",
+          "name": "edges",
+          "ty": "bytes"
+        }
+      ],
+      "requires": [
+        {
+          "expr": [
+            "<=",
+            0,
+            "n"
+          ],
+          "id": "n_non_negative"
+        },
+        {
+          "expr": [
+            "<=",
+            "n",
+            8
+          ],
+          "id": "n_bounded"
+        },
+        {
+          "expr": [
+            "=",
+            [
+              "%",
+              [
+                "bytes.len",
+                "edges"
+              ],
+              8
+            ],
+            0
+          ],
+          "id": "edges_word_aligned"
+        }
+      ],
+      "result": "i32"
+    },
+    {
+      "doc": "Return the sorted u32le list of currently runnable nodes given a completed set.",
+      "ensures": [
+        {
+          "expr": [
+            "=",
+            [
+              "%",
+              [
+                "bytes.len",
+                "__result"
+              ],
+              4
+            ],
+            0
+          ],
+          "id": "result_word_aligned"
+        },
+        {
+          "expr": [
+            "<=",
+            [
+              "bytes.len",
+              "__result"
+            ],
+            [
+              "*",
+              "n",
+              4
+            ]
+          ],
+          "id": "result_bounded"
+        }
+      ],
+      "ensures_props": [
+        {
+          "args": [
+            "n",
+            "edges",
+            "completed"
+          ],
+          "id": "prop_ready_frontier_valid",
+          "prop": "workflow.graph.props.prop_ready_frontier_valid"
+        }
+      ],
+      "examples_ref": "spec/workflow.graph.ready_frontier.examples.jsonl",
+      "id": "op.workflow.graph.ready_frontier_u32.v1",
+      "name": "workflow.graph.ready_frontier_u32",
+      "params": [
+        {
+          "name": "n",
+          "ty": "i32"
+        },
+        {
+          "brand": "workflow.graph.edge_pairs_u32_v1",
+          "name": "edges",
+          "ty": "bytes"
+        },
+        {
+          "brand": "workflow.graph.node_set_u32_v1",
+          "name": "completed",
+          "ty": "bytes"
+        }
+      ],
+      "requires": [
+        {
+          "expr": [
+            "<=",
+            0,
+            "n"
+          ],
+          "id": "n_non_negative"
+        },
+        {
+          "expr": [
+            "<=",
+            "n",
+            8
+          ],
+          "id": "n_bounded"
+        },
+        {
+          "expr": [
+            "=",
+            [
+              "%",
+              [
+                "bytes.len",
+                "edges"
+              ],
+              8
+            ],
+            0
+          ],
+          "id": "edges_word_aligned"
+        },
+        {
+          "expr": [
+            "=",
+            [
+              "%",
+              [
+                "bytes.len",
+                "completed"
+              ],
+              4
+            ],
+            0
+          ],
+          "id": "completed_word_aligned"
+        }
+      ],
+      "result": "bytes",
+      "result_brand": "workflow.graph.node_set_u32_v1"
+    },
+    {
+      "doc": "Longest weighted path length in a DAG, or -1 if the graph is cyclic or malformed.",
+      "ensures": [
+        {
+          "expr": [
+            "<=",
+            -1,
+            "__result"
+          ],
+          "id": "makespan_lower_bound"
+        }
+      ],
+      "ensures_props": [
+        {
+          "args": [
+            "n",
+            "edges",
+            "durations"
+          ],
+          "id": "prop_makespan_bounds",
+          "prop": "workflow.graph.props.prop_makespan_bounds"
+        }
+      ],
+      "examples_ref": "spec/workflow.graph.makespan.examples.jsonl",
+      "id": "op.workflow.graph.makespan_u32.v1",
+      "name": "workflow.graph.makespan_u32",
+      "params": [
+        {
+          "name": "n",
+          "ty": "i32"
+        },
+        {
+          "brand": "workflow.graph.edge_pairs_u32_v1",
+          "name": "edges",
+          "ty": "bytes"
+        },
+        {
+          "brand": "workflow.graph.node_weights_u32_v1",
+          "name": "durations",
+          "ty": "bytes"
+        }
+      ],
+      "requires": [
+        {
+          "expr": [
+            "<=",
+            0,
+            "n"
+          ],
+          "id": "n_non_negative"
+        },
+        {
+          "expr": [
+            "<=",
+            "n",
+            8
+          ],
+          "id": "n_bounded"
+        },
+        {
+          "expr": [
+            "=",
+            [
+              "%",
+              [
+                "bytes.len",
+                "edges"
+              ],
+              8
+            ],
+            0
+          ],
+          "id": "edges_word_aligned"
+        },
+        {
+          "expr": [
+            "=",
+            [
+              "bytes.len",
+              "durations"
+            ],
+            [
+              "*",
+              "n",
+              4
+            ]
+          ],
+          "id": "durations_len_matches_nodes"
+        }
+      ],
+      "result": "i32"
+    }
+  ],
+  "schema_version": "x07.x07spec@0.1.0"
+}

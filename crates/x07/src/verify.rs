@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
 use base64::Engine;
@@ -48,8 +49,10 @@ const X07DIAG_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07diag.schema
 
 const VERIFY_INPUT_BUF_NAME: &str = "x07_verify_input";
 const VERIFY_HARNESS_FN: &str = "x07_verify_harness";
-const Z3_TIMEOUT_SECONDS: u64 = 10;
+const Z3_SMT_TIMEOUT_SECONDS: u64 = 10;
+const Z3_PROVE_TIMEOUT_SECONDS: u64 = 60;
 const Z3_ASYNC_PROVE_TIMEOUT_SECONDS: u64 = 90;
+const VERIFY_HARNESS_ARENA_CAP_BYTES: usize = 4096;
 const PROCESS_SUMMARY_MAX_CHARS: usize = 1024;
 const CBMC_OBJECT_BITS_RETRY_VALUES: [u32; 2] = [12, 16];
 const VERIFY_VEC_SUPPORT_MODULE_ID: &str = "x07.verify.vec_support_v1";
@@ -690,12 +693,6 @@ struct CoverageDecl {
     source_path: PathBuf,
 }
 
-#[derive(Debug, Clone)]
-struct VerifyBrandModule {
-    imports: Vec<String>,
-    validators: BTreeMap<String, String>,
-}
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct VerifySchedulerModel {
@@ -1322,6 +1319,7 @@ fn cmd_verify_bmc(
         "--json-ui".to_string(),
     ];
     maybe_disable_cbmc_standard_checks(&mut cbmc_args);
+    maybe_enable_cbmc_slice_formula(&mut cbmc_args);
 
     let (out, used_cbmc_args) = run_cbmc_with_object_bits_retry(&cbmc_args, "run cbmc")?;
 
@@ -1509,6 +1507,7 @@ fn cmd_verify_smt(
         smt2_path.display().to_string(),
     ];
     maybe_disable_cbmc_standard_checks(&mut cbmc_args);
+    maybe_enable_cbmc_slice_formula(&mut cbmc_args);
 
     let (out, _) = run_cbmc_with_object_bits_retry(&cbmc_args, "run cbmc (smt2 emit)")?;
 
@@ -1676,6 +1675,7 @@ fn cmd_verify_smt(
                     "--json-ui".to_string(),
                 ];
                 maybe_disable_cbmc_standard_checks(&mut cbmc_args);
+                maybe_enable_cbmc_slice_formula(&mut cbmc_args);
                 let (out, used_cbmc_args) = run_cbmc_with_object_bits_retry(
                     &cbmc_args,
                     "run cbmc (prove counterexample capture)",
@@ -1793,15 +1793,16 @@ fn cmd_verify_smt(
             )
         }
         other => {
-            let (code, message) =
-                if other == "unknown" && reason_unknown.as_deref() == Some("timeout") {
-                    (
-                        "X07V_SMT_TIMEOUT",
-                        "solver returned \"unknown\" (reason=timeout)".to_string(),
-                    )
-                } else {
-                    ("X07V_SMT_UNKNOWN", format!("solver returned {other:?}"))
-                };
+            let (code, message) = if other == "timeout" {
+                ("X07V_SMT_TIMEOUT", "solver timed out".to_string())
+            } else if other == "unknown" && reason_unknown.as_deref() == Some("timeout") {
+                (
+                    "X07V_SMT_TIMEOUT",
+                    "solver returned \"unknown\" (reason=timeout)".to_string(),
+                )
+            } else {
+                ("X07V_SMT_UNKNOWN", format!("solver returned {other:?}"))
+            };
             write_report_and_exit(
                 machine,
                 attach_summary(VerifyReport::inconclusive(
@@ -1844,6 +1845,7 @@ fn normalize_smt2_logic_for_z3(path: &Path) -> Result<()> {
     let has_quantifiers = text.contains("(forall") || text.contains("(exists");
 
     let mut changed = false;
+    let mut logic_rewritten = false;
     let mut lines = Vec::new();
     for line in text.lines() {
         let trimmed = line.trim_start();
@@ -1851,12 +1853,17 @@ fn normalize_smt2_logic_for_z3(path: &Path) -> Result<()> {
             changed = true;
             continue;
         }
-        if has_quantifiers && !changed && trimmed.starts_with("(set-logic QF_") {
+        if trimmed.starts_with("(set-option :produce-models") {
+            changed = true;
+            continue;
+        }
+        if has_quantifiers && !logic_rewritten && trimmed.starts_with("(set-logic QF_") {
             let prefix_len = line.len() - trimmed.len();
             let indent = &line[..prefix_len];
             let rest = trimmed.trim_start_matches("(set-logic QF_");
             lines.push(format!("{indent}(set-logic {rest}"));
             changed = true;
+            logic_rewritten = true;
             continue;
         }
         lines.push(line.to_string());
@@ -2153,92 +2160,6 @@ fn load_target_info(module_roots: &[PathBuf], entry: &str) -> Result<TargetSig> 
     }
 
     anyhow::bail!("could not find function {entry:?} in resolved module {module_id:?}")
-}
-
-fn load_verify_brand_module<'a>(
-    module_roots: &[PathBuf],
-    module_id: &str,
-    cache: &'a mut BTreeMap<String, VerifyBrandModule>,
-) -> Result<&'a VerifyBrandModule> {
-    if !cache.contains_key(module_id) {
-        let source =
-            x07c::module_source::load_module_source(module_id, WorldId::SolvePure, module_roots)
-                .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
-        let doc: Value = serde_json::from_str(&source.src)
-            .with_context(|| format!("parse module JSON for {module_id:?}"))?;
-        let imports = doc
-            .get("imports")
-            .and_then(Value::as_array)
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .map(str::to_string)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-        let meta = doc
-            .get("meta")
-            .and_then(Value::as_object)
-            .map(|obj| {
-                obj.iter()
-                    .map(|(key, value)| (key.clone(), value.clone()))
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default();
-        let validators = x07c::stream_pipe::brand_registry_from_meta_v1(&meta)
-            .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
-        cache.insert(
-            module_id.to_string(),
-            VerifyBrandModule {
-                imports,
-                validators,
-            },
-        );
-    }
-    Ok(cache
-        .get(module_id)
-        .expect("verify brand module inserted into cache"))
-}
-
-fn resolve_verify_brand_validator(
-    module_roots: &[PathBuf],
-    entry: &str,
-    brand_id: &str,
-) -> Result<String> {
-    let (module_id, _) = entry.rsplit_once('.').context("--entry must contain '.'")?;
-    let mut cache = BTreeMap::new();
-    let mut queue = VecDeque::from([module_id.to_string()]);
-    let mut visited = BTreeSet::new();
-    let mut matches = BTreeSet::new();
-
-    while let Some(current) = queue.pop_front() {
-        if !visited.insert(current.clone()) {
-            continue;
-        }
-        let module = load_verify_brand_module(module_roots, &current, &mut cache)?;
-        if let Some(validator) = module.validators.get(brand_id) {
-            matches.insert(validator.clone());
-        }
-        for import in &module.imports {
-            queue.push_back(import.clone());
-        }
-    }
-
-    match matches.len() {
-        1 => Ok(matches.into_iter().next().expect("single validator match")),
-        0 => anyhow::bail!(
-            "brand {:?} is missing meta.brands_v1.validate in the reachable module graph for {:?}",
-            brand_id,
-            entry
-        ),
-        _ => anyhow::bail!(
-            "brand {:?} resolves to multiple validators in the reachable module graph for {:?}: {:?}",
-            brand_id,
-            entry,
-            matches.into_iter().collect::<Vec<_>>()
-        ),
-    }
 }
 
 fn decl_sha256_hex_for_value(value: &Value) -> Result<String> {
@@ -2879,10 +2800,23 @@ fn resolve_ref_symbol(
     if prefix == module_id || prefix.contains('.') {
         return Some(raw.to_string());
     }
+    if is_builtin_ref_symbol(raw) {
+        return Some(raw.to_string());
+    }
     alias_map
         .get(prefix)
         .map(|target| format!("{target}.{suffix}"))
         .or_else(|| Some(raw.to_string()))
+}
+
+fn is_builtin_ref_symbol(raw: &str) -> bool {
+    static BUILTIN_SIGS: OnceLock<x07c::typecheck::TypecheckSigs> = OnceLock::new();
+    let sigs = BUILTIN_SIGS.get_or_init(|| {
+        let mut sigs = x07c::typecheck::TypecheckSigs::new();
+        sigs.add_builtins();
+        sigs
+    });
+    sigs.get(raw).is_some()
 }
 
 fn collect_contract_exprs(defn: &Value) -> Vec<Value> {
@@ -3011,7 +2945,15 @@ fn encoded_verify_param_bytes(param: &VerifySignatureParam, max_bytes_len: u32) 
 }
 
 fn verify_brand_supported_carrier(ty: &str) -> bool {
-    matches!(ty, "bytes_view" | "option_bytes_view" | "result_bytes_view")
+    matches!(
+        ty,
+        "bytes"
+            | "bytes_view"
+            | "option_bytes"
+            | "option_bytes_view"
+            | "result_bytes"
+            | "result_bytes_view"
+    )
 }
 
 fn verify_driver_raw_param(param: &VerifySignatureParam) -> Result<VerifySignatureParam> {
@@ -3062,11 +3004,11 @@ fn find_signature_rich_type_unsupported(
         if param.brand.is_some() {
             if !verify_brand_supported_carrier(&param.ty) {
                 return Some(format!(
-                    "x07 verify currently supports proof-input brands on bytes_view and its option/result view carriers, got {:?}",
+                    "x07 verify currently supports proof-input brands on bytes/bytes_view and their option/result carriers, got {:?}",
                     param.ty
                 ));
             }
-            if let Err(err) = resolve_verify_brand_validator(
+            if let Err(err) = crate::brands::resolve_brand_validator(
                 module_roots,
                 entry,
                 param.brand.as_deref().expect("brand checked"),
@@ -3193,7 +3135,7 @@ fn prove_unsupported_reason(
             ));
         }
     }
-    if let Some(msg) = find_for_with_non_literal_bounds(&target.body) {
+    if let Some(msg) = find_unsupported_for_forms(&target.body) {
         return Some(("X07V_UNSUPPORTED_FOR_BOUNDS", msg));
     }
     if let Some(msg) = find_signature_rich_type_unsupported(module_roots, entry, target) {
@@ -4206,7 +4148,7 @@ fn build_verify_sync_helper_decl(
     call_items.push(Value::String(entry.to_string()));
     for (idx, (param, compile_param)) in sig.params.iter().zip(compile_params.iter()).enumerate() {
         if let Some(brand_id) = param.brand.as_deref() {
-            let validator = resolve_verify_brand_validator(module_roots, entry, brand_id)?;
+            let validator = crate::brands::resolve_brand_validator(module_roots, entry, brand_id)?;
             if let Some((validator_module, _)) = validator.rsplit_once('.') {
                 imports.insert(validator_module.to_string());
             }
@@ -4252,7 +4194,7 @@ fn build_verify_sync_helper_arg_expr(
             .brand
             .as_deref()
             .context("verify helper missing brand id")?;
-        let validator = resolve_verify_brand_validator(module_roots, entry, brand_id)?;
+        let validator = crate::brands::resolve_brand_validator(module_roots, entry, brand_id)?;
         let check_name = format!("{raw_name}_brand_check");
         let view_name = format!("{raw_name}_brand_view");
         let validate_value = value.clone();
@@ -4799,7 +4741,10 @@ fn build_direct_prove_c_harness(
     out.push_str("  return value;\n");
     out.push_str("}\n");
     out.push_str(&format!("static void {VERIFY_HARNESS_FN}(void) {{\n"));
-    out.push_str("  uint8_t arena_mem[65536];\n");
+    out.push_str(&format!(
+        "  uint8_t arena_mem[{}];\n",
+        VERIFY_HARNESS_ARENA_CAP_BYTES
+    ));
     out.push_str("  ctx_t ctx;\n");
     out.push_str("  memset(&ctx, 0, sizeof(ctx));\n");
     out.push_str("  ctx.fuel_init = (uint64_t)(X07_FUEL_INIT);\n");
@@ -5069,7 +5014,10 @@ fn build_c_harness(input_len: u32) -> String {
     out.push_str("  return value;\n");
     out.push_str("}\n");
     out.push_str(&format!("static void {VERIFY_HARNESS_FN}(void) {{\n"));
-    out.push_str("  uint8_t arena_mem[65536];\n");
+    out.push_str(&format!(
+        "  uint8_t arena_mem[{}];\n",
+        VERIFY_HARNESS_ARENA_CAP_BYTES
+    ));
     out.push_str("  ctx_t ctx;\n");
     out.push_str("  memset(&ctx, 0, sizeof(ctx));\n");
     out.push_str("  ctx.fuel_init = (uint64_t)(X07_FUEL_INIT);\n");
@@ -5257,23 +5205,16 @@ fn find_recursive_termination_failure(target: &TargetSig, entry: &str) -> Option
     walk(&target.body, entry, decreases_ident, decreases_param_idx)
 }
 
-fn find_for_with_non_literal_bounds(expr: &Value) -> Option<String> {
+fn find_unsupported_for_forms(expr: &Value) -> Option<String> {
     match expr {
         Value::Array(items) => {
-            if matches!(items.first(), Some(Value::String(head)) if head == "for") {
-                if items.len() != 5 {
-                    return Some("unsupported `for` form in target body".to_string());
-                }
-                let start = &items[2];
-                let end = &items[3];
-                if start.as_i64().is_none() || end.as_i64().is_none() {
-                    return Some(
-                        "x07 verify v0.1 requires `for` bounds to be integer literals".to_string(),
-                    );
-                }
+            if matches!(items.first(), Some(Value::String(head)) if head == "for")
+                && items.len() != 5
+            {
+                return Some("unsupported `for` form in target body".to_string());
             }
             for item in items {
-                if let Some(msg) = find_for_with_non_literal_bounds(item) {
+                if let Some(msg) = find_unsupported_for_forms(item) {
                     return Some(msg);
                 }
             }
@@ -5281,7 +5222,7 @@ fn find_for_with_non_literal_bounds(expr: &Value) -> Option<String> {
         }
         Value::Object(map) => {
             for v in map.values() {
-                if let Some(msg) = find_for_with_non_literal_bounds(v) {
+                if let Some(msg) = find_unsupported_for_forms(v) {
                     return Some(msg);
                 }
             }
@@ -6864,6 +6805,7 @@ pub(crate) fn check_proof_object_path(proof_path: &Path) -> Result<VerifyProofCh
         replay_smt2_path.display().to_string(),
     ];
     maybe_disable_cbmc_standard_checks(&mut cbmc_args);
+    maybe_enable_cbmc_slice_formula(&mut cbmc_args);
     let (cbmc_out, _) = match run_cbmc_with_object_bits_retry(&cbmc_args, "run cbmc (proof replay)")
     {
         Ok(out) => out,
@@ -7353,6 +7295,12 @@ fn maybe_disable_cbmc_standard_checks(cbmc_args: &mut Vec<String>) {
     }
 }
 
+fn maybe_enable_cbmc_slice_formula(cbmc_args: &mut Vec<String>) {
+    if command_supports_option("cbmc", "--help", "--slice-formula") {
+        cbmc_args.push("--slice-formula".to_string());
+    }
+}
+
 fn command_supports_option(command: &str, help_flag: &str, option: &str) -> bool {
     let Ok(out) = Command::new(command).arg(help_flag).output() else {
         return false;
@@ -7400,8 +7348,10 @@ fn cbmc_too_many_addressed_objects(stdout: &[u8], stderr: &[u8]) -> bool {
 fn z3_timeout_seconds(mode: Mode, target: &TargetSig) -> u64 {
     if mode == Mode::Prove && target.is_async {
         Z3_ASYNC_PROVE_TIMEOUT_SECONDS
+    } else if mode == Mode::Prove {
+        Z3_PROVE_TIMEOUT_SECONDS
     } else {
-        Z3_TIMEOUT_SECONDS
+        Z3_SMT_TIMEOUT_SECONDS
     }
 }
 
@@ -7770,11 +7720,11 @@ exit 0
         );
         assert_eq!(
             z3_timeout_seconds(Mode::Smt, &async_target),
-            Z3_TIMEOUT_SECONDS
+            Z3_SMT_TIMEOUT_SECONDS
         );
         assert_eq!(
             z3_timeout_seconds(Mode::Prove, &sync_target),
-            Z3_TIMEOUT_SECONDS
+            Z3_PROVE_TIMEOUT_SECONDS
         );
     }
 
@@ -7999,11 +7949,11 @@ exit 1
     }
 
     #[test]
-    fn find_for_with_non_literal_bounds_requires_integer_literals() {
-        assert!(find_for_with_non_literal_bounds(&json!(["for", "i", 0, 10, 0])).is_none());
-        assert!(find_for_with_non_literal_bounds(&json!(["for", "i", "s", 10, 0])).is_some());
-        assert!(find_for_with_non_literal_bounds(&json!(["for", "i", 0, "n", 0])).is_some());
-        assert!(find_for_with_non_literal_bounds(&json!(["for", "i", 0, 10])).is_some());
+    fn find_unsupported_for_forms_requires_canonical_form() {
+        assert!(find_unsupported_for_forms(&json!(["for", "i", 0, 10, 0])).is_none());
+        assert!(find_unsupported_for_forms(&json!(["for", "i", "s", 10, 0])).is_none());
+        assert!(find_unsupported_for_forms(&json!(["for", "i", 0, "n", 0])).is_none());
+        assert!(find_unsupported_for_forms(&json!(["for", "i", 0, 10])).is_some());
     }
 
     #[test]

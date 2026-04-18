@@ -1,4 +1,4 @@
-# Compat Corpus (Milestone M0)
+# Compat Corpus
 
 This directory defines the **compatibility corpus** used as a regression safety net for evolving
 the X07 toolchain.
@@ -25,4 +25,3 @@ Separately, it runs one or more **fixability** cases (also defined in `corpus.js
 The repo already contains multiple historical versions under `packages/ext/x07-*/<version>/`.
 Those versioned directories are treated as “frozen snapshots” for compatibility testing, so the
 corpus does not duplicate package sources.
-

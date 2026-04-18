@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.arch.tasks.index@0.1.0",
+  "tasks": [
+    {
+      "id": "capture_incident_v1",
+      "fn": "workflow.graph.tasks.capture_incident_v1",
+      "deps": [],
+      "policy": {
+        "criticality": "best_effort_v1",
+        "on_failure": "retry_bounded_v1",
+        "max_retries": 1
+      }
+    }
+  ]
+}

@@ -232,6 +232,58 @@ run_x07_test() {
   fi
 }
 
+xtal_verify_check() {
+  local name="$1"
+  local work="$2"
+  shift 2
+
+  mkdir -p "$work/tmp"
+  local xtal_verify_report="$work/tmp/xtal.verify.report.json"
+  local xtal_verify_stderr="$work/tmp/xtal.verify.stderr"
+
+  set +e
+  (cd "$work" && "$x07_bin" xtal verify --project x07.json "$@" >"$xtal_verify_report" 2>"$xtal_verify_stderr")
+  local xtal_verify_code="$?"
+  set -e
+
+  if [[ "$xtal_verify_code" -ne 0 ]]; then
+    echo "ERROR: $name: x07 xtal verify failed (exit $xtal_verify_code)" >&2
+    if [[ -s "$xtal_verify_stderr" ]]; then
+      echo "--- stderr ($xtal_verify_stderr) ---" >&2
+      cat "$xtal_verify_stderr" >&2 || true
+    fi
+    if [[ -s "$xtal_verify_report" ]]; then
+      echo "--- report ($xtal_verify_report) ---" >&2
+      cat "$xtal_verify_report" >&2 || true
+    fi
+    exit 1
+  fi
+
+  if [[ ! -f "$work/arch/gen/index.x07gen.json" ]]; then
+    return 0
+  fi
+
+  local gen_verify_report="$work/tmp/gen.verify.report.json"
+  local gen_verify_stderr="$work/tmp/gen.verify.stderr"
+  set +e
+  (cd "$work" && "$x07_bin" gen verify --index arch/gen/index.x07gen.json >"$gen_verify_report" 2>"$gen_verify_stderr")
+  local gen_verify_code="$?"
+  set -e
+
+  if [[ "$gen_verify_code" -ne 0 ]]; then
+    echo "ERROR: $name: x07 gen verify failed (exit $gen_verify_code)" >&2
+    if [[ -s "$gen_verify_stderr" ]]; then
+      echo "--- stderr ($gen_verify_stderr) ---" >&2
+      cat "$gen_verify_stderr" >&2 || true
+    fi
+    if [[ -s "$gen_verify_report" ]]; then
+      echo "--- report ($gen_verify_report) ---" >&2
+      cat "$gen_verify_report" >&2 || true
+    fi
+    exit 1
+  fi
+}
+
 pkg_lock_check() {
   local work="$1"
 
@@ -854,47 +906,27 @@ copy_project "docs/examples/agent-gate/xtal/toy-sorter" "$xtal_work"
 seed_official_deps "$xtal_work"
 pkg_lock_check "$xtal_work"
 fmt_check_all "$xtal_work"
-
-mkdir -p "$xtal_work/tmp"
-xtal_verify_report="$xtal_work/tmp/xtal.verify.report.json"
-xtal_verify_stderr="$xtal_work/tmp/xtal.verify.stderr"
-set +e
-(cd "$xtal_work" && "$x07_bin" xtal verify --project x07.json >"$xtal_verify_report" 2>"$xtal_verify_stderr")
-xtal_verify_code="$?"
-set -e
-if [[ "$xtal_verify_code" -ne 0 ]]; then
-  echo "ERROR: xtal-toy-sorter: x07 xtal verify failed (exit $xtal_verify_code)" >&2
-  if [[ -s "$xtal_verify_stderr" ]]; then
-    echo "--- stderr ($xtal_verify_stderr) ---" >&2
-    cat "$xtal_verify_stderr" >&2 || true
-  fi
-  if [[ -s "$xtal_verify_report" ]]; then
-    echo "--- report ($xtal_verify_report) ---" >&2
-    cat "$xtal_verify_report" >&2 || true
-  fi
-  exit 1
-fi
-
-gen_verify_report="$xtal_work/tmp/gen.verify.report.json"
-gen_verify_stderr="$xtal_work/tmp/gen.verify.stderr"
-set +e
-(cd "$xtal_work" && "$x07_bin" gen verify --index arch/gen/index.x07gen.json >"$gen_verify_report" 2>"$gen_verify_stderr")
-gen_verify_code="$?"
-set -e
-if [[ "$gen_verify_code" -ne 0 ]]; then
-  echo "ERROR: xtal-toy-sorter: x07 gen verify failed (exit $gen_verify_code)" >&2
-  if [[ -s "$gen_verify_stderr" ]]; then
-    echo "--- stderr ($gen_verify_stderr) ---" >&2
-    cat "$gen_verify_stderr" >&2 || true
-  fi
-  if [[ -s "$gen_verify_report" ]]; then
-    echo "--- report ($gen_verify_report) ---" >&2
-    cat "$gen_verify_report" >&2 || true
-  fi
-  exit 1
-fi
+run_x07_test "xtal-toy-sorter" "$xtal_work"
+xtal_verify_check "xtal-toy-sorter" "$xtal_work"
 
 echo "ok: xtal-toy-sorter"
+
+# ----------------------------
+# Example 19: XTAL workflow-graph (solve-pure)
+# ----------------------------
+
+echo "==> agent example: xtal-workflow-graph (solve-pure)"
+
+xtal_graph_work="$tmp_dir/xtal-workflow-graph"
+copy_project "docs/examples/agent-gate/xtal/workflow-graph" "$xtal_graph_work"
+
+seed_official_deps "$xtal_graph_work"
+pkg_lock_check "$xtal_graph_work"
+fmt_check_all "$xtal_graph_work"
+run_x07_test "xtal-workflow-graph" "$xtal_graph_work"
+xtal_verify_check "xtal-workflow-graph" "$xtal_graph_work"
+
+echo "ok: xtal-workflow-graph"
 
 echo
 echo "ok: agent examples gate passed"

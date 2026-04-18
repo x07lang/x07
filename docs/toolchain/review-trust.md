@@ -216,6 +216,7 @@ Gates:
 - `--review-fail-on <CATEGORY>` forwards to `x07 review diff --fail-on <CATEGORY>` when `--baseline <PATH>` is provided.
   - If no `--review-fail-on` is provided, the default diff gates remain in effect.
   - When a baseline is provided, `review.diff.txt` is written next to `review.diff.json`/`review.diff.html` as a stable 1-page summary.
+- `--no-fail-fast` forwards to `x07 test --no-fail-fast` so certification can report the full set of failing tests instead of stopping after the first failure.
 
 The certificate bundle includes:
 

@@ -283,7 +283,7 @@ So “regenerate stdlib” is reproducible.
 
 ---
 
-## Development plan as PR-sized milestones (no ambiguity)
+## Development plan as PR-sized deliverables (no ambiguity)
 
 Note: the repo implementation landed as `crates/x07import-core/` + `crates/x07import-cli/` (not the `x07-translator*` names in this historical draft plan).
 

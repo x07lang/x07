@@ -8499,8 +8499,8 @@ fn x07_init_creates_project_skeleton() {
         vec![
             "Agent kit: AGENT.md (self-recovery + canonical commands)",
             "Toolchain pin: x07-toolchain.toml (channel=stable; components=docs+skills)",
-            "Project docs: .agent/docs/ (linked to toolchain docs)",
-            "Project skills: .agent/skills/ (linked to toolchain skills)",
+            "Project docs: .agent/docs/ (copied from toolchain docs)",
+            "Project skills: .agent/skills/ (copied from toolchain skills)",
             "Offline docs: x07up docs path --json",
             "Skills status: x07up skills status --json",
         ]
@@ -9285,8 +9285,8 @@ fn x07_init_creates_package_skeleton() {
             "Package repo: x07-package.json (publish contract)",
             "Agent kit: AGENT.md (self-recovery + canonical commands)",
             "Toolchain pin: x07-toolchain.toml (channel=stable; components=docs+skills)",
-            "Project docs: .agent/docs/ (linked to toolchain docs)",
-            "Project skills: .agent/skills/ (linked to toolchain skills)",
+            "Project docs: .agent/docs/ (copied from toolchain docs)",
+            "Project skills: .agent/skills/ (copied from toolchain skills)",
             "Offline docs: x07up docs path --json",
             "Skills status: x07up skills status --json",
         ]

@@ -36,6 +36,7 @@ Do not add `.x07/deps/*/modules` paths to `module_roots` manually.
 If you see an `unknown module` compile error and you don’t know which package provides it, use:
 
 - `x07 pkg provides <module-id>`
+- To see what ships in the current toolchain bundle (offline): `x07 pkg inventory` (see `docs/packages/inventory.md`).
 
 ## Local path dependencies
 

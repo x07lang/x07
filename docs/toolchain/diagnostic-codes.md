@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 637
-- quickfix support (`sometimes` or `always`): 577
-- quickfix coverage: 90.58%
+- total codes: 640
+- quickfix support (`sometimes` or `always`): 580
+- quickfix coverage: 90.62%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -313,6 +313,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `WXTAL_REPAIR_SPEC_PATCH_SUGGESTED` | x07 / run / warning | sometimes | XTAL emitted a spec patch suggestion for review. |
 | `WXTAL_SPEC_NONCANONICAL_JSON` | x07 / rewrite / warning | always | Spec JSON is not in canonical form. |
 | `WXTAL_VERIFY_PROVE_INCONCLUSIVE` | x07 / run / warning | sometimes | Proof attempt was inconclusive. |
+| `WXTAL_VERIFY_PROVE_SUPPORT` | x07 / run / warning | sometimes | Proof support summary emitted for verification entries. |
 | `WXTAL_VERIFY_PROVE_TIMEOUT` | x07 / run / warning | sometimes | Proof attempt hit the configured budget. |
 | `WXTAL_VERIFY_PROVE_TOOL_MISSING` | x07 / run / warning | sometimes | Proof tool is missing or unavailable. |
 | `WXTAL_VERIFY_PROVE_UNSUPPORTED` | x07 / run / warning | sometimes | Proof attempt is unsupported for this entry. |
@@ -435,6 +436,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_INDEX_CONFIG` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_CONFIG`. |
 | `X07PKG_INDEX_FETCH` | x07 / lint / error | never | Diagnostic code `X07PKG_INDEX_FETCH`. |
 | `X07PKG_INDEX_NO_MATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`. |
+| `X07PKG_INVENTORY_LAYOUT` | x07 / lint / error | sometimes | Toolchain layout is missing required package directories. |
+| `X07PKG_INVENTORY_TOOLCHAIN_ROOT` | x07 / lint / error | sometimes | Could not auto-detect the toolchain root for package inventory. |
 | `X07PKG_LIST_INDEX_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LIST_INDEX_MISSING`. |
 | `X07PKG_LIST_UNSUPPORTED` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LIST_UNSUPPORTED`. |
 | `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`. |
@@ -6865,6 +6868,26 @@ Agent strategy:
 - If needed, raise bounds (`--unwind`, `--max-bytes-len`) or switch to `--proof-policy strict` only when the codebase is ready.
 
 
+## `WXTAL_VERIFY_PROVE_SUPPORT`
+
+Summary: Proof support summary emitted for verification entries.
+
+Origins:
+- x07 (stage: run, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The verification run collected the first prove diagnostic per entry and emitted a compact table so you can quickly see which entries are unsupported/inconclusive and why. In balanced policy this is recorded as a warning.
+
+Agent strategy:
+
+- Read the `entry | code | message` rows.
+- For entries that must be proven, refactor to the supported subset or adjust bounds and re-run.
+- If the proof surface is optional, keep balanced policy and rely on tests/runtime checks.
+
+
 ## `WXTAL_VERIFY_PROVE_TIMEOUT`
 
 Summary: Proof attempt hit the configured budget.
@@ -9346,6 +9369,46 @@ Agent strategy:
 - Normalize dependency specs and run `x07 pkg lock`.
 - Use `x07 pkg add/remove/versions/login/publish` as needed.
 - Re-run the original package command.
+
+
+## `X07PKG_INVENTORY_LAYOUT`
+
+Summary: Toolchain layout is missing required package directories.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg inventory` expects `stdlib/` and `packages/ext/` under the toolchain root.
+
+Agent strategy:
+
+- Confirm `--toolchain-root` points at a toolchain root.
+- Ensure `stdlib/` and `packages/ext/` exist (reinstall/update the toolchain if needed).
+- Re-run `x07 pkg inventory`.
+
+
+## `X07PKG_INVENTORY_TOOLCHAIN_ROOT`
+
+Summary: Could not auto-detect the toolchain root for package inventory.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 pkg inventory` needs a toolchain root (a directory containing `stdlib.lock`). Auto-detection failed.
+
+Agent strategy:
+
+- Pass `--toolchain-root <dir>` (directory containing `stdlib.lock`).
+- If you expected auto-detection, run the command from the toolchain root.
+- Re-run `x07 pkg inventory`.
 
 
 ## `X07PKG_LIST_INDEX_MISSING`

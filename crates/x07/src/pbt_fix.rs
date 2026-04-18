@@ -539,13 +539,19 @@ pub(crate) fn cmd_fix_from_pbt(
     }
 
     let tys = pbt::counterexample_tys(&repro);
+    let driver_params = tys
+        .into_iter()
+        .map(|ty| pbt::PbtDriverParam { ty, brand: None })
+        .collect::<Vec<_>>();
     let (imports, begin_expr) =
-        pbt::build_case_call_begin_expr(&repro.test.entry, &tys, budget_scope).map_err(|err| {
-            anyhow::Error::new(FixFromPbtError::ReproParse {
-                repro_path: repro_path.to_path_buf(),
-                message: err.to_string(),
-            })
-        })?;
+        pbt::build_case_call_begin_expr(&repro.test.entry, &driver_params, budget_scope).map_err(
+            |err| {
+                anyhow::Error::new(FixFromPbtError::ReproParse {
+                    repro_path: repro_path.to_path_buf(),
+                    message: err.to_string(),
+                })
+            },
+        )?;
 
     let wrapper_module_doc = serde_json::json!({
         "schema_version": X07AST_SCHEMA_VERSION,

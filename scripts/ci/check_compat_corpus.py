@@ -203,7 +203,7 @@ def parse_corpus(doc: Any) -> tuple[list[CorpusProject], list[FixCase]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the X07 compat corpus checks (Milestone M0).")
+    parser = argparse.ArgumentParser(description="Run the X07 compat corpus checks.")
     parser.add_argument("--corpus", default="tests/compat_corpus/corpus.json", help="Path to corpus.json")
     parser.add_argument("--x07", required=True, help="Path to x07 binary")
     args = parser.parse_args()

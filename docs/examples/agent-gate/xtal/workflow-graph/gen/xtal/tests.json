@@ -1,0 +1,222 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0001",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.toposort_u32.v1/ex0001",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0002",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.toposort_u32.v1/ex0002",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0003",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.toposort_u32.v1/ex0003",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0004",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.has_cycle_u32.v1/ex0001",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0005",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.has_cycle_u32.v1/ex0002",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0006",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.has_cycle_u32.v1/ex0003",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0007",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.ready_frontier_u32.v1/ex0001",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0008",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.ready_frontier_u32.v1/ex0002",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0009",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.ready_frontier_u32.v1/ex0003",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0010",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.makespan_u32.v1/ex0001",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0011",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.makespan_u32.v1/ex0002",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0012",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.makespan_u32.v1/ex0003",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.ex_0013",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.makespan_u32.v1/ex0004",
+      "returns": "result_i32",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.prop_0001",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.toposort_u32.v1/prop0001",
+      "pbt": {
+        "cases": 100,
+        "max_shrinks": 4096,
+        "params": [
+          {
+            "gen": {
+              "kind": "i32",
+              "max": 1000,
+              "min": -1000
+            },
+            "name": "n"
+          },
+          {
+            "gen": {
+              "kind": "bytes",
+              "max_len": 64
+            },
+            "name": "edges"
+          }
+        ]
+      },
+      "returns": "bytes_status_v1",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.prop_0002",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.has_cycle_u32.v1/prop0002",
+      "pbt": {
+        "cases": 100,
+        "max_shrinks": 4096,
+        "params": [
+          {
+            "gen": {
+              "kind": "i32",
+              "max": 1000,
+              "min": -1000
+            },
+            "name": "n"
+          },
+          {
+            "gen": {
+              "kind": "bytes",
+              "max_len": 64
+            },
+            "name": "edges"
+          }
+        ]
+      },
+      "returns": "bytes_status_v1",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.prop_0003",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.ready_frontier_u32.v1/prop0003",
+      "pbt": {
+        "cases": 100,
+        "max_shrinks": 4096,
+        "params": [
+          {
+            "gen": {
+              "kind": "i32",
+              "max": 1000,
+              "min": -1000
+            },
+            "name": "n"
+          },
+          {
+            "gen": {
+              "kind": "bytes",
+              "max_len": 64
+            },
+            "name": "edges"
+          },
+          {
+            "gen": {
+              "kind": "bytes",
+              "max_len": 64
+            },
+            "name": "completed"
+          }
+        ]
+      },
+      "returns": "bytes_status_v1",
+      "world": "solve-pure"
+    },
+    {
+      "entry": "gen.xtal.workflow.graph.tests.prop_0004",
+      "expect": "pass",
+      "id": "xtal/workflow.graph/op.workflow.graph.makespan_u32.v1/prop0004",
+      "pbt": {
+        "cases": 100,
+        "max_shrinks": 4096,
+        "params": [
+          {
+            "gen": {
+              "kind": "i32",
+              "max": 1000,
+              "min": -1000
+            },
+            "name": "n"
+          },
+          {
+            "gen": {
+              "kind": "bytes",
+              "max_len": 64
+            },
+            "name": "edges"
+          },
+          {
+            "gen": {
+              "kind": "bytes",
+              "max_len": 64
+            },
+            "name": "durations"
+          }
+        ]
+      },
+      "returns": "bytes_status_v1",
+      "world": "solve-pure"
+    }
+  ]
+}

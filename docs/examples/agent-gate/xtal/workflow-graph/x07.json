@@ -1,0 +1,14 @@
+{
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "operational_entry_symbol": "workflow.graph.toposort_u32",
+  "module_roots": [
+    "src",
+    "tests",
+    "gen"
+  ],
+  "lockfile": "x07.lock.json",
+  "dependencies": []
+}

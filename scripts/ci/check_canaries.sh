@@ -52,28 +52,28 @@ fi
 
 run_quiet "check_prod_surface_lean" "$python_bin" scripts/ci/check_prod_surface_lean.py
 
-# Milestone 1: canonical repair loop is implicit in run/build.
+# Canary: canonical repair loop is implicit in run/build.
 run_quiet "check_run_auto_repair" ./scripts/ci/check_run_auto_repair.sh
 run_quiet "check_build_auto_repair" ./scripts/ci/check_build_auto_repair.sh
 
-# Milestone 2: whitespace-capable literals / authoring ergonomics.
+# Canary: whitespace-capable literals / authoring ergonomics.
 run_quiet "check_text_literals_smoke" ./scripts/ci/check_text_literals_smoke.sh
 
-# Milestone 2.1: data interchange codecs (ext packages).
+# Canary: data interchange codecs (ext packages).
 run_quiet "check_ext_toml_data_model_parse_smoke" ./scripts/ci/check_ext_toml_data_model_parse_smoke.sh
 run_quiet "check_ext_pb_data_model_emit_smoke" ./scripts/ci/check_ext_pb_data_model_emit_smoke.sh
 
-# Milestone 3: actionable diagnostics (ptr + suggested fix + quickfix).
+# Canary: actionable diagnostics (ptr + suggested fix + quickfix).
 run_quiet "check_diagnostics_actionable" "$python_bin" scripts/ci/check_diagnostics_actionable.py
 run_quiet "check_diag_catalog_sync" ./scripts/ci/check_diag_catalog_sync.sh
 
-# Milestone 4: package/module discovery (provides).
+# Canary: package/module discovery (provides).
 run_quiet "check_pkg_provides_smoke" ./scripts/ci/check_pkg_provides_smoke.sh
 
-# Milestone 5: concurrency + parallelism in os + sandbox worlds.
+# Canary: concurrency + parallelism in os + sandbox worlds.
 run_quiet "check_concurrency_parallelism_smoke" ./scripts/ci/check_concurrency_parallelism_smoke.sh
 
-# Milestone 6: threads policy enforcement in sandbox.
+# Canary: threads policy enforcement in sandbox.
 run_quiet "check_threads_smoke" ./scripts/ci/check_threads_smoke.sh
 
 export X07C_BIN
@@ -104,7 +104,7 @@ run_quiet "generate_stdlib_os_lock" "$python_bin" scripts/generate_stdlib_lock.p
 run_quiet "check_x07import_diagnostics_sync" ./scripts/ci/check_x07import_diagnostics_sync.sh
 run_quiet "check_x07import_generated" ./scripts/ci/check_x07import_generated.sh
 
-# Milestone 7: installer/docs contract stays consistent with release targets.
+# Canary: installer/docs contract stays consistent with release targets.
 run_quiet "check_install_docs_targets" ./scripts/ci/check_install_docs_targets.sh
 
 echo "ok: canary gate passed"

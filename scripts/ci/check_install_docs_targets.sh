@@ -29,7 +29,7 @@ if [[ ! -f "$install_md" ]]; then
 fi
 
 # Enforce that the install docs don't contradict the supported targets emitted by
-# scripts/build_channels_json.py (Milestone 7).
+# scripts/build_channels_json.py.
 if match "aarch64-unknown-linux-gnu" "$targets_py"; then
   if match "Linux ARM64.*require building from source" "$install_md"; then
     echo "ERROR: install docs claim Linux ARM64 requires source builds, but channels manifest includes aarch64-unknown-linux-gnu" >&2

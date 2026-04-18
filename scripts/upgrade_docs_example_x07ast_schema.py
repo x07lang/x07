@@ -43,11 +43,18 @@ def load_versions(root: Path) -> dict[str, str]:
 def is_hidden_rel(rel: Path) -> bool:
     return any(part.startswith(".") for part in rel.parts)
 
+def is_generated_rel(rel: Path) -> bool:
+    # docs/examples contains runnable projects. Tool outputs like `target/` and `dist/`
+    # are intentionally ignored by docs checks (they are gitignored and can be huge).
+    return any(part in {"target", "dist", "artifacts", "node_modules"} for part in rel.parts)
+
 
 def iter_x07ast_files(examples_root: Path) -> Iterable[Path]:
     for path in sorted(examples_root.rglob("*.x07.json")):
         rel = path.relative_to(examples_root)
         if is_hidden_rel(rel):
+            continue
+        if is_generated_rel(rel):
             continue
         if not path.is_file():
             continue

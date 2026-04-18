@@ -118,6 +118,7 @@ const X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_BYTES: &[u8] =
 
 const DEFAULT_MODULE_SCAN_INCLUDE: &[&str] = &["**/*.x07.json"];
 const DEFAULT_MODULE_SCAN_EXCLUDE: &[&str] = &[
+    "**/.agent/**",
     "**/.git/**",
     "**/.x07/**",
     "**/dist/**",
@@ -164,6 +165,12 @@ pub struct ArchCheckArgs {
     /// Update the lock file deterministically.
     #[arg(long)]
     pub write_lock: bool,
+
+    /// Project manifest path (`x07.json`) or directory containing it.
+    ///
+    /// When set, `--repo-root` defaults to the project root.
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
 
     /// Repository root directory.
     #[arg(long, value_name = "DIR", default_value = ".")]
@@ -1663,7 +1670,20 @@ fn cmd_arch_check(
         anyhow::bail!("--emit-patch '-' is not supported");
     }
 
-    let repo_root = util::resolve_existing_path_upwards(&args.repo_root);
+    let repo_root = if let Some(project) = args.project.as_deref() {
+        let resolved = util::resolve_existing_path_upwards(project);
+        if resolved.is_file() {
+            resolved
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."))
+                .to_path_buf()
+        } else {
+            resolved
+        }
+    } else {
+        util::resolve_existing_path_upwards(&args.repo_root)
+    };
     if !repo_root.is_dir() {
         anyhow::bail!("repo root is not a directory: {}", repo_root.display());
     }

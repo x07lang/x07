@@ -258,6 +258,10 @@ pub struct TrustCertifyArgs {
     #[arg(long, value_name = "PATH", default_value = "tests/tests.json")]
     pub tests_manifest: PathBuf,
 
+    /// Preserve full test signal after the first failure.
+    #[arg(long)]
+    pub no_fail_fast: bool,
+
     /// Optional review baseline path for `x07 review diff`.
     #[arg(long, value_name = "PATH")]
     pub baseline: Option<PathBuf>,
@@ -2938,6 +2942,7 @@ fn cmd_trust_certify(
         let tests_ref = build_tests_evidence(
             &project_root,
             &tests_manifest,
+            args.no_fail_fast,
             profile.as_ref(),
             &boundary_requirements,
             &out_dir,
@@ -5740,6 +5745,7 @@ fn load_proof_check_evidence(
 fn build_tests_evidence(
     project_root: &Path,
     tests_manifest: &Path,
+    no_fail_fast: bool,
     profile: Option<&TrustProfile>,
     boundary_requirements: &BoundaryEvidenceRequirements,
     out_dir: &Path,
@@ -5781,6 +5787,9 @@ fn build_tests_evidence(
         tests_report_path.display().to_string(),
         "--quiet-json".to_string(),
     ];
+    if no_fail_fast {
+        args.push("--no-fail-fast".to_string());
+    }
     if profile.is_some_and(|p| p.evidence_requirements.require_pbt.trim() != "none") {
         args.push("--all".to_string());
     }

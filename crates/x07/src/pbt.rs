@@ -82,6 +82,18 @@ pub(crate) enum PbtTy {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct PbtDriverParam {
+    pub ty: PbtTy,
+    pub brand: Option<PbtDriverParamBrand>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PbtDriverParamBrand {
+    pub brand_id: String,
+    pub validator_symbol: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) enum PbtGen {
     I32 { min: i32, max: i32 },
     Bytes { max_len: u32 },
@@ -163,7 +175,7 @@ impl ParamValue {
 
 pub(crate) fn build_case_call_begin_expr(
     entry: &str,
-    tys: &[PbtTy],
+    params: &[PbtDriverParam],
     budget_scope: Option<PbtBudgetScope>,
 ) -> Result<(Vec<String>, Value)> {
     let (module_id, _name) = entry.rsplit_once('.').context("entry must contain '.'")?;
@@ -172,10 +184,19 @@ pub(crate) fn build_case_call_begin_expr(
     if module_id != "std.codec" && module_id != "std.test" {
         imports.push(module_id.to_string());
     }
+    for param in params {
+        if let Some(brand) = param.brand.as_ref() {
+            if let Some(validator) = brand.validator_symbol.as_deref() {
+                if let Some((brand_module_id, _)) = validator.rsplit_once('.') {
+                    imports.push(brand_module_id.to_string());
+                }
+            }
+        }
+    }
     imports.sort();
     imports.dedup();
 
-    let expected_n = tys.len() as i32;
+    let expected_n = params.len() as i32;
     let fail_code = serde_json::json!(["std.test.code_fail_generic"]);
     let fail_status = serde_json::json!(["std.test.status_fail", fail_code]);
 
@@ -199,26 +220,23 @@ pub(crate) fn build_case_call_begin_expr(
         ["+", 4, ["*", 4, ["+", "n", 1]]]
     ]));
 
-    for (i, ty) in tys.iter().enumerate() {
+    for i in 0..=params.len() {
         let i_i32 = i as i32;
         let off_i_name = format!("off{i}");
-        let off_j_name = format!("off{}", i + 1);
-        let slice_name = format!("s{i}");
-        let arg_name = format!("a{i}");
-
         let off_i_pos = 4 + 4 * i_i32;
-        let off_j_pos = 4 + 4 * (i_i32 + 1);
-
         stmts.push(serde_json::json!([
             "let",
             off_i_name,
             ["codec.read_u32_le", "input", off_i_pos]
         ]));
-        stmts.push(serde_json::json!([
-            "let",
-            off_j_name,
-            ["codec.read_u32_le", "input", off_j_pos]
-        ]));
+    }
+
+    for (i, param) in params.iter().enumerate() {
+        let off_i_name = format!("off{i}");
+        let off_j_name = format!("off{}", i + 1);
+        let slice_name = format!("s{i}");
+        let raw_name = format!("a{i}_raw");
+        let arg_name = format!("a{i}");
 
         stmts.push(serde_json::json!([
             "let",
@@ -231,16 +249,65 @@ pub(crate) fn build_case_call_begin_expr(
             ]
         ]));
 
-        let value_expr = match *ty {
+        let raw_expr = match param.ty {
             PbtTy::I32 => serde_json::json!(["codec.read_u32_le", slice_name, 0]),
             PbtTy::Bytes => serde_json::json!(["view.to_bytes", slice_name]),
         };
-        stmts.push(serde_json::json!(["let", arg_name, value_expr]));
+        stmts.push(serde_json::json!(["let", raw_name, raw_expr]));
+
+        if let Some(brand) = param.brand.as_ref() {
+            if let Some(validator) = brand.validator_symbol.as_deref() {
+                // If the cast fails, we treat this case as skipped (discard).
+                let cast_name = format!("a{i}_cast");
+                let code_name = format!("a{i}_cast_code");
+                stmts.push(serde_json::json!([
+                    "let",
+                    cast_name,
+                    [
+                        "std.brand.cast_bytes_v1",
+                        brand.brand_id.as_str(),
+                        validator,
+                        raw_name.as_str()
+                    ]
+                ]));
+                stmts.push(serde_json::json!([
+                    "let",
+                    code_name,
+                    ["result_bytes.err_code", cast_name.as_str()]
+                ]));
+                stmts.push(serde_json::json!([
+                    "if",
+                    ["=", code_name.as_str(), 0],
+                    0,
+                    ["return", ["std.test.status_skip"]]
+                ]));
+                stmts.push(serde_json::json!([
+                    "let",
+                    arg_name,
+                    ["__internal.result_bytes.unwrap_ok_v1", cast_name.as_str()]
+                ]));
+            } else {
+                stmts.push(serde_json::json!([
+                    "let",
+                    arg_name,
+                    [
+                        "unsafe",
+                        [
+                            "std.brand.assume_bytes_v1",
+                            brand.brand_id.as_str(),
+                            raw_name.as_str()
+                        ]
+                    ]
+                ]));
+            }
+        } else {
+            stmts.push(serde_json::json!(["let", arg_name, raw_name]));
+        }
     }
 
-    let mut call_items: Vec<Value> = Vec::with_capacity(1 + tys.len());
+    let mut call_items: Vec<Value> = Vec::with_capacity(1 + params.len());
     call_items.push(Value::String(entry.to_string()));
-    for i in 0..tys.len() {
+    for i in 0..params.len() {
         call_items.push(Value::String(format!("a{i}")));
     }
     let call_expr = Value::Array(call_items);
@@ -283,10 +350,10 @@ pub(crate) fn build_case_call_begin_expr(
 
 pub(crate) fn build_case_driver_x07ast_json(
     entry: &str,
-    tys: &[PbtTy],
+    params: &[PbtDriverParam],
     budget_scope: Option<PbtBudgetScope>,
 ) -> Result<Vec<u8>> {
-    let (imports, solve) = build_case_call_begin_expr(entry, tys, budget_scope)?;
+    let (imports, solve) = build_case_call_begin_expr(entry, params, budget_scope)?;
 
     let file = serde_json::json!({
         "schema_version": X07AST_SCHEMA_VERSION,
@@ -410,6 +477,205 @@ pub(crate) enum FailureKind {
     Timeout,
     Fuel,
     Nondeterminism,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+
+    fn module_roots_with_stdlib(local_root: &Path) -> Vec<PathBuf> {
+        let cwd = std::env::current_dir().expect("cwd");
+        let toolchain_root =
+            crate::util::detect_toolchain_root_best_effort(&cwd).expect("detect toolchain root");
+        let mut roots = vec![local_root.to_path_buf()];
+        roots.extend(crate::util::toolchain_stdlib_module_roots(&toolchain_root));
+        roots
+    }
+
+    fn write_module(path: &Path, module_id: &str, imports: &[&str], decls: Vec<Value>) {
+        std::fs::create_dir_all(path.parent().expect("module parent"))
+            .expect("create module parent");
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": X07AST_SCHEMA_VERSION,
+                "kind": "module",
+                "module_id": module_id,
+                "imports": imports,
+                "decls": decls,
+            }))
+            .expect("serialize module"),
+        )
+        .expect("write module");
+    }
+
+    fn compile_driver(driver_src: &[u8], module_roots: Vec<PathBuf>) -> Result<()> {
+        let mut opts =
+            x07c::world_config::compile_options_for_world(WorldId::SolvePure, module_roots);
+        opts.allow_internal_only_heads_in_entry = true;
+        x07c::compile::compile_program_to_c_with_meta(driver_src, &opts)
+            .map_err(|err| anyhow::anyhow!("{:?}: {}", err.kind, err.message))?;
+        Ok(())
+    }
+
+    #[test]
+    fn pbt_driver_name_hygiene_handles_mixed_and_multi_bytes_signatures() {
+        let dir = std::env::temp_dir().join(format!(
+            "x07_pbt_driver_hygiene_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("time")
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+
+        let module_id = "pbt_fixture";
+        let entry_i32_bytes = "pbt_fixture.f_i32_bytes";
+        let entry_i32_bytes_bytes = "pbt_fixture.f_i32_bytes_bytes";
+        let entry_bytes_bytes = "pbt_fixture.f_bytes_bytes";
+        let module_path = dir.join("pbt_fixture.x07.json");
+        write_module(
+            &module_path,
+            module_id,
+            &["std.test"],
+            vec![
+                serde_json::json!({"kind":"export","names":[entry_i32_bytes, entry_i32_bytes_bytes, entry_bytes_bytes]}),
+                serde_json::json!({
+                    "kind":"defn",
+                    "name": entry_i32_bytes,
+                    "params": [{"name":"a","ty":"i32"},{"name":"b","ty":"bytes"}],
+                    "result":"bytes",
+                    "body":["std.test.status_ok"],
+                }),
+                serde_json::json!({
+                    "kind":"defn",
+                    "name": entry_i32_bytes_bytes,
+                    "params": [{"name":"a","ty":"i32"},{"name":"b","ty":"bytes"},{"name":"c","ty":"bytes"}],
+                    "result":"bytes",
+                    "body":["std.test.status_ok"],
+                }),
+                serde_json::json!({
+                    "kind":"defn",
+                    "name": entry_bytes_bytes,
+                    "params": [{"name":"b0","ty":"bytes"},{"name":"b1","ty":"bytes"}],
+                    "result":"bytes",
+                    "body":["std.test.status_ok"],
+                }),
+            ],
+        );
+
+        let cases = [
+            (
+                entry_i32_bytes,
+                vec![
+                    PbtDriverParam {
+                        ty: PbtTy::I32,
+                        brand: None,
+                    },
+                    PbtDriverParam {
+                        ty: PbtTy::Bytes,
+                        brand: None,
+                    },
+                ],
+            ),
+            (
+                entry_i32_bytes_bytes,
+                vec![
+                    PbtDriverParam {
+                        ty: PbtTy::I32,
+                        brand: None,
+                    },
+                    PbtDriverParam {
+                        ty: PbtTy::Bytes,
+                        brand: None,
+                    },
+                    PbtDriverParam {
+                        ty: PbtTy::Bytes,
+                        brand: None,
+                    },
+                ],
+            ),
+            (
+                entry_bytes_bytes,
+                vec![
+                    PbtDriverParam {
+                        ty: PbtTy::Bytes,
+                        brand: None,
+                    },
+                    PbtDriverParam {
+                        ty: PbtTy::Bytes,
+                        brand: None,
+                    },
+                ],
+            ),
+        ];
+
+        for (entry, params) in cases {
+            let driver = build_case_driver_x07ast_json(entry, &params, None).expect("driver");
+            let roots = module_roots_with_stdlib(&dir);
+            compile_driver(&driver, roots).expect("compile driver");
+        }
+
+        std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn pbt_driver_brands_bytes_params_via_cast() {
+        let dir = std::env::temp_dir().join(format!(
+            "x07_pbt_driver_brand_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("time")
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+
+        let module_id = "pbt_brand_fixture";
+        let entry = "pbt_brand_fixture.f";
+        let brand_id = "pbt.brand_v1";
+        let validator = "pbt_brand_fixture.validate_brand_v1";
+        let module_path = dir.join("pbt_brand_fixture.x07.json");
+        write_module(
+            &module_path,
+            module_id,
+            &["std.codec", "std.test"],
+            vec![
+                serde_json::json!({"kind":"export","names":[entry, validator]}),
+                serde_json::json!({
+                    "kind":"defn",
+                    "name": validator,
+                    "params": [{"name":"v","ty":"bytes_view"}],
+                    "result":"result_i32",
+                    "body": ["result_i32.ok", 0],
+                }),
+                serde_json::json!({
+                    "kind":"defn",
+                    "name": entry,
+                    "params": [{"name":"b","ty":"bytes","brand":brand_id}],
+                    "result":"bytes",
+                    "body":["std.test.status_ok"],
+                }),
+            ],
+        );
+
+        let params = vec![PbtDriverParam {
+            ty: PbtTy::Bytes,
+            brand: Some(PbtDriverParamBrand {
+                brand_id: brand_id.to_string(),
+                validator_symbol: Some(validator.to_string()),
+            }),
+        }];
+        let driver = build_case_driver_x07ast_json(entry, &params, None).expect("generate driver");
+        let roots = module_roots_with_stdlib(&dir);
+        compile_driver(&driver, roots).expect("compile driver");
+
+        std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -738,6 +1004,7 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
 
     let mut attempted_cases: u32 = 0;
     let mut last_run: Option<RunnerResult> = None;
+    let mut last_non_skip: Option<(RunnerResult, u8, u32)> = None;
     let mut failure_values: Option<Vec<ParamValue>> = None;
     let mut failure_kind: Option<FailureKind> = None;
     let mut failure_assert_code: Option<u32> = None;
@@ -785,6 +1052,10 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
                 failure_values = Some(values);
                 break;
             }
+            2 => {
+                // Discard this case (for example a brand cast failed inside the generated driver).
+                continue;
+            }
             other => {
                 anyhow::bail!(
                     "unsupported std.test.status_v1 tag from property: {}",
@@ -792,14 +1063,19 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
                 );
             }
         }
+
+        last_non_skip = Some((run, tag, code_u32));
     }
 
     let Some(failure_values) = failure_values else {
-        let run = last_run.context("internal error: missing last run")?;
-        let status_v1 = crate::parse_evtest_status_v1(&run.solve_output)
-            .context("parse std.test.status_v1 output")?;
-        let tag = status_v1.tag;
-        let code_u32 = status_v1.code_u32;
+        let (run, tag, code_u32) = if let Some((run, tag, code_u32)) = last_non_skip {
+            (run, tag, code_u32)
+        } else {
+            let run = last_run.context("internal error: missing last run")?;
+            let status_v1 = crate::parse_evtest_status_v1(&run.solve_output)
+                .context("parse std.test.status_v1 output")?;
+            (run, status_v1.tag, status_v1.code_u32)
+        };
         let suite = PbtSuiteRun {
             final_run: run,
             status_tag: Some(tag),
@@ -842,7 +1118,7 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
         let tag = status_v1.tag;
         let code_u32 = status_v1.code_u32;
         match tag {
-            1 => Ok(CaseEvalOutcome {
+            1 | 2 => Ok(CaseEvalOutcome {
                 fails: false,
                 run,
                 status_tag: Some(tag),

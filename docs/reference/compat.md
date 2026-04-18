@@ -84,7 +84,7 @@ How warnings are emitted:
 - Warnings are emitted as `x07diag` diagnostics with `severity="warning"` and stable `code` identifiers.
 - `x07 check` and `x07 run` continue to succeed (exit code `0`) when only warnings are present, but they still include the warnings in the JSON report so agents can repair/migrate proactively.
 
-## Guardrails (Milestone M0)
+## Guardrails
 
 Compatibility is enforced by CI guardrails:
 
@@ -95,7 +95,7 @@ Compatibility is enforced by CI guardrails:
 - **Docs examples compile**: all `docs/examples/**/x07.json` projects must typecheck against the current toolchain.
   - Harness: `scripts/ci/check_doc_examples_compile.py`
 - **Diagnostics catalog coverage**: every emitted diagnostic code must be documented and discoverable.
-  (See `x07 diag coverage` and the CI gate described in this milestone.)
+  (See `x07 diag coverage` and the CI gate described in this section.)
 
 ## How To Introduce A Behavior Change
 

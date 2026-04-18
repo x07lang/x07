@@ -21,7 +21,7 @@ fi
 files=()
 while IFS= read -r -d '' f; do
   files+=("$f")
-done < <(find docs/examples -name '*.x07.json' -type f -not -path '*/.*/*' -print0 | sort -z)
+done < <(find docs/examples -name '*.x07.json' -type f -not -path '*/.*/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/artifacts/*' -not -path '*/node_modules/*' -print0 | sort -z)
 
 if [[ "${#files[@]}" -eq 0 ]]; then
   echo "ERROR: no docs/examples/**/*.x07.json files found" >&2
@@ -41,4 +41,3 @@ if [[ "$ok" -ne 1 ]]; then
 fi
 
 echo "ok: docs/examples x07AST files formatted"
-
