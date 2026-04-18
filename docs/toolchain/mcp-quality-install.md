@@ -35,9 +35,9 @@ Artifacts under `out/scan/`:
 Score truth semantics are explicit in the report:
 
 - `score_mode=full` means `overall_score` is populated and eligible as a full score.
-- `score_mode=partial` keeps `overall_score=null` while still providing a numeric `partial_score` for comparison, plus `gating_reasons` for what is missing (commonly Trust inputs).
+- `score_mode=partial` means the scan is not publishable (`score_truth_status=partial`). `overall_score` is still computed as the effective score (matching `partial_score`), and `gating_reasons` explain what evidence is missing (commonly Trust inputs).
 
-Token/context usage truth is also explicit under `scan.json.usage_metrics.usage_mode`:
+Token/context usage truth is explicit under `scan.json.usage_metrics` (`requested_usage_mode`, `usage_status`, plus the effective `usage_mode`):
 
 - `estimate` (deterministic estimates)
 - `tokenizer_exact` (exact counts under `--tokenizer openai:o200k_base` / `openai:cl100k_base`)

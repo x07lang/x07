@@ -51,6 +51,12 @@ Token/context truth classes are explicit in `scan.json.usage_metrics` and in ric
 - `usage_mode=trace_observed`: observed counts from a real client trace (`--token-trace trace.json`)
 - `usage_mode=mixed`: per-metric mix of exact + observed
 
+By default, Hardproof uses `--usage-mode auto`. Auto prefers exact tokenization when tokenizer tables are available and the tool catalog is within limits; otherwise it falls back to deterministic estimates. Fallbacks and errors are explicit in:
+
+- `requested_usage_mode` (what you asked for)
+- `usage_status` (`ok|fallback|error`)
+- `usage_error_code` + `usage_fallback_reason` (why)
+
 4) Replay:
 
 ```sh
@@ -79,7 +85,7 @@ hardproof scan \
 Score semantics are explicit in the report:
 
 - `score_mode=full`: `overall_score` is populated and the scan is eligible for a full score.
-- `score_mode=partial`: `overall_score` stays `null`, `partial_score` remains machine-readable, and rich output withholds the primary score.
+- `score_mode=partial`: the scan is not publishable (`score_truth_status=partial`). `overall_score` is still computed as the effective score (matching `partial_score`), and `gating_reasons` explain what evidence is missing (commonly Trust inputs).
 
 `hardproof ci` now fails on `score_mode=partial` by default. Use `--allow-partial-score` only when a partial gate is intentional.
 
