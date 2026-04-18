@@ -7043,7 +7043,7 @@ Details:
 
 Binary operators in x07AST take exactly two arguments.
 
-Valid form: ["<op>", <a>, <b>].
+Valid form: `["<op>", <a>, <b>].`
 
 If you need more than two operands, nest the operator (left-associative), for example: ["+", ["+", a, b], c].
 
@@ -7051,8 +7051,8 @@ A quickfix may be emitted for some cases (for example n-ary `+`).
 
 Agent strategy:
 
-- Rewrite to the binary form: ["<op>", <a>, <b>].
-- For n-ary uses, nest left-associatively: ["<op>", ["<op>", a, b], c].
+- Rewrite to the binary form: `["<op>", <a>, <b>].`
+- For n-ary uses, nest left-associatively: `["<op>", ["<op>", a, b], c].`
 - If quickfix is present, apply it (for example via `x07 fix --write --input <PATH>`).
 - Re-run lint.
 
@@ -7073,7 +7073,7 @@ A quickfix is emitted when extra trailing expressions are present: they are wrap
 
 Agent strategy:
 
-- Valid form: ["for", "i", <start:i32>, <end:i32>, <body:any>].
+- Valid form: `["for", "i", <start:i32>, <end:i32>, <body:any>].`
 - If quickfix is present, apply it to wrap extra body expressions in `begin` (or run `x07 fix --write --input <PATH>`).
 - Otherwise rewrite the loop to canonical arity; if you need multiple body expressions, wrap them in `begin`.
 - Re-run lint.
@@ -7578,7 +7578,7 @@ Details:
 
 The `for` form expects an identifier as its first argument after the head.
 
-Valid form: ["for", "i", <start:i32>, <end:i32>, <body:any>].
+Valid form: `["for", "i", <start:i32>, <end:i32>, <body:any>].`
 
 Agent strategy:
 
@@ -13584,4 +13584,3 @@ Agent strategy:
 - Reproduce `X7I0901` and capture structured context.
 - Resolve the external dependency/state.
 - Re-run the command and continue repair loop.
-
