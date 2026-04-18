@@ -10,6 +10,12 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+## v0.2.6
+
+### Fixed
+
+- `scripts/bump_toolchain_version.py` now refreshes `docs/_generated/versions.json` during version bumps so `scripts/ci/check_all.sh` stays consistent.
+
 ## v0.2.5
 
 ### Fixed
