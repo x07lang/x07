@@ -64,6 +64,18 @@ if [[ "${X07_SKIP_FORMAL_PERF:-0}" != "1" ]]; then
     if [[ -n "$formal_report_path" ]]; then
       formal_args+=(--report-out "$formal_report_path")
     fi
+    if [[ "${X07_FORMAL_PERF_ENFORCE:-0}" == "1" ]]; then
+      formal_args+=(--enforce)
+    fi
+    if [[ -n "${X07_FORMAL_PERF_SCENARIOS:-}" ]]; then
+      IFS=',' read -r -a scenarios <<<"${X07_FORMAL_PERF_SCENARIOS}"
+      for scenario in "${scenarios[@]}"; do
+        scenario="$(echo "$scenario" | xargs)"
+        if [[ -n "$scenario" ]]; then
+          formal_args+=(--scenario "$scenario")
+        fi
+      done
+    fi
     "$python_bin" "${formal_args[@]}"
   fi
 else

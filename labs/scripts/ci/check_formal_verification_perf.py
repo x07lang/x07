@@ -620,9 +620,22 @@ def run_scenario(
     }
 
 
-def compare_budget(*, name: str, observed: int, budget: int, label: str) -> str | None:
+def compare_budget(
+    *,
+    name: str,
+    observed: int,
+    budget: int,
+    label: str,
+    baseline: int | None = None,
+    max_regression_pct: int | None = None,
+) -> str | None:
     if observed > budget:
-        return f"{name}: {label} budget exceeded (observed={observed} budget={budget})"
+        details = [f"observed={observed}", f"budget={budget}"]
+        if baseline is not None:
+            details.append(f"baseline={baseline}")
+        if max_regression_pct is not None:
+            details.append(f"max_regression_pct={max_regression_pct}")
+        return f"{name}: {label} budget exceeded ({' '.join(details)})"
     return None
 
 
@@ -637,6 +650,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--report-out",
         default=None,
         help="Optional output path for the observed perf report",
+    )
+    ap.add_argument(
+        "--scenario",
+        action="append",
+        default=[],
+        help="Only run selected scenario(s) (repeatable). Defaults to all enabled scenarios.",
+    )
+    ap.add_argument(
+        "--enforce",
+        action="store_true",
+        help="Fail on budget regressions even when the baseline host class is not enforced.",
     )
     return ap.parse_args(argv)
 
@@ -664,6 +688,20 @@ def main(argv: list[str]) -> int:
         for name, scenario in scenarios.items()
         if host_class in scenario.host_classes and scenario_enabled_for_host(baseline, name, host_class)
     ]
+    requested = [name.strip() for name in args.scenario if name.strip()]
+    if requested:
+        known = set(scenarios.keys())
+        unknown = sorted(set(requested) - known)
+        if unknown:
+            raise SystemExit(f"ERROR: unknown scenario(s): {', '.join(unknown)}")
+        enabled_set = set(enabled)
+        disabled = sorted(set(requested) - enabled_set)
+        if disabled:
+            raise SystemExit(
+                f"ERROR: scenario(s) not enabled for host class {host_class}: {', '.join(disabled)}"
+            )
+        requested_set = set(requested)
+        enabled = [name for name in enabled if name in requested_set]
     if not enabled:
         print(f"ok: formal verification perf skipped (no enabled scenarios for {host_class})")
         return 0
@@ -704,6 +742,8 @@ def main(argv: list[str]) -> int:
             observed=int(median["wall_ms"]),
             budget=int(budgets["wall_ms"]["budget"]),
             label="wall_ms",
+            baseline=budgets["wall_ms"].get("baseline"),
+            max_regression_pct=budgets["wall_ms"].get("max_regression_pct"),
         )
         if maybe_failure:
             failures.append(maybe_failure)
@@ -712,6 +752,8 @@ def main(argv: list[str]) -> int:
             observed=int(median["peak_rss_kb"]),
             budget=int(budgets["peak_rss_kb"]["budget"]),
             label="peak_rss_kb",
+            baseline=budgets["peak_rss_kb"].get("baseline"),
+            max_regression_pct=budgets["peak_rss_kb"].get("max_regression_pct"),
         )
         if maybe_failure:
             failures.append(maybe_failure)
@@ -720,11 +762,13 @@ def main(argv: list[str]) -> int:
             observed=int(median["artifact_bytes_total"]),
             budget=int(budgets["artifact_bytes_total"]["budget"]),
             label="artifact_bytes_total",
+            baseline=budgets["artifact_bytes_total"].get("baseline"),
+            max_regression_pct=budgets["artifact_bytes_total"].get("max_regression_pct"),
         )
         if maybe_failure:
             failures.append(maybe_failure)
 
-    enforced = host_enforced(baseline, host_class)
+    enforced = host_enforced(baseline, host_class) or args.enforce
     report = {
         "schema_version": "x07.formal_verification.perf_report@0.1.0",
         "host_class": host_class,

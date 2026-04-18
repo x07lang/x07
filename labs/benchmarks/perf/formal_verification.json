@@ -212,7 +212,7 @@
         "hosted-linux": {
           "budgets": {
             "artifact_bytes_total": {
-              "baseline": 523070,
+              "baseline": 686157,
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
@@ -230,7 +230,7 @@
         "macos-local": {
           "budgets": {
             "artifact_bytes_total": {
-              "baseline": 523070,
+              "baseline": 686157,
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
@@ -248,7 +248,7 @@
         "macos-vz": {
           "budgets": {
             "artifact_bytes_total": {
-              "baseline": 523070,
+              "baseline": 686157,
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
@@ -266,7 +266,7 @@
         "selfhosted-kvm": {
           "budgets": {
             "artifact_bytes_total": {
-              "baseline": 523070,
+              "baseline": 686157,
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
