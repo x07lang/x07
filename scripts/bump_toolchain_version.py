@@ -236,6 +236,35 @@ def ensure_bundle_input(repo_root: Path, *, new_version: str, check: bool) -> st
     return rel
 
 
+def ensure_generated_versions_json(repo_root: Path, *, new_version: str, check: bool) -> str | None:
+    target = repo_root / "docs" / "_generated" / "versions.json"
+    rel = str(target.relative_to(repo_root))
+
+    if check:
+        if not target.is_file():
+            return rel
+        try:
+            doc = read_json(target)
+        except json.JSONDecodeError:
+            return rel
+        if not isinstance(doc, dict):
+            return rel
+        toolchain = doc.get("toolchain")
+        if not isinstance(toolchain, dict):
+            return rel
+        for key in ("x07", "x07c", "x07up"):
+            if toolchain.get(key) != new_version:
+                return rel
+        return None
+
+    before = target.read_bytes() if target.is_file() else None
+    subprocess.run([sys.executable, "scripts/gen_versions_json.py", "--write"], cwd=repo_root, check=True)
+    after = target.read_bytes() if target.is_file() else None
+    if before == after:
+        return None
+    return rel
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True, help="New release tag (for example: v0.0.21)")
@@ -306,6 +335,7 @@ def main(argv: list[str]) -> int:
     release_metadata_updates = [
         ensure_release_compat(repo_root, new_version=new_version, check=args.check),
         ensure_bundle_input(repo_root, new_version=new_version, check=args.check),
+        ensure_generated_versions_json(repo_root, new_version=new_version, check=args.check),
     ]
     changed.extend(rel for rel in release_metadata_updates if rel is not None)
 
