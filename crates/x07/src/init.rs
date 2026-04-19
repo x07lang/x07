@@ -48,6 +48,10 @@ pub enum InitTemplate {
     ScheduledJob,
     PolicyService,
     WorkflowService,
+    #[value(help = "Solve-pure XTAL project starter (spec-first + generated tests)")]
+    XtalPure,
+    #[value(help = "Certifiable solve-pure XTAL starter (trust + certification)")]
+    XtalVerified,
     #[value(help = "Certifiable solve-pure project with strict arch/trust scaffolding")]
     VerifiedCorePure,
     #[value(help = "Sandboxed async trusted-program project with capsule evidence")]
@@ -187,6 +191,117 @@ const TEMPLATE_VERIFIED_CORE_PURE_WORKFLOW: &[u8] = include_bytes!(concat!(
     "/../../docs/examples/verified_core_pure_v1/.github/workflows/certify.yml"
 ));
 
+const TEMPLATE_XTAL_PURE_README: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/README.md"
+));
+const TEMPLATE_XTAL_PURE_PROJECT: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/x07.json"
+));
+const TEMPLATE_XTAL_PURE_LOCK: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/x07.lock.json"
+));
+const TEMPLATE_XTAL_PURE_GEN_INDEX: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/arch/gen/index.x07gen.json"
+));
+const TEMPLATE_XTAL_PURE_SPEC: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/spec/toy.sorter.x07spec.json"
+));
+const TEMPLATE_XTAL_PURE_EXAMPLES: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/spec/toy.sorter.x07spec.examples.jsonl"
+));
+const TEMPLATE_XTAL_PURE_GEN_MANIFEST: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/gen/xtal/tests.json"
+));
+const TEMPLATE_XTAL_PURE_GEN_TESTS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/gen/xtal/toy/sorter/tests.x07.json"
+));
+const TEMPLATE_XTAL_PURE_SRC_MAIN: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/src/main.x07.json"
+));
+const TEMPLATE_XTAL_PURE_SRC_SORTER: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/agent-gate/xtal/toy-sorter/src/toy/sorter.x07.json"
+));
+
+const TEMPLATE_XTAL_VERIFIED_README: &[u8] = br#"# XTAL example: certify-toy
+
+This template is a minimal end-to-end XTAL project that supports `x07 xtal certify`.
+
+Key paths:
+
+- Spec: `spec/`
+- Implementation: `src/`
+- Generated tests: `gen/xtal/`
+- Certification config: `arch/xtal/xtal.json` + `arch/trust/`
+
+Quick check:
+
+- `x07 xtal dev --project x07.json`
+- `x07 xtal certify --project x07.json`
+"#;
+
+const TEMPLATE_XTAL_VERIFIED_PROJECT: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/x07.json"
+));
+const TEMPLATE_XTAL_VERIFIED_LOCK: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/x07.lock.json"
+));
+const TEMPLATE_XTAL_VERIFIED_SPEC: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/spec/fixture.x07spec.json"
+));
+const TEMPLATE_XTAL_VERIFIED_EXAMPLES: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/spec/fixture.x07spec.examples.jsonl"
+));
+const TEMPLATE_XTAL_VERIFIED_GEN_MANIFEST: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/gen/xtal/tests.json"
+));
+const TEMPLATE_XTAL_VERIFIED_GEN_TESTS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/gen/xtal/fixture/tests.x07.json"
+));
+const TEMPLATE_XTAL_VERIFIED_SRC_MAIN: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/src/main.x07.json"
+));
+const TEMPLATE_XTAL_VERIFIED_SRC_FIXTURE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/src/fixture.x07.json"
+));
+const TEMPLATE_XTAL_VERIFIED_SRC_PROPS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/src/fixture/props.x07.json"
+));
+const TEMPLATE_XTAL_VERIFIED_ARCH_MANIFEST: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/arch/manifest.x07arch.json"
+));
+const TEMPLATE_XTAL_VERIFIED_BOUNDARIES: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/arch/boundaries/index.x07boundary.json"
+));
+const TEMPLATE_XTAL_VERIFIED_XTAL_MANIFEST: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/arch/xtal/xtal.json"
+));
+const TEMPLATE_XTAL_VERIFIED_TRUST_PROFILE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/xtal_certify_toy/arch/trust/profiles/strict.json"
+));
+
 fn ensure_trailing_newline(bytes: &[u8]) -> Vec<u8> {
     let mut out = bytes.to_vec();
     if out.last() != Some(&b'\n') {
@@ -259,6 +374,7 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
             "db.core",
             "db.postgres",
         ],
+        InitTemplate::XtalPure | InitTemplate::XtalVerified => &[],
         InitTemplate::VerifiedCorePure => &[],
         InitTemplate::TrustedSandboxProgram => &[],
         InitTemplate::TrustedNetworkService => &[],
@@ -286,6 +402,7 @@ fn template_default_profile(template: InitTemplate) -> &'static str {
         | InitTemplate::ScheduledJob
         | InitTemplate::PolicyService
         | InitTemplate::WorkflowService => "sandbox",
+        InitTemplate::XtalPure | InitTemplate::XtalVerified => "os",
         InitTemplate::VerifiedCorePure => "os",
         InitTemplate::TrustedSandboxProgram => "sandbox",
         InitTemplate::TrustedNetworkService => "sandbox",
@@ -313,6 +430,9 @@ fn init_template_policy_template(template: InitTemplate) -> crate::policy::Polic
         | InitTemplate::ScheduledJob
         | InitTemplate::PolicyService
         | InitTemplate::WorkflowService => crate::policy::PolicyTemplate::Worker,
+        InitTemplate::XtalPure | InitTemplate::XtalVerified => {
+            crate::policy::PolicyTemplate::Worker
+        }
         InitTemplate::VerifiedCorePure => crate::policy::PolicyTemplate::Worker,
         InitTemplate::TrustedSandboxProgram => crate::policy::PolicyTemplate::Worker,
         InitTemplate::TrustedNetworkService => crate::policy::PolicyTemplate::Worker,
@@ -353,6 +473,9 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
             ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_EXAMPLE),
             ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_MAIN),
         )),
+        InitTemplate::XtalPure | InitTemplate::XtalVerified => {
+            Ok((app_module_bytes()?, main_entry_bytes()?))
+        }
         InitTemplate::TrustedSandboxProgram
         | InitTemplate::TrustedNetworkService
         | InitTemplate::CertifiedCapsule
@@ -397,6 +520,64 @@ fn verified_core_pure_template_files() -> &'static [(&'static str, &'static [u8]
         (
             ".github/workflows/certify.yml",
             TEMPLATE_VERIFIED_CORE_PURE_WORKFLOW,
+        ),
+    ]
+}
+
+fn xtal_pure_template_files() -> &'static [(&'static str, &'static [u8])] {
+    &[
+        ("README.md", TEMPLATE_XTAL_PURE_README),
+        ("x07.json", TEMPLATE_XTAL_PURE_PROJECT),
+        ("x07.lock.json", TEMPLATE_XTAL_PURE_LOCK),
+        ("arch/gen/index.x07gen.json", TEMPLATE_XTAL_PURE_GEN_INDEX),
+        ("spec/toy.sorter.x07spec.json", TEMPLATE_XTAL_PURE_SPEC),
+        (
+            "spec/toy.sorter.x07spec.examples.jsonl",
+            TEMPLATE_XTAL_PURE_EXAMPLES,
+        ),
+        ("gen/xtal/tests.json", TEMPLATE_XTAL_PURE_GEN_MANIFEST),
+        (
+            "gen/xtal/toy/sorter/tests.x07.json",
+            TEMPLATE_XTAL_PURE_GEN_TESTS,
+        ),
+        ("src/main.x07.json", TEMPLATE_XTAL_PURE_SRC_MAIN),
+        ("src/toy/sorter.x07.json", TEMPLATE_XTAL_PURE_SRC_SORTER),
+    ]
+}
+
+fn xtal_verified_template_files() -> &'static [(&'static str, &'static [u8])] {
+    &[
+        ("README.md", TEMPLATE_XTAL_VERIFIED_README),
+        ("x07.json", TEMPLATE_XTAL_VERIFIED_PROJECT),
+        ("x07.lock.json", TEMPLATE_XTAL_VERIFIED_LOCK),
+        ("spec/fixture.x07spec.json", TEMPLATE_XTAL_VERIFIED_SPEC),
+        (
+            "spec/fixture.x07spec.examples.jsonl",
+            TEMPLATE_XTAL_VERIFIED_EXAMPLES,
+        ),
+        ("gen/xtal/tests.json", TEMPLATE_XTAL_VERIFIED_GEN_MANIFEST),
+        (
+            "gen/xtal/fixture/tests.x07.json",
+            TEMPLATE_XTAL_VERIFIED_GEN_TESTS,
+        ),
+        ("src/main.x07.json", TEMPLATE_XTAL_VERIFIED_SRC_MAIN),
+        ("src/fixture.x07.json", TEMPLATE_XTAL_VERIFIED_SRC_FIXTURE),
+        (
+            "src/fixture/props.x07.json",
+            TEMPLATE_XTAL_VERIFIED_SRC_PROPS,
+        ),
+        (
+            "arch/manifest.x07arch.json",
+            TEMPLATE_XTAL_VERIFIED_ARCH_MANIFEST,
+        ),
+        (
+            "arch/boundaries/index.x07boundary.json",
+            TEMPLATE_XTAL_VERIFIED_BOUNDARIES,
+        ),
+        ("arch/xtal/xtal.json", TEMPLATE_XTAL_VERIFIED_XTAL_MANIFEST),
+        (
+            "arch/trust/profiles/strict.json",
+            TEMPLATE_XTAL_VERIFIED_TRUST_PROFILE,
         ),
     ]
 }
@@ -1152,6 +1333,32 @@ fn cmd_init_verified_core_pure_template(root: &Path) -> Result<std::process::Exi
     )
 }
 
+fn cmd_init_xtal_pure_template(root: &Path) -> Result<std::process::ExitCode> {
+    cmd_init_static_template(
+        root,
+        xtal_pure_template_files(),
+        &[],
+        "Generated a solve-pure XTAL starter project.",
+        &[
+            "x07 xtal verify --project x07.json",
+            "x07 xtal dev --project x07.json",
+        ],
+    )
+}
+
+fn cmd_init_xtal_verified_template(root: &Path) -> Result<std::process::ExitCode> {
+    cmd_init_static_template(
+        root,
+        xtal_verified_template_files(),
+        &[],
+        "Generated a certifiable solve-pure XTAL starter project.",
+        &[
+            "x07 xtal dev --project x07.json",
+            "x07 xtal certify --project x07.json",
+        ],
+    )
+}
+
 fn cmd_init_trusted_sandbox_program_template(root: &Path) -> Result<std::process::ExitCode> {
     cmd_init_static_template(
         root,
@@ -1700,6 +1907,12 @@ pub fn cmd_init(
     }
 
     if let Some(template) = args.template {
+        if template == InitTemplate::XtalPure {
+            return cmd_init_xtal_pure_template(&root);
+        }
+        if template == InitTemplate::XtalVerified {
+            return cmd_init_xtal_verified_template(&root);
+        }
         if template == InitTemplate::VerifiedCorePure {
             return cmd_init_verified_core_pure_template(&root);
         }

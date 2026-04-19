@@ -117,7 +117,7 @@ Key files:
   - Runs formal verification per spec operation entrypoint:
     - `x07 verify --coverage --entry <spec.operations[*].name>`
     - `x07 verify --prove --entry <spec.operations[*].name> --emit-proof <path>`
-  - Runs `x07 test --all --manifest gen/xtal/tests.json --allow-empty`.
+  - Runs `x07 test --all --no-fail-fast --manifest gen/xtal/tests.json --allow-empty`.
   - Writes:
     - `target/xtal/xtal.verify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
     - `target/xtal/verify/summary.json` (aggregate summary, `x07.xtal.verify_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.verify_summary@0.1.0.schema.json`)
@@ -133,6 +133,10 @@ Key files:
     - Under `strict`, only `proven` outcomes pass.
   - When proofs are unsupported or inconclusive, the wrapper emits a compact per-entry reason summary in the XTAL diagnostics (for example: unsupported loop forms or unsupported branded input shapes).
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
+  - Under `--proof-policy balanced`, xtal verify uses conservative proof budgets so the default loop stays bounded.
+    - Defaults: `--unwind 1`, `--max-bytes-len 8`, `--z3-timeout-seconds 1`.
+  - The Z3 timeout for the proof lane can be overridden with `--z3-timeout-seconds` (otherwise x07's default timeout applies under `--proof-policy strict`).
+  - The Z3 solver memory limit can be set with `--z3-memory-mb`.
   - Proof caching is automatic when a project manifest is available:
     - Successful `x07 verify --prove` runs cache proof summaries under `.x07/cache/verify/proof_summaries/`.
     - When proof objects are emitted, proof bundles are cached under `.x07/cache/verify/proofs/` and may be reused on subsequent prove runs (even without solver tools present).
@@ -147,6 +151,7 @@ Key files:
     - `--baseline <path>` (optional, enables review diff outputs)
     - `--review-fail-on <gate>` for each `trust.review_gates[]` entry
     - `--no-fail-fast` (optional; preserve full test signal after the first failure)
+    - Proof budgets forwarded to `x07 verify --prove`: `--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, `--z3-memory-mb`
   - Writes:
     - `target/xtal/xtal.certify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
     - `target/xtal/cert/summary.json` (`x07.xtal.certify_summary@0.1.0`; see `docs/spec/schemas/x07.xtal.certify_summary@0.1.0.schema.json`)

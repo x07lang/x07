@@ -55,17 +55,6 @@ fn resolve_run_os_sandboxed_policy_language_toggles(
     )))
 }
 
-fn should_walk_dir_entry(entry: &walkdir::DirEntry) -> bool {
-    let name = entry.file_name().to_string_lossy();
-    if !entry.file_type().is_dir() {
-        return true;
-    }
-    !matches!(
-        name.as_ref(),
-        ".git" | ".x07" | "target" | ".agent" | ".claude"
-    )
-}
-
 fn collect_x07ast_inputs(inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = Vec::new();
     let mut seen: HashSet<PathBuf> = HashSet::new();
@@ -82,7 +71,7 @@ fn collect_x07ast_inputs(inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
             for entry in WalkDir::new(input)
                 .follow_links(false)
                 .into_iter()
-                .filter_entry(should_walk_dir_entry)
+                .filter_entry(crate::util::should_walk_dir_entry)
                 .flatten()
             {
                 if !entry.file_type().is_file() {

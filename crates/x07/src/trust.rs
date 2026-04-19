@@ -258,6 +258,26 @@ pub struct TrustCertifyArgs {
     #[arg(long, value_name = "PATH", default_value = "tests/tests.json")]
     pub tests_manifest: PathBuf,
 
+    /// Override loop unwind bound passed to `x07 verify --prove`.
+    #[arg(long, value_name = "N")]
+    pub unwind: Option<u32>,
+
+    /// Override `bytes`/`bytes_view` length bounds passed to `x07 verify --prove`.
+    #[arg(long, value_name = "N")]
+    pub max_bytes_len: Option<u32>,
+
+    /// Override the encoded proof input length passed to `x07 verify --prove`.
+    #[arg(long, value_name = "N")]
+    pub input_len_bytes: Option<u32>,
+
+    /// Override the Z3 solver timeout budget passed to `x07 verify --prove` (seconds).
+    #[arg(long, value_name = "SECONDS")]
+    pub z3_timeout_seconds: Option<u64>,
+
+    /// Override the Z3 solver memory limit passed to `x07 verify --prove` (MB).
+    #[arg(long, value_name = "MEGABYTES")]
+    pub z3_memory_mb: Option<u64>,
+
     /// Preserve full test signal after the first failure.
     #[arg(long)]
     pub no_fail_fast: bool,
@@ -2803,6 +2823,13 @@ fn cmd_trust_certify(
     } else {
         project_root.join(&args.tests_manifest)
     };
+    let verify_overrides = VerifyOverrides {
+        unwind: args.unwind,
+        max_bytes_len: args.max_bytes_len,
+        input_len_bytes: args.input_len_bytes,
+        z3_timeout_seconds: args.z3_timeout_seconds,
+        z3_memory_mb: args.z3_memory_mb,
+    };
     if let Some(baseline) = args.baseline.as_deref() {
         let resolved = util::resolve_existing_path_upwards(baseline);
         if !resolved.exists() {
@@ -2915,6 +2942,7 @@ fn cmd_trust_certify(
             &args.entry,
             &project_root,
             profile.as_ref(),
+            verify_overrides,
             &out_dir,
             &mut diagnostics,
         )?;
@@ -2937,8 +2965,13 @@ fn cmd_trust_certify(
         } else {
             Vec::new()
         };
-        let proof_inventory =
-            build_prove_evidence(project_path, &prove_targets, &out_dir, &mut diagnostics)?;
+        let proof_inventory = build_prove_evidence(
+            project_path,
+            &prove_targets,
+            verify_overrides,
+            &out_dir,
+            &mut diagnostics,
+        )?;
         let tests_ref = build_tests_evidence(
             &project_root,
             &tests_manifest,
@@ -4831,7 +4864,17 @@ fn validate_profile_against_context(
         }
     }
 
-    let features = scan_language_features(&ctx.module_roots);
+    let declared_module_roots = project::load_project_manifest(project_path)
+        .ok()
+        .map(|manifest| {
+            manifest
+                .module_roots
+                .into_iter()
+                .map(|root| ctx.root.join(root))
+                .collect::<Vec<PathBuf>>()
+        })
+        .unwrap_or_default();
+    let features = scan_language_features(&declared_module_roots);
     if !profile.language_subset.allow_defasync && features.has_defasync {
         diags.push(trust_diag(
             "X07TP_LANGUAGE",
@@ -5278,7 +5321,12 @@ fn scan_language_features(module_roots: &[PathBuf]) -> LanguageFeatureScan {
         if !root.is_dir() {
             continue;
         }
-        for entry in walkdir::WalkDir::new(root).into_iter().flatten() {
+        for entry in walkdir::WalkDir::new(root)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(crate::util::should_walk_dir_entry)
+            .flatten()
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -5393,18 +5441,28 @@ type CoverageEvidence = (
     Vec<TrustCertificateImportedSummary>,
 );
 
+#[derive(Debug, Clone, Copy, Default)]
+struct VerifyOverrides {
+    unwind: Option<u32>,
+    max_bytes_len: Option<u32>,
+    input_len_bytes: Option<u32>,
+    z3_timeout_seconds: Option<u64>,
+    z3_memory_mb: Option<u64>,
+}
+
 fn build_coverage_evidence(
     project_path: &Path,
     entry: &str,
     project_root: &Path,
     profile: Option<&TrustProfile>,
+    overrides: VerifyOverrides,
     out_dir: &Path,
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
 ) -> Result<CoverageEvidence> {
     let verify_report_path = out_dir.join("verify.coverage.report.json");
     let coverage_path = out_dir.join("verify.coverage.json");
     let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
-    let args = vec![
+    let mut args = vec![
         "verify".to_string(),
         "--coverage".to_string(),
         "--entry".to_string(),
@@ -5415,6 +5473,18 @@ fn build_coverage_evidence(
         verify_report_path.display().to_string(),
         "--quiet-json".to_string(),
     ];
+    if let Some(unwind) = overrides.unwind {
+        args.push("--unwind".to_string());
+        args.push(unwind.to_string());
+    }
+    if let Some(max_bytes_len) = overrides.max_bytes_len {
+        args.push("--max-bytes-len".to_string());
+        args.push(max_bytes_len.to_string());
+    }
+    if let Some(input_len_bytes) = overrides.input_len_bytes {
+        args.push("--input-len-bytes".to_string());
+        args.push(input_len_bytes.to_string());
+    }
     let run = run_self_command(cwd, &args)?;
     if run.exit_code != 0 {
         diagnostics.push(trust_diag(
@@ -5505,6 +5575,7 @@ fn build_coverage_evidence(
 fn build_prove_evidence(
     project_path: &Path,
     prove_targets: &[(String, String)],
+    overrides: VerifyOverrides,
     out_dir: &Path,
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
 ) -> Result<Vec<TrustCertificateProofInventoryItem>> {
@@ -5520,19 +5591,41 @@ fn build_prove_evidence(
             .with_context(|| format!("create prove item dir: {}", item_dir.display()))?;
         let report_path = item_dir.join("verify.prove.report.json");
         let proof_path = item_dir.join("proof.json");
-        let args = vec![
+        let mut args = vec![
             "verify".to_string(),
             "--prove".to_string(),
             "--entry".to_string(),
             symbol.clone(),
             "--project".to_string(),
             project_path.display().to_string(),
+        ];
+        if let Some(unwind) = overrides.unwind {
+            args.push("--unwind".to_string());
+            args.push(unwind.to_string());
+        }
+        if let Some(max_bytes_len) = overrides.max_bytes_len {
+            args.push("--max-bytes-len".to_string());
+            args.push(max_bytes_len.to_string());
+        }
+        if let Some(input_len_bytes) = overrides.input_len_bytes {
+            args.push("--input-len-bytes".to_string());
+            args.push(input_len_bytes.to_string());
+        }
+        if let Some(timeout) = overrides.z3_timeout_seconds {
+            args.push("--z3-timeout-seconds".to_string());
+            args.push(timeout.to_string());
+        }
+        if let Some(mem_mb) = overrides.z3_memory_mb {
+            args.push("--z3-memory-mb".to_string());
+            args.push(mem_mb.to_string());
+        }
+        args.extend([
             "--emit-proof".to_string(),
             proof_path.display().to_string(),
             "--report-out".to_string(),
             report_path.display().to_string(),
             "--quiet-json".to_string(),
-        ];
+        ]);
         let run = run_self_command(cwd, &args)?;
         let report_doc = if report_path.is_file() {
             report_common::read_json_file(&report_path)?

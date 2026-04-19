@@ -161,6 +161,17 @@ pub(crate) fn toolchain_stdlib_module_roots(toolchain_root: &Path) -> Vec<PathBu
     roots
 }
 
+pub(crate) fn should_walk_dir_entry(entry: &walkdir::DirEntry) -> bool {
+    let name = entry.file_name().to_string_lossy();
+    if !entry.file_type().is_dir() {
+        return true;
+    }
+    !matches!(
+        name.as_ref(),
+        ".git" | ".x07" | "target" | ".agent" | ".claude"
+    )
+}
+
 pub fn hex_lower(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);
     for b in bytes {

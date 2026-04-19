@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.lock@0.4.0",
   "toolchain": {
-    "x07_version": "0.2.9",
-    "x07c_version": "0.2.9",
+    "x07_version": "0.2.10",
+    "x07c_version": "0.2.10",
     "lang_id": "x07-core@0.2.0",
     "compat": "0.5"
   },

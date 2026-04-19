@@ -4,27 +4,37 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+## v0.2.10
+
 ### Added
 
 - `x07 pkg inventory` for emitting an offline inventory of stdlib + official external packages shipped in the current toolchain bundle.
+- `x07 init --template xtal-pure` and `x07 init --template xtal-verified` for scaffolding solve-pure XTAL starter projects.
+- `x07 verify --z3-timeout-seconds` for bounding SMT/prove solver runtime.
+- `x07 verify --z3-memory-mb` for bounding SMT/prove solver memory.
 - XTAL docs:
   - `docs/toolchain/xtal-targets.md` (certification target semantics)
   - `docs/toolchain/proof-subset.md` (compact proof-supported subset guide)
   - `docs/packages/inventory.md` (offline package inventory entry point)
-- XTAL example project: `docs/examples/agent-gate/xtal/workflow-graph/` (branded multi-operation pure library surface).
+  - XTAL example project: `docs/examples/agent-gate/xtal/workflow-graph/` (branded multi-operation pure library surface).
 
 ### Changed
 
 - `x07 init` now copies `.agent/docs/` and `.agent/skills/` into the project for portability (instead of creating toolchain-path symlinks).
 - `x07 arch check` now accepts `--project <x07.json|dir>` as an alternative to `--repo-root`.
 - `x07 trust certify` and `x07 xtal certify` now accept `--no-fail-fast` to preserve full test signal in the certification test lane.
+- `x07 trust certify` and `x07 xtal certify` now accept proof-budget overrides (`--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, `--z3-memory-mb`) and forward them to `x07 verify --prove`.
+- `x07 xtal verify` now runs the generated test lane with `--no-fail-fast` to preserve full suite signal after the first failure.
+- `x07 xtal verify --proof-policy balanced` now uses smaller default proof bounds and a shorter solver timeout (override with `--unwind`, `--max-bytes-len`, `--input-len-bytes`, and `--z3-timeout-seconds`).
 
 ### Fixed
 
 - XTAL generated PBT driver generation no longer emits duplicate local bindings for mixed and multi-bytes signatures (for example `(i32, bytes)` and `(i32, bytes, bytes)`).
 - Branded PBT inputs are now validated via brand casts and treated as skipped when invalid (instead of being counted as passing cases).
 - `x07 xtal verify` now emits a compact per-entry proof support summary (first diagnostic code/message) when proofs are unsupported or inconclusive.
+- `x07 xtal dev` now surfaces `x07 xtal verify` warnings in the top-level diagnostics report.
 - `x07 verify --prove` no longer rejects `for` loops solely because their bounds are non-literal.
+- `x07 trust profile check` and `x07 trust certify` no longer scan toolchain/dependency sources when enforcing language-subset flags (only declared `module_roots`).
 
 ## v0.2.9
 

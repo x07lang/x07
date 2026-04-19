@@ -442,6 +442,18 @@ pub struct VerifyArgs {
     #[arg(long, value_name = "N", default_value_t = 16)]
     pub max_bytes_len: u32,
 
+    /// Override the Z3 solver timeout budget (seconds).
+    ///
+    /// Applies to `--smt` and `--prove` modes.
+    #[arg(long, value_name = "SECONDS")]
+    pub z3_timeout_seconds: Option<u64>,
+
+    /// Override the Z3 solver memory limit (MB).
+    ///
+    /// Applies to `--smt` and `--prove` modes.
+    #[arg(long, value_name = "MEGABYTES")]
+    pub z3_memory_mb: Option<u64>,
+
     /// Override the encoded verification input length (bytes).
     ///
     /// If set, it must be >= the required encoding length for the target signature.
@@ -1554,8 +1566,15 @@ fn cmd_verify_smt(
         );
     }
 
-    let z3_out = Command::new("z3")
-        .arg(format!("-T:{}", z3_timeout_seconds(plan.mode, plan.target)))
+    let mut z3_cmd = Command::new("z3");
+    z3_cmd.arg(format!(
+        "-T:{}",
+        z3_timeout_seconds_for_args(args, plan.mode, plan.target)
+    ));
+    if let Some(mem_mb) = args.z3_memory_mb {
+        z3_cmd.arg(format!("-memory:{mem_mb}"));
+    }
+    let z3_out = z3_cmd
         .arg("-smt2")
         .arg(&smt2_path)
         .output()
@@ -4560,6 +4579,7 @@ fn compile_driver_to_c(driver_src: &[u8], module_roots: &[PathBuf]) -> Result<St
     opts.freestanding = true;
     opts.contract_mode = x07c::compile::ContractMode::VerifyBmc;
     opts.allow_internal_only_heads_in_entry = true;
+    opts.allow_non_exported_calls_in_entry = true;
     opts.prefer_module_roots_first = true;
     let out = x07c::compile::compile_program_to_c_with_meta(driver_src, &opts)
         .map_err(|err| anyhow::anyhow!("{:?}: {}", err.kind, err.message))?;
@@ -6554,6 +6574,8 @@ pub(crate) fn check_proof_object_path(proof_path: &Path) -> Result<VerifyProofCh
         module_root: Vec::new(),
         unwind: object.unwind,
         max_bytes_len: object.max_bytes_len,
+        z3_timeout_seconds: None,
+        z3_memory_mb: None,
         input_len_bytes: None,
         artifact_dir: None,
         summary: imported_summary_paths.clone(),
@@ -7355,6 +7377,11 @@ fn z3_timeout_seconds(mode: Mode, target: &TargetSig) -> u64 {
     }
 }
 
+fn z3_timeout_seconds_for_args(args: &VerifyArgs, mode: Mode, target: &TargetSig) -> u64 {
+    args.z3_timeout_seconds
+        .unwrap_or_else(|| z3_timeout_seconds(mode, target))
+}
+
 fn cbmc_stderr_is_benign(stderr: &[u8]) -> bool {
     let text = String::from_utf8_lossy(stderr);
     let mut saw_line = false;
@@ -8114,6 +8141,8 @@ exit 1
             module_root: vec![dir.clone()],
             unwind: 8,
             max_bytes_len: 16,
+            z3_timeout_seconds: None,
+            z3_memory_mb: None,
             input_len_bytes: None,
             artifact_dir: None,
             summary: Vec::new(),

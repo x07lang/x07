@@ -12,6 +12,10 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 init --package`
   - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
   - Not compatible with `--template` (templates are for app scaffolds).
+- `x07 init --template xtal-pure`
+  - Creates a solve-pure XTAL starter with `spec/`, `src/`, and `gen/xtal/` wired for `x07 xtal dev` / `x07 xtal verify`.
+- `x07 init --template xtal-verified`
+  - Creates a certifiable solve-pure XTAL starter with `arch/xtal/xtal.json` + `arch/trust/` wired for `x07 xtal certify`.
 - `x07 init --template verified-core-pure`
   - Creates a certifiable `solve-pure` project with `arch/manifest.x07arch.json`, `arch/boundaries/index.x07boundary.json`, `arch/trust/profiles/verified_core_pure_v1.json`, `.github/workflows/certify.yml`, and a smoke + PBT harness wired for `x07 trust certify`.
 - `x07 init --template trusted-sandbox-program`
@@ -238,6 +242,7 @@ See: [Review & trust artifacts](review-trust.md).
 - `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry <sym> --out-dir target/cert`
   - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, proof inventory, proof assumptions, proof-check acceptance metadata, formal-verification scope fields, compile attestation evidence, dependency-closure evidence, and any observed capsule/runtime/peer-policy evidence references (`x07.trust.certificate@0.7.0`).
   - Strong profiles reject surrogate certification entries, coverage-only imports, developer-only imported stubs, and bounded recursive proof usage.
+  - Proof budgets forwarded to `x07 verify --prove`: `--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, `--z3-memory-mb`.
 
 - `x07 prove check --proof <path>`
   - Independently checks a proof object emitted by `x07 verify --prove --emit-proof`.
@@ -325,6 +330,9 @@ See: [Property-based testing](pbt.md).
   - `--project <path>` (or one/more `--module-root <dir>`)
   - `--unwind <n>` (CBMC loop unwinding bound)
   - `--max-bytes-len <n>` (bound for `bytes` / `bytes_view` params)
+  - `--input-len-bytes <n>` (override encoded input length; advanced)
+  - `--z3-timeout-seconds <seconds>` (bound Z3 runtime for `--smt` and `--prove`)
+  - `--z3-memory-mb <mb>` (bound Z3 memory for `--smt` and `--prove`)
   - `--proof-summary <path>` (import reviewed proof-summary artifacts from `x07 verify --prove`)
   - `--summary <path>` (deprecated alias for `--proof-summary`)
   - `--allow-imported-stubs` (developer-only proof mode)
@@ -336,7 +344,7 @@ Notes:
 - Direct prove inputs accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
 - That means schema-derived record and tagged-union documents can be proved directly as `bytes_view@brand` inputs, with the generated verify driver running the validator before it constructs the branded view seen by the proof target.
 - Owned branded `bytes` and nested result carriers are still rejected explicitly.
-- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, `while` loops, and `for` loops with non-literal bounds remain unsupported.
+- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, and `while` loops remain unsupported. `for` loops must use the canonical 5-item form; their bounds do not need to be literal.
 - `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
 - `--prove` reports include `proof_summary` for the solver engine, recursion kind, `decreases` usage, unwind-bounded recursion, and the reachable dependency symbol set.
 - `--coverage` emits a reachable-closure support artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including `supported*` counters plus per-function `support_summary`, alongside `trusted_scheduler_model` and `capsule_boundary` statuses when they apply.

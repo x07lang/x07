@@ -6,6 +6,7 @@ This repository is an X07 project. You are a coding agent. Your job is to make c
 - Build / format / lint / fix: `x07 fmt`, `x07 lint`, `x07 fix`
 - Run: `x07 run` (single front door; emits JSON reports)
 - Test: `x07 test` (JSON report; deterministic suites)
+- XTAL (spec-first loop): `x07 xtal dev`, `x07 xtal verify`, `x07 xtal certify`
 - Policies: `x07 policy init` and `x07 run --allow-host/--deny-host/...` (derived policy generation)
 - Packages: `x07 pkg add`, `x07 pkg lock`, `x07 pkg pack`, `x07 pkg login`, `x07 pkg publish`
 

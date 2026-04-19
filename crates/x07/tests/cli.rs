@@ -8669,6 +8669,160 @@ fn x07_init_verified_core_pure_template_creates_certifiable_project() {
 }
 
 #[test]
+fn x07_init_xtal_pure_template_creates_xtal_project() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_xtal_pure");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--template", "xtal-pure"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+    assert_eq!(
+        v["notes"]
+            .as_array()
+            .expect("notes[]")
+            .iter()
+            .map(|v| v.as_str().expect("notes[] string"))
+            .collect::<Vec<_>>(),
+        vec!["Generated a solve-pure XTAL starter project."]
+    );
+    assert_eq!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .map(|v| v.as_str().expect("next_steps[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "x07 xtal verify --project x07.json",
+            "x07 xtal dev --project x07.json",
+        ]
+    );
+
+    for rel in [
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "arch/gen/index.x07gen.json",
+        "spec/toy.sorter.x07spec.json",
+        "spec/toy.sorter.x07spec.examples.jsonl",
+        "gen/xtal/tests.json",
+        "gen/xtal/toy/sorter/tests.x07.json",
+        "src/main.x07.json",
+        "src/toy/sorter.x07.json",
+        "x07-toolchain.toml",
+        "AGENT.md",
+        ".agent/docs/index.md",
+        ".agent/skills/README.md",
+        ".gitignore",
+    ] {
+        assert!(dir.join(rel).is_file(), "missing {}", rel);
+    }
+
+    let out = run_x07_in_dir(&dir, &["xtal", "verify", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_init_xtal_verified_template_creates_certifiable_xtal_project() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_xtal_verified");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--template", "xtal-verified"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+    assert_eq!(
+        v["notes"]
+            .as_array()
+            .expect("notes[]")
+            .iter()
+            .map(|v| v.as_str().expect("notes[] string"))
+            .collect::<Vec<_>>(),
+        vec!["Generated a certifiable solve-pure XTAL starter project."]
+    );
+    assert_eq!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .map(|v| v.as_str().expect("next_steps[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "x07 xtal dev --project x07.json",
+            "x07 xtal certify --project x07.json",
+        ]
+    );
+
+    for rel in [
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "spec/fixture.x07spec.json",
+        "spec/fixture.x07spec.examples.jsonl",
+        "gen/xtal/tests.json",
+        "gen/xtal/fixture/tests.x07.json",
+        "src/main.x07.json",
+        "src/fixture.x07.json",
+        "src/fixture/props.x07.json",
+        "arch/manifest.x07arch.json",
+        "arch/boundaries/index.x07boundary.json",
+        "arch/xtal/xtal.json",
+        "arch/trust/profiles/strict.json",
+        "x07-toolchain.toml",
+        "AGENT.md",
+        ".agent/docs/index.md",
+        ".agent/skills/README.md",
+        ".gitignore",
+    ] {
+        assert!(dir.join(rel).is_file(), "missing {}", rel);
+    }
+
+    let out = run_x07_in_dir(&dir, &["xtal", "certify", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
 fn x07_init_trusted_sandbox_program_template_creates_capsule_backed_project() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_init_trusted_sandbox_program");

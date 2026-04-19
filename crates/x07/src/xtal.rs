@@ -78,6 +78,11 @@ const DEFAULT_INGEST_DIAG_REPORT_PATH: &str = "target/xtal/xtal.ingest.diag.json
 const DEFAULT_IMPROVE_DIR: &str = "target/xtal/improve";
 const DEFAULT_IMPROVE_DIAG_REPORT_PATH: &str = "target/xtal/xtal.improve.diag.json";
 const DEFAULT_REPAIR_DIR: &str = "target/xtal/repair";
+
+const XTAL_BALANCED_DEFAULT_UNWIND: u32 = 1;
+const XTAL_BALANCED_DEFAULT_MAX_BYTES_LEN: u32 = 8;
+const XTAL_BALANCED_Z3_TIMEOUT_SECONDS: u64 = 1;
+
 const DEFAULT_REPAIR_ATTEMPTS_DIR: &str = "target/xtal/repair/attempts";
 const DEFAULT_REPAIR_PATCHSET_PATH: &str = "target/xtal/repair/patchset.json";
 const DEFAULT_REPAIR_DIFF_PATH: &str = "target/xtal/repair/diff.txt";
@@ -320,6 +325,14 @@ pub struct XtalVerifyArgs {
     #[arg(long)]
     pub allow_os_world: bool,
 
+    /// Override the Z3 solver timeout budget passed to `x07 verify --prove` (seconds).
+    #[arg(long, value_name = "SECONDS")]
+    pub z3_timeout_seconds: Option<u64>,
+
+    /// Override the Z3 solver memory limit passed to `x07 verify --prove` (MB).
+    #[arg(long, value_name = "MEGABYTES")]
+    pub z3_memory_mb: Option<u64>,
+
     /// Override loop unwind bound passed to `x07 verify`.
     #[arg(long, value_name = "N")]
     pub unwind: Option<u32>,
@@ -424,6 +437,26 @@ pub struct XtalCertifyArgs {
     /// Preserve full test signal after the first failure.
     #[arg(long)]
     pub no_fail_fast: bool,
+
+    /// Override loop unwind bound passed to `x07 trust certify`.
+    #[arg(long, value_name = "N")]
+    pub unwind: Option<u32>,
+
+    /// Override `bytes`/`bytes_view` length bounds passed to `x07 trust certify`.
+    #[arg(long, value_name = "N")]
+    pub max_bytes_len: Option<u32>,
+
+    /// Override the encoded proof input length passed to `x07 trust certify`.
+    #[arg(long, value_name = "N")]
+    pub input_len_bytes: Option<u32>,
+
+    /// Override the Z3 solver timeout budget passed to `x07 trust certify` (seconds).
+    #[arg(long, value_name = "SECONDS")]
+    pub z3_timeout_seconds: Option<u64>,
+
+    /// Override the Z3 solver memory limit passed to `x07 trust certify` (MB).
+    #[arg(long, value_name = "MEGABYTES")]
+    pub z3_memory_mb: Option<u64>,
 }
 
 #[derive(Debug, Args)]
@@ -766,6 +799,26 @@ fn cmd_xtal_certify(
                 "--tests-manifest".to_string(),
                 DEFAULT_MANIFEST_PATH.to_string(),
             ];
+            if let Some(unwind) = args.unwind {
+                trust_args.push("--unwind".to_string());
+                trust_args.push(unwind.to_string());
+            }
+            if let Some(max_bytes_len) = args.max_bytes_len {
+                trust_args.push("--max-bytes-len".to_string());
+                trust_args.push(max_bytes_len.to_string());
+            }
+            if let Some(input_len_bytes) = args.input_len_bytes {
+                trust_args.push("--input-len-bytes".to_string());
+                trust_args.push(input_len_bytes.to_string());
+            }
+            if let Some(timeout) = args.z3_timeout_seconds {
+                trust_args.push("--z3-timeout-seconds".to_string());
+                trust_args.push(timeout.to_string());
+            }
+            if let Some(mem_mb) = args.z3_memory_mb {
+                trust_args.push("--z3-memory-mb".to_string());
+                trust_args.push(mem_mb.to_string());
+            }
             if let Some(baseline) = args.baseline.as_deref() {
                 trust_args.push("--baseline".to_string());
                 trust_args.push(baseline.display().to_string());
@@ -3119,6 +3172,8 @@ fn cmd_xtal_improve(
         manifest: verify_manifest_rel.clone(),
         proof_policy: ProofPolicy::Balanced,
         allow_os_world: false,
+        z3_timeout_seconds: None,
+        z3_memory_mb: None,
         unwind: None,
         max_bytes_len: None,
         input_len_bytes: None,
@@ -3310,6 +3365,11 @@ fn cmd_xtal_improve(
                                                     baseline: args.baseline.clone(),
                                                     no_prechecks: false,
                                                     no_fail_fast: false,
+                                                    unwind: None,
+                                                    max_bytes_len: None,
+                                                    input_len_bytes: None,
+                                                    z3_timeout_seconds: None,
+                                                    z3_memory_mb: None,
                                                 },
                                             )
                                         })?;
@@ -4498,6 +4558,8 @@ fn cmd_xtal_dev(
             manifest: PathBuf::from(DEFAULT_MANIFEST_PATH),
             proof_policy: ProofPolicy::Balanced,
             allow_os_world: false,
+            z3_timeout_seconds: None,
+            z3_memory_mb: None,
             unwind: None,
             max_bytes_len: None,
             input_len_bytes: None,
@@ -4511,6 +4573,8 @@ fn cmd_xtal_dev(
                 } else {
                     "failed".to_string()
                 };
+                diagnostics
+                    .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
                 verify_report = Some(v);
             }
             Err(err) => {
@@ -4547,9 +4611,10 @@ fn cmd_xtal_dev(
                     } else {
                         "failed".to_string()
                     };
+                    diagnostics
+                        .extend(crate::tool_api::extract_diagnostics(Some(&v)).unwrap_or_default());
                     repair_report = Some(v);
                     if ok {
-                        verify_ok = true;
                         verify_status = "ok".to_string();
                     }
                 }
@@ -4562,17 +4627,6 @@ fn cmd_xtal_dev(
                         None,
                     ));
                 }
-            }
-        }
-
-        if !verify_ok {
-            if let Some(v) = verify_report.as_ref() {
-                diagnostics
-                    .extend(crate::tool_api::extract_diagnostics(Some(v)).unwrap_or_default());
-            }
-            if let Some(v) = repair_report.as_ref() {
-                diagnostics
-                    .extend(crate::tool_api::extract_diagnostics(Some(v)).unwrap_or_default());
             }
         }
     }
@@ -5001,6 +5055,18 @@ fn cmd_xtal_verify(
 
     let policy_str = args.proof_policy.as_str();
 
+    let mut effective_unwind = args.unwind;
+    let mut effective_max_bytes_len = args.max_bytes_len;
+    let effective_input_len_bytes = args.input_len_bytes;
+    if args.proof_policy == ProofPolicy::Balanced {
+        if effective_unwind.is_none() {
+            effective_unwind = Some(XTAL_BALANCED_DEFAULT_UNWIND);
+        }
+        if effective_max_bytes_len.is_none() {
+            effective_max_bytes_len = Some(XTAL_BALANCED_DEFAULT_MAX_BYTES_LEN);
+        }
+    }
+
     if prechecks_ok && (eval_world_ok || args.allow_os_world) {
         std::fs::create_dir_all(project_root.join(DEFAULT_VERIFY_ARTIFACT_DIR)).with_context(
             || {
@@ -5025,15 +5091,15 @@ fn cmd_xtal_verify(
         }
 
         let mut bound_args: Vec<String> = Vec::new();
-        if let Some(v) = args.unwind {
+        if let Some(v) = effective_unwind {
             bound_args.push("--unwind".to_string());
             bound_args.push(v.to_string());
         }
-        if let Some(v) = args.max_bytes_len {
+        if let Some(v) = effective_max_bytes_len {
             bound_args.push("--max-bytes-len".to_string());
             bound_args.push(v.to_string());
         }
-        if let Some(v) = args.input_len_bytes {
+        if let Some(v) = effective_input_len_bytes {
             bound_args.push("--input-len-bytes".to_string());
             bound_args.push(v.to_string());
         }
@@ -5182,6 +5248,17 @@ fn cmd_xtal_verify(
                     DEFAULT_VERIFY_NESTED_ARTIFACT_DIR.to_string(),
                 ];
                 prove_args.extend(bound_args.clone());
+                if let Some(timeout) = args.z3_timeout_seconds {
+                    prove_args.push("--z3-timeout-seconds".to_string());
+                    prove_args.push(timeout.to_string());
+                } else if args.proof_policy == ProofPolicy::Balanced {
+                    prove_args.push("--z3-timeout-seconds".to_string());
+                    prove_args.push(XTAL_BALANCED_Z3_TIMEOUT_SECONDS.to_string());
+                }
+                if let Some(mem_mb) = args.z3_memory_mb {
+                    prove_args.push("--z3-memory-mb".to_string());
+                    prove_args.push(mem_mb.to_string());
+                }
                 prove_args.extend([
                     "--emit-proof".to_string(),
                     proof_object_rel.clone(),
@@ -5550,6 +5627,7 @@ fn cmd_xtal_verify(
         &[
             "test".to_string(),
             "--all".to_string(),
+            "--no-fail-fast".to_string(),
             "--manifest".to_string(),
             args.manifest.display().to_string(),
             "--allow-empty".to_string(),
@@ -5683,21 +5761,24 @@ fn cmd_xtal_verify(
         "proof_policy".to_string(),
         Value::String(policy_str.to_string()),
     );
-    if args.unwind.is_some() || args.max_bytes_len.is_some() || args.input_len_bytes.is_some() {
+    if effective_unwind.is_some()
+        || effective_max_bytes_len.is_some()
+        || effective_input_len_bytes.is_some()
+    {
         let mut bounds = serde_json::Map::new();
-        if let Some(v) = args.unwind {
+        if let Some(v) = effective_unwind {
             bounds.insert(
                 "unwind".to_string(),
                 Value::Number(serde_json::Number::from(v as u64)),
             );
         }
-        if let Some(v) = args.max_bytes_len {
+        if let Some(v) = effective_max_bytes_len {
             bounds.insert(
                 "max_bytes_len".to_string(),
                 Value::Number(serde_json::Number::from(v as u64)),
             );
         }
-        if let Some(v) = args.input_len_bytes {
+        if let Some(v) = effective_input_len_bytes {
             bounds.insert(
                 "input_len_bytes".to_string(),
                 Value::Number(serde_json::Number::from(v as u64)),
@@ -5920,21 +6001,24 @@ fn cmd_xtal_verify(
         "world": project_world_str.clone(),
         "proof_policy": policy_str,
     });
-    if args.unwind.is_some() || args.max_bytes_len.is_some() || args.input_len_bytes.is_some() {
+    if effective_unwind.is_some()
+        || effective_max_bytes_len.is_some()
+        || effective_input_len_bytes.is_some()
+    {
         let mut bounds = serde_json::Map::new();
-        if let Some(v) = args.unwind {
+        if let Some(v) = effective_unwind {
             bounds.insert(
                 "unwind".to_string(),
                 Value::Number(serde_json::Number::from(v as u64)),
             );
         }
-        if let Some(v) = args.max_bytes_len {
+        if let Some(v) = effective_max_bytes_len {
             bounds.insert(
                 "max_bytes_len".to_string(),
                 Value::Number(serde_json::Number::from(v as u64)),
             );
         }
-        if let Some(v) = args.input_len_bytes {
+        if let Some(v) = effective_input_len_bytes {
             bounds.insert(
                 "input_len_bytes".to_string(),
                 Value::Number(serde_json::Number::from(v as u64)),

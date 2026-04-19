@@ -53,6 +53,8 @@ flowchart LR
 - `x07 verify --coverage` is for planning and review. It does not create proof.
 - `x07 verify --prove` is for generating proof evidence.
 - `x07 verify --prove --emit-proof <dir>` adds a proof object and proof-check report.
+- `x07 verify --z3-timeout-seconds <seconds>` bounds solver runtime for `--smt` and `--prove`.
+- `x07 verify --z3-memory-mb <megabytes>` bounds solver memory for `--smt` and `--prove`.
 - Successful prove runs are cached when a project manifest is available:
   - proof summaries: `.x07/cache/verify/proof_summaries/`
   - proof bundles (when emitting proof objects): `.x07/cache/verify/proofs/`

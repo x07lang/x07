@@ -1,7 +1,9 @@
 {
-  "schema_version": "x07.project@0.2.0",
+  "schema_version": "x07.project@0.5.0",
+  "compat": "0.5",
   "world": "solve-pure",
   "entry": "src/main.x07.json",
+  "operational_entry_symbol": "toy.sorter.sort_u8_asc",
   "module_roots": ["src", "gen"],
   "dependencies": [],
   "lockfile": "x07.lock.json"

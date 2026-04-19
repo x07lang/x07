@@ -568,7 +568,7 @@ fn copy_project_tree(src_root: &Path, dst_root: &Path) -> Result<()> {
     for entry in WalkDir::new(src_root)
         .follow_links(false)
         .into_iter()
-        .filter_entry(should_copy_entry)
+        .filter_entry(crate::util::should_walk_dir_entry)
         .flatten()
     {
         let path = entry.path();
@@ -592,17 +592,6 @@ fn copy_project_tree(src_root: &Path, dst_root: &Path) -> Result<()> {
             .with_context(|| format!("copy {} -> {}", path.display(), dst.display()))?;
     }
     Ok(())
-}
-
-fn should_copy_entry(entry: &walkdir::DirEntry) -> bool {
-    if !entry.file_type().is_dir() {
-        return true;
-    }
-    let name = entry.file_name().to_string_lossy();
-    !matches!(
-        name.as_ref(),
-        ".git" | ".x07" | "target" | ".agent" | ".claude"
-    )
 }
 
 fn remove_outputs(project_root: &Path, outputs: &[String]) {

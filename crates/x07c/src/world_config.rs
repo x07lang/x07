@@ -106,6 +106,7 @@ pub fn compile_options_for_world(
         allow_unsafe: features.allow_unsafe,
         allow_ffi: features.allow_ffi,
         allow_internal_only_heads_in_entry: false,
+        allow_non_exported_calls_in_entry: false,
     }
 }
 

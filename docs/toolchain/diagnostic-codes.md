@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 640
-- quickfix support (`sometimes` or `always`): 580
-- quickfix coverage: 90.62%
+- total codes: 642
+- quickfix support (`sometimes` or `always`): 582
+- quickfix coverage: 90.65%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -14,6 +14,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `ECLI_SCHEMA_INVALID` | x07 / lint / error | sometimes | CLI specrows tooling diagnostic `ECLI_SCHEMA_INVALID`. |
 | `ECLI_SEMANTIC` | x07 / lint / error | sometimes | CLI specrows tooling diagnostic `ECLI_SEMANTIC`. |
 | `ECLI_TOOL` | x07 / lint / error | sometimes | CLI specrows tooling diagnostic `ECLI_TOOL`. |
+| `EFAIL_FAST` | x07 / run / info | sometimes | Tests were skipped due to fail-fast. |
+| `ETEST_COMPILE` | x07 / run / error | sometimes | Test compilation diagnostic `ETEST_COMPILE`. |
 | `ETEST_ENTRY_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ENTRY_INVALID`. |
 | `ETEST_EXPECT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_EXPECT_INVALID`. |
 | `ETEST_FIXTURE_FORBIDDEN` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_FIXTURE_FORBIDDEN`. |
@@ -766,6 +768,45 @@ Agent strategy:
 - Run `x07 cli spec fmt` and `x07 cli spec check`.
 - Fix schema or semantic issues in the spec document.
 - Re-run compile/check to verify.
+
+
+## `EFAIL_FAST`
+
+Summary: Tests were skipped due to fail-fast.
+
+Origins:
+- x07 (stage: run, severity: info)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Fail-fast stopped the test run after an earlier failure, so subsequent tests were skipped.
+
+Agent strategy:
+
+- Re-run with `x07 test --no-fail-fast` to see the full failing set.
+- Fix the earliest failure first, then rerun the suite.
+
+
+## `ETEST_COMPILE`
+
+Summary: Test compilation diagnostic `ETEST_COMPILE`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The test driver failed to compile. This is deterministic and must be resolved by updating the referenced modules or regenerating generated test artifacts.
+
+Agent strategy:
+
+- Read the compiler diagnostics in the test report ("compile.compiler_diags").
+- Run `x07 fmt`, `x07 lint`, and `x07 fix` on the failing modules.
+- Re-run `x07 test` (or `x07 xtal verify` if this is an XTAL-generated test).
 
 
 ## `ETEST_ENTRY_INVALID`

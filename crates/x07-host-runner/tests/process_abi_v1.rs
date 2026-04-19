@@ -50,6 +50,7 @@ fn compile_options(world: WorldId) -> x07c::compile::CompileOptions {
         allow_unsafe: None,
         allow_ffi: None,
         allow_internal_only_heads_in_entry: false,
+        allow_non_exported_calls_in_entry: false,
     }
 }
 

@@ -2818,6 +2818,7 @@ mod tests {
             allow_unsafe: None,
             allow_ffi: None,
             allow_internal_only_heads_in_entry: false,
+            allow_non_exported_calls_in_entry: false,
         };
 
         let cfg = base_runner_config(1024 * 1024);

@@ -46,6 +46,7 @@ pub struct CompileOptions {
     pub allow_unsafe: Option<bool>,
     pub allow_ffi: Option<bool>,
     pub allow_internal_only_heads_in_entry: bool,
+    pub allow_non_exported_calls_in_entry: bool,
 }
 
 impl Default for CompileOptions {
@@ -67,6 +68,7 @@ impl Default for CompileOptions {
             allow_unsafe: None,
             allow_ffi: None,
             allow_internal_only_heads_in_entry: false,
+            allow_non_exported_calls_in_entry: false,
         }
     }
 }
@@ -204,7 +206,7 @@ pub fn compile_program_to_program_with_meta(
         fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
     }
 
-    validate_program_visibility(&parsed_program, &module_infos)?;
+    validate_program_visibility(&parsed_program, &module_infos, options)?;
     forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos, options)?;
 
     let contract_nodes = |clauses: &[crate::x07ast::ContractClauseAst]| -> usize {
@@ -1266,6 +1268,7 @@ fn enforce_contract_typecheck(
 fn validate_program_visibility(
     program: &Program,
     module_infos: &BTreeMap<String, ModuleInfo>,
+    options: &CompileOptions,
 ) -> Result<(), CompilerError> {
     let mut fn_module: BTreeMap<String, String> = BTreeMap::new();
     for f in &program.functions {
@@ -1344,16 +1347,34 @@ fn validate_program_visibility(
         }
     }
 
-    validate_expr_visibility(&program.solve, "main", &fn_module, module_infos)?;
+    validate_expr_visibility(
+        &program.solve,
+        "main",
+        &fn_module,
+        module_infos,
+        options.allow_non_exported_calls_in_entry,
+    )?;
 
     for f in &program.functions {
         let caller_mod = fn_module.get(&f.name).map(|s| s.as_str()).unwrap_or("main");
-        validate_expr_visibility(&f.body, caller_mod, &fn_module, module_infos)?;
+        validate_expr_visibility(
+            &f.body,
+            caller_mod,
+            &fn_module,
+            module_infos,
+            options.allow_non_exported_calls_in_entry,
+        )?;
     }
 
     for f in &program.async_functions {
         let caller_mod = fn_module.get(&f.name).map(|s| s.as_str()).unwrap_or("main");
-        validate_expr_visibility(&f.body, caller_mod, &fn_module, module_infos)?;
+        validate_expr_visibility(
+            &f.body,
+            caller_mod,
+            &fn_module,
+            module_infos,
+            options.allow_non_exported_calls_in_entry,
+        )?;
     }
 
     Ok(())
@@ -1639,6 +1660,7 @@ fn validate_expr_visibility(
     caller_module: &str,
     fn_module: &BTreeMap<String, String>,
     module_infos: &BTreeMap<String, ModuleInfo>,
+    allow_non_exported_calls_in_entry: bool,
 ) -> Result<(), CompilerError> {
     match expr {
         crate::ast::Expr::Int { .. } | crate::ast::Expr::Ident { .. } => Ok(()),
@@ -1666,7 +1688,9 @@ fn validate_expr_visibility(
                                 format!("unknown module: {callee_module:?}"),
                             )
                         })?;
-                        if !callee_info.exports.contains(head) {
+                        if !(callee_info.exports.contains(head)
+                            || (allow_non_exported_calls_in_entry && caller_module == "main"))
+                        {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
                                 format!(
@@ -1678,7 +1702,13 @@ fn validate_expr_visibility(
                 }
             }
             for item in items {
-                validate_expr_visibility(item, caller_module, fn_module, module_infos)?;
+                validate_expr_visibility(
+                    item,
+                    caller_module,
+                    fn_module,
+                    module_infos,
+                    allow_non_exported_calls_in_entry,
+                )?;
             }
             Ok(())
         }

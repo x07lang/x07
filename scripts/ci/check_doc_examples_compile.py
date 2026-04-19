@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import os
 import shutil
 import subprocess
@@ -93,6 +94,7 @@ def find_doc_standalone_examples(root: Path) -> list[Path]:
 @dataclass(frozen=True)
 class WorkItem:
     label: str
+    repo_dir: Path | None
     work_dir: Path
     manifest_path: Path
     allow_network: bool
@@ -123,6 +125,7 @@ def prepare_project_work(
 
     return WorkItem(
         label=str(rel),
+        repo_dir=project_dir,
         work_dir=work_dir,
         manifest_path=work_dir / "x07.json",
         allow_network=allow_network,
@@ -158,6 +161,7 @@ def prepare_standalone_work(root: Path, tmp: Path, prog: Path) -> WorkItem:
 
     return WorkItem(
         label=str(rel),
+        repo_dir=None,
         work_dir=work_dir,
         manifest_path=work_dir / "x07.json",
         allow_network=False,
@@ -166,6 +170,14 @@ def prepare_standalone_work(root: Path, tmp: Path, prog: Path) -> WorkItem:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--write-lockfiles",
+        action="store_true",
+        help="Rewrite docs/examples x07.lock.json files to match x07 pkg lock output.",
+    )
+    args = ap.parse_args()
+
     root = repo_root()
     x07_bin = find_x07_bin(root)
     if not x07_bin.exists():
@@ -197,19 +209,28 @@ def main() -> int:
 
         for item in items:
             if item.check_lockfile:
-                pkg_cmd = [
-                    str(x07_bin),
-                    "pkg",
-                    "lock",
-                    "--check",
-                    "--project",
-                    str(item.manifest_path),
-                ]
+                pkg_cmd = [str(x07_bin), "pkg", "lock"]
+                if not args.write_lockfiles:
+                    pkg_cmd.append("--check")
+                pkg_cmd.extend(["--project", str(item.manifest_path)])
                 if not item.allow_network:
                     pkg_cmd.append("--offline")
                 proc = run(pkg_cmd, cwd=item.work_dir, env=env_base)
                 if proc.returncode != 0:
-                    fail(f"{item.label}: pkg lock --check", pkg_cmd, proc)
+                    suffix = " --check" if not args.write_lockfiles else ""
+                    fail(f"{item.label}: pkg lock{suffix}", pkg_cmd, proc)
+
+                if args.write_lockfiles:
+                    if item.repo_dir is None:
+                        raise SystemExit(
+                            f"internal error: write-lockfiles enabled for standalone item {item.label}"
+                        )
+                    src = item.work_dir / "x07.lock.json"
+                    dst = item.repo_dir / "x07.lock.json"
+                    if not src.exists():
+                        raise SystemExit(f"missing generated lockfile at {src}")
+                    if not dst.exists() or src.read_bytes() != dst.read_bytes():
+                        shutil.copy2(src, dst)
             else:
                 pkg_cmd = [
                     str(x07_bin),
@@ -228,6 +249,8 @@ def main() -> int:
             if proc.returncode != 0:
                 fail(f"{item.label}: x07 check", check_cmd, proc)
 
+    if args.write_lockfiles:
+        print("ok: wrote docs examples lockfiles")
     print("ok: docs examples compile")
     return 0
 

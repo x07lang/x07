@@ -61,6 +61,7 @@ fn compile_exe(program: &[u8], module_roots: Vec<PathBuf>) -> PathBuf {
         allow_unsafe: None,
         allow_ffi: None,
         allow_internal_only_heads_in_entry: false,
+        allow_non_exported_calls_in_entry: false,
     };
     let compile = compile_program_with_options(program, &cfg, None, &compile_options, &[])
         .expect("compile ok");
