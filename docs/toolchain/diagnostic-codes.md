@@ -6942,11 +6942,12 @@ Details:
 
 The solver reported a timeout (within configured bounds). In balanced policy this is recorded as a warning; in strict policy it fails the command.
 
-Message: `Proof attempt hit the configured budget for "{entry}" (world="{world}", policy="{policy}"). See report: {report_path}.`
+Message: `Proof attempt hit the configured budget ({budget}) for "{entry}" (world="{world}", policy="{policy}"). See report: {report_path}.`
 
 Agent strategy:
 
-- Increase budgets (`--unwind`, `--max-bytes-len`, `--input-len-bytes`) and re-run `x07 xtal verify`.
+- Read the effective budget in the diagnostic message and `target/xtal/verify/summary.json` (`settings.proof_budget` and `settings.verify_bounds`).
+- Re-run the specific entry with a measured override, for example `x07 verify --prove --entry ... --z3-timeout-seconds <n>`, before changing the implementation.
 - If timeouts are expected, keep balanced policy so the lane remains usable.
 
 

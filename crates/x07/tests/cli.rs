@@ -131,6 +131,17 @@ fn run_x07_in_dir_with_fake_prove_solvers(dir: &Path, args: &[&str]) -> std::pro
     run_x07_in_dir_with_path_prefixes(dir, args, &[solver_dir])
 }
 
+#[cfg(unix)]
+fn run_x07_in_dir_with_fake_z3_stdout(
+    dir: &Path,
+    args: &[&str],
+    z3_stdout: &str,
+) -> std::process::Output {
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers_with_z3_stdout(&solver_dir, z3_stdout);
+    run_x07_in_dir_with_path_prefixes(dir, args, &[solver_dir])
+}
+
 fn parse_json_stdout(out: &std::process::Output) -> Value {
     serde_json::from_slice(&out.stdout).expect("parse stdout JSON")
 }
@@ -6683,6 +6694,11 @@ fn write_lockfile_for_project_bytes(dir: &Path, project_bytes: &[u8]) {
 
 #[cfg(unix)]
 fn write_fake_prove_solvers(bin_dir: &Path) {
+    write_fake_prove_solvers_with_z3_stdout(bin_dir, "unsat");
+}
+
+#[cfg(unix)]
+fn write_fake_prove_solvers_with_z3_stdout(bin_dir: &Path, z3_stdout: &str) {
     std::fs::create_dir_all(bin_dir).expect("create fake solver bin dir");
     let cbmc_path = bin_dir.join("cbmc");
     let cbmc_src = r#"#!/usr/bin/env python3
@@ -6716,9 +6732,11 @@ print("[]")
         .expect("chmod fake cbmc");
 
     let z3_path = bin_dir.join("z3");
-    let z3_src = r#"#!/usr/bin/env python3
-print("unsat")
-"#;
+    let z3_src = format!(
+        r#"#!/usr/bin/env python3
+print({z3_stdout:?})
+"#
+    );
     write_bytes(&z3_path, z3_src.as_bytes());
     std::fs::set_permissions(&z3_path, std::fs::Permissions::from_mode(0o755))
         .expect("chmod fake z3");
@@ -15865,6 +15883,67 @@ fn x07_xtal_verify_routes_nested_artifacts_under_target_xtal() {
     assert_eq!(summary["settings"]["verify_bounds"]["unwind"], 1);
     assert_eq!(summary["settings"]["verify_bounds"]["max_bytes_len"], 8);
     assert_eq!(summary["settings"]["proof_budget"]["z3_timeout_seconds"], 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_xtal_verify_timeout_warning_reports_effective_budget() {
+    let src = repo_root()
+        .join("tests")
+        .join("fixtures")
+        .join("xtal_certify_toy");
+    assert!(src.is_dir(), "missing {}", src.display());
+
+    let dir = fresh_os_tmp_dir("x07_xtal_verify_timeout_budget");
+    copy_dir_recursive(&src, &dir);
+
+    let out = run_x07_in_dir_with_fake_z3_stdout(&dir, &["xtal", "verify"], "timeout");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
+
+    let diagnostics = report["diagnostics"].as_array().expect("diagnostics[]");
+    let timeout_message = diagnostics
+        .iter()
+        .find(|d| d["code"] == "WXTAL_VERIFY_PROVE_TIMEOUT")
+        .and_then(|d| d["message"].as_str())
+        .expect("timeout diagnostic message");
+    assert!(
+        timeout_message.contains("z3_timeout_seconds=1"),
+        "{timeout_message}"
+    );
+    assert!(timeout_message.contains("unwind=1"), "{timeout_message}");
+    assert!(
+        timeout_message.contains("max_bytes_len=8"),
+        "{timeout_message}"
+    );
+
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("verify")
+        .join("summary.json");
+    let summary: Value = serde_json::from_slice(
+        &std::fs::read(&summary_path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", summary_path.display())),
+    )
+    .expect("parse xtal verify summary");
+    assert_eq!(summary["settings"]["proof_budget"]["z3_timeout_seconds"], 1);
+    assert_eq!(summary["entries"][0]["prove"]["raw"], "timeout");
+    assert_eq!(summary["entries"][0]["prove"]["policy_outcome"], "warn");
 }
 
 #[test]

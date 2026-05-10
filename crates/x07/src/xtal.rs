@@ -5073,6 +5073,27 @@ fn cmd_xtal_verify(
             effective_max_bytes_len = Some(XTAL_BALANCED_DEFAULT_MAX_BYTES_LEN);
         }
     }
+    let mut proof_budget_parts = Vec::new();
+    if let Some(v) = effective_z3_timeout_seconds {
+        proof_budget_parts.push(format!("z3_timeout_seconds={v}"));
+    }
+    if let Some(v) = args.z3_memory_mb {
+        proof_budget_parts.push(format!("z3_memory_mb={v}"));
+    }
+    if let Some(v) = effective_unwind {
+        proof_budget_parts.push(format!("unwind={v}"));
+    }
+    if let Some(v) = effective_max_bytes_len {
+        proof_budget_parts.push(format!("max_bytes_len={v}"));
+    }
+    if let Some(v) = effective_input_len_bytes {
+        proof_budget_parts.push(format!("input_len_bytes={v}"));
+    }
+    let proof_budget_summary = if proof_budget_parts.is_empty() {
+        "default solver budget".to_string()
+    } else {
+        proof_budget_parts.join(", ")
+    };
 
     if prechecks_ok && (eval_world_ok || args.allow_os_world) {
         std::fs::create_dir_all(project_root.join(DEFAULT_VERIFY_ARTIFACT_DIR)).with_context(
@@ -5538,7 +5559,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_TIMEOUT",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt hit the configured budget for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt hit the configured budget ({proof_budget_summary}) for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
@@ -5547,7 +5568,7 @@ fn cmd_xtal_verify(
                                 "WXTAL_VERIFY_PROVE_TIMEOUT",
                                 diag_stage,
                                 format!(
-                                    "Proof attempt hit the configured budget for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
+                                    "Proof attempt hit the configured budget ({proof_budget_summary}) for \"{entry}\" (world={project_world_str:?}, policy=\"{policy_str}\"). See report: {prove_report_rel}."
                                 ),
                                 None,
                             )
