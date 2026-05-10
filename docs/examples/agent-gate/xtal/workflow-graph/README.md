@@ -32,6 +32,12 @@ Check generated-artifact drift:
 x07 gen verify --index arch/gen/index.x07gen.json
 ```
 
+Run generated examples and property wrappers:
+
+```bash
+x07 test --all --no-fail-fast --manifest gen/xtal/tests.json
+```
+
 Check impl/spec alignment:
 
 ```bash

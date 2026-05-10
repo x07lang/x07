@@ -103,6 +103,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
 - `x07 test --manifest gen/xtal/tests.json` runs the non-PBT example tests.
 - `x07 test --pbt --manifest gen/xtal/tests.json` runs the generated property tests.
 - `x07 test --all --no-fail-fast --manifest gen/xtal/tests.json` runs examples and properties in one lane.
+  - Use the `--all` form for manual XTAL validation when specs declare `ensures_props`; otherwise the generated property wrappers are not selected.
 
 ### Implementation conformance
 

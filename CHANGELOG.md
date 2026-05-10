@@ -12,6 +12,7 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 ### Changed
 
 - Clarified agent-facing XTAL docs for current `x07 init` templates, generated PBT test selection, and project-root-relative XTAL report paths.
+- Clarified the XTAL example agent loop so generated `ensures_props` property wrappers are run with `x07 test --all`.
 - Added XTAL proof-warning triage guidance for balanced-policy summaries, SMT timeouts, and proof-facing loop design.
 - Clarified that proof-facing XTAL operations need a simplified implementation body, not only a narrower public spec surface.
 - Documented `x07.patchset@0.1.0` / `x07 patch apply` as the deterministic multi-file edit path for XTAL agents.
