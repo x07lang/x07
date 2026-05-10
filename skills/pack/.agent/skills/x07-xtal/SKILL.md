@@ -39,7 +39,7 @@ Advanced building blocks (use when you need to isolate a step):
 
 - Never edit `gen/**` directly. Use `x07 xtal tests gen-from-spec --write` or update spec/examples and regenerate.
 - Always read `target/xtal/**/summary.json` (and `target/xtal/xtal.*.diag.json`) to determine next actions.
+- For deterministic multi-file edits across `spec/**`, `src/**`, and manifests, use an `x07.patchset@0.1.0` and apply it with `x07 patch apply --in <patchset.json> --repo-root . --write`.
 - When a repair emits `target/xtal/repair/patchset.json`, apply it via:
   - `x07 patch apply --in target/xtal/repair/patchset.json --repo-root . --write`
 - If a patch touches `spec/**`, do not apply unless explicitly allowed (`--allow-spec-change`) and approved by project policy.
-

@@ -277,6 +277,7 @@ Two canonical repair mechanisms:
 
 - **Quickfixes**: `x07 fix` applies the tool-provided `quickfix` JSON patches deterministically.
 - **Explicit patches**: `x07 ast apply-patch` applies RFC 6902 JSON Patch.
+- **Multi-file patchsets**: `x07 patch apply --in <patchset.json> --repo-root . --write` applies an `x07.patchset@0.1.0` across specs, source modules, and manifests.
 
 Note: `x07 run`, `x07 build`, and `x07 bundle` apply quickfixes automatically by default (`--repair=...`). Use the explicit loop below when you want raw diagnostics or tighter control.
 

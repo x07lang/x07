@@ -74,6 +74,12 @@ Key files:
 - `x07 xtal spec fmt --input <spec.x07spec.json> --write [--inject-ids]`
 - `x07 xtal spec extract --project x07.json (--module-id <id> | --impl-path <path>) (--write | --patchset-out <path>)`
 
+For deterministic multi-file edits that touch specs, implementation modules, and examples together, prefer an `x07.patchset@0.1.0` plus:
+
+- `x07 patch apply --in <patchset.json> --repo-root . --write`
+
+Then run `x07 fmt`, `x07 xtal spec fmt`, and `x07 xtal tests gen-from-spec --write`. Do not edit `gen/xtal/**` directly.
+
 ### Validation
 
 - `x07 xtal spec lint --input <spec.x07spec.json>`
