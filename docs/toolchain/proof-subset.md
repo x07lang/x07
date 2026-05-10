@@ -29,7 +29,7 @@ For public APIs, `bytes_view@brand` is usually the most proof-friendly shape.
 - If a loop can execute more iterations than the configured unwind bound, proof will be inconclusive or fail
 - Nested loops over byte-derived record counts and repeated calls to scanning helpers can time out even when each loop form is supported. Keep proof-facing entrypoints small, prefer byte/input bounds that match the claim, and split complex helpers into separately proved operations when possible.
 - A specialized proof-facing operation must also simplify the implementation body. Wrapping a broad helper in a narrower API can still inherit the helper's SMT obligation if the body delegates back into data-scanning code.
-- A longer `--z3-timeout-seconds` is a diagnostic knob, not a proof strategy. If `x07 verify --prove` reports `X07V_SMT_TIMEOUT`, inspect the per-entry report and consider simplifying the proof obligation before increasing solver time or memory budgets.
+- A longer `--z3-timeout-seconds` is a diagnostic knob, not a proof strategy. If `x07 verify --prove` reports `X07V_SMT_TIMEOUT`, inspect the per-entry report and the XTAL summary's `settings.proof_budget` before deciding whether to simplify the proof obligation or increase solver time/memory budgets.
 
 ## Effects and unsupported operations
 

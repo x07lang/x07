@@ -68,6 +68,14 @@
             "max_bytes_len": { "type": "integer", "minimum": 0 },
             "input_len_bytes": { "type": "integer", "minimum": 0 }
           }
+        },
+        "proof_budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "z3_timeout_seconds": { "type": "integer", "minimum": 0 },
+            "z3_memory_mb": { "type": "integer", "minimum": 0 }
+          }
         }
       }
     },

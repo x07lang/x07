@@ -5058,6 +5058,13 @@ fn cmd_xtal_verify(
     let mut effective_unwind = args.unwind;
     let mut effective_max_bytes_len = args.max_bytes_len;
     let effective_input_len_bytes = args.input_len_bytes;
+    let effective_z3_timeout_seconds = if let Some(v) = args.z3_timeout_seconds {
+        Some(v)
+    } else if args.proof_policy == ProofPolicy::Balanced {
+        Some(XTAL_BALANCED_Z3_TIMEOUT_SECONDS)
+    } else {
+        None
+    };
     if args.proof_policy == ProofPolicy::Balanced {
         if effective_unwind.is_none() {
             effective_unwind = Some(XTAL_BALANCED_DEFAULT_UNWIND);
@@ -5248,12 +5255,9 @@ fn cmd_xtal_verify(
                     DEFAULT_VERIFY_NESTED_ARTIFACT_DIR.to_string(),
                 ];
                 prove_args.extend(bound_args.clone());
-                if let Some(timeout) = args.z3_timeout_seconds {
+                if let Some(timeout) = effective_z3_timeout_seconds {
                     prove_args.push("--z3-timeout-seconds".to_string());
                     prove_args.push(timeout.to_string());
-                } else if args.proof_policy == ProofPolicy::Balanced {
-                    prove_args.push("--z3-timeout-seconds".to_string());
-                    prove_args.push(XTAL_BALANCED_Z3_TIMEOUT_SECONDS.to_string());
                 }
                 if let Some(mem_mb) = args.z3_memory_mb {
                     prove_args.push("--z3-memory-mb".to_string());
@@ -5788,6 +5792,24 @@ fn cmd_xtal_verify(
             .meta
             .insert("verify_bounds".to_string(), Value::Object(bounds));
     }
+    if effective_z3_timeout_seconds.is_some() || args.z3_memory_mb.is_some() {
+        let mut budget = serde_json::Map::new();
+        if let Some(v) = effective_z3_timeout_seconds {
+            budget.insert(
+                "z3_timeout_seconds".to_string(),
+                Value::Number(serde_json::Number::from(v)),
+            );
+        }
+        if let Some(v) = args.z3_memory_mb {
+            budget.insert(
+                "z3_memory_mb".to_string(),
+                Value::Number(serde_json::Number::from(v)),
+            );
+        }
+        report
+            .meta
+            .insert("proof_budget".to_string(), Value::Object(budget));
+    }
     report.meta.insert(
         "verify_summary_path".to_string(),
         Value::String(DEFAULT_VERIFY_SUMMARY_PATH.to_string()),
@@ -6026,6 +6048,24 @@ fn cmd_xtal_verify(
         }
         if let Some(obj) = settings.as_object_mut() {
             obj.insert("verify_bounds".to_string(), Value::Object(bounds));
+        }
+    }
+    if effective_z3_timeout_seconds.is_some() || args.z3_memory_mb.is_some() {
+        let mut budget = serde_json::Map::new();
+        if let Some(v) = effective_z3_timeout_seconds {
+            budget.insert(
+                "z3_timeout_seconds".to_string(),
+                Value::Number(serde_json::Number::from(v)),
+            );
+        }
+        if let Some(v) = args.z3_memory_mb {
+            budget.insert(
+                "z3_memory_mb".to_string(),
+                Value::Number(serde_json::Number::from(v)),
+            );
+        }
+        if let Some(obj) = settings.as_object_mut() {
+            obj.insert("proof_budget".to_string(), Value::Object(budget));
         }
     }
 

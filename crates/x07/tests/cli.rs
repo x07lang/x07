@@ -15852,6 +15852,19 @@ fn x07_xtal_verify_routes_nested_artifacts_under_target_xtal() {
             .is_file(),
         "missing xtal verify summary"
     );
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("verify")
+        .join("summary.json");
+    let summary: Value = serde_json::from_slice(
+        &std::fs::read(&summary_path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", summary_path.display())),
+    )
+    .expect("parse xtal verify summary");
+    assert_eq!(summary["settings"]["verify_bounds"]["unwind"], 1);
+    assert_eq!(summary["settings"]["verify_bounds"]["max_bytes_len"], 8);
+    assert_eq!(summary["settings"]["proof_budget"]["z3_timeout_seconds"], 1);
 }
 
 #[test]

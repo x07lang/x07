@@ -141,6 +141,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
     - `target/xtal/verify/prove/<module_path>/<local>.report.json` (per-entry prove reports)
     - `target/xtal/verify/prove/<module_path>/<local>/proof.object.json` (proof objects, when emitted)
   - Paths in the XTAL JSON report are project-root-relative. If you invoke `x07 xtal verify --project subdir/x07.json` from a parent directory, look under `subdir/target/xtal/...`.
+  - `target/xtal/verify/summary.json` records the effective `settings.verify_bounds` and `settings.proof_budget` values used for the proof lane.
   - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
     - Under `balanced`, missing proof tools produce warnings (and verification continues).
     - Under `strict`, only `proven` outcomes pass.
@@ -152,6 +153,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
   - The Z3 timeout for the proof lane can be overridden with `--z3-timeout-seconds` (otherwise x07's default timeout applies under `--proof-policy strict`).
   - The Z3 solver memory limit can be set with `--z3-memory-mb`.
   - Treat `X07V_SMT_TIMEOUT` as a proof-design signal, not just a request for a larger timeout. Nested data-dependent scans, repeated calls into scanning helpers, and broad byte bounds can make the SMT obligation grow quickly; try a smaller proof-facing entrypoint, tighter byte/input bounds, or a helper with its own proof summary before raising solver budgets. Higher timeouts are useful for measurement, but can also increase peak memory substantially.
+  - If an operation times out under balanced policy, compare the summary's `settings.proof_budget.z3_timeout_seconds` with a targeted `x07 verify --prove --entry ... --z3-timeout-seconds <n>` run before changing the implementation.
   - A narrower spec operation only reduces proof cost when the implementation body is narrower too. If it still calls an unproved generic scanner inside its loop, the summary can keep reporting `prove.raw: "timeout"` for the new operation.
   - Proof caching is automatic when a project manifest is available:
     - Successful `x07 verify --prove` runs cache proof summaries under `.x07/cache/verify/proof_summaries/`.
