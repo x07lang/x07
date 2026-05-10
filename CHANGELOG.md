@@ -11,6 +11,7 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 ### Changed
 
 - Clarified agent-facing XTAL docs for current `x07 init` templates, generated PBT test selection, and project-root-relative XTAL report paths.
+- Added XTAL proof-warning triage guidance for balanced-policy summaries, SMT timeouts, and proof-facing loop design.
 
 ## v0.2.10
 

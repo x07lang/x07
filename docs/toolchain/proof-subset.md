@@ -27,6 +27,8 @@ For public APIs, `bytes_view@brand` is usually the most proof-friendly shape.
 - `for` loops must use the strict x07AST form: `["for","i",<start:i32>,<end:i32>,<body:any>]`
 - Proof is bounded by `--unwind` and input-size bounds (`--max-bytes-len` / `--input-len-bytes`)
 - If a loop can execute more iterations than the configured unwind bound, proof will be inconclusive or fail
+- Nested loops over byte-derived record counts and repeated calls to scanning helpers can time out even when each loop form is supported. Keep proof-facing entrypoints small, prefer byte/input bounds that match the claim, and split complex helpers into separately proved operations when possible.
+- A longer `--z3-timeout-seconds` is a diagnostic knob, not a proof strategy. If `x07 verify --prove` reports `X07V_SMT_TIMEOUT`, inspect the per-entry report and consider simplifying the proof obligation before increasing solver time or memory budgets.
 
 ## Effects and unsupported operations
 
@@ -38,4 +40,3 @@ Use `x07 verify --coverage` to see support posture and the exact rejection reaso
 
 - Self-recursive `defn` targets require `decreases[]` to be certifiable.
 - Strong certification profiles reject bounded-recursion “success” unless explicitly disclosed as an assumption in the trust posture.
-

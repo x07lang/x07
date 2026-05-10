@@ -139,11 +139,13 @@ Run generated tests with the same selection rules as any other X07 manifest:
     - Under `balanced`, missing proof tools produce warnings (and verification continues).
     - Under `strict`, only `proven` outcomes pass.
   - When proofs are unsupported or inconclusive, the wrapper emits a compact per-entry reason summary in the XTAL diagnostics (for example: unsupported loop forms or unsupported branded input shapes).
+  - Always inspect `target/xtal/verify/summary.json` after a warning. The top-level `ok: true` can coexist with per-entry `prove.policy_outcome: "warn"` under `balanced`; use the per-entry `prove.raw` value to decide whether the operation actually has proof evidence.
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
   - Under `--proof-policy balanced`, xtal verify uses conservative proof budgets so the default loop stays bounded.
     - Defaults: `--unwind 1`, `--max-bytes-len 8`, `--z3-timeout-seconds 1`.
   - The Z3 timeout for the proof lane can be overridden with `--z3-timeout-seconds` (otherwise x07's default timeout applies under `--proof-policy strict`).
   - The Z3 solver memory limit can be set with `--z3-memory-mb`.
+  - Treat `X07V_SMT_TIMEOUT` as a proof-design signal, not just a request for a larger timeout. Nested data-dependent scans, repeated calls into scanning helpers, and broad byte bounds can make the SMT obligation grow quickly; try a smaller proof-facing entrypoint, tighter byte/input bounds, or a helper with its own proof summary before raising solver budgets. Higher timeouts are useful for measurement, but can also increase peak memory substantially.
   - Proof caching is automatic when a project manifest is available:
     - Successful `x07 verify --prove` runs cache proof summaries under `.x07/cache/verify/proof_summaries/`.
     - When proof objects are emitted, proof bundles are cached under `.x07/cache/verify/proofs/` and may be reused on subsequent prove runs (even without solver tools present).
