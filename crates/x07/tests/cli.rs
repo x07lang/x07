@@ -15944,6 +15944,14 @@ fn x07_xtal_verify_timeout_warning_reports_effective_budget() {
     assert_eq!(summary["settings"]["proof_budget"]["z3_timeout_seconds"], 1);
     assert_eq!(summary["entries"][0]["prove"]["raw"], "timeout");
     assert_eq!(summary["entries"][0]["prove"]["policy_outcome"], "warn");
+    assert_eq!(
+        summary["entries"][0]["prove"]["first_diagnostic"]["code"],
+        "X07V_SMT_TIMEOUT"
+    );
+    assert_eq!(
+        summary["entries"][0]["prove"]["first_diagnostic"]["message"],
+        "solver timed out"
+    );
 }
 
 #[test]

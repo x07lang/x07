@@ -8,6 +8,7 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 - Documented the new sibling `x07-studio` repo as the artifact-first Studio/Forge surface for XTAL workflows, backed by the shared Loom lifecycle daemon.
 - XTAL verify summaries and proof-timeout diagnostics now record the effective proof solver budget used for the proof lane.
+- XTAL verify summaries now include the first proof diagnostic code/message for proof rows that are unsupported, inconclusive, timed out, or missing tools.
 
 ### Changed
 

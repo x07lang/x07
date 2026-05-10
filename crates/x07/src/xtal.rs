@@ -5296,6 +5296,7 @@ fn cmd_xtal_verify(
                 let mut prove_sha256 = util::sha256_hex(b"");
                 let mut prove_schema_version = "unknown".to_string();
                 let mut prove_raw = "error";
+                let mut prove_first_diagnostic: Option<Value> = None;
                 if !prove_path.is_file() {
                     diagnostics.push(diag_error(
                         "EXTAL_VERIFY_REPORT_MISSING",
@@ -5376,6 +5377,10 @@ fn cmd_xtal_verify(
                                             diag0_message
                                         };
                                         if !code.is_empty() || !msg.is_empty() {
+                                            prove_first_diagnostic = Some(json!({
+                                                "code": code.clone(),
+                                                "message": msg.clone(),
+                                            }));
                                             prove_reason_rows.push((entry.to_string(), code, msg));
                                         }
                                     }
@@ -5605,6 +5610,11 @@ fn cmd_xtal_verify(
                     "policy_outcome": policy_outcome,
                     "report": prove_ref,
                 });
+                if let Some(first_diagnostic) = prove_first_diagnostic {
+                    if let Some(obj) = prove_obj.as_object_mut() {
+                        obj.insert("first_diagnostic".to_string(), first_diagnostic);
+                    }
+                }
                 if let Some(proof_ref) = proof_object_ref {
                     if let Some(obj) = prove_obj.as_object_mut() {
                         obj.insert("proof_object".to_string(), proof_ref);

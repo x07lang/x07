@@ -147,7 +147,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
     - Under `balanced`, missing proof tools produce warnings (and verification continues).
     - Under `strict`, only `proven` outcomes pass.
   - When proofs are unsupported or inconclusive, the wrapper emits a compact per-entry reason summary in the XTAL diagnostics (for example: unsupported loop forms or unsupported branded input shapes).
-  - Always inspect `target/xtal/verify/summary.json` after a warning. The top-level `ok: true` can coexist with per-entry `prove.policy_outcome: "warn"` under `balanced`; use the per-entry `prove.raw` value to decide whether the operation actually has proof evidence.
+  - Always inspect `target/xtal/verify/summary.json` after a warning. The top-level `ok: true` can coexist with per-entry `prove.policy_outcome: "warn"` under `balanced`; use the per-entry `prove.raw` value and optional `prove.first_diagnostic` code/message to decide whether the operation actually has proof evidence.
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
   - Under `--proof-policy balanced`, xtal verify uses conservative proof budgets so the default loop stays bounded.
     - Defaults: `--unwind 1`, `--max-bytes-len 8`, `--z3-timeout-seconds 1`.
