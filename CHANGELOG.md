@@ -4,6 +4,10 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+### Added
+
+- Documented the new sibling `x07-studio` repo as the artifact-first Studio/Forge surface for XTAL workflows, backed by the shared Loom lifecycle daemon.
+
 ## v0.2.10
 
 ### Added

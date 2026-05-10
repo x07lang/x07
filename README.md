@@ -109,6 +109,7 @@ The core toolchain stays in this repo. The broader X07 stack extends into focuse
 - [`x07lang/x07-web-ui`](https://github.com/x07lang/x07-web-ui) for reducer-style web UI contracts and browser host surfaces
 - [`x07lang/x07-device-host`](https://github.com/x07lang/x07-device-host) for desktop and mobile WebView hosting
 - [`x07lang/x07-platform`](https://github.com/x07lang/x07-platform) for workload delivery, release review, incidents, and lifecycle control
+- [`x07lang/x07-studio`](https://github.com/x07lang/x07-studio) for the Loom lifecycle kernel, x07 Studio desktop shell, and Forge terminal shell over the XTAL loop
 
 ## Formal Verification And Certification
 
@@ -139,6 +140,7 @@ The public X07 ecosystem is split into focused repos with clear boundaries:
 - [`x07lang/x07-web-ui`](https://github.com/x07lang/x07-web-ui): browser UI contracts and host surfaces
 - [`x07lang/x07-device-host`](https://github.com/x07lang/x07-device-host): desktop and mobile WebView host
 - [`x07lang/x07-platform`](https://github.com/x07lang/x07-platform): public runtime and lifecycle control plane
+- [`x07lang/x07-studio`](https://github.com/x07lang/x07-studio): artifact-first Studio/Forge shells and the shared Loom lifecycle daemon for XTAL workflows
 - [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry): package registry backend
 - [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web): package registry UI at [x07.io](https://x07.io)
 - [`x07lang/x07-website`](https://github.com/x07lang/x07-website): public docs site at [x07lang.org](https://x07lang.org)
