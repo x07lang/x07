@@ -43,3 +43,4 @@ Advanced building blocks (use when you need to isolate a step):
 - When a repair emits `target/xtal/repair/patchset.json`, apply it via:
   - `x07 patch apply --in target/xtal/repair/patchset.json --repo-root . --write`
 - If a patch touches `spec/**`, do not apply unless explicitly allowed (`--allow-spec-change`) and approved by project policy.
+- When composing helpers that take owned `bytes` inside loops, bind public byte params once with `bytes.view` and pass copies via `view.to_bytes(<view>)`. Passing the original `bytes` directly can move it and break later postconditions with `use after move`.

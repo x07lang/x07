@@ -47,6 +47,7 @@ See: [Compatibility contract](../reference/compat.md) and `x07 migrate` in [Tool
 
 - Loops: use `for` for counted loops and `while` for scanning loops; reserve recursion for contract/verified code. `for` is strict-form x07AST; see [AST authoring best practices](../guides/ast-authoring-best-practices.md) (`X07-FOR-0001`).
 - Bytes/view: call-argument coercion exists, but prefer explicit `bytes.view` at library boundaries. `bytes.view` requires an identifier owner; for literals prefer `bytes.view_lit` (`X07-BORROW-0001` + auto-fix via `x07 fix`).
+- Owned byte params: helper calls that take `bytes` consume the value. If a public byte param is reused across loops, helper calls, or postconditions, bind `["bytes.view","param"]` once and pass `["view.to_bytes","param_v"]` to owned-byte helpers.
 - Dependency roots: when imports fail, check `x07.json.module_roots` + `x07.lock.json` and inspect closure with `x07 pkg tree`.
 - Error propagation:
   - typed results (`result_i32`, `result_bytes`) use `try`
@@ -56,6 +57,7 @@ See: [Compatibility contract](../reference/compat.md) and `x07 migrate` in [Tool
 
 - **Loop forms (`for`)**: valid form is `["for","i",<start:i32>,<end:i32>,<body:any>]` (`X07-FOR-0001`). Wrap multi-statement bodies in `begin`.
 - **`bytes.view` literals/temporaries**: `bytes.view` requires an identifier owner; use `bytes.view_lit` for literals and `let tmp = <expr>` for temporaries (`X07-BORROW-0001`, often auto-fixable via `x07 fix`).
+- **Owned `bytes` reuse**: passing a `bytes` param to a helper that expects owned `bytes` can move it. In composed library code, keep a `bytes_view` local and pass `view.to_bytes` copies into repeated helper calls.
 - **Borrow-union returns**: returning `bytes_view` from `if`/option/result branches that borrow from different owners is usually rejected; return owned `bytes` (copy) instead.
 - **XTAL brands**: when a public byte boundary is branded in `src/*.x07.json`, the corresponding `spec/*.x07spec.json` operation signature must also carry the same `brand` / `result_brand` ids (and generated property wrappers will inherit them). See `docs/toolchain/xtal.md` and `docs/examples/agent-gate/xtal/workflow-graph/`.
 - **Dependency roots**: module-not-found errors are usually missing `module_roots` or missing/stale locks; use `x07 pkg tree` / `x07 pkg provides` and re-run `x07 pkg lock --check --offline`.
