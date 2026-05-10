@@ -92,6 +92,12 @@ Key files:
 - `x07 xtal tests gen-from-spec --project x07.json --check`
   - Fails if any generated output would change (drift check).
 
+Run generated tests with the same selection rules as any other X07 manifest:
+
+- `x07 test --manifest gen/xtal/tests.json` runs the non-PBT example tests.
+- `x07 test --pbt --manifest gen/xtal/tests.json` runs the generated property tests.
+- `x07 test --all --no-fail-fast --manifest gen/xtal/tests.json` runs examples and properties in one lane.
+
 ### Implementation conformance
 
 - `x07 xtal impl check --project x07.json`
@@ -128,6 +134,7 @@ Key files:
     - `target/xtal/verify/coverage/<module_path>/<local>.report.json` (per-entry coverage reports)
     - `target/xtal/verify/prove/<module_path>/<local>.report.json` (per-entry prove reports)
     - `target/xtal/verify/prove/<module_path>/<local>/proof.object.json` (proof objects, when emitted)
+  - Paths in the XTAL JSON report are project-root-relative. If you invoke `x07 xtal verify --project subdir/x07.json` from a parent directory, look under `subdir/target/xtal/...`.
   - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
     - Under `balanced`, missing proof tools produce warnings (and verification continues).
     - Under `strict`, only `proven` outcomes pass.

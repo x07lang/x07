@@ -40,6 +40,7 @@ All skills live under `.agent/skills/<skill-name>/SKILL.md`.
 | `x07-format` | Formatting workflows (`x07 fmt`) |
 | `x07-package` | Dependency + lockfile workflows (`x07 pkg ...`, `project.patch`, lock safety checks) |
 | `x07-test` | Test harness workflows (`x07 test ...`) |
+| `x07-xtal` | Spec-first XTAL workflow (`x07 xtal ...`) |
 | `x07-os-run` | OS runner workflows (`x07-os-runner`) (advanced) |
 | `x07-ffi-c` | OS-world embedding via C (`x07 build --emit-c-header`) (advanced) |
 | `x07-io-streams` | Streaming I/O patterns (`std.io`, `std.io.bufread`) |

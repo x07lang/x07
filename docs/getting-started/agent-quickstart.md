@@ -138,7 +138,9 @@ For control-room style clients, keep release-candidate or workspace state in the
 If you are creating a new HTTP/SSE MCP server project that needs long-running tool calls or task polling, start from:
 
 ```bash
-x07 init --template mcp-server-http-tasks --dir ./my-mcp-http-tasks
+mkdir ./my-mcp-http-tasks
+cd ./my-mcp-http-tasks
+x07 init --template mcp-server-http-tasks
 ```
 
 That scaffold still comes from `x07-mcp`; `x07` only owns the delegation path and the surrounding project bootstrap.
@@ -169,6 +171,8 @@ Use templates when the shape matches your project: they include pinned local dep
 - Typed CLI (`ext-cli` + specrows): `x07 init --template cli`
 - File I/O with explicit caps (`run-os-sandboxed`): `x07 init --template fs-tool` (defaults to the `sandbox` profile)
 - JSON reporting (DataModel → canonical JSON): `x07 init --template json-report` (see [JSON reporting](../guides/json-reporting.md))
+- Spec-first pure XTAL starter: `x07 init --template xtal-pure`
+- Certifiable pure XTAL starter: `x07 init --template xtal-verified`
 
 Offline sanity check (for dependency hydration):
 
@@ -251,11 +255,13 @@ For non-mutating, whole-project validation (full import graph + typecheck + back
 x07 check --project x07.json
 ```
 
-If the suite includes property-based tests, run:
+By default, the test harness runs non-PBT tests. If the suite includes property-based tests, run the full suite with:
 
 ```bash
 x07 test --all --manifest tests/tests.json
 ```
+
+To run only property-based tests, use `x07 test --pbt --manifest tests/tests.json`.
 
 If PBT finds a counterexample, convert it into a committable regression test:
 

@@ -8,6 +8,10 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 - Documented the new sibling `x07-studio` repo as the artifact-first Studio/Forge surface for XTAL workflows, backed by the shared Loom lifecycle daemon.
 
+### Changed
+
+- Clarified agent-facing XTAL docs for current `x07 init` templates, generated PBT test selection, and project-root-relative XTAL report paths.
+
 ## v0.2.10
 
 ### Added
