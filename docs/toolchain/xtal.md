@@ -152,6 +152,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
   - The Z3 timeout for the proof lane can be overridden with `--z3-timeout-seconds` (otherwise x07's default timeout applies under `--proof-policy strict`).
   - The Z3 solver memory limit can be set with `--z3-memory-mb`.
   - Treat `X07V_SMT_TIMEOUT` as a proof-design signal, not just a request for a larger timeout. Nested data-dependent scans, repeated calls into scanning helpers, and broad byte bounds can make the SMT obligation grow quickly; try a smaller proof-facing entrypoint, tighter byte/input bounds, or a helper with its own proof summary before raising solver budgets. Higher timeouts are useful for measurement, but can also increase peak memory substantially.
+  - A narrower spec operation only reduces proof cost when the implementation body is narrower too. If it still calls an unproved generic scanner inside its loop, the summary can keep reporting `prove.raw: "timeout"` for the new operation.
   - Proof caching is automatic when a project manifest is available:
     - Successful `x07 verify --prove` runs cache proof summaries under `.x07/cache/verify/proof_summaries/`.
     - When proof objects are emitted, proof bundles are cached under `.x07/cache/verify/proofs/` and may be reused on subsequent prove runs (even without solver tools present).
