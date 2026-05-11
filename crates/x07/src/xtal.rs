@@ -145,6 +145,34 @@ pub struct XtalDevArgs {
     /// If verification fails, apply a bounded repair and re-run verification.
     #[arg(long)]
     pub repair_on_fail: bool,
+
+    /// Proof lane policy (`balanced` warns on inconclusive/unsupported; `strict` fails).
+    #[arg(long, value_enum, default_value_t = ProofPolicy::Balanced)]
+    pub proof_policy: ProofPolicy,
+
+    /// Permit OS-capable worlds during verification (default: require solve-* worlds).
+    #[arg(long)]
+    pub allow_os_world: bool,
+
+    /// Override the Z3 solver timeout budget passed to `x07 verify --prove` (seconds).
+    #[arg(long, value_name = "SECONDS")]
+    pub z3_timeout_seconds: Option<u64>,
+
+    /// Override the Z3 solver memory limit passed to `x07 verify --prove` (MB).
+    #[arg(long, value_name = "MEGABYTES")]
+    pub z3_memory_mb: Option<u64>,
+
+    /// Override loop unwind bound passed to `x07 verify`.
+    #[arg(long, value_name = "N")]
+    pub unwind: Option<u32>,
+
+    /// Override max bytes length bound passed to `x07 verify`.
+    #[arg(long, value_name = "N")]
+    pub max_bytes_len: Option<u32>,
+
+    /// Override the verification input encoding length (advanced; passed to `x07 verify`).
+    #[arg(long, value_name = "N")]
+    pub input_len_bytes: Option<u32>,
 }
 
 #[derive(Debug, Args)]
@@ -727,6 +755,13 @@ fn cmd_xtal_certify(
             gen_index: None,
             prechecks_only: true,
             repair_on_fail: false,
+            proof_policy: ProofPolicy::Balanced,
+            allow_os_world: false,
+            z3_timeout_seconds: None,
+            z3_memory_mb: None,
+            unwind: None,
+            max_bytes_len: None,
+            input_len_bytes: None,
         };
         match capture_report_json("xtal_certify_dev", |m| cmd_xtal_dev(m, dev_args)) {
             Ok((code, v)) => {
@@ -4556,13 +4591,13 @@ fn cmd_xtal_dev(
             gen_index: args.gen_index.clone(),
             gen_dir: PathBuf::from(DEFAULT_GEN_DIR),
             manifest: PathBuf::from(DEFAULT_MANIFEST_PATH),
-            proof_policy: ProofPolicy::Balanced,
-            allow_os_world: false,
-            z3_timeout_seconds: None,
-            z3_memory_mb: None,
-            unwind: None,
-            max_bytes_len: None,
-            input_len_bytes: None,
+            proof_policy: args.proof_policy,
+            allow_os_world: args.allow_os_world,
+            z3_timeout_seconds: args.z3_timeout_seconds,
+            z3_memory_mb: args.z3_memory_mb,
+            unwind: args.unwind,
+            max_bytes_len: args.max_bytes_len,
+            input_len_bytes: args.input_len_bytes,
         };
         let mut verify_ok = false;
         match capture_report_json("xtal_dev_verify", |m| cmd_xtal_verify(m, verify_args)) {

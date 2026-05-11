@@ -125,6 +125,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
   - Otherwise, runs `x07 xtal tests gen-from-spec --check`.
   - Runs `x07 xtal impl check`.
   - Unless `--prechecks-only` is set, runs `x07 xtal verify`.
+  - Forwards proof/verification controls to the verification step: `--proof-policy`, `--allow-os-world`, `--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, and `--z3-memory-mb`.
   - If verification fails and `--repair-on-fail` is set, runs `x07 xtal repair --write`.
 - `x07 xtal verify`
   - Runs spec/gen/impl prechecks.

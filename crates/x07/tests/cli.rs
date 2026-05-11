@@ -15954,6 +15954,70 @@ fn x07_xtal_verify_timeout_warning_reports_effective_budget() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn x07_xtal_dev_forwards_verify_proof_budgets() {
+    let src = repo_root()
+        .join("tests")
+        .join("fixtures")
+        .join("xtal_certify_toy");
+    assert!(src.is_dir(), "missing {}", src.display());
+
+    let dir = fresh_os_tmp_dir("x07_xtal_dev_forwards_proof_budgets");
+    copy_dir_recursive(&src, &dir);
+
+    let out = run_x07_in_dir_with_fake_z3_stdout(
+        &dir,
+        &[
+            "xtal",
+            "dev",
+            "--z3-timeout-seconds",
+            "7",
+            "--z3-memory-mb",
+            "64",
+            "--unwind",
+            "2",
+            "--max-bytes-len",
+            "12",
+            "--input-len-bytes",
+            "16",
+        ],
+        "timeout",
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
+
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("verify")
+        .join("summary.json");
+    let summary: Value = serde_json::from_slice(
+        &std::fs::read(&summary_path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", summary_path.display())),
+    )
+    .expect("parse xtal verify summary");
+    assert_eq!(summary["settings"]["verify_bounds"]["unwind"], 2);
+    assert_eq!(summary["settings"]["verify_bounds"]["max_bytes_len"], 12);
+    assert_eq!(summary["settings"]["verify_bounds"]["input_len_bytes"], 16);
+    assert_eq!(summary["settings"]["proof_budget"]["z3_timeout_seconds"], 7);
+    assert_eq!(summary["settings"]["proof_budget"]["z3_memory_mb"], 64);
+}
+
 #[test]
 fn x07_xtal_certify_writes_cert_bundle_manifest() {
     let src = repo_root()
