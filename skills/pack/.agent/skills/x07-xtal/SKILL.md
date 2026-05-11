@@ -45,6 +45,7 @@ Advanced building blocks (use when you need to isolate a step):
 - Run `x07 fmt` only on x07AST files. Run `x07 xtal spec fmt --input <spec.x07spec.json> --write` for XTAL spec files.
 - Use `x07 xtal dev` proof flags (`--entry`, `--test-filter`, `--test-exact`, `--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, `--z3-memory-mb`, `--proof-policy`) when measuring timeout warnings in the full inner loop.
 - Use `--entry <spec operation name or id>` for focused coverage/proof work on one operation. Generated tests still run from the manifest by default; add `--test-filter <generated test id substring>` when you need a focused generated-test run.
+- Keep proof-facing modules inside the certifiable pure subset. Prefer byte-encoded pure structures such as `std.btree_map` before native-handle helpers; helpers that emit through internal-only builtins, for example `std.hash_map.emit_kv_u32le_u32le`, can report `prove.raw: "unsupported"` even when tests and coverage pass. If such a helper is necessary, isolate it in a dedicated proof entry and inspect the full `target/xtal/verify/summary.json` because shared imports can widen the unsupported surface.
 - Patchsets use top-level `patches`, not `ops`:
   - `{"schema_version":"x07.patchset@0.1.0","patches":[{"path":"spec/foo.x07spec.json","patch":[{"op":"add","path":"/operations/-","value":{...}}]}]}`
 - When a repair emits `target/xtal/repair/patchset.json`, apply it via:
