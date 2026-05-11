@@ -74,9 +74,11 @@ Key files:
 - `x07 xtal spec fmt --input <spec.x07spec.json> --write [--inject-ids]`
 - `x07 xtal spec extract --project x07.json (--module-id <id> | --impl-path <path>) (--write | --patchset-out <path>)`
 
-For deterministic multi-file edits that touch specs, implementation modules, and examples together, prefer an `x07.patchset@0.1.0` plus:
+For deterministic multi-file edits that touch JSON specs, implementation modules, and manifests, prefer an `x07.patchset@0.1.0` plus:
 
 - `x07 patch apply --in <patchset.json> --repo-root . --write`
+
+`x07 patch apply` currently applies RFC 6902 patches to JSON documents. Edit `*.examples.jsonl` streams directly, then regenerate tests so their digests are recorded in the XTAL report.
 
 Then run `x07 fmt`, `x07 xtal spec fmt`, and `x07 xtal tests gen-from-spec --write`. Do not edit `gen/xtal/**` directly.
 
