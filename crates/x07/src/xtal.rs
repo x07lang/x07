@@ -138,6 +138,10 @@ pub struct XtalDevArgs {
     #[arg(long, value_name = "PATH")]
     pub gen_index: Option<PathBuf>,
 
+    /// Restrict verification to matching spec operation names or ids.
+    #[arg(long, value_name = "ENTRY")]
+    pub entry: Vec<String>,
+
     /// Stop after spec/gen/impl prechecks (no verification).
     #[arg(long)]
     pub prechecks_only: bool,
@@ -344,6 +348,10 @@ pub struct XtalVerifyArgs {
     /// Generated tests manifest path relative to the project root.
     #[arg(long, value_name = "PATH", default_value = DEFAULT_MANIFEST_PATH)]
     pub manifest: PathBuf,
+
+    /// Restrict coverage/proof verification to matching spec operation names or ids.
+    #[arg(long, value_name = "ENTRY")]
+    pub entry: Vec<String>,
 
     /// Proof lane policy (`balanced` warns on inconclusive/unsupported; `strict` fails).
     #[arg(long, value_enum, default_value_t = ProofPolicy::Balanced)]
@@ -753,6 +761,7 @@ fn cmd_xtal_certify(
             project: Some(project_root.join("x07.json")),
             spec_dir: args.spec_dir.clone(),
             gen_index: None,
+            entry: Vec::new(),
             prechecks_only: true,
             repair_on_fail: false,
             proof_policy: ProofPolicy::Balanced,
@@ -3205,6 +3214,7 @@ fn cmd_xtal_improve(
         gen_index: None,
         gen_dir: PathBuf::from(DEFAULT_GEN_DIR),
         manifest: verify_manifest_rel.clone(),
+        entry: Vec::new(),
         proof_policy: ProofPolicy::Balanced,
         allow_os_world: false,
         z3_timeout_seconds: None,
@@ -4591,6 +4601,7 @@ fn cmd_xtal_dev(
             gen_index: args.gen_index.clone(),
             gen_dir: PathBuf::from(DEFAULT_GEN_DIR),
             manifest: PathBuf::from(DEFAULT_MANIFEST_PATH),
+            entry: args.entry.clone(),
             proof_policy: args.proof_policy,
             allow_os_world: args.allow_os_world,
             z3_timeout_seconds: args.z3_timeout_seconds,
@@ -5089,6 +5100,14 @@ fn cmd_xtal_verify(
     let mut prove_reason_rows: Vec<(String, String, String)> = Vec::new();
 
     let policy_str = args.proof_policy.as_str();
+    let entry_filter: BTreeSet<String> = args
+        .entry
+        .iter()
+        .map(|entry| entry.trim())
+        .filter(|entry| !entry.is_empty())
+        .map(str::to_string)
+        .collect();
+    let entry_filter_values: Vec<Value> = entry_filter.iter().cloned().map(Value::String).collect();
 
     let mut effective_unwind = args.unwind;
     let mut effective_max_bytes_len = args.max_bytes_len;
@@ -5167,17 +5186,26 @@ fn cmd_xtal_verify(
             bound_args.push(v.to_string());
         }
 
+        let mut matched_entry_filter = 0u64;
         for (spec_path, spec) in &specs {
             for op in &spec.operations {
                 let entry = op.name.trim();
                 if entry.is_empty() {
                     continue;
                 }
+                let op_id_ref = op.id.as_deref().unwrap_or(entry).trim();
+                if !entry_filter.is_empty()
+                    && !entry_filter.contains(entry)
+                    && !entry_filter.contains(op_id_ref)
+                {
+                    continue;
+                }
+                matched_entry_filter += 1;
                 let Ok((module_id, local)) = parse_symbol_to_module_and_local(entry) else {
                     continue;
                 };
                 let module_path = module_id.replace('.', "/");
-                let op_id = op.id.as_deref().unwrap_or(entry).trim().to_string();
+                let op_id = op_id_ref.to_string();
                 let spec_rel = spec_path
                     .strip_prefix(&project_root)
                     .unwrap_or(spec_path)
@@ -5668,6 +5696,18 @@ fn cmd_xtal_verify(
                 }));
             }
         }
+
+        if !entry_filter.is_empty() && matched_entry_filter == 0 {
+            diagnostics.push(diag_error(
+                "EXTAL_VERIFY_ENTRY_NOT_FOUND",
+                diagnostics::Stage::Parse,
+                format!(
+                    "xtal verify --entry did not match any spec operation name or id: {}",
+                    entry_filter.iter().cloned().collect::<Vec<_>>().join(", ")
+                ),
+                None,
+            ));
+        }
     }
 
     if !prove_reason_rows.is_empty() {
@@ -5825,6 +5865,12 @@ fn cmd_xtal_verify(
     }
     if let Some(v) = spec_fmt_report {
         report.meta.insert("spec_fmt_report".to_string(), v);
+    }
+    if !entry_filter_values.is_empty() {
+        report.meta.insert(
+            "entry_filter".to_string(),
+            Value::Array(entry_filter_values.clone()),
+        );
     }
 
     report.meta.insert(
@@ -6132,6 +6178,14 @@ fn cmd_xtal_verify(
         }
         if let Some(obj) = settings.as_object_mut() {
             obj.insert("proof_budget".to_string(), Value::Object(budget));
+        }
+    }
+    if !entry_filter_values.is_empty() {
+        if let Some(obj) = settings.as_object_mut() {
+            obj.insert(
+                "entry_filter".to_string(),
+                Value::Array(entry_filter_values.clone()),
+            );
         }
     }
 

@@ -125,7 +125,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
   - Otherwise, runs `x07 xtal tests gen-from-spec --check`.
   - Runs `x07 xtal impl check`.
   - Unless `--prechecks-only` is set, runs `x07 xtal verify`.
-  - Forwards proof/verification controls to the verification step: `--proof-policy`, `--allow-os-world`, `--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, and `--z3-memory-mb`.
+  - Forwards proof/verification controls to the verification step: `--entry`, `--proof-policy`, `--allow-os-world`, `--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, and `--z3-memory-mb`.
   - If verification fails and `--repair-on-fail` is set, runs `x07 xtal repair --write`.
 - `x07 xtal verify`
   - Runs spec/gen/impl prechecks.
@@ -133,6 +133,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
   - Runs formal verification per spec operation entrypoint:
     - `x07 verify --coverage --entry <spec.operations[*].name>`
     - `x07 verify --prove --entry <spec.operations[*].name> --emit-proof <path>`
+  - `--entry <name-or-id>` can be passed more than once to restrict the coverage/proof lane to matching spec operation names or ids. Generated tests still run from the manifest as a regression gate.
   - Runs `x07 test --all --no-fail-fast --manifest gen/xtal/tests.json --allow-empty`.
   - Writes:
     - `target/xtal/xtal.verify.diag.json` (wrapper diagnostics report, `x07diag.report@0.3.0`)
@@ -145,7 +146,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
     - `target/xtal/verify/prove/<module_path>/<local>.report.json` (per-entry prove reports)
     - `target/xtal/verify/prove/<module_path>/<local>/proof.object.json` (proof objects, when emitted)
   - Paths in the XTAL JSON report are project-root-relative. If you invoke `x07 xtal verify --project subdir/x07.json` from a parent directory, look under `subdir/target/xtal/...`.
-  - `target/xtal/verify/summary.json` records the effective `settings.verify_bounds` and `settings.proof_budget` values used for the proof lane.
+  - `target/xtal/verify/summary.json` records the effective `settings.entry_filter`, `settings.verify_bounds`, and `settings.proof_budget` values used for the proof lane.
   - Proof outcomes are controlled by `--proof-policy {balanced|strict}` (default: `balanced`).
     - Under `balanced`, missing proof tools produce warnings (and verification continues).
     - Under `strict`, only `proven` outcomes pass.

@@ -15956,6 +15956,246 @@ fn x07_xtal_verify_timeout_warning_reports_effective_budget() {
 
 #[cfg(unix)]
 #[test]
+fn x07_xtal_verify_entry_filter_limits_proof_entries() {
+    let dir = fresh_os_tmp_dir("x07_xtal_verify_entry_filter");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    write_xtal_project_files(&dir);
+
+    std::fs::create_dir_all(dir.join("spec")).expect("create spec dir");
+    std::fs::create_dir_all(dir.join("src").join("toy")).expect("create src dir");
+
+    write_json(
+        &dir.join("spec").join("toy.app.x07spec.json"),
+        &serde_json::json!({
+            "schema_version": "x07.x07spec@0.1.0",
+            "module_id": "toy.app",
+            "operations": [
+                {
+                    "id": "op.echo.v1",
+                    "name": "toy.app.echo",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "ensures": [{"id": "e0", "expr": ["=", "__result", "x"]}],
+                    "examples_ref": "spec/toy.app.x07spec.examples.jsonl"
+                },
+                {
+                    "id": "op.plus_one.v1",
+                    "name": "toy.app.plus_one",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "ensures": [{"id": "e0", "expr": ["=", "__result", ["+", "x", 1]]}],
+                    "examples_ref": "spec/toy.app.x07spec.examples.jsonl"
+                }
+            ]
+        }),
+    );
+    let example_lines = [
+        serde_json::json!({
+            "schema_version": "x07.x07spec_examples@0.1.0",
+            "op": "op.echo.v1",
+            "args": { "x": 11 },
+            "expect": 11
+        }),
+        serde_json::json!({
+            "schema_version": "x07.x07spec_examples@0.1.0",
+            "op": "op.plus_one.v1",
+            "args": { "x": 11 },
+            "expect": 12
+        }),
+    ];
+    let mut jsonl = String::new();
+    for line in example_lines {
+        jsonl.push_str(&serde_json::to_string(&line).expect("serialize example"));
+        jsonl.push('\n');
+    }
+    write_bytes(
+        &dir.join("spec").join("toy.app.x07spec.examples.jsonl"),
+        jsonl.as_bytes(),
+    );
+
+    write_json(
+        &dir.join("src").join("toy").join("app.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "toy.app",
+            "imports": [],
+            "decls": [
+                {"kind": "export", "names": ["toy.app.echo", "toy.app.plus_one"]},
+                {
+                    "kind": "defn",
+                    "name": "toy.app.echo",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "ensures": [{"id": "e0", "expr": ["=", "__result", "x"]}],
+                    "body": "x"
+                },
+                {
+                    "kind": "defn",
+                    "name": "toy.app.plus_one",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "ensures": [{"id": "e0", "expr": ["=", "__result", ["+", "x", 1]]}],
+                    "body": ["+", "x", 1]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "xtal",
+            "spec",
+            "fmt",
+            "--input",
+            "spec/toy.app.x07spec.json",
+            "--write",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir(&dir, &["xtal", "tests", "gen-from-spec", "--write"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out =
+        run_x07_in_dir_with_fake_prove_solvers(&dir, &["xtal", "verify", "--entry", "op.echo.v1"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["meta"]["entry_filter"][0], "op.echo.v1");
+
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("verify")
+        .join("summary.json");
+    let summary: Value = serde_json::from_slice(
+        &std::fs::read(&summary_path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", summary_path.display())),
+    )
+    .expect("parse xtal verify summary");
+    assert_eq!(summary["settings"]["entry_filter"][0], "op.echo.v1");
+    assert_eq!(
+        summary["results"]["verification"]["counts"]["entries_total"],
+        1
+    );
+    assert_eq!(
+        summary["results"]["verification"]["counts"]["prove_proven"],
+        1
+    );
+    assert_eq!(summary["entries"].as_array().expect("entries[]").len(), 1);
+    assert_eq!(summary["entries"][0]["entry"], "toy.app.echo");
+    assert_eq!(summary["entries"][0]["op_id"], "op.echo.v1");
+    assert_eq!(summary["results"]["tests"]["passed"], 2);
+    assert!(
+        !dir.join("target")
+            .join("xtal")
+            .join("verify")
+            .join("coverage")
+            .join("toy")
+            .join("app")
+            .join("plus_one.report.json")
+            .exists(),
+        "unselected operation produced a coverage report"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_xtal_verify_entry_filter_errors_when_no_operation_matches() {
+    let src = repo_root()
+        .join("tests")
+        .join("fixtures")
+        .join("xtal_certify_toy");
+    assert!(src.is_dir(), "missing {}", src.display());
+
+    let dir = fresh_os_tmp_dir("x07_xtal_verify_entry_filter_missing");
+    copy_dir_recursive(&src, &dir);
+
+    let out = run_x07_in_dir_with_fake_prove_solvers(
+        &dir,
+        &["xtal", "verify", "--entry", "missing.entry"],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(report["ok"], false);
+    let diagnostics = report["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d["code"] == "EXTAL_VERIFY_ENTRY_NOT_FOUND"),
+        "missing EXTAL_VERIFY_ENTRY_NOT_FOUND diagnostic: {diagnostics:?}"
+    );
+
+    let summary_path = dir
+        .join("target")
+        .join("xtal")
+        .join("verify")
+        .join("summary.json");
+    let summary: Value = serde_json::from_slice(
+        &std::fs::read(&summary_path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", summary_path.display())),
+    )
+    .expect("parse xtal verify summary");
+    assert_eq!(summary["settings"]["entry_filter"][0], "missing.entry");
+    assert_eq!(
+        summary["results"]["verification"]["counts"]["entries_total"],
+        0
+    );
+    assert_eq!(summary["entries"].as_array().expect("entries[]").len(), 0);
+}
+
+#[cfg(unix)]
+#[test]
 fn x07_xtal_dev_forwards_verify_proof_budgets() {
     let src = repo_root()
         .join("tests")
@@ -15971,6 +16211,8 @@ fn x07_xtal_dev_forwards_verify_proof_budgets() {
         &[
             "xtal",
             "dev",
+            "--entry",
+            "op.fixture.main.v1",
             "--z3-timeout-seconds",
             "7",
             "--z3-memory-mb",
@@ -16011,6 +16253,7 @@ fn x07_xtal_dev_forwards_verify_proof_budgets() {
             .unwrap_or_else(|err| panic!("read {}: {err}", summary_path.display())),
     )
     .expect("parse xtal verify summary");
+    assert_eq!(summary["settings"]["entry_filter"][0], "op.fixture.main.v1");
     assert_eq!(summary["settings"]["verify_bounds"]["unwind"], 2);
     assert_eq!(summary["settings"]["verify_bounds"]["max_bytes_len"], 12);
     assert_eq!(summary["settings"]["verify_bounds"]["input_len_bytes"], 16);

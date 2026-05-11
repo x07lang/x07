@@ -60,6 +60,11 @@
       "properties": {
         "world": { "type": "string", "minLength": 1, "maxLength": 64 },
         "proof_policy": { "type": "string", "enum": ["balanced", "strict"] },
+        "entry_filter": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "uniqueItems": true
+        },
         "verify_bounds": {
           "type": "object",
           "additionalProperties": false,
