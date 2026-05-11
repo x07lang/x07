@@ -49,8 +49,8 @@
     },
     {
       "name": "ext-net",
-      "path": ".x07/deps/ext-net/0.1.9",
-      "version": "0.1.9"
+      "path": ".x07/deps/ext-net/0.1.8",
+      "version": "0.1.8"
     },
     {
       "name": "ext-obs",
