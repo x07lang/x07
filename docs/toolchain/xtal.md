@@ -80,7 +80,7 @@ For deterministic multi-file edits that touch JSON specs, implementation modules
 
 `x07 patch apply` currently applies RFC 6902 patches to JSON documents. Edit `*.examples.jsonl` streams directly, then regenerate tests so their digests are recorded in the XTAL report.
 
-Then run `x07 fmt`, `x07 xtal spec fmt`, and `x07 xtal tests gen-from-spec --write`. Do not edit `gen/xtal/**` directly.
+Then run `x07 fmt` on changed x07AST files, `x07 xtal spec fmt` on changed `*.x07spec.json` files, and `x07 xtal tests gen-from-spec --write`. Do not edit `gen/xtal/**` directly.
 
 ### Validation
 
