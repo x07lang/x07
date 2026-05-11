@@ -41,6 +41,7 @@ jobs:
             python3
             python3-pip
             python3-venv
+            unzip
             xz-utils
             zlib1g-dev
 
@@ -54,6 +55,11 @@ jobs:
 
           . "$HOME/.cargo/env"
           rustup component add rustfmt clippy
+
+      - name: Install formal verification tools (WSL2)
+        run: |
+          set -euo pipefail
+          bash ./scripts/ci/install_formal_verification_tools_linux.sh
 
       - name: CI gate (WSL2 Ubuntu-24.04)
         run: |
