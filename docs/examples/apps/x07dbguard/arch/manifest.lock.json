@@ -1,8 +1,9 @@
 {
-  "jcs_sha256_hex": "28a1b893f7d9bf8c3e488d825d693787d953cb71c834575d7cea4eb785e38a98",
+  "jcs_sha256_hex": "c81435c272e34c9774ad7e0caa0019ad971ae10f4f178715261358e3ae291edf",
   "manifest_path": "arch/manifest.x07arch.json",
   "module_scan": {
     "exclude_globs": [
+      "**/.agent/**",
       "**/.git/**",
       "**/.x07/**",
       "**/dist/**",

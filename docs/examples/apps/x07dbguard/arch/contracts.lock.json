@@ -1,0 +1,34 @@
+{
+  "files": {
+    "arch/budgets/profiles/db_migrate_v1.budget.json": {
+      "jcs_sha256_hex": "b01986857d5add4699ccc7cf8f7f3d0193d5cfc7d294057abfbb2cff29b7aca2"
+    },
+    "arch/budgets/profiles/db_plan_v1.budget.json": {
+      "jcs_sha256_hex": "9b078e9b1aef34eee05ebf835806fcf715b8a72b7f2dd5d1b22eda770374baa4"
+    },
+    "arch/budgets/profiles/db_verify_v1.budget.json": {
+      "jcs_sha256_hex": "32f08b4483a331ba9d7d387525320dab0677c4d7c55dd8008638663ed7c7d896"
+    },
+    "arch/db/migrations/dbguard_v1.migrate.json": {
+      "jcs_sha256_hex": "5bfad66b1617c262c8c847fd6d45ce6d45c018c50887c8787bc7126624af9dcb"
+    },
+    "arch/rr/policies/dbguard_rr_v1.policy.json": {
+      "jcs_sha256_hex": "2ab658d7c127f2ad57db92ba1944773f0f1c8cf451affae22bf66b4447d6c4a2"
+    },
+    "arch/rr/sanitizers/sanitize_none_v1.sanitize.json": {
+      "jcs_sha256_hex": "a2c6c285baa339b679eb1c6332a9eb5acf69bfc8f638a611e33e081e7f498b6b"
+    }
+  },
+  "indexes": {
+    "arch/budgets/index.x07budgets.json": {
+      "jcs_sha256_hex": "01ab0343b03079a1d9d73b730306f83b7776c0ed537922e83bc8803104b2a916"
+    },
+    "arch/db/index.x07db.json": {
+      "jcs_sha256_hex": "38543bfe97cefe255d5bbf170aca11649a86e6532ddc79b07875e58f0d21ce05"
+    },
+    "arch/rr/index.x07rr.json": {
+      "jcs_sha256_hex": "f590cc92faffbd6a5c691afbd937412c381e7b747e9f5df65e030309be747456"
+    }
+  },
+  "schema_version": "x07.arch.contracts.lock@0.1.0"
+}
