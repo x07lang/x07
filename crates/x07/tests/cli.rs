@@ -16296,6 +16296,26 @@ fn x07_xtal_dev_forwards_verify_proof_budgets() {
     let report = parse_json_stdout(&out);
     assert_eq!(report["schema_version"], X07DIAG_SCHEMA_VERSION);
     assert_eq!(report["ok"], true);
+    assert_eq!(report["meta"]["summary"]["prechecks"]["spec_fmt"], "pass");
+    assert_eq!(report["meta"]["summary"]["prechecks"]["spec_lint"], "pass");
+    assert_eq!(report["meta"]["summary"]["prechecks"]["spec_check"], "pass");
+    assert_eq!(report["meta"]["summary"]["prechecks"]["generation"], "pass");
+    assert_eq!(report["meta"]["summary"]["prechecks"]["impl"], "pass");
+    assert_eq!(report["meta"]["summary"]["verify_status"], "ok");
+    assert_eq!(report["meta"]["summary"]["repair_status"], "skipped");
+    assert_eq!(
+        report["meta"]["summary"]["verify_settings"]["entry_filter"][0],
+        "op.fixture.main.v1"
+    );
+    assert_eq!(
+        report["meta"]["summary"]["verify_settings"]["test_filter"]["filter"],
+        "xtal/fixture/op.fixture.main.v1/ex0001"
+    );
+    assert_eq!(report["meta"]["summary"]["verify"]["tests"]["passed"], 1);
+    assert_eq!(
+        report["meta"]["summary"]["verify"]["verification"]["counts"]["entries_total"],
+        1
+    );
 
     let summary_path = dir
         .join("target")

@@ -39,6 +39,7 @@ Advanced building blocks (use when you need to isolate a step):
 
 - Never edit `gen/**` directly. Use `x07 xtal tests gen-from-spec --write` or update spec/examples and regenerate.
 - Always read `target/xtal/**/summary.json` (and `target/xtal/xtal.*.diag.json`) to determine next actions.
+- For `x07 xtal dev`, first inspect `meta.summary` in the command JSON report for the compact precheck, verification, and test outcome view; use the referenced `target/xtal/**/summary.json` when you need full per-entry evidence.
 - For deterministic multi-file edits across JSON specs, `src/**`, and manifests, use an `x07.patchset@0.1.0` and apply it with `x07 patch apply --in <patchset.json> --repo-root . --write`.
 - `x07 patch apply` currently patches JSON documents only. Edit `*.examples.jsonl` streams directly, then run `x07 xtal tests gen-from-spec --write` so the example digests are captured.
 - Run `x07 fmt` only on x07AST files. Run `x07 xtal spec fmt --input <spec.x07spec.json> --write` for XTAL spec files.

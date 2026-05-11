@@ -127,6 +127,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
   - Unless `--prechecks-only` is set, runs `x07 xtal verify`.
   - Forwards proof/verification controls to the verification step: `--entry`, `--test-filter`, `--test-exact`, `--proof-policy`, `--allow-os-world`, `--unwind`, `--max-bytes-len`, `--input-len-bytes`, `--z3-timeout-seconds`, and `--z3-memory-mb`.
   - If verification fails and `--repair-on-fail` is set, runs `x07 xtal repair --write`.
+  - The JSON report includes `meta.summary`, a compact agent-facing view of precheck status plus the forwarded verification `settings` and `results` when verification ran.
 - `x07 xtal verify`
   - Runs spec/gen/impl prechecks.
   - Requires a deterministic `solve-*` world by default (pass `--allow-os-world` to override).

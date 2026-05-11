@@ -4769,6 +4769,45 @@ fn cmd_xtal_dev(
         "repair_on_fail".to_string(),
         Value::Bool(args.repair_on_fail),
     );
+    let mut dev_summary = json!({
+        "prechecks_only": args.prechecks_only,
+        "prechecks": {
+            "spec_fmt": if spec_fmt_ok { "pass" } else { "fail" },
+            "spec_lint": if spec_lint_ok { "pass" } else { "fail" },
+            "spec_check": if spec_check_ok { "pass" } else { "fail" },
+            "generation": if gen_ok { "pass" } else { "fail" },
+            "impl": if impl_ok { "pass" } else { "fail" }
+        },
+        "verify_status": verify_status.clone(),
+        "repair_status": repair_status.clone(),
+        "verify_summary_path": DEFAULT_VERIFY_SUMMARY_PATH
+    });
+    let verify_summary_path = project_root.join(DEFAULT_VERIFY_SUMMARY_PATH);
+    if verify_summary_path.is_file() {
+        match std::fs::read(&verify_summary_path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        {
+            Some(summary) => {
+                if let Some(v) = summary.get("results").cloned() {
+                    if let Some(obj) = dev_summary.as_object_mut() {
+                        obj.insert("verify".to_string(), v);
+                    }
+                }
+                if let Some(v) = summary.get("settings").cloned() {
+                    if let Some(obj) = dev_summary.as_object_mut() {
+                        obj.insert("verify_settings".to_string(), v);
+                    }
+                }
+            }
+            None => {
+                if let Some(obj) = dev_summary.as_object_mut() {
+                    obj.insert("verify_summary_readable".to_string(), Value::Bool(false));
+                }
+            }
+        }
+    }
+    report.meta.insert("summary".to_string(), dev_summary);
     report
         .meta
         .insert("verify_status".to_string(), Value::String(verify_status));
