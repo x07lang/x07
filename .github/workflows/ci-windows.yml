@@ -24,7 +24,7 @@ jobs:
         uses: Vampire/setup-wsl@v6
         with:
           distribution: Ubuntu-24.04
-          update: "true"
+          update: "false"
           additional-packages: >-
             bash
             build-essential
