@@ -117,7 +117,7 @@ jobs:
             zlib1g-dev \
             libsqlite3-dev
       - name: Install cargo-fuzz
-        run: cargo +nightly install cargo-fuzz --locked
+        run: cargo install cargo-fuzz --version 0.13.1 --locked
       - name: Fuzz smoke
         shell: bash
         run: ./scripts/ci/check_fuzz_smoke.sh

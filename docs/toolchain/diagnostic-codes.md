@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 642
+- total codes: 643
 - quickfix support (`sometimes` or `always`): 582
-- quickfix coverage: 90.65%
+- quickfix coverage: 90.51%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -155,6 +155,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `EXTAL_TASKS_TASK_FAILED` | x07 / run / error | sometimes | Recovery task failed. |
 | `EXTAL_TASKS_TASK_SKIPPED` | x07 / run / warning | sometimes | Recovery task was skipped. |
 | `EXTAL_VERIFY_COVERAGE_FAILED` | x07 / run / error | sometimes | Coverage verification failed. |
+| `EXTAL_VERIFY_ENTRY_NOT_FOUND` | x07 / parse / error | never | XTAL verify entry filter matched no operation. |
 | `EXTAL_VERIFY_PROVE_COUNTEREXAMPLE` | x07 / run / error | sometimes | Proof attempt found a counterexample. |
 | `EXTAL_VERIFY_PROVE_ERROR` | x07 / run / error | sometimes | Proof attempt failed with an internal error. |
 | `EXTAL_VERIFY_PROVE_TOOL_MISSING` | x07 / run / error | sometimes | Proof tool is missing or unavailable. |
@@ -3674,6 +3675,29 @@ Agent strategy:
 
 - Open the referenced coverage report JSON and inspect the first error diagnostic.
 - Fix the underlying contract/type issue and re-run `x07 xtal verify`.
+
+
+## `EXTAL_VERIFY_ENTRY_NOT_FOUND`
+
+Summary: XTAL verify entry filter matched no operation.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires choosing an intended XTAL operation name or id, or removing the entry filter.
+
+Details:
+
+The `x07 xtal verify --entry` filter did not match any discovered XTAL spec operation name or operation id, so verification produced no selected entries.
+
+Message: `xtal verify --entry did not match any spec operation name or id: {entry_filter}`
+
+Agent strategy:
+
+- Run `x07 xtal ops` or inspect the XTAL spec operations list to find the available operation names and ids.
+- Fix the `--entry` filter or remove it when all operations should be verified.
+- Re-run `x07 xtal verify`.
 
 
 ## `EXTAL_VERIFY_PROVE_COUNTEREXAMPLE`
