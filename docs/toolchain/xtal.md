@@ -10,6 +10,7 @@ Example projects:
 
 - Smallest end-to-end: `docs/examples/agent-gate/xtal/toy-sorter/`
 - Branded multi-operation library surface: `docs/examples/agent-gate/xtal/workflow-graph/`
+- Complex app slices: start from a passing app test baseline, then expose a narrow pure helper surface under XTAL instead of targeting the full CLI, reducer, OS, or replay entrypoint.
 
 ## Artifacts
 
@@ -135,6 +136,7 @@ Run generated tests with the same selection rules as any other X07 manifest:
     - `x07 verify --coverage --entry <spec.operations[*].name>`
     - `x07 verify --prove --entry <spec.operations[*].name> --emit-proof <path>`
   - `--entry <name-or-id>` can be passed more than once to restrict the coverage/proof lane to matching spec operation names or ids.
+    - Use the full spec operation name or id, for example `--entry op.app.foo.bar_v1.v1`; generated test id substrings belong under `--test-filter`.
   - Runs `x07 test --all --no-fail-fast --manifest gen/xtal/tests.json --allow-empty`.
     - By default this keeps the generated tests as a full regression gate.
     - Pass `--test-filter <substr>` to forward `x07 test --filter <substr>` for focused generated-test runs; add `--test-exact` to require an exact generated test id match.
@@ -156,6 +158,9 @@ Run generated tests with the same selection rules as any other X07 manifest:
   - When proofs are unsupported or inconclusive, the wrapper emits a compact per-entry reason summary in the XTAL diagnostics (for example: unsupported loop forms or unsupported branded input shapes).
   - Always inspect `target/xtal/verify/summary.json` after a warning. The top-level `ok: true` can coexist with per-entry `prove.policy_outcome: "warn"` under `balanced`; use the per-entry `prove.raw` value and optional `prove.first_diagnostic` code/message to decide whether the operation actually has proof evidence.
   - Keep proof-facing modules inside the certifiable pure subset. Native-handle helpers whose implementations depend on internal-only builtins, such as `std.hash_map.emit_kv_u32le_u32le` via `map_u32.dump_kv_u32le_u32le`, can make affected entries report `prove.raw: "unsupported"` even when generated tests and coverage pass. Prefer byte-encoded pure structures such as `std.btree_map` for proof-facing paths, or isolate native-handle helpers behind dedicated entries and confirm the impact in `target/xtal/verify/summary.json`.
+  - When adapting a larger example or app, preserve the manifest dependencies and keep `x07.lock.json` aligned with the scratch manifest. A module can look local and pure while still importing package-provided helpers such as `std.crawl.*` or `std.web_ui.*`; removing those dependencies can make generated tests or verification fail with lockfile/module-root diagnostics instead of measuring the intended XTAL surface.
+  - If coverage and generated tests pass but proof reports `X07V_PROOF_SUMMARY_REQUIRED`, the operation reached an imported helper that has no loaded proof summary. Treat that as a proof-surface boundary: either target a smaller local helper, add/import the required proof summary, or record the entry as test/coverage-validated but not proof-proven.
+  - For web-ui reducers and other large state machines, expose small deterministic helpers for JSON/path/key/string transformations first. Adding contracts directly to broad reducer helpers can widen the verification obligation for unrelated reducer paths; a dedicated proof-facing adapter is usually easier to reason about.
   - Verification bounds can be overridden with `--unwind`, `--max-bytes-len`, and `--input-len-bytes`.
   - Under `--proof-policy balanced`, xtal verify uses conservative proof budgets so the default loop stays bounded.
     - Defaults: `--unwind 1`, `--max-bytes-len 8`, `--z3-timeout-seconds 1`.
