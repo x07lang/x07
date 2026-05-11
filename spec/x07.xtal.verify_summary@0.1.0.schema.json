@@ -65,6 +65,15 @@
           "items": { "type": "string", "minLength": 1, "maxLength": 512 },
           "uniqueItems": true
         },
+        "test_filter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["filter", "exact"],
+          "properties": {
+            "filter": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "exact": { "type": "boolean" }
+          }
+        },
         "verify_bounds": {
           "type": "object",
           "additionalProperties": false,

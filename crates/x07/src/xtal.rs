@@ -142,6 +142,14 @@ pub struct XtalDevArgs {
     #[arg(long, value_name = "ENTRY")]
     pub entry: Vec<String>,
 
+    /// Restrict generated test execution to ids containing this substring.
+    #[arg(long, value_name = "SUBSTR")]
+    pub test_filter: Option<String>,
+
+    /// Treat --test-filter as an exact generated test id match.
+    #[arg(long)]
+    pub test_exact: bool,
+
     /// Stop after spec/gen/impl prechecks (no verification).
     #[arg(long)]
     pub prechecks_only: bool,
@@ -352,6 +360,14 @@ pub struct XtalVerifyArgs {
     /// Restrict coverage/proof verification to matching spec operation names or ids.
     #[arg(long, value_name = "ENTRY")]
     pub entry: Vec<String>,
+
+    /// Restrict generated test execution to ids containing this substring.
+    #[arg(long, value_name = "SUBSTR")]
+    pub test_filter: Option<String>,
+
+    /// Treat --test-filter as an exact generated test id match.
+    #[arg(long)]
+    pub test_exact: bool,
 
     /// Proof lane policy (`balanced` warns on inconclusive/unsupported; `strict` fails).
     #[arg(long, value_enum, default_value_t = ProofPolicy::Balanced)]
@@ -762,6 +778,8 @@ fn cmd_xtal_certify(
             spec_dir: args.spec_dir.clone(),
             gen_index: None,
             entry: Vec::new(),
+            test_filter: None,
+            test_exact: false,
             prechecks_only: true,
             repair_on_fail: false,
             proof_policy: ProofPolicy::Balanced,
@@ -3215,6 +3233,8 @@ fn cmd_xtal_improve(
         gen_dir: PathBuf::from(DEFAULT_GEN_DIR),
         manifest: verify_manifest_rel.clone(),
         entry: Vec::new(),
+        test_filter: None,
+        test_exact: false,
         proof_policy: ProofPolicy::Balanced,
         allow_os_world: false,
         z3_timeout_seconds: None,
@@ -4602,6 +4622,8 @@ fn cmd_xtal_dev(
             gen_dir: PathBuf::from(DEFAULT_GEN_DIR),
             manifest: PathBuf::from(DEFAULT_MANIFEST_PATH),
             entry: args.entry.clone(),
+            test_filter: args.test_filter.clone(),
+            test_exact: args.test_exact,
             proof_policy: args.proof_policy,
             allow_os_world: args.allow_os_world,
             z3_timeout_seconds: args.z3_timeout_seconds,
@@ -5108,6 +5130,15 @@ fn cmd_xtal_verify(
         .map(str::to_string)
         .collect();
     let entry_filter_values: Vec<Value> = entry_filter.iter().cloned().map(Value::String).collect();
+    let test_filter = args
+        .test_filter
+        .as_ref()
+        .map(|filter| filter.trim())
+        .filter(|filter| !filter.is_empty())
+        .map(str::to_string);
+    let test_filter_value = test_filter
+        .as_ref()
+        .map(|filter| json!({ "filter": filter, "exact": args.test_exact }));
 
     let mut effective_unwind = args.unwind;
     let mut effective_max_bytes_len = args.max_bytes_len;
@@ -5732,22 +5763,27 @@ fn cmd_xtal_verify(
 
     std::fs::create_dir_all(project_root.join(DEFAULT_VERIFY_DIR))
         .with_context(|| format!("mkdir: {}", project_root.join(DEFAULT_VERIFY_DIR).display()))?;
-    let test_run = run_self_command(
-        &project_root,
-        &[
-            "test".to_string(),
-            "--all".to_string(),
-            "--no-fail-fast".to_string(),
-            "--manifest".to_string(),
-            args.manifest.display().to_string(),
-            "--allow-empty".to_string(),
-            "--artifact-dir".to_string(),
-            DEFAULT_VERIFY_NESTED_TEST_ARTIFACT_DIR.to_string(),
-            "--report-out".to_string(),
-            DEFAULT_VERIFY_TEST_REPORT_PATH.to_string(),
-            "--quiet-json".to_string(),
-        ],
-    )?;
+    let mut test_args = vec![
+        "test".to_string(),
+        "--all".to_string(),
+        "--no-fail-fast".to_string(),
+        "--manifest".to_string(),
+        args.manifest.display().to_string(),
+        "--allow-empty".to_string(),
+        "--artifact-dir".to_string(),
+        DEFAULT_VERIFY_NESTED_TEST_ARTIFACT_DIR.to_string(),
+        "--report-out".to_string(),
+        DEFAULT_VERIFY_TEST_REPORT_PATH.to_string(),
+        "--quiet-json".to_string(),
+    ];
+    if let Some(filter) = test_filter.as_deref() {
+        test_args.push("--filter".to_string());
+        test_args.push(filter.to_string());
+        if args.test_exact {
+            test_args.push("--exact".to_string());
+        }
+    }
+    let test_run = run_self_command(&project_root, &test_args)?;
     let mut tests_ok = test_run.exit_code == 0;
     if !tests_ok {
         diagnostics.push(diag_error(
@@ -5871,6 +5907,9 @@ fn cmd_xtal_verify(
             "entry_filter".to_string(),
             Value::Array(entry_filter_values.clone()),
         );
+    }
+    if let Some(v) = test_filter_value.as_ref() {
+        report.meta.insert("test_filter".to_string(), v.clone());
     }
 
     report.meta.insert(
@@ -6186,6 +6225,11 @@ fn cmd_xtal_verify(
                 "entry_filter".to_string(),
                 Value::Array(entry_filter_values.clone()),
             );
+        }
+    }
+    if let Some(v) = test_filter_value.as_ref() {
+        if let Some(obj) = settings.as_object_mut() {
+            obj.insert("test_filter".to_string(), v.clone());
         }
     }
 
