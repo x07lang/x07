@@ -1,0 +1,17 @@
+{
+  "schema_version": "x07.arch.wasm.component.index@0.1.0",
+  "profiles": [
+    {
+      "id": "component_release",
+      "path": "arch/wasm/component/profiles/component_release.json"
+    },
+    {
+      "id": "component_debug",
+      "path": "arch/wasm/component/profiles/component_debug.json"
+    }
+  ],
+  "defaults": {
+    "default_profile_id": "component_release"
+  }
+}
+

@@ -1,0 +1,7 @@
+package x07:cli-adapter@0.1.0;
+
+world command-with-solve {
+  include wasi:cli/command@0.2.8;
+  import x07:solve/handler@0.1.0;
+}
+

@@ -1,0 +1,14 @@
+package x07:web-ui@0.2.0;
+
+/// Web-ui app contract.
+///
+/// The boundary is JSON bytes (UTF-8) by convention:
+/// - `step` input: a dispatch envelope
+/// - `init`/`step` output: a frame
+///
+world web-ui-app {
+  type json-bytes = list<u8>;
+
+  export init: func() -> json-bytes;
+  export step: func(input: json-bytes) -> json-bytes;
+}

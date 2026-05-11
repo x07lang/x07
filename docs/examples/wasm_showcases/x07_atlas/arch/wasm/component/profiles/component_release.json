@@ -1,0 +1,60 @@
+{
+  "schema_version": "x07.wasm.component.profile@0.2.0",
+  "id": "component_release",
+  "v": 2,
+  "cfg": {
+    "wit_index_path": "arch/wit/index.x07wit.json",
+    "toolchain": {
+      "wit_bindgen": {
+        "cmd": "wit-bindgen"
+      },
+      "wasm_tools": {
+        "cmd": "wasm-tools"
+      },
+      "wac": {
+        "cmd": "wac"
+      },
+      "wasmtime": {
+        "cmd": "wasmtime"
+      }
+    },
+    "componentize": {
+      "mode": "wasm-tools-component-new_v1",
+      "solve_package": "x07:solve@0.1.0",
+      "solve_world": "solve"
+    },
+    "compose": { "mode": "wac-plug_v1" },
+    "targets": {
+      "http_package": "wasi:http@0.2.8",
+      "http_world": "proxy",
+      "cli_package": "wasi:cli@0.2.8",
+      "cli_world": "command"
+    },
+    "native_targets": {
+      "http": {
+        "mode": "native-http-proxy_v1",
+        "package": "wasi:http@0.2.8",
+        "world": "proxy",
+        "budgets": {
+          "max_request_body_bytes": 1048576,
+          "max_response_body_bytes": 1048576,
+          "max_headers": 128,
+          "max_header_bytes_total": 65536,
+          "max_path_bytes": 2048,
+          "max_query_bytes": 4096,
+          "max_envelope_bytes": 2097152
+        }
+      },
+      "cli": {
+        "mode": "native-cli-command_v1",
+        "package": "wasi:cli@0.2.8",
+        "world": "command",
+        "budgets": {
+          "max_stdin_bytes": 1048576,
+          "max_stdout_bytes": 1048576,
+          "max_stderr_bytes": 65536
+        }
+      }
+    }
+  }
+}

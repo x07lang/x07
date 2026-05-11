@@ -1,0 +1,7 @@
+package x07:web-ui-adapter@0.1.0;
+
+world web-ui-app-with-solve {
+  include x07:web-ui/web-ui-app@0.2.0;
+  import x07:solve/handler@0.1.0;
+}
+

@@ -1,0 +1,77 @@
+{
+  "schema_version": "x07.arch.wit.index@0.1.0",
+  "packages": [
+    {
+      "id": "x07:solve@0.1.0",
+      "path": "wit/x07/solve/0.1.0",
+      "kind": "local",
+      "sha256_tree": "bb63b291a45fb4828c5fc9e72a240310fa8f943e4de2cf5517a7c64c37577af0"
+    },
+    {
+      "id": "x07:web-ui@0.2.0",
+      "path": "wit/x07/web_ui/0.2.0",
+      "kind": "local",
+      "sha256_tree": "36cb5929f2872050333cde89340426beecf549d6c8e1edade110f8078b7b3d91"
+    },
+    {
+      "id": "x07:web-ui-adapter@0.1.0",
+      "path": "wit/x07/web_ui_adapter/0.1.0",
+      "kind": "local",
+      "sha256_tree": "cfce54b02f13e8c4d31611880e3ddc7438877ac1295dce61b1f7aaca3b4a90d5"
+    },
+    {
+      "id": "x07:cli-adapter@0.1.0",
+      "path": "wit/x07/cli_adapter/0.1.0",
+      "kind": "local",
+      "sha256_tree": "938377739dc1e8a1d8c6dd9f4f18e306ada4f43dfd17175d56c30cb5c0c8793e"
+    },
+    {
+      "id": "x07:http-adapter@0.1.0",
+      "path": "wit/x07/http_adapter/0.1.0",
+      "kind": "local",
+      "sha256_tree": "41ff64d53a9f446f1c18c269d72c37437ad7a77af70688c1c5b2e3783ad055e5"
+    },
+    {
+      "id": "wasi:cli@0.2.8",
+      "path": "wit/deps/wasi/cli/0.2.8",
+      "kind": "vendored",
+      "sha256_tree": "a8d847b49a68474e9625d4909c93f5d499dbee073664d467022a8bc8bb98fd18"
+    },
+    {
+      "id": "wasi:clocks@0.2.8",
+      "path": "wit/deps/wasi/clocks/0.2.8",
+      "kind": "vendored",
+      "sha256_tree": "865f5888ca2a506ae825e00e0bafe556cc12696d69d1fee589215a5b87cdc8d9"
+    },
+    {
+      "id": "wasi:filesystem@0.2.8",
+      "path": "wit/deps/wasi/filesystem/0.2.8",
+      "kind": "vendored",
+      "sha256_tree": "7f3b08f584eb8177ce0b4f87042f5057183e0d972a21eadc21dc2f50e8552f28"
+    },
+    {
+      "id": "wasi:http@0.2.8",
+      "path": "wit/deps/wasi/http/0.2.8",
+      "kind": "vendored",
+      "sha256_tree": "ffb1faa397f5e60f06417d6ae84f2ade394bf51da9a8b438a2fd18e1cfaec5bd"
+    },
+    {
+      "id": "wasi:io@0.2.8",
+      "path": "wit/deps/wasi/io/0.2.8",
+      "kind": "vendored",
+      "sha256_tree": "4451c505c1c1bf37ea256e8cd5a228dadc91f7e47600573dd4e65da3a5b4e011"
+    },
+    {
+      "id": "wasi:random@0.2.8",
+      "path": "wit/deps/wasi/random/0.2.8",
+      "kind": "vendored",
+      "sha256_tree": "2904cc5568db4398531ad8d292eda6ebb34762c251e0ccf33555b55eca5094b9"
+    },
+    {
+      "id": "wasi:sockets@0.2.8",
+      "path": "wit/deps/wasi/sockets/0.2.8",
+      "kind": "vendored",
+      "sha256_tree": "5270265d7e164a059163b5d3fbac2b789b42d2da29b5198b24d43bfc65039def"
+    }
+  ]
+}

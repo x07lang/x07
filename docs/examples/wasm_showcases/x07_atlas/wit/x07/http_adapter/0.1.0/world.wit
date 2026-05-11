@@ -1,0 +1,7 @@
+package x07:http-adapter@0.1.0;
+
+world proxy-with-solve {
+  include wasi:http/proxy@0.2.8;
+  import x07:solve/handler@0.1.0;
+}
+

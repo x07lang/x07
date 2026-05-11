@@ -1,0 +1,9 @@
+package x07:solve@0.1.0;
+
+interface handler {
+  solve: func(input: list<u8>) -> list<u8>;
+}
+
+world solve {
+  export handler;
+}
