@@ -223,10 +223,16 @@ impl<'a> InferState<'a> {
 
     fn should_diag_unknown_callee(&self, callee: &str) -> bool {
         let Some((prefix, _)) = callee.rsplit_once('.') else {
-            // Dotless heads are operators or special forms; an unknown one can
-            // never compile (c_emit rejects it as an unsupported head), so
-            // diagnose here where suggestions are available ("==" -> "=").
-            return true;
+            // Unknown symbol-like heads ("==", "<>") are operator typos and
+            // can never compile, so diagnose them here where suggestions are
+            // available ("==" -> "="). Word-like dotless atoms stay silent:
+            // structured forms (for example task.scope.cfg_v1) carry data
+            // lists like ["max_children", 4] whose heads are config keys,
+            // not calls, and unsafe builtins (memcpy, addr_of, ...) have no
+            // typecheck signatures.
+            return !callee
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_');
         };
         prefix == self.module_id || self.sigs.knows_module_prefix(prefix)
     }
