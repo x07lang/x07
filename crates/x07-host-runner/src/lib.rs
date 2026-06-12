@@ -124,6 +124,9 @@ pub struct CompilerResult {
     pub compiled_exe: Option<PathBuf>,
     pub compiled_exe_size: Option<u64>,
     pub compile_error: Option<String>,
+    /// Structured diagnostics for a failed compile (same shape as `x07 lint`),
+    /// so run reports carry pointers/quickfixes instead of only a message string.
+    pub compile_diagnostics: Vec<x07c::diagnostics::Diagnostic>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub fuel_used: Option<u64>,
@@ -302,6 +305,7 @@ pub fn compile_program_with_options(
                     msg.push_str(&format!("x07 pkg provides {module_id}"));
                 }
             }
+            let compile_diagnostics = compile_failure_diagnostics(program, &err, compile_options);
             return Ok(CompilerResult {
                 ok: false,
                 exit_status: 1,
@@ -311,6 +315,7 @@ pub fn compile_program_with_options(
                 compiled_exe: None,
                 compiled_exe_size: None,
                 compile_error: Some(msg),
+                compile_diagnostics,
                 stdout: Vec::new(),
                 stderr: Vec::new(),
                 fuel_used: None,
@@ -338,6 +343,7 @@ pub fn compile_program_with_options(
                 compiled_exe: None,
                 compiled_exe_size: None,
                 compile_error: Some(format_native_backend_error(&err)),
+                compile_diagnostics: Vec::new(),
                 stdout: Vec::new(),
                 stderr: Vec::new(),
                 fuel_used: Some(compile_stats.fuel_used),
@@ -358,6 +364,7 @@ pub fn compile_program_with_options(
             compiled_exe: None,
             compiled_exe_size: None,
             compile_error: Some(format!("C toolchain failed (exit={})", tool.exit_status)),
+            compile_diagnostics: Vec::new(),
             stdout: tool.stdout,
             stderr: tool.stderr,
             fuel_used: Some(compile_stats.fuel_used),
@@ -397,6 +404,7 @@ pub fn compile_program_with_options(
         compiled_exe: Some(final_exe),
         compiled_exe_size: exe_size,
         compile_error: None,
+        compile_diagnostics: Vec::new(),
         stdout: tool.stdout,
         stderr: tool.stderr,
         fuel_used: Some(compile_stats.fuel_used),
@@ -512,6 +520,78 @@ fn missing_module_id_from_compile_error(message: &str) -> Option<String> {
     }
     let quoted = take_rust_debug_quoted_string(rest)?;
     serde_json::from_str::<String>(quoted).ok()
+}
+
+/// Module id named by a `(fn=module.symbol)` marker in a compile error message.
+fn module_id_from_compile_error_fn_marker(message: &str) -> Option<String> {
+    let idx = message.find("fn=")?;
+    let rest = &message[idx + "fn=".len()..];
+    let end = rest
+        .char_indices()
+        .find(|(_, ch)| ch.is_whitespace() || *ch == ')' || *ch == ',')
+        .map(|(i, _)| i)
+        .unwrap_or(rest.len());
+    let fn_name = &rest[..end];
+    let (module_id, _) = fn_name.rsplit_once('.')?;
+    (!module_id.is_empty()).then(|| module_id.to_string())
+}
+
+const MAX_COMPILE_FAILURE_DIAGNOSTICS: usize = 20;
+
+/// Structured diagnostics for a failed compile. Prefers the compiler's own
+/// diagnostic; otherwise lints the module named by the error's `fn=` marker
+/// (or the entry program) so run reports carry pointers and quickfixes
+/// alongside `compile_error`.
+fn compile_failure_diagnostics(
+    program: &[u8],
+    err: &x07c::compile::CompilerError,
+    compile_options: &compile::CompileOptions,
+) -> Vec<x07c::diagnostics::Diagnostic> {
+    if let Some(d) = err.diagnostic.as_deref() {
+        return vec![d.clone()];
+    }
+
+    let mut source_path: Option<PathBuf> = None;
+    let mut module_bytes: Option<Vec<u8>> = None;
+    if let Some(module_id) = module_id_from_compile_error_fn_marker(&err.message) {
+        if let Ok(src) = x07c::module_source::load_module_source_with_preference(
+            &module_id,
+            compile_options.world,
+            &compile_options.module_roots,
+            compile_options.prefer_module_roots_first,
+        ) {
+            source_path = src.path.clone();
+            module_bytes = Some(src.src.into_bytes());
+        }
+    }
+    let bytes = module_bytes.as_deref().unwrap_or(program);
+
+    let Ok(mut file) = x07c::x07ast::parse_x07ast_json(bytes) else {
+        return Vec::new();
+    };
+    x07c::x07ast::canonicalize_x07ast_file(&mut file);
+    let report = x07c::lint::lint_file(
+        &file,
+        x07c::lint::LintOptions {
+            world: compile_options.world,
+            ..Default::default()
+        },
+    );
+    let mut out: Vec<x07c::diagnostics::Diagnostic> = report
+        .diagnostics
+        .into_iter()
+        .filter(|d| matches!(d.severity, x07c::diagnostics::Severity::Error))
+        .take(MAX_COMPILE_FAILURE_DIAGNOSTICS)
+        .collect();
+    if let Some(path) = source_path {
+        let path = path.display().to_string();
+        for d in &mut out {
+            d.data
+                .entry("file".to_string())
+                .or_insert_with(|| serde_json::Value::String(path.clone()));
+        }
+    }
+    out
 }
 
 fn take_rust_debug_quoted_string(s: &str) -> Option<&str> {
@@ -1241,6 +1321,7 @@ pub fn compile_bundle_exe(
                     msg.push_str(&format!("x07 pkg provides {module_id}"));
                 }
             }
+            let compile_diagnostics = compile_failure_diagnostics(program, &err, &compile_options);
             return Ok(BundleCompileOutput {
                 compile: CompilerResult {
                     ok: false,
@@ -1251,6 +1332,7 @@ pub fn compile_bundle_exe(
                     compiled_exe: None,
                     compiled_exe_size: None,
                     compile_error: Some(msg),
+                    compile_diagnostics,
                     stdout: Vec::new(),
                     stderr: Vec::new(),
                     fuel_used: None,
@@ -1283,6 +1365,7 @@ pub fn compile_bundle_exe(
                     compiled_exe: None,
                     compiled_exe_size: None,
                     compile_error: Some(format_native_backend_error(&err)),
+                    compile_diagnostics: Vec::new(),
                     stdout: Vec::new(),
                     stderr: Vec::new(),
                     fuel_used: Some(compile_stats.fuel_used),
@@ -1314,6 +1397,7 @@ pub fn compile_bundle_exe(
                 compiled_exe: None,
                 compiled_exe_size: None,
                 compile_error: Some(format!("C toolchain failed (exit={})", tool.exit_status)),
+                compile_diagnostics: Vec::new(),
                 stdout: tool.stdout,
                 stderr: tool.stderr,
                 fuel_used: Some(compile_stats.fuel_used),
@@ -1353,6 +1437,7 @@ pub fn compile_bundle_exe(
             compiled_exe: Some(compiled_out.to_path_buf()),
             compiled_exe_size: exe_size,
             compile_error: None,
+            compile_diagnostics: Vec::new(),
             stdout: tool.stdout,
             stderr: tool.stderr,
             fuel_used: Some(compile_stats.fuel_used),

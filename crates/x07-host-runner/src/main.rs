@@ -346,20 +346,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "schema_version": X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "compile",
                     "exit_code": exit_code,
-                        "compile": {
-                            "ok": compile.ok,
-                            "exit_status": compile.exit_status,
-                            "lang_id": compile.lang_id,
-                            "native_requires": compile.native_requires,
-                            "c_source_size": compile.c_source_size,
-                            "compiled_exe": compile.compiled_exe.as_ref().map(|p| p.display().to_string()),
-                            "compiled_exe_size": compile.compiled_exe_size,
-                        "compile_error": compile.compile_error,
-                        "stdout_b64": b64.encode(&compile.stdout),
-                        "stderr_b64": b64.encode(&compile.stderr),
-                        "fuel_used": compile.fuel_used,
-                        "trap": compile.trap,
-                    },
+                        "compile": compiler_json(&compile, &b64),
                     "solve": serde_json::Value::Null,
                 });
                 println!("{}", serde_json::to_string_pretty(&json)?);
@@ -413,20 +400,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "schema_version": X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
                 "mode": "compile-run",
                 "exit_code": exit_code,
-                    "compile": {
-                        "ok": result.compile.ok,
-                        "exit_status": result.compile.exit_status,
-                        "lang_id": result.compile.lang_id,
-                        "native_requires": result.compile.native_requires,
-                        "c_source_size": result.compile.c_source_size,
-                        "compiled_exe": result.compile.compiled_exe.as_ref().map(|p| p.display().to_string()),
-                        "compiled_exe_size": result.compile.compiled_exe_size,
-                    "compile_error": result.compile.compile_error,
-                    "stdout_b64": b64.encode(&result.compile.stdout),
-                    "stderr_b64": b64.encode(&result.compile.stderr),
-                    "fuel_used": result.compile.fuel_used,
-                    "trap": result.compile.trap,
-                },
+                    "compile": compiler_json(&result.compile, &b64),
                 "solve": solve_json,
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
@@ -544,20 +518,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "schema_version": X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "project-compile",
                     "exit_code": exit_code,
-                        "compile": {
-                            "ok": compile.ok,
-                            "exit_status": compile.exit_status,
-                            "lang_id": compile.lang_id,
-                            "native_requires": compile.native_requires,
-                            "c_source_size": compile.c_source_size,
-                            "compiled_exe": compile.compiled_exe.as_ref().map(|p| p.display().to_string()),
-                            "compiled_exe_size": compile.compiled_exe_size,
-                        "compile_error": compile.compile_error,
-                        "stdout_b64": b64.encode(&compile.stdout),
-                        "stderr_b64": b64.encode(&compile.stderr),
-                        "fuel_used": compile.fuel_used,
-                        "trap": compile.trap,
-                    },
+                        "compile": compiler_json(&compile, &b64),
                     "solve": serde_json::Value::Null,
                 });
                 println!("{}", serde_json::to_string_pretty(&json)?);
@@ -570,20 +531,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "schema_version": X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "project-compile-run",
                     "exit_code": exit_code,
-                        "compile": {
-                            "ok": compile.ok,
-                            "exit_status": compile.exit_status,
-                            "lang_id": compile.lang_id,
-                            "native_requires": compile.native_requires,
-                            "c_source_size": compile.c_source_size,
-                            "compiled_exe": compile.compiled_exe.as_ref().map(|p| p.display().to_string()),
-                            "compiled_exe_size": compile.compiled_exe_size,
-                        "compile_error": compile.compile_error,
-                        "stdout_b64": b64.encode(&compile.stdout),
-                        "stderr_b64": b64.encode(&compile.stderr),
-                        "fuel_used": compile.fuel_used,
-                        "trap": compile.trap,
-                    },
+                        "compile": compiler_json(&compile, &b64),
                     "solve": serde_json::Value::Null,
                 });
                 println!("{}", serde_json::to_string_pretty(&json)?);
@@ -602,20 +550,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "schema_version": X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
                 "mode": "project-compile-run",
                 "exit_code": exit_code,
-                    "compile": {
-                        "ok": compile.ok,
-                        "exit_status": compile.exit_status,
-                        "lang_id": compile.lang_id,
-                        "native_requires": compile.native_requires,
-                        "c_source_size": compile.c_source_size,
-                        "compiled_exe": compile.compiled_exe.as_ref().map(|p| p.display().to_string()),
-                        "compiled_exe_size": compile.compiled_exe_size,
-                    "compile_error": compile.compile_error,
-                    "stdout_b64": b64.encode(&compile.stdout),
-                    "stderr_b64": b64.encode(&compile.stderr),
-                    "fuel_used": compile.fuel_used,
-                    "trap": compile.trap,
-                },
+                    "compile": compiler_json(&compile, &b64),
                 "solve": {
                     "ok": solve.ok,
                     "exit_status": solve.exit_status,
@@ -645,4 +580,31 @@ fn try_main() -> Result<std::process::ExitCode> {
             Ok(std::process::ExitCode::from(exit_code))
         }
     }
+}
+
+fn compiler_json(
+    compile: &x07_host_runner::CompilerResult,
+    b64: &base64::engine::general_purpose::GeneralPurpose,
+) -> serde_json::Value {
+    use base64::Engine as _;
+    let mut out = serde_json::json!({
+        "ok": compile.ok,
+        "exit_status": compile.exit_status,
+        "lang_id": compile.lang_id,
+        "native_requires": compile.native_requires,
+        "c_source_size": compile.c_source_size,
+        "compiled_exe": compile.compiled_exe.as_ref().map(|p| p.display().to_string()),
+        "compiled_exe_size": compile.compiled_exe_size,
+        "compile_error": compile.compile_error,
+        "stdout_b64": b64.encode(&compile.stdout),
+        "stderr_b64": b64.encode(&compile.stderr),
+        "fuel_used": compile.fuel_used,
+        "trap": compile.trap,
+    });
+    if !compile.compile_diagnostics.is_empty() {
+        if let Ok(diags) = serde_json::to_value(&compile.compile_diagnostics) {
+            out["diagnostics"] = diags;
+        }
+    }
+    out
 }

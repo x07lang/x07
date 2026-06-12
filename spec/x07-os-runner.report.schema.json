@@ -152,6 +152,11 @@
         "compiled_exe": { "$ref": "#/$defs/maybe_string" },
         "compiled_exe_size": { "$ref": "#/$defs/maybe_u64" },
         "compile_error": { "$ref": "#/$defs/maybe_string" },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic" },
+          "default": []
+        },
         "stdout_b64": { "$ref": "#/$defs/base64_bytes" },
         "stderr_b64": { "$ref": "#/$defs/base64_bytes" },
         "fuel_used": { "$ref": "#/$defs/maybe_u64" },
