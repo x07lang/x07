@@ -7,9 +7,18 @@
       "title": "Uppercase ASCII",
       "prompt": "Read all input bytes. Output the same bytes with ASCII lowercase letters a-z converted to uppercase. All other bytes pass through unchanged.",
       "vectors": [
-        {"input": "hello, World! 123", "expected": "HELLO, WORLD! 123"},
-        {"input": "", "expected": ""},
-        {"input": "abc\nxyz\n", "expected": "ABC\nXYZ\n"}
+        {
+          "input": "hello, World! 123",
+          "expected": "HELLO, WORLD! 123"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "abc\nxyz\n",
+          "expected": "ABC\nXYZ\n"
+        }
       ]
     },
     {
@@ -17,10 +26,22 @@
       "title": "Count newline bytes",
       "prompt": "Read all input bytes. Output the number of 0x0A (newline) bytes as decimal ASCII digits with no trailing newline.",
       "vectors": [
-        {"input": "a\nb\nc\n", "expected": "3"},
-        {"input": "", "expected": "0"},
-        {"input": "no newline", "expected": "0"},
-        {"input": "\n\n", "expected": "2"}
+        {
+          "input": "a\nb\nc\n",
+          "expected": "3"
+        },
+        {
+          "input": "",
+          "expected": "0"
+        },
+        {
+          "input": "no newline",
+          "expected": "0"
+        },
+        {
+          "input": "\n\n",
+          "expected": "2"
+        }
       ]
     },
     {
@@ -28,10 +49,22 @@
       "title": "Sum integer lines",
       "prompt": "Input is zero or more lines, each a non-negative decimal integer (< 1000000), separated by 0x0A newlines; a trailing newline may be absent and empty lines must be ignored. Output the sum as decimal ASCII with no trailing newline.",
       "vectors": [
-        {"input": "1\n2\n3\n", "expected": "6"},
-        {"input": "10\n\n20", "expected": "30"},
-        {"input": "", "expected": "0"},
-        {"input": "999999\n1\n", "expected": "1000000"}
+        {
+          "input": "1\n2\n3\n",
+          "expected": "6"
+        },
+        {
+          "input": "10\n\n20",
+          "expected": "30"
+        },
+        {
+          "input": "",
+          "expected": "0"
+        },
+        {
+          "input": "999999\n1\n",
+          "expected": "1000000"
+        }
       ]
     },
     {
@@ -39,9 +72,18 @@
       "title": "Most frequent word",
       "prompt": "Tokenize input into words: maximal runs of ASCII letters a-z/A-Z, lowercased; every other byte separates words. Output 'word count' (single 0x20 between word and decimal count, no trailing newline) for the most frequent word; break count ties by lexicographically smallest word. Input contains at least one word.",
       "vectors": [
-        {"input": "The quick brown fox jumps over the lazy dog the fox", "expected": "the 3"},
-        {"input": "a b b a", "expected": "a 2"},
-        {"input": "Tie tie TIE zzz", "expected": "tie 3"}
+        {
+          "input": "The quick brown fox jumps over the lazy dog the fox",
+          "expected": "the 3"
+        },
+        {
+          "input": "a b b a",
+          "expected": "a 2"
+        },
+        {
+          "input": "Tie tie TIE zzz",
+          "expected": "tie 3"
+        }
       ]
     },
     {
@@ -49,10 +91,22 @@
       "title": "Run-length encode",
       "prompt": "Read all input bytes. For each maximal run of identical bytes, output the byte itself followed by the run length as decimal ASCII digits. Output nothing for empty input.",
       "vectors": [
-        {"input": "aaabb", "expected": "a3b2"},
-        {"input": "abc", "expected": "a1b1c1"},
-        {"input": "", "expected": ""},
-        {"input": "aaaaaaaaaaaa", "expected": "a12"}
+        {
+          "input": "aaabb",
+          "expected": "a3b2"
+        },
+        {
+          "input": "abc",
+          "expected": "a1b1c1"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "aaaaaaaaaaaa",
+          "expected": "a12"
+        }
       ]
     },
     {
@@ -60,9 +114,144 @@
       "title": "Extract JSON field",
       "prompt": "Input is a single JSON object whose 'name' member is a JSON string containing no escape sequences. Output the raw string value of 'name' (no quotes, no trailing newline). The object may contain other members in any order; whitespace may vary.",
       "vectors": [
-        {"input": "{\"id\": 7, \"name\": \"atlas\"}", "expected": "atlas"},
-        {"input": "{\"name\":\"x07 lang\",\"tags\":[\"a\",\"b\"]}", "expected": "x07 lang"},
-        {"input": "{ \"meta\": {\"name\": \"inner\"}, \"name\": \"outer\" }", "expected": "outer"}
+        {
+          "input": "{\"id\": 7, \"name\": \"atlas\"}",
+          "expected": "atlas"
+        },
+        {
+          "input": "{\"name\":\"x07 lang\",\"tags\":[\"a\",\"b\"]}",
+          "expected": "x07 lang"
+        },
+        {
+          "input": "{ \"meta\": {\"name\": \"inner\"}, \"name\": \"outer\" }",
+          "expected": "outer"
+        }
+      ]
+    },
+    {
+      "id": "dedupe_lines",
+      "title": "Dedupe lines",
+      "prompt": "Split input on 0x0A newlines into lines (a missing trailing newline still ends a final line; a trailing newline does not create an extra empty line). Output each line the FIRST time it occurs, in order, each followed by 0x0A. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "a\nb\na\n",
+          "expected": "a\nb\n"
+        },
+        {
+          "input": "a\na",
+          "expected": "a\n"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "x\n\n\nx\ny\n",
+          "expected": "x\n\ny\n"
+        }
+      ]
+    },
+    {
+      "id": "fnv1a32",
+      "title": "FNV-1a 32-bit checksum",
+      "prompt": "Compute the FNV-1a 32-bit hash of all input bytes (offset basis 2166136261; for each byte: hash = (hash XOR byte) * 16777619 with wrapping u32 multiplication). Output the final hash as decimal ASCII, no trailing newline.",
+      "vectors": [
+        {
+          "input": "",
+          "expected": "2166136261"
+        },
+        {
+          "input": "a",
+          "expected": "3826002220"
+        },
+        {
+          "input": "hello",
+          "expected": "1335831723"
+        },
+        {
+          "input": "x07",
+          "expected": "2163369350"
+        }
+      ]
+    },
+    {
+      "id": "frame_u32le",
+      "title": "Length-prefix frames",
+      "prompt": "Split input on 0x0A newlines into lines (a trailing newline does not create a final empty line; a missing trailing newline still ends a final line). For each line, output a 4-byte little-endian u32 length followed by the line bytes. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "ab\nc\n",
+          "expected": "\u0002\u0000\u0000\u0000ab\u0001\u0000\u0000\u0000c"
+        },
+        {
+          "input": "hey",
+          "expected": "\u0003\u0000\u0000\u0000hey"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "\n",
+          "expected": "\u0000\u0000\u0000\u0000"
+        }
+      ]
+    },
+    {
+      "id": "csv_sum_col",
+      "title": "Sum CSV second column",
+      "prompt": "Input is zero or more 0x0A-separated lines of the form name,value where value is a non-negative decimal integer < 1000000; empty lines must be ignored. Output the sum of the value column as decimal ASCII, no trailing newline.",
+      "vectors": [
+        {
+          "input": "a,1\nb,2\n",
+          "expected": "3"
+        },
+        {
+          "input": "x,10\n\ny,5",
+          "expected": "15"
+        },
+        {
+          "input": "",
+          "expected": "0"
+        }
+      ]
+    },
+    {
+      "id": "reverse_lines",
+      "title": "Reverse line order",
+      "prompt": "Split input on 0x0A newlines into lines (a trailing newline does not create a final empty line). Output the lines in reverse order, each followed by 0x0A. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "a\nb\nc\n",
+          "expected": "c\nb\na\n"
+        },
+        {
+          "input": "one",
+          "expected": "one\n"
+        },
+        {
+          "input": "",
+          "expected": ""
+        }
+      ]
+    },
+    {
+      "id": "second_largest",
+      "title": "Second largest distinct integer",
+      "prompt": "Input is non-negative decimal integers (< 1000000) separated by ASCII whitespace, containing at least two distinct values. Output the second-largest DISTINCT value as decimal ASCII, no trailing newline.",
+      "vectors": [
+        {
+          "input": "3 1 4 1 5",
+          "expected": "4"
+        },
+        {
+          "input": "7 7 7 2",
+          "expected": "2"
+        },
+        {
+          "input": "10\n9 10",
+          "expected": "9"
+        }
       ]
     }
   ]

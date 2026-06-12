@@ -20,11 +20,13 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TIMEOUT_SECONDS = 60
+_BUILD_CACHE = {}
 
 
 def run_python(solution: Path, input_bytes: bytes):
@@ -38,6 +40,52 @@ def run_python(solution: Path, input_bytes: bytes):
     if proc.returncode != 0:
         return None, f"exit {proc.returncode}: {proc.stderr.decode(errors='replace')[:300]}"
     return proc.stdout, None
+
+
+def run_rust(solution: Path, input_bytes: bytes):
+    exe = _BUILD_CACHE.get(solution)
+    if exe is None:
+        exe = Path(tempfile.mkdtemp(prefix="agent-eval-rs-")) / solution.stem
+        build = subprocess.run(
+            ["rustc", "-O", "--edition", "2021", "-o", str(exe), str(solution)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=TIMEOUT_SECONDS,
+        )
+        if build.returncode != 0:
+            return None, f"rustc failed: {build.stderr.decode(errors='replace')[:300]}"
+        _BUILD_CACHE[solution] = exe
+    proc = subprocess.run(
+        [str(exe)],
+        input=input_bytes,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=TIMEOUT_SECONDS,
+    )
+    if proc.returncode != 0:
+        return None, f"exit {proc.returncode}: {proc.stderr.decode(errors='replace')[:300]}"
+    return proc.stdout, None
+
+
+def run_x07text(solution: Path, input_bytes: bytes):
+    # x07text arm: convert the .x07t source via `x07 ast from-text`, then
+    # delegate to the x07 runner. Conversion is part of the arm under test.
+    converted = _BUILD_CACHE.get(solution)
+    if converted is None:
+        x07_bin = os.environ.get("X07_BIN", "x07")
+        converted = Path(tempfile.mkdtemp(prefix="agent-eval-x07t-")) / (
+            solution.stem + ".x07.json"
+        )
+        conv = subprocess.run(
+            [x07_bin, "ast", "from-text", "--in", str(solution), "--out", str(converted)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=TIMEOUT_SECONDS,
+        )
+        if conv.returncode != 0:
+            return None, f"from-text failed: {conv.stderr.decode(errors='replace')[:300]}"
+        _BUILD_CACHE[solution] = converted
+    return run_x07(converted, input_bytes)
 
 
 def run_x07(solution: Path, input_bytes: bytes):
@@ -74,7 +122,12 @@ def run_x07(solution: Path, input_bytes: bytes):
 
 
 def evaluate(lang: str, solutions_dir: Path, tasks: dict):
-    runners = {"python": (run_python, ".py"), "x07": (run_x07, ".x07.json")}
+    runners = {
+        "python": (run_python, ".py"),
+        "rust": (run_rust, ".rs"),
+        "x07": (run_x07, ".x07.json"),
+        "x07text": (run_x07text, ".x07t"),
+    }
     run_fn, ext = runners[lang]
     rows = []
     for task in tasks["tasks"]:
@@ -134,7 +187,7 @@ def evaluate(lang: str, solutions_dir: Path, tasks: dict):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", default=str(HERE / "tasks" / "tasks.json"))
-    ap.add_argument("--lang", choices=["python", "x07"], required=True)
+    ap.add_argument("--lang", choices=["python", "rust", "x07", "x07text"], required=True)
     ap.add_argument("--solutions", required=True)
     ap.add_argument("--results", default="")
     args = ap.parse_args()

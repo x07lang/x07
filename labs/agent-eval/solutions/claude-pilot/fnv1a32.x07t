@@ -1,0 +1,15 @@
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports (std.bytes std.fmt)
+  :decls ()
+  :solve (begin
+    (let n (bytes.len input))
+    (let h -2128831035) ; 2166136261 (FNV offset basis) as i32
+    (for i 0 n
+      (set0 h (* (^ h (std.bytes.get_u8 input i)) 16777619))
+    )
+    (std.fmt.u32_to_dec h)
+  )
+}

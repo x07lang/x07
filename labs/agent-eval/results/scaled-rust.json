@@ -1,0 +1,120 @@
+{
+  "lang": "rust",
+  "schema_version": "x07.agent-eval.results@0.1.0",
+  "solutions_dir": "solutions/claude-pilot",
+  "summary": {
+    "pass_rate": 1.0,
+    "passed": 12,
+    "total": 12
+  },
+  "tasks": [
+    {
+      "first_failure": null,
+      "id": "upper_ascii",
+      "solution_bytes": 253,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 554
+    },
+    {
+      "first_failure": null,
+      "id": "count_newlines",
+      "solution_bytes": 182,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 116
+    },
+    {
+      "first_failure": null,
+      "id": "sum_lines",
+      "solution_bytes": 254,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 158
+    },
+    {
+      "first_failure": null,
+      "id": "top_word",
+      "solution_bytes": 654,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 173
+    },
+    {
+      "first_failure": null,
+      "id": "rle_encode",
+      "solution_bytes": 482,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 124
+    },
+    {
+      "first_failure": null,
+      "id": "json_name",
+      "solution_bytes": 1191,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 126
+    },
+    {
+      "first_failure": null,
+      "id": "dedupe_lines",
+      "solution_bytes": 564,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 151
+    },
+    {
+      "first_failure": null,
+      "id": "fnv1a32",
+      "solution_bytes": 247,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 109
+    },
+    {
+      "first_failure": null,
+      "id": "frame_u32le",
+      "solution_bytes": 491,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 137
+    },
+    {
+      "first_failure": null,
+      "id": "csv_sum_col",
+      "solution_bytes": 283,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 161
+    },
+    {
+      "first_failure": null,
+      "id": "reverse_lines",
+      "solution_bytes": 462,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 133
+    },
+    {
+      "first_failure": null,
+      "id": "second_largest",
+      "solution_bytes": 297,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 171
+    }
+  ]
+}

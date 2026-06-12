@@ -1,0 +1,29 @@
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports (std.bytes std.small_map std.text.ascii std.text.slices std.vec)
+  :decls ()
+  :solve (begin
+    (let n (bytes.len input))
+    (if (= n 0) (return (bytes.lit "")) 0)
+    (let sl (std.text.ascii.split_lines_view input))
+    (let k (std.text.slices.count_v1 (bytes.view sl)))
+    (let m (std.small_map.empty_bytes_u32))
+    (let v (std.vec.with_capacity n))
+    (for i 0 k
+      (begin
+        (let w (std.text.slices.view_at_v1 input (bytes.view sl) i))
+        (if (= (std.small_map.get_bytes_u32_or (bytes.view m) w 0) 0)
+          (begin
+            (set0 m (std.small_map.put_bytes_u32 m w 1))
+            (set0 v (std.vec.extend_bytes v w))
+            (set0 v (std.vec.push v 10))
+          )
+          0
+        )
+      )
+    )
+    (std.vec.as_bytes v)
+  )
+}

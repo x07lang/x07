@@ -1,0 +1,18 @@
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports (std.bytes std.json std.vec)
+  :decls ()
+  :solve (begin
+    (let q (std.vec.with_capacity (+ (bytes.len input) 8)))
+    (set q (std.vec.extend_bytes q input))
+    (set q (std.vec.push q 0))
+    (let path (bytes.lit name))
+    (set q (std.vec.extend_bytes q (bytes.view path)))
+    (let qb (std.vec.as_bytes q))
+    (let r (std.json.extract_path_canon_or_err (bytes.view qb)))
+    (let rl (bytes.len r))
+    (view.to_bytes (bytes.subview r 1 (- rl 2)))
+  )
+}
