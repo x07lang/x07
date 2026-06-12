@@ -65,6 +65,7 @@ mod trust;
 mod util;
 mod verify;
 mod x07ast_util;
+mod x07text;
 mod xtal;
 mod xtal_events;
 mod xtal_violation;
@@ -441,6 +442,8 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(ast::AstCommand::Canon(_)) => vec!["ast", "canon"],
                 Some(ast::AstCommand::Schema(_)) => vec!["ast", "schema"],
                 Some(ast::AstCommand::Grammar(_)) => vec!["ast", "grammar"],
+                Some(ast::AstCommand::ToText(_)) => vec!["ast", "to-text"],
+                Some(ast::AstCommand::FromText(_)) => vec!["ast", "from-text"],
             },
             Some(Command::Agent(args)) => match &args.cmd {
                 None => vec!["agent"],

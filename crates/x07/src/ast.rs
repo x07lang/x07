@@ -68,6 +68,32 @@ pub enum AstCommand {
     Schema(AstSchemaArgs),
     /// Emit the x07AST grammar bundle for constrained decoding runtimes.
     Grammar(AstGrammarArgs),
+    /// Render an x07AST JSON file as lossless x07text (stdout or --out).
+    ToText(AstToTextArgs),
+    /// Parse an x07text file back into canonical x07AST JSON (stdout or --out).
+    FromText(AstFromTextArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstToTextArgs {
+    #[arg(long, value_name = "PATH")]
+    pub r#in: PathBuf,
+
+    #[arg(long, value_name = "PATH")]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstFromTextArgs {
+    #[arg(long, value_name = "PATH")]
+    pub r#in: PathBuf,
+
+    #[arg(long, value_name = "PATH")]
+    pub out: Option<PathBuf>,
+
+    /// Validate the parsed document as an x07AST file before writing.
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    pub validate: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -164,7 +190,45 @@ pub fn cmd_ast(
         AstCommand::Canon(args) => cmd_canon(machine, args),
         AstCommand::Schema(args) => cmd_schema(machine, args),
         AstCommand::Grammar(args) => cmd_grammar(args),
+        AstCommand::ToText(args) => cmd_to_text(args),
+        AstCommand::FromText(args) => cmd_from_text(args),
     }
+}
+
+fn cmd_to_text(args: AstToTextArgs) -> Result<std::process::ExitCode> {
+    let input_bytes = std::fs::read(&args.r#in)
+        .with_context(|| format!("read input: {}", args.r#in.display()))?;
+    let value: serde_json::Value = serde_json::from_slice(&input_bytes)
+        .with_context(|| format!("parse JSON: {}", args.r#in.display()))?;
+    let text = crate::x07text::to_text(&value);
+    match args.out.as_deref() {
+        Some(path) => crate::reporting::write_bytes(path, text.as_bytes())?,
+        None => print!("{text}"),
+    }
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_from_text(args: AstFromTextArgs) -> Result<std::process::ExitCode> {
+    let input = std::fs::read_to_string(&args.r#in)
+        .with_context(|| format!("read input: {}", args.r#in.display()))?;
+    let value = crate::x07text::from_text(&input)
+        .with_context(|| format!("parse x07text: {}", args.r#in.display()))?;
+    // Canonical (JCS) bytes so output is byte-identical to `x07 fmt` output.
+    let json = crate::reporting::canonical_json_bytes(&value)?;
+    if args.validate {
+        if let Err(err) = x07c::x07ast::parse_x07ast_json(&json) {
+            eprintln!("x07text parsed, but the document is not a valid x07AST file: {err}");
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+    match args.out.as_deref() {
+        Some(path) => crate::reporting::write_bytes(path, &json)?,
+        None => {
+            use std::io::Write as _;
+            std::io::stdout().write_all(&json).context("write stdout")?;
+        }
+    }
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 #[derive(Debug, Clone, Args)]
