@@ -1,6 +1,8 @@
 # Platform (x07lp)
 
-The x07 Platform (x07-LP) is the public runtime and control-plane surface for X07 workloads and release operations. In the current split, `x07` owns authoring and service scaffolds, `x07-wasm` emits workload, app, and device artifacts, and `x07lp` operates workloads, bindings, releases, incidents, and regressions through the public `lp.*` contracts. The managed control layer built on top of that split is sold as x07 Sentinel; the private repo that implements it is `x07-platform-cloud`.
+> **Status (2026-06):** the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`) are in maintenance mode under the [2026-06 scope cut](../roadmap.md) — security and compatibility fixes only. This page documents the existing public `lp.*` contract surface for users who still depend on it.
+
+The x07 Platform (x07-LP) is the public runtime and control-plane surface for X07 workloads and release operations. In the current split, `x07` owns authoring and service scaffolds, `x07-wasm` emits workload, app, and device artifacts, and `x07lp` operates workloads, bindings, releases, incidents, and regressions through the public `lp.*` contracts. The managed control layer built on top of that split was offered as x07 Sentinel; the private repo that implements it is `x07-platform-cloud`.
 
 ## Vision
 

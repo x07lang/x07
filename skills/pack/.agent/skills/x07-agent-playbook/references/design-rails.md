@@ -1,4 +1,4 @@
-# Agent-first design rails
+# Design rails for agent-written X07
 
 These constraints are intended to keep autonomous agents convergent and reviews tractable.
 

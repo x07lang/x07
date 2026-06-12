@@ -7,3 +7,5 @@ These source mirrors make the official `x07-wasm` showcase apps visible to both 
 - [`x07_field_notes/README.md`](x07_field_notes/README.md): shared desktop/mobile reducer with replay traces, desktop smoke, and iOS/Android packaging
 
 These docs directories intentionally mirror source and contract files only. The canonical runnable projects, CI scripts, and generated outputs live in `x07-wasm-backend/examples/`.
+
+Note (2026-06): the device-bundle and web-ui lanes these showcases use depend on `x07-device-host` / `x07-web-ui`, which are in maintenance mode under the [2026-06 scope cut](../../roadmap.md).

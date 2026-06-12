@@ -2,7 +2,7 @@
 
 X07’s record/replay system (“rr”) turns real-world boundary interactions into **deterministic** fixture inputs by storing them in cassette files that can be replayed later.
 
-This is a core piece of the “agent-first” loop: failures become reproducible, and repairs can be validated without re-running real side effects.
+This is a core piece of the deterministic-execution story: failures become reproducible, and repairs can be validated without re-running real side effects.
 
 ## Cassette location (`.x07_rr/`)
 

@@ -1,25 +1,37 @@
 # Repositories
 
-The `x07lang` GitHub org is split into focused repos so each part of the language story stays understandable. Together they form one public ecosystem around X07 as an agent-first programming language.
+The `x07lang` GitHub org is split into focused repos. The active set was deliberately narrowed in 2026-06 to concentrate on X07 as the deterministic, certifiable execution substrate for agent-written software (see the [roadmap](../roadmap.md)).
 
-- `x07lang/x07`: the canonical toolchain repo. Compiler, runners, stdlib and package sources, schemas, specs, and the docs source for x07lang.org.
-- `x07lang/x07-rfcs`: the public RFC process and design-record repo for language, release, and governance changes that need formal review.
-- `x07lang/x07-mcp`: the MCP kit plus the official `io.x07/x07lang-mcp` server for coding, package, WASM, web UI, device, and platform workflows from agent runtimes.
-- `x07lang/x07-wasm-backend`: the WASM toolchain, host runners, app bundling, browser UI support, device packaging, and incident-to-regression workflows.
-- `x07lang/x07-web-ui`: the official reducer-style web UI contracts, browser host, and `std.web_ui.*` packages.
-- `x07lang/x07-device-host`: the desktop and mobile WebView host for packaged X07 device apps.
-- `x07lang/x07-wasi`: canonical `std.wasi.*` packages for WASI-facing X07 programs.
-- `x07lang/x07-platform-contracts`: authoritative public `lp.*` lifecycle contracts, schema indexes, and registry mirror helpers.
-- `x07lang/x07-platform`: public workload/runtime control plane, `x07lp` CLI, adapters, fixtures, and platform docs.
+## Active repos (2026-06 scope)
+
+- `x07lang/x07`: the canonical toolchain repo. Compiler, runners, stdlib and package sources, schemas, specs, verification/certification tooling, and the docs source for x07lang.org.
+- `x07lang/x07-mcp`: the MCP kit plus the official `io.x07/x07lang-mcp` server for driving the toolchain from agent runtimes.
 - `x07lang/x07-registry`: the package registry backend.
-- `x07lang/x07-registry-web`: the package registry UI at `x07.io`.
+- `x07lang/x07-wasm-backend`: the WASM toolchain (modules and WASI components) for portable sandboxed execution.
+- `x07lang/hardproof`: the standalone verifier CLI for MCP server quality and trust checks.
+
+## Supporting repos
+
+- `x07lang/x07-rfcs`: the public RFC process and design-record repo (RFC 0001 x07text, RFC 0002 expressiveness floor).
 - `x07lang/x07-website`: the `x07lang.org` site built from released docs bundles.
 - `x07lang/x07-perf-compare`: performance comparison harnesses and reproducible benchmark snapshots.
-- `x07lang/x07-crewops`: a multi-role showcase app that demonstrates how the ecosystem fits together for a real product.
-- `x07lang/x07-sentinel-reference-stack`: the canonical public backend reference system for x07 Sentinel (orders domain: API + consumer + scheduled job) with AWS/GCP tutorials and a local smoke path.
 
-The `x07lang/x07-platform-cloud` repo is the private implementation repo for x07 Sentinel, the managed control layer built on the public platform split. `x07lang/x07-infra-private` holds operational infrastructure.
+## Maintenance mode (2026-06 scope cut)
 
-For governance purposes, the official companion repositories currently cited alongside
-`x07` are `x07-rfcs`, `x07-mcp`, `x07-wasm-backend`, `x07-web-ui`,
-`x07-device-host`, `x07-platform`, `x07-registry`, and `x07-website`.
+These repos receive security and compatibility fixes only, until the direct-authoring eval gate passes and at least one external adopter exists (rationale in the [roadmap](../roadmap.md)):
+
+- `x07lang/x07-studio`: Studio/Forge shells and the Loom lifecycle daemon.
+- `x07lang/x07-forge`: terminal shell over the XTAL loop.
+- `x07lang/x07-crewops`: multi-role showcase app.
+- `x07lang/x07-tactics`: tactics showcase.
+- `x07lang/x07-web-ui`: reducer-style web UI contracts and browser host.
+- `x07lang/x07-device-host`: desktop and mobile WebView host for packaged device apps.
+- `x07lang/x07-registry-web`: the package registry UI at `x07.io`.
+- `x07lang/x07-sentinel-reference-stack`: backend reference system for the former managed-platform offering.
+- `x07lang/x07-platform` and `x07lang/x07-platform-contracts`: workload/runtime control plane and its public `lp.*` contracts.
+
+The private `x07lang/x07-platform-cloud` (managed control layer) follows the platform repos into maintenance mode. `x07lang/x07-infra-private` holds operational infrastructure.
+
+## Governance scope
+
+For governance purposes, the official companion repositories currently cited alongside `x07` are listed in `GOVERNANCE.md`; maintenance-mode repos remain covered for security and compatibility fixes.

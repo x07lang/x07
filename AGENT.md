@@ -63,7 +63,7 @@
   - `dist/install/` and generated `dist/channels*`
 - Bump the toolchain version with:
   - `python3 scripts/bump_toolchain_version.py --tag vX.Y.Z`
-- Before tagging `x07`, make sure component release manifests already exist for the repos consumed by the bundle (`x07-web-ui`, `x07-wasm-backend`, `x07-device-host`).
+- Before tagging `x07`, make sure component release manifests already exist for the repos consumed by the bundle (`x07-web-ui`, `x07-wasm-backend`, `x07-device-host`). Note: `x07-web-ui` and `x07-device-host` are in maintenance mode under the 2026-06 scope cut (see `docs/roadmap.md`); the bundle still pins their existing component releases.
 - Canonical verification for release work:
   - `./scripts/ci/check_release_ready.sh`
   - `cargo test -p x07up`

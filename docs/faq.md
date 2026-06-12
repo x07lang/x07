@@ -9,14 +9,36 @@ Fixture worlds exist to make testing and repair deterministic, not to limit real
 ## Why not just use Rust / Go / Python?
 
 You can.
-X07 exists because autonomous agents struggle with:
+X07 exists because running agent-written code in mainstream ecosystems leaves the trust questions open:
 
-- multiple equivalent patterns,
-- ambiguous diagnostics,
 - nondeterministic test environments,
-- text-based patching on fragile syntax.
+- ambiguous diagnostics,
+- implicit capabilities and unbounded resource use,
+- review that depends on humans re-reading source.
 
-X07 makes those constraints first-class.
+X07 makes determinism, budgets, capability sandboxing, structured diagnostics, and proof-backed certification first-class. Whether it also beats those languages for *direct agent authoring* is an open, measured question — see the next entry.
+
+## Is direct agent authoring proven?
+
+No — it is an explicitly gated bet, and the project says so.
+
+The comparative eval in `labs/agent-eval/` (toolchain repo) has agents solve identical bytes-in/bytes-out tasks in X07 and baseline languages, judged by the same vectors. The pilot (`labs/agent-eval/results/pilot-2026-06-12.md`) showed X07 behind Python on first-attempt correctness (4/6 vs 6/6 pass@1, converging by attempt 2) with roughly 4x larger solutions. The scaled run — protocol, cost estimate, and a predeclared go/park decision rule — is specified in `labs/agent-eval/RUNBOOK.md` and decides whether deeper language investment (RFC 0002: records, enums + match, string, f64) proceeds. The results get published either way.
+
+The 2026-06 authoring improvements (x07text, `x07 doc` behavioral summaries, did-you-mean diagnostics) came directly out of the pilot's friction log.
+
+## Why is x07text not the canonical format?
+
+Because the toolchain's contracts operate on one canonical artifact: x07AST JSON.
+
+JSON Patch and quickfixes, diagnostic JSON Pointers (`ptr=/...`), schema validation, and deterministic formatting (`x07 fmt` emits canonical JCS bytes) all target the JSON document. Making text canonical would reintroduce the parse/drift problems JSON-first sources were chosen to avoid, and would split every tool across two source formats.
+
+x07text is instead a **lossless projection**: `x07 ast to-text` renders readable text, `x07 ast from-text` converts back to byte-identical canonical JSON, and a CI corpus round-trip gate keeps the mapping exact. You can author entirely in x07text and let conversion re-canonicalize the file. See [x07text](language/x07text.md) and RFC 0001 in `x07-rfcs`.
+
+## What happened to the studio / device / web-ui repos?
+
+They were moved to maintenance mode in the 2026-06 scope cut: `x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, and the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`). They receive security and compatibility fixes only.
+
+The reasoning: those surfaces duplicate mature mainstream ecosystems, multiply single-maintainer load, and none of them move the core bet — the deterministic, certifiable substrate. The active set is `x07`, `x07-mcp`, `x07-registry`, `x07-wasm-backend`, and `hardproof`. Reactivation conditions are in the [roadmap](roadmap.md).
 
 ## Is X07 safe?
 

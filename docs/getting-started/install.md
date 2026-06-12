@@ -103,6 +103,8 @@ Fallbacks:
 - preferred fallback for `x07-device-host-desktop`: `cargo install --locked x07-device-host-desktop --version <VERSION>`
 - use `cargo install --locked --git ...` only for local development against unreleased repo state
 
+Note: the `device-host` component comes from `x07-device-host`, which is in maintenance mode under the [2026-06 scope cut](../roadmap.md) (security and compatibility fixes only).
+
 ### Pin a toolchain per project
 
 Write `x07-toolchain.toml` in your repo root:

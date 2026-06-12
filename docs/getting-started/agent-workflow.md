@@ -1,4 +1,4 @@
-# Agent workflow (how to build software with 100% autonomous coding agents)
+# Agent workflow (building software with autonomous coding agents)
 
 X07 is designed around a simple reality:
 
@@ -30,15 +30,15 @@ Use the template in: [Agentic design patterns](../libraries/agentic-design.md#th
 
 An autonomous agent should follow a loop like:
 
-1. Read task/spec + `AGENT.md`
-2. Modify code **only through structured patches** (JSON Patch)
+1. Read task/spec + `AGENT.md`. Use `x07 doc <symbol>` for behavioral summaries of stdlib exports before guessing at APIs.
+2. Modify code through **structured patches** (JSON Patch), or author whole modules as [x07text](../language/x07text.md) and convert with `x07 ast from-text` (lossless; output is canonical `x07 fmt` bytes)
 3. Iterate in deterministic worlds:
-   - `x07 run` (auto-repair by default via `--repair=...`)
+   - `x07 run` (auto-repair by default via `--repair=...`; failure reports embed structured diagnostics)
    - `x07 check --project x07.json` (non-mutating whole-project validation)
    - `x07 test`
    - optional: `x07 lint` for raw diagnostics (`x07diag`)
 4. If it fails:
-   - parse `x07diag` output
+   - parse `x07diag` output (unknown-symbol errors include did-you-mean suggestions; `ptr=/...` JSON Pointers locate the failing node)
    - apply a suggested quickfix (`x07 fix`) or produce a new patch and apply it with `x07 ast apply-patch`
    - if diagnostics indicate a compatibility or migration issue, run `x07 migrate --check/--write --to 0.5` (or temporarily override with `--compat`)
    - if the repo uses a legacy `x07.json` schema line, run `x07 project migrate --check/--write --project x07.json`

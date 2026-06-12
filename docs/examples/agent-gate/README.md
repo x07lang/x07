@@ -1,6 +1,6 @@
 # Agent gate examples
 
-These example projects are used by the CI gate to exercise the agent-first workflow:
+These example projects are used by the CI gate to exercise the canonical agent workflow:
 
 - `x07 fmt` / `x07 lint` / `x07 fix` / `x07 test`
 - `x07 run` with profiles and lockfile module roots

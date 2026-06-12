@@ -27,11 +27,13 @@ The governance scope covers these official companion repositories:
 - `x07lang/x07-rfcs`
 - `x07lang/x07-mcp`
 - `x07lang/x07-wasm-backend`
-- `x07lang/x07-web-ui`
-- `x07lang/x07-device-host`
-- `x07lang/x07-platform`
+- `x07lang/x07-web-ui` (maintenance mode)
+- `x07lang/x07-device-host` (maintenance mode)
+- `x07lang/x07-platform` (maintenance mode)
 - `x07lang/x07-registry`
 - `x07lang/x07-website`
+
+Under the 2026-06 scope cut (see the [roadmap](roadmap.md)), active development concentrates on `x07`, `x07-mcp`, `x07-registry`, `x07-wasm-backend`, and `hardproof`. Repos marked maintenance mode remain in governance scope and receive security and compatibility fixes only.
 
 ## How decisions are made
 

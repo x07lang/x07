@@ -1,6 +1,6 @@
 # Language overview
 
-X07 is a compiled systems language with an agent-first surface.
+X07 is a compiled systems language built as a deterministic execution substrate for agent-written software. Canonical source is x07AST JSON; the lossless [x07text projection](x07text.md) provides a readable text surface that always converts back to canonical JSON.
 
 ## Compilation pipeline (high-level)
 

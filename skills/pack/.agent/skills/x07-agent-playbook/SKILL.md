@@ -1,6 +1,6 @@
 ---
 name: x07-agent-playbook
-description: Agent-first workflow and design rails for building X07 programs with the released toolchain (no repo-only dependencies). Canonical execution is via `x07 run`.
+description: Canonical agent workflow and design rails for building X07 programs with the released toolchain (no repo-only dependencies). Canonical execution is via `x07 run`.
 metadata:
   short-description: X07 agent workflow + rails
   version: 0.1.0
@@ -37,7 +37,9 @@ Canonical docs:
 
 ## Single canonical agent loop (edit → run → test)
 
-1. Create or edit x07AST JSON (`*.x07.json`).
+1. Create or edit x07AST JSON (`*.x07.json`). For reading or whole-module authoring, the lossless x07text projection is available: `x07 ast to-text --in src/main.x07.json` renders text, `x07 ast from-text --in mod.x07t --out src/main.x07.json` converts back to canonical bytes (the canonical source stays JSON).
+
+   Discovery: `x07 doc <symbol>` returns behavioral summaries for stdlib exports with fuzzy lookup, and unknown-symbol diagnostics include did-you-mean suggestions.
 2. Run in the correct capability world (canonical: `x07 run`):
    - default run (uses `x07.json` `default_profile`): `x07 run`
    - policy-enforced run: `x07 policy init --template <cli|http-client|web-service|fs-tool|sqlite-app|postgres-client|worker|worker-parallel>` (starting point; review and extend), then `x07 run --profile sandbox` (optionally add `--allow-host ...` / `--deny-host ...` to materialize derived policies)
@@ -152,7 +154,7 @@ Add deps with `x07 pkg add NAME@VERSION --sync` (choose `NAME@VERSION` from the 
 
 If you don’t know which package provides an import, use `x07 pkg provides <module-id>`.
 
-## Agent-first design rails
+## Design rails
 
 See `references/design-rails.md`.
 

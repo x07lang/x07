@@ -12,6 +12,8 @@
 
 This surface is implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
+> **Status (2026-06):** core WASM modules and WASI components are active surfaces. The web-ui, app-bundle, and device lanes depend on `x07-web-ui` / `x07-device-host`, which are in maintenance mode under the [2026-06 scope cut](../roadmap.md) — they keep working but receive security and compatibility fixes only.
+
 ## Delegation model
 
 The core toolchain delegates WASM commands:

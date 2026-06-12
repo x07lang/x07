@@ -1,13 +1,13 @@
 # X07 (x07lang)
 
-X07 is an **agent-first systems language**. It is built so coding agents can generate, modify, test, and repair software reliably, while still giving end users the things they actually care about: memory-safe defaults, speed, explicit concurrency, predictable deployment, and clear tooling.
+X07 is the **deterministic, certifiable execution substrate for agent-written software**. As code generation gets cheap, trust becomes the bottleneck — so X07 makes generated code runnable: deterministic solve worlds with record/replay, explicit resource budgets, capability sandboxing, structured diagnostics with quickfix coverage, spec-first testing (XTAL), and proof-backed certification. It compiles via C to fast native binaries, with a WASM target for portable sandboxed execution.
 
 Most languages optimize for human style flexibility. X07 optimizes for:
 
 - **Canonical representations** so the same intent produces the same program shape.
-- **LLM-oriented diagnostics** with stable error codes and machine-applicable fixes.
+- **Machine-readable diagnostics** with stable error codes, did-you-mean suggestions, and machine-applicable fixes.
 - **World-based capability modeling** so side effects stay explicit and reviewable.
-- **Structured concurrency** so async work stays fast without turning into orphan-task chaos.
+- **Evidence over review-by-reading**: budgets, replayable runs, trust reports, and certificates.
 
 ## The mental model
 
@@ -16,7 +16,9 @@ Think of X07 as two layers:
 1. **A small, stable core** (compiler + runtime substrate)
 2. **A growing ecosystem of libraries** (stdlib + external packages)
 
-Programs are stored and exchanged in a **structured AST format** (x07AST JSON). Humans usually edit a pretty form (or generated templates), while agents operate on the structured form directly.
+Programs are stored and exchanged in a **structured AST format** (x07AST JSON). Agents and humans can operate on the structured form directly, or read and author through [x07text](language/x07text.md) — a lossless text projection (`x07 ast to-text` / `from-text`) that always converts back to canonical JSON.
+
+Direct authoring by agents is a supported surface and an explicitly gated bet: a comparative eval (`labs/agent-eval/` in the toolchain repo) with a predeclared decision rule determines whether deeper language-surface investment proceeds. See [Why X07](why-x07.md) for the honest status.
 
 ## Start here
 
@@ -38,15 +40,17 @@ Programs are stored and exchanged in a **structured AST format** (x07AST JSON). 
 - [Agent contracts](agent/contract.md)
 - [Formal verification & certification](toolchain/formal-verification.md)
 
-## Ecosystem at a glance
+## Ecosystem at a glance (2026-06 scope)
 
-The `x07` repo is the entrypoint, but the public ecosystem is intentionally split into focused repos:
+The `x07` repo is the entrypoint. The active ecosystem was deliberately narrowed in 2026-06 to concentrate on the substrate bet (see the [roadmap](roadmap.md)):
 
+- **Core toolchain**: [`x07`](https://github.com/x07lang/x07) — language, CLI, compiler, stdlib, verification/certification tooling, and the canonical docs source.
 - **MCP kit + official MCP server**: [`x07-mcp`](https://github.com/x07lang/x07-mcp) gives you templates for building MCP servers in X07 and ships the official `io.x07/x07lang-mcp` server for agent runtimes. Start with [MCP kit](toolchain/mcp-kit.md).
-- **WASM, web UI, and device apps**: [`x07-wasm-backend`](https://github.com/x07lang/x07-wasm-backend), [`x07-web-ui`](https://github.com/x07lang/x07-web-ui), [`x07-device-host`](https://github.com/x07lang/x07-device-host), and [`x07-wasi`](https://github.com/x07lang/x07-wasi) cover browser UI, WASM services, packaged desktop/mobile apps, and WASI-facing contracts. Start with [WASM tooling](toolchain/wasm.md).
-- **Lifecycle platform**: [`x07-platform`](https://github.com/x07lang/x07-platform) and [`x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts) cover public workload delivery, bindings, releases, incidents, regressions, and device-release control through `x07lp`. Start with [Platform for agents](agent/platform.md).
-- **Managed control layer**: x07 Sentinel builds on that public split; its private implementation repo is `x07-platform-cloud`.
-- **Packages and docs**: [`x07-registry`](https://github.com/x07lang/x07-registry) powers package publishing, [`x07-registry-web`](https://github.com/x07lang/x07-registry-web) serves [x07.io](https://x07.io), and [`x07-website`](https://github.com/x07lang/x07-website) serves [x07lang.org](https://x07lang.org).
+- **WASM**: [`x07-wasm-backend`](https://github.com/x07lang/x07-wasm-backend) covers WASM modules and WASI components for portable sandboxed execution. Start with [WASM tooling](toolchain/wasm.md).
+- **Packages and docs**: [`x07-registry`](https://github.com/x07lang/x07-registry) powers package publishing at [x07.io](https://x07.io), and [`x07-website`](https://github.com/x07lang/x07-website) serves [x07lang.org](https://x07lang.org).
+- **MCP server verification**: [`hardproof`](https://github.com/x07lang/hardproof) is the standalone verifier CLI used by the [MCP quality](toolchain/mcp-quality.md) flow.
+
+Former ecosystem surfaces — studio/IDE shells, web UI contracts, device hosts, and the lifecycle platform (`x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, `x07-platform` + contracts/cloud) — are in maintenance mode under the 2026-06 scope cut: security and compatibility fixes only. See the [roadmap](roadmap.md) for the rationale and reactivation conditions.
 
 ## What makes X07 different?
 
@@ -72,8 +76,8 @@ When you need real OS resources (real network, real disk, real time), you switch
 
 ## Why this matters in practice
 
-- **For end users**: you get one language and one ecosystem for CLIs, MCP servers, web UI, packaged device apps, WASM services, package publishing, and lifecycle operations.
-- **For teams**: the same contracts show up in docs, CLI reports, schema files, CI checks, and operational tooling.
+- **For teams running agent-generated code**: deterministic runs, budgets, sandbox policies, and certificates turn “should we run this?” from a judgment call into a checkable artifact.
+- **For end users**: one language and one ecosystem for CLIs, MCP servers, WASM services, and package publishing.
 - **For coding agents**: the language removes many of the ambiguities that make autonomous edits hard to trust in mainstream languages.
 
 ## Documentation map (human)
@@ -87,6 +91,7 @@ When you need real OS resources (real network, real disk, real time), you switch
 - Language:
   - [Overview](language/overview.md)
   - [Syntax & x07AST](language/syntax-x07ast.md)
+  - [x07text projection](language/x07text.md)
   - [Generics](language/generics.md)
   - [Types & memory model](language/types-memory.md)
   - [Concurrency & multiprocessing](language/concurrency-multiprocessing.md)

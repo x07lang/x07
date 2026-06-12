@@ -17,7 +17,7 @@ Installation (copy skills explicitly):
 
 Available skills:
 
-- `x07-agent-playbook`: agent-first workflow + design rails (toolchain-only)
+- `x07-agent-playbook`: canonical agent workflow + design rails (toolchain-only)
 - `x07-agent-context`: deterministic context packs for repair handoffs (`x07 agent context`)
 - `x07-xtal`: spec-first workflows and incident improvement (`x07 xtal ...`)
 - `x07-language-guide`: canonical language + stdlib reference (`x07 guide`)

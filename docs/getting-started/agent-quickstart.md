@@ -13,6 +13,7 @@ If you find a documentation gap, check the toolchain source directly in GitHub:
 - X07 source is **x07AST JSON** (`*.x07.json`), not text.
 - The toolchain is **JSON-first**: diagnostics, patches, and reports are structured.
 - Programs run in worlds (fixture or OS); OS worlds are `run-os` and `run-os-sandboxed`.
+- If you prefer authoring text, use the lossless **x07text projection**: write x07text, convert with `x07 ast from-text --in mod.x07t --out mod.x07.json` (output is canonical `x07 fmt` bytes), and render any module readable with `x07 ast to-text`. See [x07text](../language/x07text.md).
 
 High-level primitives to learn early (the “one whole system”):
 
@@ -105,7 +106,7 @@ See also: [Install](install.md).
 
 ## MCP: install the official X07 MCP server (optional)
 
-If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient core tools plus capability-gated ecosystem tools (`x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.wasm.core_v1`, `x07.web_ui.exec_v1`, `x07.device.exec_v1`, `x07.app.exec_v1`, `lp.query_v1`, `lp.control_v1`, safe patching, etc).
+If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient core tools plus capability-gated ecosystem tools (`x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.doc_v1`, `x07.wasm.core_v1`, safe patching, etc). The web-ui/device/app/platform tool packs target ecosystem surfaces that are in maintenance mode under the [2026-06 scope cut](../roadmap.md); they keep working where enabled, but the active surface is core editing, packages, and WASM.
 
 Download the published bundle from GitHub releases:
 - Repo: https://github.com/x07lang/x07-mcp
@@ -133,9 +134,7 @@ Configure your MCP client:
   - `cwd`: `.../x07lang-mcp.bundle` (so `config/mcp.server.json` + `out/mcp-worker` resolve)
   - env (recommended): `X07_MCP_X07_EXE=/absolute/path/to/x07` (`command -v x07`)
 
-Before optional wasm or platform actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine. When a workflow needs safe structured lifecycle actions, use the official MCP server path (`lp.control_v1` when the platform pack is enabled) instead of private shell glue to `x07-platform`.
-
-For control-room style clients, keep release-candidate or workspace state in the client and join it to the public lifecycle result contracts (`lp.control.action.result`, `lp.deploy.query.result`, `lp.environment.list.result`, `lp.incident.query.result`, `lp.regression.run.result`) rather than parsing shell output. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
+Before optional wasm actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine. If a workflow still uses the maintenance-mode platform pack, prefer the official MCP server path (`lp.control_v1` when enabled) and the public `lp.*` result contracts over private shell glue — see [Platform (x07lp)](../agent/platform.md).
 
 If you are creating a new HTTP/SSE MCP server project that needs long-running tool calls or task polling, start from:
 
@@ -231,7 +230,7 @@ x07 run
 
 See: [Running programs](../toolchain/running-programs.md).
 
-Diagnostics tip: many compiler errors include `ptr=/...` (a JSON Pointer into your x07AST) and sometimes `moved_ptr=/...` for ownership errors. Use `x07 ast get --in src/main.x07.json --ptr /...` to extract the failing node without manually counting indexes.
+Diagnostics tip: many compiler errors include `ptr=/...` (a JSON Pointer into your x07AST) and sometimes `moved_ptr=/...` for ownership errors. Use `x07 ast get --in src/main.x07.json --ptr /...` to extract the failing node without manually counting indexes. Unknown-symbol errors include did-you-mean suggestions, and `x07 run` failure reports embed the structured diagnostics — parse the report instead of scraping stderr.
 
 If you hit a compiler budget error (for example `Budget: max locals exceeded` or `Budget: AST too large`), see: [Compiler limits](../toolchain/compiler-limits.md).
 
@@ -397,7 +396,7 @@ See: [OS worlds](../worlds/os-worlds.md).
 - Schemas: `spec/*.schema.json` (and the synced copies on x07lang.org under `/agent/.../schemas/`)
 - External packages index: `GET /agent/latest/packages/index.json` on x07lang.org
 - Offline docs: `x07up docs path --json`
-- Local module inspection: `x07 doc <module-or-symbol>` (example: `x07 doc std.bytes`)
+- Local module inspection: `x07 doc <module-or-symbol>` (example: `x07 doc std.bytes`). Stdlib exports include behavioral summaries (what the function does, not just its signature), and lookup is fuzzy — near-miss names resolve with suggestions.
 - Local package inspection (project deps): `x07 doc <package-name>` (example: `x07 doc ext-net`)
 - Built-in reference guide: `x07 guide`
 

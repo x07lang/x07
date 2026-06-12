@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. (2026-06 note: the platform/Sentinel repos referenced below are in maintenance mode under the roadmap scope cut — see `docs/roadmap.md`. The service/workload vocabulary remains in use in the core toolchain.)
 
 ## Context
 

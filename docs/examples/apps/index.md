@@ -1,6 +1,6 @@
-# Roadmap apps (full projects)
+# Reference apps (full projects)
 
-This directory contains **full X07 application projects** derived from the Roadmap app prompts in [`docs/agent/apps.md`](../../agent/apps.md).
+This directory contains **full X07 application projects** derived from the reference app prompts in [`docs/agent/apps.md`](../../agent/apps.md).
 
 Each project is a complete directory you can copy into a fresh repo:
 
