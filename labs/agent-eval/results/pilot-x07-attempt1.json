@@ -1,0 +1,72 @@
+{
+  "lang": "x07",
+  "schema_version": "x07.agent-eval.results@0.1.0",
+  "solutions_dir": "solutions/claude-pilot",
+  "summary": {
+    "pass_rate": 0.6667,
+    "passed": 4,
+    "total": 6
+  },
+  "tasks": [
+    {
+      "first_failure": null,
+      "id": "upper_ascii",
+      "solution_bytes": 369,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 265
+    },
+    {
+      "first_failure": null,
+      "id": "count_newlines",
+      "solution_bytes": 182,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 234
+    },
+    {
+      "first_failure": null,
+      "id": "sum_lines",
+      "solution_bytes": 498,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 425
+    },
+    {
+      "first_failure": {
+        "error": "compile/run failed: Unsupported: unsupported head: \"==\" (fn=solve) []",
+        "vector": 0
+      },
+      "id": "top_word",
+      "solution_bytes": 1150,
+      "status": "error",
+      "vectors_passed": 0,
+      "vectors_total": 3,
+      "wall_ms": 24
+    },
+    {
+      "first_failure": {
+        "error": "compile/run failed: Unsupported: unsupported head: \"==\" (fn=solve) []",
+        "vector": 0
+      },
+      "id": "rle_encode",
+      "solution_bytes": 857,
+      "status": "error",
+      "vectors_passed": 0,
+      "vectors_total": 4,
+      "wall_ms": 9
+    },
+    {
+      "first_failure": null,
+      "id": "json_name",
+      "solution_bytes": 592,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 896
+    }
+  ]
+}

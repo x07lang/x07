@@ -1,0 +1,66 @@
+{
+  "lang": "python",
+  "schema_version": "x07.agent-eval.results@0.1.0",
+  "solutions_dir": "solutions/claude-pilot",
+  "summary": {
+    "pass_rate": 1.0,
+    "passed": 6,
+    "total": 6
+  },
+  "tasks": [
+    {
+      "first_failure": null,
+      "id": "upper_ascii",
+      "solution_bytes": 68,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 45
+    },
+    {
+      "first_failure": null,
+      "id": "count_newlines",
+      "solution_bytes": 71,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 58
+    },
+    {
+      "first_failure": null,
+      "id": "sum_lines",
+      "solution_bytes": 128,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 55
+    },
+    {
+      "first_failure": null,
+      "id": "top_word",
+      "solution_bytes": 300,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 43
+    },
+    {
+      "first_failure": null,
+      "id": "rle_encode",
+      "solution_bytes": 207,
+      "status": "pass",
+      "vectors_passed": 4,
+      "vectors_total": 4,
+      "wall_ms": 56
+    },
+    {
+      "first_failure": null,
+      "id": "json_name",
+      "solution_bytes": 70,
+      "status": "pass",
+      "vectors_passed": 3,
+      "vectors_total": 3,
+      "wall_ms": 46
+    }
+  ]
+}

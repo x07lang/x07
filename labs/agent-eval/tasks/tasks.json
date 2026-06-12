@@ -1,0 +1,69 @@
+{
+  "schema_version": "x07.agent-eval.tasks@0.1.0",
+  "notes": "Substrate-class tasks: deterministic bytes-in/bytes-out compute, language-neutral. Vectors are the full acceptance contract; prompts state exactly what solutions receive and must emit.",
+  "tasks": [
+    {
+      "id": "upper_ascii",
+      "title": "Uppercase ASCII",
+      "prompt": "Read all input bytes. Output the same bytes with ASCII lowercase letters a-z converted to uppercase. All other bytes pass through unchanged.",
+      "vectors": [
+        {"input": "hello, World! 123", "expected": "HELLO, WORLD! 123"},
+        {"input": "", "expected": ""},
+        {"input": "abc\nxyz\n", "expected": "ABC\nXYZ\n"}
+      ]
+    },
+    {
+      "id": "count_newlines",
+      "title": "Count newline bytes",
+      "prompt": "Read all input bytes. Output the number of 0x0A (newline) bytes as decimal ASCII digits with no trailing newline.",
+      "vectors": [
+        {"input": "a\nb\nc\n", "expected": "3"},
+        {"input": "", "expected": "0"},
+        {"input": "no newline", "expected": "0"},
+        {"input": "\n\n", "expected": "2"}
+      ]
+    },
+    {
+      "id": "sum_lines",
+      "title": "Sum integer lines",
+      "prompt": "Input is zero or more lines, each a non-negative decimal integer (< 1000000), separated by 0x0A newlines; a trailing newline may be absent and empty lines must be ignored. Output the sum as decimal ASCII with no trailing newline.",
+      "vectors": [
+        {"input": "1\n2\n3\n", "expected": "6"},
+        {"input": "10\n\n20", "expected": "30"},
+        {"input": "", "expected": "0"},
+        {"input": "999999\n1\n", "expected": "1000000"}
+      ]
+    },
+    {
+      "id": "top_word",
+      "title": "Most frequent word",
+      "prompt": "Tokenize input into words: maximal runs of ASCII letters a-z/A-Z, lowercased; every other byte separates words. Output 'word count' (single 0x20 between word and decimal count, no trailing newline) for the most frequent word; break count ties by lexicographically smallest word. Input contains at least one word.",
+      "vectors": [
+        {"input": "The quick brown fox jumps over the lazy dog the fox", "expected": "the 3"},
+        {"input": "a b b a", "expected": "a 2"},
+        {"input": "Tie tie TIE zzz", "expected": "tie 3"}
+      ]
+    },
+    {
+      "id": "rle_encode",
+      "title": "Run-length encode",
+      "prompt": "Read all input bytes. For each maximal run of identical bytes, output the byte itself followed by the run length as decimal ASCII digits. Output nothing for empty input.",
+      "vectors": [
+        {"input": "aaabb", "expected": "a3b2"},
+        {"input": "abc", "expected": "a1b1c1"},
+        {"input": "", "expected": ""},
+        {"input": "aaaaaaaaaaaa", "expected": "a12"}
+      ]
+    },
+    {
+      "id": "json_name",
+      "title": "Extract JSON field",
+      "prompt": "Input is a single JSON object whose 'name' member is a JSON string containing no escape sequences. Output the raw string value of 'name' (no quotes, no trailing newline). The object may contain other members in any order; whitespace may vary.",
+      "vectors": [
+        {"input": "{\"id\": 7, \"name\": \"atlas\"}", "expected": "atlas"},
+        {"input": "{\"name\":\"x07 lang\",\"tags\":[\"a\",\"b\"]}", "expected": "x07 lang"},
+        {"input": "{ \"meta\": {\"name\": \"inner\"}, \"name\": \"outer\" }", "expected": "outer"}
+      ]
+    }
+  ]
+}

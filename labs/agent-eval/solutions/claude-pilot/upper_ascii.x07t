@@ -1,0 +1,16 @@
+; upper_ascii authored in x07text, converted via `x07 ast from-text`
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports (std.bytes std.text.ascii std.vec)
+  :decls ()
+  :solve (begin
+    (let n (bytes.len input))
+    (let v (std.vec.with_capacity n))
+    (for i 0 n
+      (set0 v (std.vec.push v (std.text.ascii.to_upper_u8 (std.bytes.get_u8 input i))))
+    )
+    (std.vec.as_bytes v)
+  )
+}
