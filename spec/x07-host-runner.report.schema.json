@@ -185,7 +185,8 @@
         "sched_stats": { "oneOf": [{ "$ref": "#/$defs/sched_stats" }, { "type": "null" }] },
         "mem_stats": { "oneOf": [{ "$ref": "#/$defs/mem_stats" }, { "type": "null" }] },
         "debug_stats": { "oneOf": [{ "$ref": "#/$defs/debug_stats" }, { "type": "null" }] },
-        "trap": { "$ref": "#/$defs/maybe_string" }
+        "trap": { "$ref": "#/$defs/maybe_string" },
+        "trap_help": { "$ref": "#/$defs/maybe_string" }
       }
     },
     "solve_report": {
@@ -241,7 +242,8 @@
         "sched_stats": { "oneOf": [{ "$ref": "#/$defs/sched_stats" }, { "type": "null" }] },
         "mem_stats": { "oneOf": [{ "$ref": "#/$defs/mem_stats" }, { "type": "null" }] },
         "debug_stats": { "oneOf": [{ "$ref": "#/$defs/debug_stats" }, { "type": "null" }] },
-        "trap": { "$ref": "#/$defs/maybe_string" }
+        "trap": { "$ref": "#/$defs/maybe_string" },
+        "trap_help": { "$ref": "#/$defs/maybe_string" }
       }
     },
     "compile_report": {

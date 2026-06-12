@@ -59,9 +59,9 @@
     },
     "type_name": {
       "type": "string",
-      "minLength": 0,
+      "minLength": 1,
       "maxLength": 64,
-      "pattern": "^[a-z][a-z0-9_]*$"
+      "pattern": "^[A-Za-z][A-Za-z0-9_(), ]*$"
     },
     "semver": {
       "type": "string",
@@ -103,7 +103,22 @@
           "items": { "$ref": "#/$defs/param" },
           "default": []
         },
-        "result": { "$ref": "#/$defs/type_name" }
+        "result": { "$ref": "#/$defs/type_name" },
+        "summary": { "type": "string", "maxLength": 4096 },
+        "type_params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/type_param" },
+          "default": []
+        }
+      }
+    },
+    "type_param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "bound": { "type": "string", "minLength": 1, "maxLength": 64 }
       }
     },
     "suggestion": {

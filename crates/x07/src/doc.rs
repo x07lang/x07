@@ -105,9 +105,19 @@ struct DocParam {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct DocTypeParam {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bound: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 struct DocExportSig {
     name: String,
     kind: String,
+    /// Generic type parameters from the decl (empty for concrete functions).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    type_params: Vec<DocTypeParam>,
     #[serde(default)]
     params: Vec<DocParam>,
     result: String,
@@ -1059,6 +1069,14 @@ fn export_sig_row(name: &str, sig: &ExportSig) -> DocExportSig {
     DocExportSig {
         name: name.to_string(),
         kind: sig.kind.clone(),
+        type_params: sig
+            .type_params
+            .iter()
+            .map(|(tp_name, tp_bound)| DocTypeParam {
+                name: tp_name.clone(),
+                bound: tp_bound.clone(),
+            })
+            .collect(),
         params: sig
             .params
             .iter()
@@ -1751,8 +1769,34 @@ fn resolve_project_package_by_query(
 #[derive(Debug, Clone)]
 struct ExportSig {
     kind: String,
+    type_params: Vec<(String, Option<String>)>,
     params: Vec<(String, String)>,
     result: String,
+    doc: Option<String>,
+}
+
+/// Render a `type_ref` value as display text.
+///
+/// A `type_ref` is either a concrete type string, a type variable
+/// `["t","A"]` (rendered as `A`), or a type application like
+/// `["option",["t","A"]]` (rendered as `option(A)`).
+fn type_ref_text(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.trim().to_string(),
+        Value::Array(items) => {
+            let Some(head) = items.first().and_then(Value::as_str) else {
+                return value.to_string();
+            };
+            if head == "t" && items.len() == 2 {
+                if let Some(name) = items[1].as_str() {
+                    return name.trim().to_string();
+                }
+            }
+            let args: Vec<String> = items[1..].iter().map(type_ref_text).collect();
+            format!("{head}({})", args.join(", "))
+        }
+        _ => String::new(),
+    }
 }
 
 fn parse_module_bytes(
@@ -1807,8 +1851,10 @@ fn parse_module_bytes(
             name.clone(),
             ExportSig {
                 kind: "export".to_string(),
+                type_params: Vec::new(),
                 params: Vec::new(),
                 result: String::new(),
+                doc: None,
             },
         );
     }
@@ -1826,27 +1872,46 @@ fn parse_module_bytes(
         if name.is_empty() || !exported.contains(name) {
             continue;
         }
+        let mut type_params = Vec::new();
+        if let Some(tps) = decl.get("type_params").and_then(Value::as_array) {
+            for tp in tps {
+                let tp_name = tp.get("name").and_then(Value::as_str).unwrap_or("").trim();
+                if tp_name.is_empty() {
+                    continue;
+                }
+                let tp_bound = tp
+                    .get("bound")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string);
+                type_params.push((tp_name.to_string(), tp_bound));
+            }
+        }
         let params = decl.get("params").and_then(Value::as_array);
         let mut out_params = Vec::new();
         if let Some(params) = params {
             for p in params {
                 let pname = p.get("name").and_then(Value::as_str).unwrap_or("").trim();
-                let pty = p.get("ty").and_then(Value::as_str).unwrap_or("").trim();
-                out_params.push((pname.to_string(), pty.to_string()));
+                let pty = p.get("ty").map(type_ref_text).unwrap_or_default();
+                out_params.push((pname.to_string(), pty));
             }
         }
-        let result = decl
-            .get("result")
+        let result = decl.get("result").map(type_ref_text).unwrap_or_default();
+        let doc = decl
+            .get("doc")
             .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim()
-            .to_string();
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
         sigs.insert(
             name.to_string(),
             ExportSig {
                 kind: kind.to_string(),
+                type_params,
                 params: out_params,
                 result,
+                doc,
             },
         );
     }
@@ -1873,68 +1938,143 @@ fn find_module_file(module_id: &str, module_roots: &[PathBuf]) -> Option<PathBuf
     None
 }
 
-fn print_module(
-    module_id: &str,
-    path: &Path,
-    exports: &std::collections::BTreeMap<String, ExportSig>,
-) {
-    println!("module: {module_id}");
-    println!("file: {}", path.display());
-    if exports.is_empty() {
-        println!("exports: (none)");
-        return;
-    }
-    println!("exports:");
-    for (name, sig) in exports {
-        print!("  - {name}(");
-        for (idx, (pname, pty)) in sig.params.iter().enumerate() {
-            if idx != 0 {
-                print!(", ");
-            }
-            if pname.is_empty() && pty.is_empty() {
-                continue;
-            }
-            if pname.is_empty() {
-                print!("{pty}");
-            } else if pty.is_empty() {
-                print!("{pname}");
-            } else {
-                print!("{pname}: {pty}");
-            }
-        }
-        if sig.result.is_empty() {
-            println!(")");
-        } else {
-            println!(") -> {}", sig.result);
-        }
-    }
-}
+/// Target total width (indent + text) for wrapped summary lines.
+const DOC_TEXT_WIDTH: usize = 80;
 
-fn print_symbol(symbol: &str, sig: &ExportSig) {
-    print!("{symbol}(");
+/// Render one signature line: `name[A: bound](p: ty, ...) -> result`.
+fn format_export_sig(name: &str, sig: &ExportSig) -> String {
+    let mut out = String::new();
+    out.push_str(name);
+    if !sig.type_params.is_empty() {
+        out.push('[');
+        for (idx, (tp_name, tp_bound)) in sig.type_params.iter().enumerate() {
+            if idx != 0 {
+                out.push_str(", ");
+            }
+            out.push_str(tp_name);
+            if let Some(bound) = tp_bound {
+                out.push_str(": ");
+                out.push_str(bound);
+            }
+        }
+        out.push(']');
+    }
+    out.push('(');
     for (idx, (pname, pty)) in sig.params.iter().enumerate() {
         if idx != 0 {
-            print!(", ");
+            out.push_str(", ");
         }
         if pname.is_empty() && pty.is_empty() {
             continue;
         }
         if pname.is_empty() {
-            print!("{pty}");
+            out.push_str(pty);
         } else if pty.is_empty() {
-            print!("{pname}");
+            out.push_str(pname);
         } else {
-            print!("{pname}: {pty}");
+            out.push_str(pname);
+            out.push_str(": ");
+            out.push_str(pty);
         }
     }
-    if sig.result.is_empty() {
-        println!(")");
-    } else {
-        println!(") -> {}", sig.result);
+    out.push(')');
+    if !sig.result.is_empty() {
+        out.push_str(" -> ");
+        out.push_str(&sig.result);
+    }
+    out
+}
+
+/// One-line `tapp` call template for generic exports (None for concrete ones).
+fn tapp_call_hint(name: &str, sig: &ExportSig) -> Option<String> {
+    if sig.type_params.is_empty() {
+        return None;
+    }
+    let tys = sig
+        .type_params
+        .iter()
+        .map(|(tp_name, _)| format!("\"<{tp_name}>\""))
+        .collect::<Vec<_>>()
+        .join(",");
+    Some(format!(
+        "call via: [\"tapp\",\"{name}\",[\"tys\",{tys}], ...]"
+    ))
+}
+
+/// Greedy word wrap; a word longer than `width` gets its own line.
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        if line.is_empty() {
+            line.push_str(word);
+        } else if line.len() + 1 + word.len() <= width {
+            line.push(' ');
+            line.push_str(word);
+        } else {
+            lines.push(std::mem::take(&mut line));
+            line.push_str(word);
+        }
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    lines
+}
+
+fn module_text(
+    module_id: &str,
+    path: &Path,
+    exports: &std::collections::BTreeMap<String, ExportSig>,
+) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("module: {module_id}\n"));
+    out.push_str(&format!("file: {}\n", path.display()));
+    if exports.is_empty() {
+        out.push_str("exports: (none)\n");
+        return out;
+    }
+    out.push_str("exports:\n");
+    for (name, sig) in exports {
+        out.push_str(&format!("  - {}\n", format_export_sig(name, sig)));
+        if let Some(summary) = stdlib_summary(name).or(sig.doc.as_deref()) {
+            for line in wrap_text(summary, DOC_TEXT_WIDTH - 6) {
+                out.push_str(&format!("      {line}\n"));
+            }
+        }
+    }
+    out
+}
+
+fn symbol_text(symbol: &str, sig: &ExportSig) -> String {
+    let mut out = String::new();
+    out.push_str(&format_export_sig(symbol, sig));
+    out.push('\n');
+    if let Some(summary) = stdlib_summary(symbol).or(sig.doc.as_deref()) {
+        for line in wrap_text(summary, DOC_TEXT_WIDTH - 2) {
+            out.push_str(&format!("  {line}\n"));
+        }
+    }
+    if let Some(hint) = tapp_call_hint(symbol, sig) {
+        out.push_str(&hint);
+        out.push('\n');
     }
     if sig.kind != "defn" {
-        println!("kind: {}", sig.kind);
+        out.push_str(&format!("kind: {}\n", sig.kind));
     }
+    out
+}
+
+fn print_module(
+    module_id: &str,
+    path: &Path,
+    exports: &std::collections::BTreeMap<String, ExportSig>,
+) {
+    print!("{}", module_text(module_id, path, exports));
+}
+
+fn print_symbol(symbol: &str, sig: &ExportSig) {
+    print!("{}", symbol_text(symbol, sig));
 }
 
 fn try_print_builtin_stdlib_docs(query: &str) -> Result<bool> {
@@ -2172,6 +2312,214 @@ mod tests {
         );
 
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn parse_module_bytes_extracts_type_params_and_structured_types() {
+        let src = r#"{
+  "schema_version":"x07.x07ast@0.8.0",
+  "kind":"module",
+  "module_id":"ext.gen",
+  "imports":[],
+  "decls":[
+    {"kind":"export","names":["ext.gen.push"]},
+    {"kind":"defn","name":"ext.gen.push",
+     "type_params":[{"name":"A","bound":"orderable"},{"name":"B"}],
+     "params":[{"name":"h","ty":"bytes"},{"name":"x","ty":["t","A"]},{"name":"o","ty":["option",["t","B"]]}],
+     "result":["t","A"],"body":0}
+  ]
+}
+"#;
+        let (module_id, exports) = parse_module_bytes(src.as_bytes()).unwrap();
+        assert_eq!(module_id, "ext.gen");
+        let sig = exports.get("ext.gen.push").unwrap();
+        assert_eq!(
+            sig.type_params,
+            vec![
+                ("A".to_string(), Some("orderable".to_string())),
+                ("B".to_string(), None),
+            ]
+        );
+        assert_eq!(
+            sig.params,
+            vec![
+                ("h".to_string(), "bytes".to_string()),
+                ("x".to_string(), "A".to_string()),
+                ("o".to_string(), "option(B)".to_string()),
+            ]
+        );
+        assert_eq!(sig.result, "A");
+    }
+
+    #[test]
+    fn format_export_sig_renders_type_params() {
+        let sig = ExportSig {
+            kind: "defn".to_string(),
+            type_params: vec![("A".to_string(), Some("orderable".to_string()))],
+            params: vec![
+                ("h".to_string(), "bytes".to_string()),
+                ("x".to_string(), "A".to_string()),
+            ],
+            result: "bytes".to_string(),
+            doc: None,
+        };
+        assert_eq!(
+            format_export_sig("std.heap.push", &sig),
+            "std.heap.push[A: orderable](h: bytes, x: A) -> bytes"
+        );
+    }
+
+    #[test]
+    fn symbol_text_adds_tapp_hint_for_generics() {
+        let sig = ExportSig {
+            kind: "defn".to_string(),
+            type_params: vec![
+                ("A".to_string(), Some("orderable".to_string())),
+                ("B".to_string(), None),
+            ],
+            params: vec![("x".to_string(), "A".to_string())],
+            result: "A".to_string(),
+            doc: None,
+        };
+        let text = symbol_text("ext.gen.push", &sig);
+        assert!(text.contains("ext.gen.push[A: orderable, B](x: A) -> A\n"));
+        assert!(
+            text.contains("call via: [\"tapp\",\"ext.gen.push\",[\"tys\",\"<A>\",\"<B>\"], ...]\n")
+        );
+    }
+
+    #[test]
+    fn symbol_text_concrete_has_no_tapp_hint() {
+        let sig = ExportSig {
+            kind: "defn".to_string(),
+            type_params: Vec::new(),
+            params: vec![("x".to_string(), "i32".to_string())],
+            result: "i32".to_string(),
+            doc: None,
+        };
+        let text = symbol_text("ext.cli.hello", &sig);
+        assert_eq!(text, "ext.cli.hello(x: i32) -> i32\n");
+    }
+
+    #[test]
+    fn symbol_text_prints_summary_indented() {
+        let sig = ExportSig {
+            kind: "defn".to_string(),
+            type_params: Vec::new(),
+            params: vec![
+                ("b".to_string(), "bytes_view".to_string()),
+                ("opts".to_string(), "i32".to_string()),
+            ],
+            result: "bytes".to_string(),
+            doc: None,
+        };
+        let text = symbol_text("std.json.encode", &sig);
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(
+            lines[0],
+            "std.json.encode(b: bytes_view, opts: i32) -> bytes"
+        );
+        // Summary present, wrapped, every line indented two spaces.
+        assert!(lines.len() > 2, "expected wrapped summary lines: {text}");
+        for line in &lines[1..] {
+            assert!(line.starts_with("  "), "summary line not indented: {line}");
+            assert!(line.len() <= DOC_TEXT_WIDTH, "line too long: {line}");
+        }
+        assert!(lines[1].starts_with("  With opts bit 0 set"));
+    }
+
+    #[test]
+    fn module_text_prints_summaries_under_exports() {
+        let mut exports = BTreeMap::new();
+        exports.insert(
+            "std.json.encode".to_string(),
+            ExportSig {
+                kind: "defn".to_string(),
+                type_params: Vec::new(),
+                params: vec![
+                    ("b".to_string(), "bytes_view".to_string()),
+                    ("opts".to_string(), "i32".to_string()),
+                ],
+                result: "bytes".to_string(),
+                doc: None,
+            },
+        );
+        exports.insert(
+            "ext.nosummary.f".to_string(),
+            ExportSig {
+                kind: "defn".to_string(),
+                type_params: Vec::new(),
+                params: Vec::new(),
+                result: "i32".to_string(),
+                doc: None,
+            },
+        );
+        let text = module_text("std.json", Path::new("<builtin>"), &exports);
+        assert!(text.contains("  - std.json.encode(b: bytes_view, opts: i32) -> bytes\n"));
+        assert!(text.contains("\n      With opts bit 0 set"));
+        // Exports without a summary keep a single line.
+        assert!(text.contains("  - ext.nosummary.f() -> i32\n"));
+        assert!(!text.contains("ext.nosummary.f() -> i32\n      "));
+    }
+
+    #[test]
+    fn builtin_std_heap_push_is_generic() {
+        let src = x07c::builtin_modules::builtin_module_source("std.heap").unwrap();
+        let (_mid, exports) = parse_module_bytes(src.as_bytes()).unwrap();
+        let sig = exports.get("std.heap.push").unwrap();
+        assert!(
+            !sig.type_params.is_empty(),
+            "std.heap.push should expose type_params"
+        );
+        let line = format_export_sig("std.heap.push", sig);
+        assert!(line.contains('['), "missing type params in: {line}");
+        assert!(
+            tapp_call_hint("std.heap.push", sig).is_some(),
+            "expected tapp call hint for std.heap.push"
+        );
+    }
+
+    #[test]
+    fn wrap_text_wraps_at_width() {
+        let text = "alpha beta gamma delta";
+        assert_eq!(wrap_text(text, 11), vec!["alpha beta", "gamma delta"]);
+        assert_eq!(wrap_text("", 10), Vec::<String>::new());
+        assert_eq!(wrap_text("superlongword", 4), vec!["superlongword"]);
+    }
+
+    #[test]
+    fn doc_json_export_sig_type_params_field_is_additive() {
+        let concrete = export_sig_row(
+            "ext.cli.hello",
+            &ExportSig {
+                kind: "defn".to_string(),
+                type_params: Vec::new(),
+                params: Vec::new(),
+                result: "i32".to_string(),
+                doc: None,
+            },
+        );
+        let value = serde_json::to_value(&concrete).unwrap();
+        assert!(
+            value.get("type_params").is_none(),
+            "concrete exports must not serialize type_params: {value}"
+        );
+
+        let generic = export_sig_row(
+            "ext.gen.push",
+            &ExportSig {
+                kind: "defn".to_string(),
+                type_params: vec![("A".to_string(), Some("orderable".to_string()))],
+                params: Vec::new(),
+                result: "bytes".to_string(),
+                doc: None,
+            },
+        );
+        let value = serde_json::to_value(&generic).unwrap();
+        assert_eq!(
+            value.get("type_params").unwrap(),
+            &serde_json::json!([{"name":"A","bound":"orderable"}])
+        );
     }
 
     #[test]

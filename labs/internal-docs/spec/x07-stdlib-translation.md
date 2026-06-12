@@ -409,15 +409,15 @@ You can do this by making x07IR higher-level (“builder append”, “scan byte
 
 ---
 
-[1]: https://docs.rs/syn?utm_source=chatgpt.com "syn - Rust"
-[2]: https://rustc-dev-guide.rust-lang.org/rustc-driver/intro.html?utm_source=chatgpt.com "rustc_driver and rustc_interface"
-[3]: https://rustc-dev-guide.rust-lang.org/borrow_check.html?utm_source=chatgpt.com "The borrow checker"
-[4]: https://clang.llvm.org/docs/LibClang.html?utm_source=chatgpt.com "Libclang tutorial — Clang 22.0.0git documentation - LLVM"
-[5]: https://tree-sitter.github.io/?utm_source=chatgpt.com "Tree-sitter: Introduction"
-[6]: https://altsysrq.github.io/proptest-book/?utm_source=chatgpt.com "Introduction - Proptest"
-[7]: https://docs.rs/proptest?utm_source=chatgpt.com "proptest - Rust"
-[8]: https://rust-fuzz.github.io/book/cargo-fuzz.html?utm_source=chatgpt.com "Fuzzing with cargo-fuzz - Rust Fuzz Book"
-[9]: https://users.cs.utah.edu/~regehr/yarpgen-oopsla20.pdf?utm_source=chatgpt.com "Random Testing for C and C++ Compilers with YARPGen"
+[1]: https://docs.rs/syn "syn - Rust"
+[2]: https://rustc-dev-guide.rust-lang.org/rustc-driver/intro.html "rustc_driver and rustc_interface"
+[3]: https://rustc-dev-guide.rust-lang.org/borrow_check.html "The borrow checker"
+[4]: https://clang.llvm.org/docs/LibClang.html "Libclang tutorial — Clang 22.0.0git documentation - LLVM"
+[5]: https://tree-sitter.github.io/ "Tree-sitter: Introduction"
+[6]: https://altsysrq.github.io/proptest-book/ "Introduction - Proptest"
+[7]: https://docs.rs/proptest "proptest - Rust"
+[8]: https://rust-fuzz.github.io/book/cargo-fuzz.html "Fuzzing with cargo-fuzz - Rust Fuzz Book"
+[9]: https://users.cs.utah.edu/~regehr/yarpgen-oopsla20.pdf "Random Testing for C and C++ Compilers with YARPGen"
 
 ## Archived draft (superseded)
 
@@ -2731,10 +2731,10 @@ Pipeline for v1:
 
 ---
 
-[1]: https://docs.rs/syn/latest/syn/fn.parse_file.html?utm_source=chatgpt.com "parse_file in syn - Rust"
-[2]: https://docs.rs/syn/latest/syn/visit/index.html?utm_source=chatgpt.com "syn::visit - Rust"
-[3]: https://docs.rs/syn/latest/syn/enum.Stmt.html?utm_source=chatgpt.com "Stmt in syn - Rust"
-[4]: https://docs.rs/syn/latest/syn/struct.Path.html?utm_source=chatgpt.com "Path in syn - Rust"
+[1]: https://docs.rs/syn/latest/syn/fn.parse_file.html "parse_file in syn - Rust"
+[2]: https://docs.rs/syn/latest/syn/visit/index.html "syn::visit - Rust"
+[3]: https://docs.rs/syn/latest/syn/enum.Stmt.html "Stmt in syn - Rust"
+[4]: https://docs.rs/syn/latest/syn/struct.Path.html "Path in syn - Rust"
 [5]: https://docs.rs/syn/latest/syn/enum.BinOp.html "BinOp in syn - Rust"
 [6]: https://docs.rs/syn/latest/syn/struct.ExprBinary.html "ExprBinary in syn - Rust"
 ----------

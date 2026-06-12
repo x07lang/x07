@@ -62,6 +62,12 @@ See: [Compatibility contract](../reference/compat.md) and `x07 migrate` in [Tool
 - **Borrow-union returns**: returning `bytes_view` from `if`/option/result branches that borrow from different owners is usually rejected; return owned `bytes` (copy) instead.
 - **XTAL brands**: when a public byte boundary is branded in `src/*.x07.json`, the corresponding `spec/*.x07spec.json` operation signature must also carry the same `brand` / `result_brand` ids (and generated property wrappers will inherit them). See `docs/toolchain/xtal.md` and `docs/examples/agent-gate/xtal/workflow-graph/`.
 - **Dependency roots**: module-not-found errors are usually missing `module_roots` or missing/stale locks; use `x07 pkg tree` / `x07 pkg provides` and re-run `x07 pkg lock --check --offline`.
+- **`set` is an expression**: `["set", x, e]` evaluates to the assigned value, so statement-shaped `["if", c, ["set", x, e], 0]` fails branch unification when `x` is not `i32`. Use `["set0", x, e]` (returns `0` as `i32`) for statement assignments.
+- **`std.hash_map` is fixed capacity**: the slot table never grows; inserting a new key into a full map traps with `map_u32 full`. Create maps with `std.hash_map.with_capacity_u32(expected)` instead of guessing a `cap_pow2`.
+- **`vec_u8` is accumulate-then-freeze**: build with `std.vec.push` / `std.vec.extend_bytes` (rebinding the move-only handle each call), then freeze once with `std.vec.as_bytes`. No random reads while growing — for read-while-grow state keep a `bytes` arena and read it with `std.codec.read_u32_le`.
+- **Two `concat`s**: the builtin `bytes.concat` takes owned `(bytes, bytes)` and consumes both; `std.bytes.concat` takes views. Prefer `std.vec.extend_bytes` or `std.bytes.concat` to avoid accidental moves.
+- **Generics need explicit instantiation**: generic stdlib calls (`std.heap`, `std.btree_map`, `std.deque`, ...) require explicit `tapp` / `tys` type arguments; there is no inference.
+- **Integer literals are `i32`**: `0xFFFFFFFF` overflows the literal range; write all-ones sentinels as `-1`.
 
 ## 1) Install and verify the toolchain
 

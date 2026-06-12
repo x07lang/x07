@@ -338,7 +338,8 @@ impl InferCtx {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 format!(
-                                    "if branches must have same type (then={then_ty:?}, else={else_ty:?})"
+                                    "if branches must have same type (then={:?}, else={:?}); if a branch is a statement assignment, use [\"set0\",name,expr] (yields i32) or end the branch with 0",
+                                    then_ty.ty, else_ty.ty
                                 ),
                             ));
                         }

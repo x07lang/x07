@@ -1345,9 +1345,9 @@ fn cmd_show(
 }
 
 fn cmd_list(root: &Path, args: ListArgs) -> Result<std::process::ExitCode> {
-    if !args.installed {
-        bail!("only --installed is supported");
-    }
+    // Plain `x07up list` lists installed toolchains; `--installed` is the
+    // explicit (and only) mode today.
+    let _ = args.installed;
     for t in list_installed_toolchains(root)? {
         println!("{}", t.toolchain);
     }

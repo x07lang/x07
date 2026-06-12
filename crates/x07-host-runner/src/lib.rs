@@ -865,6 +865,25 @@ pub fn run_artifact_file(
     })
 }
 
+/// Maps well-known runtime trap messages to actionable hints surfaced in run
+/// reports next to `trap`.
+pub fn trap_help_for(trap: Option<&str>, solve_fuel: u64) -> Option<String> {
+    match trap? {
+        "fuel exhausted" => Some(format!(
+            "fuel limit {solve_fuel} reached; raise it with --solve-fuel or scope costs with budget.scope_v1"
+        )),
+        "X07T_BUDGET_EXCEEDED_FUEL" => Some(
+            "a budget.scope_v1 fuel budget was exceeded; raise the scope budget or reduce work inside the scope"
+                .to_string(),
+        ),
+        "map_u32 full" => Some(
+            "std.hash_map capacity exceeded; create the map with std.hash_map.with_capacity_u32(expected_len) sized for the input"
+                .to_string(),
+        ),
+        _ => None,
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct MetricsLine {
     pub fuel_used: Option<u64>,

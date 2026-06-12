@@ -328,6 +328,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "mem_stats": solve.mem_stats,
                 "debug_stats": solve.debug_stats,
                 "trap": solve.trap,
+                "trap_help": x07_host_runner::trap_help_for(solve.trap.as_deref(), cli.solve_fuel),
             });
             attach_runtime_fields(
                 &mut json,
@@ -475,7 +476,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "world": world.as_str(),
                 "exit_code": exit_code,
                 "compile": compiler_json(&compile, &b64),
-                "solve": runner_json(&solve, &b64),
+                "solve": runner_json(&solve, &b64, cli.solve_fuel),
             });
             attach_runtime_fields(
                 &mut json,
@@ -617,7 +618,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "world": world.as_str(),
                 "exit_code": exit_code,
                 "compile": compiler_json(&compile, &b64),
-                "solve": runner_json(&solve, &b64),
+                "solve": runner_json(&solve, &b64, cli.solve_fuel),
             });
             attach_runtime_fields(
                 &mut json,
@@ -1470,6 +1471,7 @@ fn compiler_json(
 fn runner_json(
     solve: &RunnerResult,
     b64: &base64::engine::general_purpose::GeneralPurpose,
+    solve_fuel: u64,
 ) -> serde_json::Value {
     serde_json::json!({
         "ok": solve.ok,
@@ -1493,6 +1495,7 @@ fn runner_json(
         "mem_stats": solve.mem_stats,
         "debug_stats": solve.debug_stats,
         "trap": solve.trap,
+        "trap_help": x07_host_runner::trap_help_for(solve.trap.as_deref(), solve_fuel),
     })
 }
 

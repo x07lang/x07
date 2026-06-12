@@ -2102,7 +2102,44 @@ impl<'a> InferState<'a> {
                 })
         });
 
+        // Two-phase solve. A call-arg position that admits the implicit
+        // bytes -> bytes_view coercion must not be the thing that PINS an
+        // otherwise-unresolved meta to `bytes_view`: in module-local checking
+        // an imported callee's result is a fresh meta, and binding it at a
+        // coercible use permanently retypes the local, turning later owned
+        // uses (moves, assignments) into false type errors that project-level
+        // checking does not produce. Defer those constraints so every
+        // non-coercible use gets to resolve the meta first.
+        let mut deferred: Vec<usize> = Vec::new();
         for idx in 0..self.constraints.len() {
+            if matches!(
+                self.constraints[idx].origin,
+                ConstraintOrigin::CallArg { .. }
+            ) {
+                let lhs = self.subst.resolve(&self.constraints[idx].lhs);
+                let rhs = self.subst.resolve(&self.constraints[idx].rhs);
+                if matches!(lhs, TyTerm::Meta(_))
+                    && matches!(&rhs, TyTerm::Named(n) if n == "bytes_view")
+                {
+                    deferred.push(idx);
+                    continue;
+                }
+            }
+            if !self.solve_constraint_at(idx) {
+                return;
+            }
+        }
+        for idx in deferred {
+            if !self.solve_constraint_at(idx) {
+                return;
+            }
+        }
+    }
+
+    /// Solves one recorded constraint; returns false when a diagnostic was
+    /// emitted (solving stops at the first unification failure).
+    fn solve_constraint_at(&mut self, idx: usize) -> bool {
+        {
             let (lhs, rhs, blame_ptr, origin) = {
                 let c = &self.constraints[idx];
                 (
@@ -2132,7 +2169,7 @@ impl<'a> InferState<'a> {
                         self.record_implicit_call_arg_coercion(
                             &blame_ptr, callee, *arg_index, &got, &want,
                         );
-                        continue;
+                        return true;
                     }
                 }
 
@@ -2143,9 +2180,10 @@ impl<'a> InferState<'a> {
                     origin,
                 };
                 self.diagnostics.push(diag_for_unify_error(&c, &err));
-                break;
+                return false;
             }
         }
+        true
     }
 }
 
@@ -4508,6 +4546,45 @@ mod tests {
                 ["let", "b", ["bytes.alloc", 0]],
                 ["if", 1, ["set0", "b", ["bytes.alloc", 1]], 0],
                 "b"
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        assert!(
+            report.diagnostics.is_empty(),
+            "unexpected diags: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn typecheck_defers_view_coercion_for_unresolved_imported_results() {
+        // Module-local checking: `other.mod.get` has no known signature, so
+        // its result is a fresh meta. The coercible `bytes.len` use must not
+        // pin that meta to `bytes_view` — the later `set` (an owned use)
+        // resolves it to `bytes`, and the call-arg position then coerces.
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "main.mod",
+            "imports": ["other.mod"],
+            "decls": [
+                {
+                    "kind": "defn",
+                    "name": "main.mod.t1",
+                    "params": [{"name": "j", "ty": "bytes"}],
+                    "result": "bytes",
+                    "body": ["begin",
+                        ["let", "vraw", ["other.mod.get", ["bytes.view", "j"]]],
+                        ["let", "val", ["bytes.lit", ""]],
+                        ["if", ["=", ["bytes.len", "vraw"], 0], ["return", "val"], 0],
+                        ["if", ["=", ["bytes.len", "j"], 1], ["set0", "val", "vraw"], 0],
+                        "val"
+                    ],
+                }
             ],
         });
         let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");

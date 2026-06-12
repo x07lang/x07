@@ -253,6 +253,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "mem_stats": result.mem_stats,
                 "debug_stats": result.debug_stats,
                 "trap": result.trap,
+                "trap_help": x07_host_runner::trap_help_for(result.trap.as_deref(), config.solve_fuel),
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
 
@@ -385,6 +386,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "mem_stats": solve.mem_stats,
                     "debug_stats": solve.debug_stats,
                     "trap": solve.trap,
+                    "trap_help": x07_host_runner::trap_help_for(solve.trap.as_deref(), config.solve_fuel),
                 }),
                 None => serde_json::Value::Null,
             };
@@ -573,6 +575,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "mem_stats": solve.mem_stats,
                     "debug_stats": solve.debug_stats,
                     "trap": solve.trap,
+                    "trap_help": x07_host_runner::trap_help_for(solve.trap.as_deref(), config.solve_fuel),
                 },
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
