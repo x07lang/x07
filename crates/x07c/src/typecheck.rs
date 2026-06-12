@@ -228,6 +228,33 @@ impl<'a> InferState<'a> {
         prefix == self.module_id || self.sigs.knows_module_prefix(prefix)
     }
 
+    fn diag_unknown_callee(&mut self, list_ptr: &str, callee: &str) {
+        let suggestions =
+            crate::suggest::rank_similar(callee, self.sigs.sigs.keys().map(String::as_str), 3);
+        let mut notes = Vec::new();
+        let mut data = BTreeMap::from([("callee".to_string(), Value::String(callee.to_string()))]);
+        if !suggestions.is_empty() {
+            notes.push(format!("did you mean: {}", suggestions.join(", ")));
+            data.insert(
+                "suggestions".to_string(),
+                Value::Array(suggestions.into_iter().map(Value::String).collect()),
+            );
+        }
+        self.diagnostics.push(Diagnostic {
+            code: "X07-TYPE-CALL-0001".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Type,
+            message: format!("unknown callee: {callee:?}"),
+            loc: Some(Location::X07Ast {
+                ptr: list_ptr.to_string(),
+            }),
+            notes,
+            related: Vec::new(),
+            data,
+            quickfix: None,
+        });
+    }
+
     fn diag_call_arity_mismatch(
         &mut self,
         list_ptr: &str,
@@ -877,22 +904,7 @@ impl<'a> InferState<'a> {
         };
         let Some(sig) = self.sigs.sigs.get(callee) else {
             if self.should_diag_unknown_callee(callee) {
-                self.diagnostics.push(Diagnostic {
-                    code: "X07-TYPE-CALL-0001".to_string(),
-                    severity: Severity::Error,
-                    stage: Stage::Type,
-                    message: format!("unknown callee: {callee:?}"),
-                    loc: Some(Location::X07Ast {
-                        ptr: list_ptr.to_string(),
-                    }),
-                    notes: Vec::new(),
-                    related: Vec::new(),
-                    data: BTreeMap::from([(
-                        "callee".to_string(),
-                        Value::String(callee.to_string()),
-                    )]),
-                    quickfix: None,
-                });
+                self.diag_unknown_callee(list_ptr, callee);
             }
 
             match items.get(2) {
@@ -1891,22 +1903,7 @@ impl<'a> InferState<'a> {
 
         let Some(sig) = self.sigs.sigs.get(callee) else {
             if self.should_diag_unknown_callee(callee) {
-                self.diagnostics.push(Diagnostic {
-                    code: "X07-TYPE-CALL-0001".to_string(),
-                    severity: Severity::Error,
-                    stage: Stage::Type,
-                    message: format!("unknown callee: {callee:?}"),
-                    loc: Some(Location::X07Ast {
-                        ptr: list_ptr.to_string(),
-                    }),
-                    notes: Vec::new(),
-                    related: Vec::new(),
-                    data: BTreeMap::from([(
-                        "callee".to_string(),
-                        Value::String(callee.to_string()),
-                    )]),
-                    quickfix: None,
-                });
+                self.diag_unknown_callee(list_ptr, callee);
             }
             for it in items.iter().skip(1) {
                 let _ = self.infer_expr(it, None);

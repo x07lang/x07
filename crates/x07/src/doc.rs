@@ -111,6 +111,9 @@ struct DocExportSig {
     #[serde(default)]
     params: Vec<DocParam>,
     result: String,
+    /// One-line behavioral contract from the toolchain summaries sidecar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -844,15 +847,26 @@ fn resolve_doc_json_query(ctx: &DocContext, args: &DocArgs, query: &str) -> Resu
                     hints: Vec::new(),
                 });
             }
-            let mut suggestions: Vec<DocSuggestion> = exports
-                .keys()
-                .filter(|name| name.starts_with(module_id))
-                .take(20)
-                .map(|name| DocSuggestion {
-                    query: name.clone(),
-                    kind: DocSuggestionKind::Symbol,
-                })
-                .collect();
+            let ranked = x07c::suggest::rank_similar(query, exports.keys().map(String::as_str), 10);
+            let mut suggestions: Vec<DocSuggestion> = if ranked.is_empty() {
+                exports
+                    .keys()
+                    .filter(|name| name.starts_with(module_id))
+                    .take(20)
+                    .map(|name| DocSuggestion {
+                        query: name.clone(),
+                        kind: DocSuggestionKind::Symbol,
+                    })
+                    .collect()
+            } else {
+                ranked
+                    .into_iter()
+                    .map(|name| DocSuggestion {
+                        query: name,
+                        kind: DocSuggestionKind::Symbol,
+                    })
+                    .collect()
+            };
             suggestions.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.query.cmp(&b.query)));
             return Ok(not_found_resolution(
                 query,
@@ -1054,7 +1068,20 @@ fn export_sig_row(name: &str, sig: &ExportSig) -> DocExportSig {
             })
             .collect(),
         result: sig.result.clone(),
+        summary: stdlib_summary(name).map(str::to_string),
     }
+}
+
+/// Toolchain-owned behavioral summaries for stdlib exports. Stored as a
+/// sidecar asset (not in stdlib packages, which are hash-locked) and merged
+/// into `x07 doc` export rows.
+fn stdlib_summary(symbol: &str) -> Option<&'static str> {
+    static SUMMARIES: std::sync::OnceLock<std::collections::HashMap<String, String>> =
+        std::sync::OnceLock::new();
+    let map = SUMMARIES.get_or_init(|| {
+        serde_json::from_str(include_str!("assets/stdlib_summaries.json")).unwrap_or_default()
+    });
+    map.get(symbol).map(String::as_str)
 }
 
 fn find_module_file_with_source(
@@ -1251,10 +1278,54 @@ fn default_not_found_suggestions(query: &str, ctx: &DocContext) -> Vec<DocSugges
             kind: DocSuggestionKind::Spec,
         });
     }
+
+    // Near-match module ids for typo'd or partial module queries.
+    {
+        let modules = collect_module_id_candidates(&ctx.module_roots);
+        let pool = modules
+            .iter()
+            .map(String::as_str)
+            .chain(x07c::builtin_modules::builtin_module_ids().iter().copied());
+        for name in x07c::suggest::rank_similar(query, pool, 5) {
+            out.push(DocSuggestion {
+                query: name,
+                kind: DocSuggestionKind::Module,
+            });
+        }
+    }
+    // Keyword/typo search over builtin stdlib export symbols, so bare queries
+    // like "split" land on std.text.ascii.split_u8 instead of a dead end.
+    for name in builtin_export_symbol_suggestions(query) {
+        out.push(DocSuggestion {
+            query: name,
+            kind: DocSuggestionKind::Symbol,
+        });
+    }
+
     out.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.query.cmp(&b.query)));
     out.dedup_by(|a, b| a.kind == b.kind && a.query == b.query);
     out.truncate(50);
     out
+}
+
+/// Rank builtin stdlib export symbols against a free-form query. Scans the
+/// embedded builtin modules only (bounded, offline, deterministic).
+fn builtin_export_symbol_suggestions(query: &str) -> Vec<String> {
+    let leaf = query.rsplit_once('.').map_or(query, |(_, l)| l);
+    if leaf.len() < 3 {
+        return Vec::new();
+    }
+    let mut names: Vec<String> = Vec::new();
+    for module_id in x07c::builtin_modules::builtin_module_ids() {
+        let Some(src) = x07c::builtin_modules::builtin_module_source(module_id) else {
+            continue;
+        };
+        let Ok((_mid, exports)) = parse_module_bytes(src.as_bytes()) else {
+            continue;
+        };
+        names.extend(exports.keys().cloned());
+    }
+    x07c::suggest::rank_similar(query, names.iter().map(String::as_str), 12)
 }
 
 fn collect_module_id_candidates(module_roots: &[PathBuf]) -> Vec<String> {

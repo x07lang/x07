@@ -637,6 +637,14 @@ fn x07_check_unknown_callee_in_stdlib_is_type_error_not_codegen() {
             )
         });
     assert_eq!(d["data"]["callee"], "std.bytes.lenn");
+    let suggestions = d["data"]["suggestions"]
+        .as_array()
+        .expect("data.suggestions[]");
+    assert!(
+        suggestions.contains(&serde_json::json!("std.bytes.len")),
+        "expected did-you-mean to include std.bytes.len; got:\n{}",
+        serde_json::to_string_pretty(&d["data"]).unwrap()
+    );
 
     std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
 }

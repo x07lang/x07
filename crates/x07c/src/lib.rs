@@ -18,6 +18,7 @@ pub mod optimize;
 pub mod program;
 pub mod project;
 pub mod stream_pipe;
+pub mod suggest;
 pub mod typecheck;
 pub mod types;
 pub mod validate;
