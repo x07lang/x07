@@ -223,7 +223,10 @@ impl<'a> InferState<'a> {
 
     fn should_diag_unknown_callee(&self, callee: &str) -> bool {
         let Some((prefix, _)) = callee.rsplit_once('.') else {
-            return false;
+            // Dotless heads are operators or special forms; an unknown one can
+            // never compile (c_emit rejects it as an unsupported head), so
+            // diagnose here where suggestions are available ("==" -> "=").
+            return true;
         };
         prefix == self.module_id || self.sigs.knows_module_prefix(prefix)
     }
@@ -4705,6 +4708,44 @@ mod tests {
         assert!(
             diag.notes.iter().any(|n| n.contains("vec_u8.into_bytes")),
             "expected vec_u8.into_bytes suggestion: {diag:?}"
+        );
+    }
+
+    #[test]
+    fn unknown_bare_operator_head_is_diagnosed_with_suggestions() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["begin",
+                ["let", "x", ["==", 1, 2]],
+                ["bytes.alloc", "x"]
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        let diag = report
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "X07-TYPE-CALL-0001")
+            .expect("expected X07-TYPE-CALL-0001 for unknown bare head");
+        assert_eq!(
+            diag.data.get("callee"),
+            Some(&Value::String("==".to_string()))
+        );
+        let suggestions = diag
+            .data
+            .get("suggestions")
+            .and_then(|v| v.as_array())
+            .expect("data.suggestions must be an array");
+        assert!(
+            suggestions.contains(&Value::String("=".to_string())),
+            "expected '=' among suggestions: {suggestions:?}"
         );
     }
 }
