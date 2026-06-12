@@ -110,7 +110,7 @@ Note: the `device-host` component comes from `x07-device-host`, which is in main
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.2.11
+x07up override set v0.2.12
 ```
 
 This makes toolchain selection deterministic for agents and CI.

@@ -4,6 +4,57 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+## v0.2.12
+
+### Added
+
+- x07AST: defn/defasync declarations accept an optional `doc` string,
+  preserved through `x07 fmt` and the `x07 ast to-text` / `from-text`
+  round-trip; `x07 doc` renders it for project and package symbols. Schemas
+  updated additively (`x07.x07ast@0.8.0`).
+- `meta.requires_packages` accepts SemVer comparator ranges
+  (`name@>=1.2.3 <1.3.0`) alongside exact versions: in-project versions that
+  satisfy a range are kept, otherwise the highest satisfying version is
+  selected (vendored deps, official tree, then index; never pre-releases) and
+  `x07.lock.json` freezes the choice. `x07 pkg tree` resolves range edges;
+  `x07 pkg publish` prints the registry's reverse-dependency conflict
+  warnings. See the updated `docs/versioning-policy.md` pin policy.
+- Run reports gain `trap_help` next to `trap`: fuel exhaustion names the
+  configured limit and `--solve-fuel`; `map_u32 full` points at
+  `std.hash_map.with_capacity_u32`. Runner report schemas updated additively.
+- `x07 doc` text output renders behavioral summaries (module listings and
+  symbol view), generic signatures with type params (`std.heap.push[A:
+  orderable](...)`) plus a `tapp` call template, and falls back to defn
+  `doc` strings; structured `type_ref` params no longer render as empty
+  types. Doc report schema reconciled (`summary`, `type_params`).
+- `x07 ast from-text` defaults a missing `:decls` to the empty list for
+  entry files.
+- Stdlib summaries document the `std.hash_map` fixed-capacity contract
+  (cap is total open-addressing slots; full table traps `map_u32 full`;
+  key `-1` is the reserved empty-slot sentinel), the vec_u8
+  accumulate-then-freeze contract, and `std.small_map` bytes-key behavior.
+- Docs: program-level performance tuning section (fuel accounting, owned vs
+  view discipline, arena patterns, `x07 run` recompile vs `x07 build`),
+  six new agent-quickstart pitfalls, requires_packages range guidance.
+
+### Fixed
+
+- Module-local typecheck (lint) no longer pins an unresolved imported-callee
+  result meta to `bytes_view` at coercible call-arg positions, which
+  falsely retyped locals and rejected later moves with X07-TYPE-SET-0002.
+- `if`-branch type mismatch errors from project compile name the branch
+  types concisely and suggest `set0` for statement assignments.
+- `x07up list` without flags lists installed toolchains instead of erroring.
+- Stdlib spec source docs no longer carry `utm_source` link suffixes that
+  broke the website link checker.
+
+### Packages
+
+- ext-json-rs 0.1.8: doc-annotated public pointer/data-model API (including
+  the empty-bytes missing-path sentinel), SPDX license metadata.
+- ext-data-model 0.1.12: requires ext-json-rs@0.1.8, healing the
+  latest-with-latest auto-deps conflict.
+
 ## v0.2.11
 
 ### Added
