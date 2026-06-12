@@ -149,6 +149,7 @@ pub struct AsyncProtocolAst {
 #[derive(Debug, Clone)]
 pub struct AstFunctionDef {
     pub name: String,
+    pub doc: Option<String>,
     pub type_params: Vec<TypeParam>,
     pub requires: Vec<ContractClauseAst>,
     pub ensures: Vec<ContractClauseAst>,
@@ -163,6 +164,7 @@ pub struct AstFunctionDef {
 #[derive(Debug, Clone)]
 pub struct AstAsyncFunctionDef {
     pub name: String,
+    pub doc: Option<String>,
     pub type_params: Vec<TypeParam>,
     pub requires: Vec<ContractClauseAst>,
     pub ensures: Vec<ContractClauseAst>,
@@ -385,6 +387,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 }
                 functions.push(AstFunctionDef {
                     name: parsed.name,
+                    doc: parsed.doc,
                     type_params: parsed.type_params,
                     requires: parsed.requires,
                     ensures: parsed.ensures,
@@ -417,6 +420,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 }
                 async_functions.push(AstAsyncFunctionDef {
                     name: parsed.name,
+                    doc: parsed.doc,
                     type_params: parsed.type_params,
                     requires: parsed.requires,
                     ensures: parsed.ensures,
@@ -486,6 +490,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
 #[derive(Debug, Clone)]
 struct ParsedDefLike {
     name: String,
+    doc: Option<String>,
     type_params: Vec<TypeParam>,
     requires: Vec<ContractClauseAst>,
     ensures: Vec<ContractClauseAst>,
@@ -620,8 +625,27 @@ fn parse_def_like(
     })?;
     let body = expr_from_json_sexpr(body_v, &format!("{ptr}/body"))?;
 
+    let doc = match dobj.get("doc") {
+        None => None,
+        Some(Value::String(d)) => {
+            let d = d.trim();
+            if d.is_empty() {
+                None
+            } else {
+                Some(d.to_string())
+            }
+        }
+        Some(_) => {
+            return Err(X07AstError {
+                message: "doc must be a string".to_string(),
+                ptr: format!("{ptr}/doc"),
+            });
+        }
+    };
+
     Ok(ParsedDefLike {
         name,
+        doc,
         type_params,
         requires,
         ensures,
@@ -1425,6 +1449,7 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
         out.push(Value::Object(def_decl_value(
             "defn",
             &f.name,
+            f.doc.as_deref(),
             &f.type_params,
             &f.requires,
             &f.ensures,
@@ -1442,6 +1467,7 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
         out.push(Value::Object(def_decl_value(
             "defasync",
             &f.name,
+            f.doc.as_deref(),
             &f.type_params,
             &f.requires,
             &f.ensures,
@@ -1534,6 +1560,7 @@ pub fn type_ref_from_expr(e: &Expr) -> Result<TypeRef, String> {
 fn def_decl_value(
     kind: &str,
     name: &str,
+    doc: Option<&str>,
     type_params: &[TypeParam],
     requires: &[ContractClauseAst],
     ensures: &[ContractClauseAst],
@@ -1549,6 +1576,9 @@ fn def_decl_value(
     let mut m = serde_json::Map::new();
     m.insert("kind".to_string(), Value::String(kind.to_string()));
     m.insert("name".to_string(), Value::String(name.to_string()));
+    if let Some(doc) = doc {
+        m.insert("doc".to_string(), Value::String(doc.to_string()));
+    }
 
     if !type_params.is_empty() {
         m.insert(

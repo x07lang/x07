@@ -34,7 +34,7 @@ pub fn to_text(value: &Value) -> String {
 pub fn from_text(input: &str) -> Result<Value> {
     let mut p = Parser::new(input);
     p.skip_trivia();
-    let v = p.parse_value()?;
+    let mut v = p.parse_value()?;
     p.skip_trivia();
     if !p.at_end() {
         bail!(
@@ -42,6 +42,13 @@ pub fn from_text(input: &str) -> Result<Value> {
             p.line(),
             p.column()
         );
+    }
+    // x07AST documents require `decls`; entry files routinely have none, so
+    // default it to an empty list instead of failing validation.
+    if let Value::Object(obj) = &mut v {
+        if obj.get("kind").and_then(Value::as_str).is_some() && !obj.contains_key("decls") {
+            obj.insert("decls".to_string(), Value::Array(Vec::new()));
+        }
     }
     Ok(v)
 }

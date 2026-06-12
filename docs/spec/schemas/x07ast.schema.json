@@ -230,6 +230,7 @@
       "properties": {
         "kind": { "const": "defn" },
         "name": { "$ref": "#/$defs/symbol" },
+        "doc": { "type": "string", "minLength": 1, "maxLength": 4096 },
         "type_params": { "$ref": "#/$defs/type_params" },
         "requires": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "ensures": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
@@ -253,6 +254,7 @@
       "properties": {
         "kind": { "const": "defasync" },
         "name": { "$ref": "#/$defs/symbol" },
+        "doc": { "type": "string", "minLength": 1, "maxLength": 4096 },
         "type_params": { "$ref": "#/$defs/type_params" },
         "requires": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "ensures": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },

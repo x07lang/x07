@@ -1,0 +1,71 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.json/canon_object_sort",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_canon_object_sort",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/canon_string_escapes",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_canon_string_escapes",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/canon_number_formats",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_canon_number_formats",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/canon_rejects_invalid_escape",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_canon_rejects_invalid_escape",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/data_model_empty_object",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_data_model_empty_object",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/data_model_empty_array",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_data_model_empty_array",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/data_model_nested_empty_values",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_data_model_nested_empty_values",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/pointer_object",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_pointer_object",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/pointer_array",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_pointer_array",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/pointer_nested",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_pointer_nested",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.json/pointer_string",
+      "world": "solve-pure",
+      "entry": "ext.json.tests.test_pointer_string",
+      "expect": "pass"
+    }
+  ]
+}

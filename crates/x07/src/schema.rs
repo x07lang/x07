@@ -2315,6 +2315,7 @@ fn generate_runtime_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Resul
         .into_iter()
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
+            doc: None,
             type_params: Vec::new(),
             requires: Vec::new(),
             ensures: Vec::new(),
@@ -2497,6 +2498,7 @@ fn generate_runtime_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<
         .into_iter()
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
+            doc: None,
             type_params: Vec::new(),
             requires: Vec::new(),
             ensures: Vec::new(),
@@ -2580,6 +2582,7 @@ fn generate_tests_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Result<
         .into_iter()
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
+            doc: None,
             type_params: Vec::new(),
             requires: Vec::new(),
             ensures: Vec::new(),
@@ -2656,6 +2659,7 @@ fn generate_tests_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Ve
         .into_iter()
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
+            doc: None,
             type_params: Vec::new(),
             requires: Vec::new(),
             ensures: Vec::new(),

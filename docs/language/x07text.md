@@ -65,11 +65,10 @@ the usual `\"` `\\` `\n` `\r` `\t` `\u{hex}` escapes.
 
 ## Workflow notes
 
-- Entry programs: `:kind entry` files currently require an explicit
-  `:decls ()` even when the program is only a `:solve` body. `decls` is a
-  required x07AST field, and the 1:1 mapping means `from-text` does not insert
-  it for you — omitting it fails validation with "missing required field:
-  decls".
+- Entry programs: `decls` is a required x07AST field, but `from-text`
+  defaults a missing `:decls` to the empty list, so `:kind entry` files that
+  are only a `:solve` body may omit it. `to-text` always renders `:decls ()`
+  explicitly.
 - Authoring: write x07text, then `x07 ast from-text --out <file>.x07.json` and
   continue with the normal loop (`x07 run`, `x07 lint`, `x07 fix`). Whole-file
   conversion re-canonicalizes everything, so text editing cannot accumulate

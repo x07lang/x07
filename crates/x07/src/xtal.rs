@@ -9673,6 +9673,7 @@ fn contract_clause_is_contract_core(
 
     let mut f = x07ast::AstFunctionDef {
         name: op.name.clone(),
+        doc: None,
         type_params: Vec::new(),
         requires: Vec::new(),
         ensures: Vec::new(),
@@ -10162,6 +10163,7 @@ fn sync_prop_defns<'a>(
             .collect();
         file.functions.push(x07ast::AstFunctionDef {
             name: req.symbol.clone(),
+            doc: None,
             type_params: Vec::new(),
             requires: Vec::new(),
             ensures: Vec::new(),
@@ -10201,6 +10203,7 @@ fn stub_defn_from_spec(
 
     x07ast::AstFunctionDef {
         name: op.name.clone(),
+        doc: None,
         type_params: Vec::new(),
         requires,
         ensures,
@@ -11980,6 +11983,7 @@ fn generate_tests_from_specs(
 
                 functions.push(x07ast::AstFunctionDef {
                     name: wrapper_name.clone(),
+                    doc: None,
                     type_params: Vec::new(),
                     requires: Vec::new(),
                     ensures: Vec::new(),
@@ -12211,6 +12215,7 @@ fn gen_test_defn(
 
     Ok(x07ast::AstFunctionDef {
         name: fn_name.to_string(),
+        doc: None,
         type_params: Vec::new(),
         requires: Vec::new(),
         ensures: Vec::new(),
@@ -12930,6 +12935,7 @@ fn typecheck_spec_contracts(
 
         functions.push(x07ast::AstFunctionDef {
             name: op.name.clone(),
+            doc: None,
             type_params: Vec::new(),
             requires,
             ensures,
@@ -12962,6 +12968,7 @@ fn typecheck_spec_contracts(
                 spec.module_id,
                 sanitize_ident_segment(&sort.name)
             ),
+            doc: None,
             type_params: Vec::new(),
             requires: Vec::new(),
             ensures: Vec::new(),

@@ -3857,6 +3857,100 @@
       "import_mode": "handwritten",
       "modules": [
         {
+          "module_id": "ext.data_model.csv.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/csv/tests.x07.json",
+          "sha256": "0d6b6062d0a184fcc2a90931800a44841587f5bf954b64e0746a66962647ba03",
+          "size_bytes": 1383
+        },
+        {
+          "module_id": "ext.data_model.csv",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/csv.x07.json",
+          "sha256": "42b94c24968c02b7d80446ff90460f444cdf713f4872a70c7ddaa69bb2689d2c",
+          "size_bytes": 2665
+        },
+        {
+          "module_id": "ext.data_model.ini.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/ini/tests.x07.json",
+          "sha256": "dae65469c097a352baae7158122964b8350dabce90fb920d67ea908543ad720a",
+          "size_bytes": 1397
+        },
+        {
+          "module_id": "ext.data_model.ini",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/ini.x07.json",
+          "sha256": "b0d5f77d4ba731dec07bdc05e749c0bbffe26db14f43415517e999fec63bc234",
+          "size_bytes": 3711
+        },
+        {
+          "module_id": "ext.data_model.json.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/json/tests.x07.json",
+          "sha256": "f3864d60686079a8f085951225df07f1420793abdbf245a0db563a4c64ec0092",
+          "size_bytes": 4314
+        },
+        {
+          "module_id": "ext.data_model.json",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/json.x07.json",
+          "sha256": "7af30d80e5e8aca047deea65bb10d682c7093a7cf75bec05e459b5dc7416e08f",
+          "size_bytes": 8864
+        },
+        {
+          "module_id": "ext.data_model.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/tests.x07.json",
+          "sha256": "71951d65bc191cadf11cd448815f8d08fe8eefacb8e59ec192958140af2cf2b5",
+          "size_bytes": 8272
+        },
+        {
+          "module_id": "ext.data_model.toml.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/toml/tests.x07.json",
+          "sha256": "31c73adfc54f3fdd9c12856d60dd821fbf951e840b58c094fb81b8c37c6e5d34",
+          "size_bytes": 9243
+        },
+        {
+          "module_id": "ext.data_model.toml",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/toml.x07.json",
+          "sha256": "5a26b59380b70c922cc28b3e85afaba8aba08c6483f55d58b6be6b134e3f4f12",
+          "size_bytes": 13793
+        },
+        {
+          "module_id": "ext.data_model.xml.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/xml/tests.x07.json",
+          "sha256": "e5c5878fe4206102e96e7a40f66a6b6e9e947ae5498369ec569847b1c9b46174",
+          "size_bytes": 1499
+        },
+        {
+          "module_id": "ext.data_model.xml",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/xml.x07.json",
+          "sha256": "1fc40f3c12ee97797447352b044f151ebffae497e3d62490ecf6e9d308ac94dd",
+          "size_bytes": 9156
+        },
+        {
+          "module_id": "ext.data_model.yaml.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/yaml/tests.x07.json",
+          "sha256": "a6a0acd7e7fbc93c25d2c9874315d9bd09f777523d308199f31995d09c9e96bd",
+          "size_bytes": 1158
+        },
+        {
+          "module_id": "ext.data_model.yaml",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model/yaml.x07.json",
+          "sha256": "426c701a64831bd6fd6ca176cf8f76332144261867c5003a2736da3d3777940f",
+          "size_bytes": 9446
+        },
+        {
+          "module_id": "ext.data_model",
+          "path": "packages/ext/x07-ext-data-model/0.1.12/modules/ext/data_model.x07.json",
+          "sha256": "0ccbb44a004127875464a769a72f2b56d6a55beb3c3ebaff7686cdddaac8b6c2",
+          "size_bytes": 17747
+        }
+      ],
+      "name": "ext-data-model",
+      "package_manifest_sha256": "01edce2432fc1db92a28b3c0289b9b07d6c9969974905b13c95729209232178b",
+      "path": "packages/ext/x07-ext-data-model/0.1.12",
+      "version": "0.1.12"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
           "module_id": "ext.data_model.json.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/json/tests.x07.json",
           "sha256": "0af030b9b17d03c554364c518841410f9263470d25e1f75ae70c582ad1182f01",
@@ -7215,6 +7309,46 @@
       "package_manifest_sha256": "6e6e85497b70ea851b44a29ff0059d6ffd3802cfd9302a2d5e676d75bc9486de",
       "path": "packages/ext/x07-ext-json-rs/0.1.7",
       "version": "0.1.7"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "x07import",
+      "modules": [
+        {
+          "generated_by": "x07import",
+          "module_id": "ext.json.canon",
+          "path": "packages/ext/x07-ext-json-rs/0.1.8/modules/ext/json/canon.x07.json",
+          "sha256": "2b1254ac42bdd3a8d616b738e1e0434d13cca30cdc5b97890e35089c66668034",
+          "size_bytes": 18384,
+          "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/canon.rs",
+          "source_sha256": "6e3a09dc1094a38fa1cd56e508d42fd0b6822898a1c22e75b20200803d59e34e"
+        },
+        {
+          "module_id": "ext.json.data_model",
+          "path": "packages/ext/x07-ext-json-rs/0.1.8/modules/ext/json/data_model.x07.json",
+          "sha256": "2872abb4e14173e6a2e1f55e2f60f613d4e7e10d958eef338c1bc44b06454c91",
+          "size_bytes": 16073
+        },
+        {
+          "generated_by": "x07import",
+          "module_id": "ext.json.pointer",
+          "path": "packages/ext/x07-ext-json-rs/0.1.8/modules/ext/json/pointer.x07.json",
+          "sha256": "cf56656eb7cd1de48e933c04af9e64bdf32558b1dd18059ae41868a9e1328c7a",
+          "size_bytes": 12221,
+          "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/pointer.rs",
+          "source_sha256": "af033d64890f287b7beef6e36f765c896dba8bb80fb1d09ae4893eceff8a10f9"
+        },
+        {
+          "module_id": "ext.json.tests",
+          "path": "packages/ext/x07-ext-json-rs/0.1.8/modules/ext/json/tests.x07.json",
+          "sha256": "10108c17ce39db201a8662fea7e433c01b74f2b74833d5cf3497a0ce00261d30",
+          "size_bytes": 8347
+        }
+      ],
+      "name": "ext-json-rs",
+      "package_manifest_sha256": "1d2c23ebe9b6f610adc673135b7db931428ad03445170192646e784daa7a0641",
+      "path": "packages/ext/x07-ext-json-rs/0.1.8",
+      "version": "0.1.8"
     },
     {
       "determinism_tier": "pure",
@@ -14593,6 +14727,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "de31e78abdb72ddc8a046056910dd48812e37dd33ebba50f039b96d608758035",
+  "packages_hash": "4367d265f42497b0ccbdc24dee14afa09940c4bce5786e094d5fbaf052e955ab",
   "packages_root": "packages/ext"
 }

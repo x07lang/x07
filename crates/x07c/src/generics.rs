@@ -2772,6 +2772,7 @@ mod tests {
         // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
         let loop_fn = AstFunctionDef {
             name: "main.loop".to_string(),
+            doc: None,
             type_params: vec![TypeParam {
                 name: "A".to_string(),
                 bound: None,
