@@ -4,9 +4,58 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+## v0.2.11
+
 ### Added
 
-- Documented the new sibling `x07-studio` repo as the artifact-first Studio/Forge surface for XTAL workflows, backed by the shared Loom lifecycle daemon.
+- Did-you-mean suggestions on unknown callees (`X07-TYPE-CALL-0001` now
+  carries ranked `data.suggestions` and a "did you mean" note), including
+  unknown dotless heads such as `==` (suggesting `=`), which previously
+  surfaced only as an unsupported-head string from codegen.
+- `x07 doc` fuzzy lookup: not-found queries return ranked near-matches over
+  module ids and builtin stdlib export symbols (for example `split` finds
+  `std.text.ascii.split_u8`), and symbol misses inside a found module rank
+  that module's exports.
+- `x07 doc` behavioral summaries: export rows gain an optional `summary`
+  field with one-line behavioral contracts (separators, encodings, error
+  codes, move semantics) for 79 stdlib exports, sourced from a
+  toolchain-owned sidecar.
+- x07text (RFC 0001): `x07 ast to-text` / `x07 ast from-text` provide a
+  lossless, deterministic text projection of x07AST JSON; `from-text` output
+  is byte-identical to `x07 fmt` canonical bytes; a corpus round-trip gate
+  covers the full stdlib and fixture tree. New docs page
+  `docs/language/x07text.md`.
+- Failed-compile runner reports (`x07-host-runner`, `x07-os-runner`) attach
+  structured lint diagnostics (pointer, provenance, quickfix) as
+  `compile.diagnostics` alongside `compile_error`; runner report schemas gain
+  the optional `diagnostics` property (additive).
+- `labs/agent-eval`: comparative agent benchmark harness (python, rust, x07,
+  x07text arms; 12 vector-judged tasks) with pilot results and a scaled-run
+  RUNBOOK containing a predeclared decision rule for the direct-authoring
+  bet.
+
+### Changed
+
+- Project story and roadmap: X07 leads as the deterministic, certifiable
+  execution substrate for agent-written software; direct-authoring
+  investment (RFC 0002 expressiveness floor) is gated on the comparative
+  eval. Active ecosystem scope narrows to `x07`, `x07-mcp`, `x07-registry`,
+  `x07-wasm-backend`, and `hardproof`.
+
+### Deprecated
+
+- Device/app delivery surfaces: `x07-device-host`, `x07-web-ui`, the studio
+  and demo repos, and the platform control-plane repos are archived
+  (2026-06 scope cut). Their bundle/compat entries remain in this release
+  for installer continuity and are planned for removal from the release
+  train in a future release. Note: external packages currently pin
+  `x07c_compat < 0.3.0`, so the next minor requires a coordinated package
+  compat-widening train.
+
+### Carried docs notes (pre-0.2.11 unreleased)
+
+### Added
+
 - XTAL verify summaries and proof-timeout diagnostics now record the effective proof solver budget used for the proof lane.
 - XTAL verify summaries now include the first proof diagnostic code/message for proof rows that are unsupported, inconclusive, timed out, or missing tools.
 
