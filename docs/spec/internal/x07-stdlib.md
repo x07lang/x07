@@ -134,10 +134,10 @@ Bench suites and fixtures:
 - Fixtures: `ci/fixtures/bench/**` (FS/RR/KV fixture worlds)
 - Fixture snapshot helper script: `./scripts/build_fixture_fs_tree.sh`
 
-[1]: https://en.cppreference.com/w/c/header.html?utm_source=chatgpt.com "C Standard Library headers"
+[1]: https://en.cppreference.com/w/c/header.html "C Standard Library headers"
 [2]: https://man7.org/linux/man-pages/man3/readdir.3.html "readdir(3) - Linux manual page"
-[3]: https://man7.org/linux/man-pages/man2/open.2.html?utm_source=chatgpt.com "open(2) - Linux manual page"
-[4]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/socket.html?utm_source=chatgpt.com "socket"
-[5]: https://doc.rust-lang.org/std/?utm_source=chatgpt.com "std - Rust"
-[6]: https://doc.rust-lang.org/alloc/?utm_source=chatgpt.com "alloc - Rust"
-[7]: https://en.cppreference.com/w/c/header/string.html?utm_source=chatgpt.com "Standard library header <string.h>"
+[3]: https://man7.org/linux/man-pages/man2/open.2.html "open(2) - Linux manual page"
+[4]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/socket.html "socket"
+[5]: https://doc.rust-lang.org/std/ "std - Rust"
+[6]: https://doc.rust-lang.org/alloc/ "alloc - Rust"
+[7]: https://en.cppreference.com/w/c/header/string.html "Standard library header <string.h>"
