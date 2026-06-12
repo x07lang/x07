@@ -164,7 +164,6 @@
     "result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stdout", "stderr"],
       "properties": {
         "stdout": {
           "$ref": "#/$defs/stream_payload"
@@ -172,18 +171,17 @@
         "stderr": {
           "$ref": "#/$defs/stream_payload"
         },
-        "stdout_json": {
-          "type": ["object", "array", "null"]
-        },
-        "stderr_json": {
-          "type": ["object", "array", "null"]
-        }
-      }
+        "stdout_json": {},
+        "stderr_json": {}
+      },
+      "required": [
+        "stdout",
+        "stderr"
+      ]
     },
     "stream_payload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["bytes_len"],
       "properties": {
         "bytes_len": {
           "type": "integer",
@@ -195,7 +193,10 @@
         "base64": {
           "type": "string"
         }
-      }
+      },
+      "required": [
+        "bytes_len"
+      ]
     }
   }
 }

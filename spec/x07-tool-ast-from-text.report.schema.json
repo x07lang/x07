@@ -1,18 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://x07.io/spec/x07-tool-pkg-inventory.report.schema.json",
-  "title": "x07.tool.pkg.inventory.report@0.1.0",
+  "$id": "https://x07.io/spec/x07-tool-ast-from-text.report.schema.json",
+  "title": "x07.tool.ast.from-text.report@0.1.0",
   "description": "Generic machine-readable report envelope for x07 CLI command wrappers.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "x07.tool.pkg.inventory.report@0.1.0"
+      "const": "x07.tool.ast.from-text.report@0.1.0"
     },
     "command": {
       "type": "string",
-      "const": "x07.pkg.inventory"
+      "const": "x07.ast.from-text"
     },
     "ok": {
       "type": "boolean"

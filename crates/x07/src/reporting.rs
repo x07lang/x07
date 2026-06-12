@@ -400,6 +400,8 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "canon",
             "schema",
             "grammar",
+            "to-text",
+            "from-text",
         ],
         "ast.edit" => &["insert-stmts", "apply-quickfix"],
         "agent" => &["context"],

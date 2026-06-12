@@ -41,6 +41,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("ast.edit.insert-stmts") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-edit-insert-stmts.report.schema.json"
         )),
+        Some("ast.from-text") => Some(include_bytes!(
+            "../../../spec/x07-tool-ast-from-text.report.schema.json"
+        )),
         Some("ast.get") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-get.report.schema.json"
         )),
@@ -55,6 +58,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("ast.slice") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-slice.report.schema.json"
+        )),
+        Some("ast.to-text") => Some(include_bytes!(
+            "../../../spec/x07-tool-ast-to-text.report.schema.json"
         )),
         Some("ast.validate") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-validate.report.schema.json"
@@ -176,11 +182,11 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("pkg.info") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-info.report.schema.json"
         )),
-        Some("pkg.list") => Some(include_bytes!(
-            "../../../spec/x07-tool-pkg-list.report.schema.json"
-        )),
         Some("pkg.inventory") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-inventory.report.schema.json"
+        )),
+        Some("pkg.list") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-list.report.schema.json"
         )),
         Some("pkg.lock") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-lock.report.schema.json"
@@ -320,6 +326,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("xtal") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal.report.schema.json"
         )),
+        Some("xtal.certify") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-certify.report.schema.json"
+        )),
         Some("xtal.dev") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-dev.report.schema.json"
         )),
@@ -331,6 +340,15 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("xtal.impl.sync") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-impl-sync.report.schema.json"
+        )),
+        Some("xtal.improve") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-improve.report.schema.json"
+        )),
+        Some("xtal.ingest") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-ingest.report.schema.json"
+        )),
+        Some("xtal.repair") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-repair.report.schema.json"
         )),
         Some("xtal.spec") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-spec.report.schema.json"
@@ -350,6 +368,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("xtal.spec.scaffold") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-spec-scaffold.report.schema.json"
         )),
+        Some("xtal.tasks") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-tasks.report.schema.json"
+        )),
+        Some("xtal.tasks.run") => Some(include_bytes!(
+            "../../../spec/x07-tool-xtal-tasks-run.report.schema.json"
+        )),
         Some("xtal.tests") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-tests.report.schema.json"
         )),
@@ -358,24 +382,6 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("xtal.verify") => Some(include_bytes!(
             "../../../spec/x07-tool-xtal-verify.report.schema.json"
-        )),
-        Some("xtal.certify") => Some(include_bytes!(
-            "../../../spec/x07-tool-xtal-certify.report.schema.json"
-        )),
-        Some("xtal.ingest") => Some(include_bytes!(
-            "../../../spec/x07-tool-xtal-ingest.report.schema.json"
-        )),
-        Some("xtal.improve") => Some(include_bytes!(
-            "../../../spec/x07-tool-xtal-improve.report.schema.json"
-        )),
-        Some("xtal.tasks") => Some(include_bytes!(
-            "../../../spec/x07-tool-xtal-tasks.report.schema.json"
-        )),
-        Some("xtal.tasks.run") => Some(include_bytes!(
-            "../../../spec/x07-tool-xtal-tasks-run.report.schema.json"
-        )),
-        Some("xtal.repair") => Some(include_bytes!(
-            "../../../spec/x07-tool-xtal-repair.report.schema.json"
         )),
         _ => None,
     }

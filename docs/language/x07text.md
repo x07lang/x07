@@ -9,12 +9,14 @@ round-trip test over the whole stdlib and fixture tree.
 ## Commands
 
 ```bash
-x07 ast to-text --in src/app.x07.json              # print x07text to stdout
-x07 ast to-text --in src/app.x07.json --out src/app.x07t
+x07 ast to-text --in src/app.x07.json              # writes src/app.x07t + JSON report
+x07 ast to-text --in src/app.x07.json --out other.x07t
 
-x07 ast from-text --in src/app.x07t --out src/app.x07.json
+x07 ast from-text --in src/app.x07t               # writes src/app.x07.json + JSON report
+x07 ast from-text --in src/app.x07t --out other.x07.json
 # from-text output is canonical JCS bytes — byte-identical to `x07 fmt` output.
 # --validate true (default) also requires a well-formed x07AST document.
+# Both commands print an {ok, in, out, sha256} report to stdout.
 ```
 
 ## Format in one minute

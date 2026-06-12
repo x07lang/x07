@@ -195,39 +195,95 @@ pub fn cmd_ast(
     }
 }
 
+#[derive(Debug, Serialize)]
+struct AstTextReport {
+    ok: bool,
+    r#in: String,
+    out: String,
+    sha256: String,
+}
+
 fn cmd_to_text(args: AstToTextArgs) -> Result<std::process::ExitCode> {
-    let input_bytes = std::fs::read(&args.r#in)
-        .with_context(|| format!("read input: {}", args.r#in.display()))?;
-    let value: serde_json::Value = serde_json::from_slice(&input_bytes)
-        .with_context(|| format!("parse JSON: {}", args.r#in.display()))?;
+    // Default output: the input path with the .x07t extension.
+    let out_path = args.out.clone().unwrap_or_else(|| {
+        let name = args.r#in.file_name().map(|n| n.to_string_lossy());
+        let stem = name
+            .as_deref()
+            .map(|n| n.strip_suffix(".x07.json").unwrap_or(n).to_string())
+            .unwrap_or_default();
+        args.r#in.with_file_name(format!("{stem}.x07t"))
+    });
+    let fail = |reason: &str| -> Result<std::process::ExitCode> {
+        print_json(&AstTextReport {
+            ok: false,
+            r#in: args.r#in.display().to_string(),
+            out: out_path.display().to_string(),
+            sha256: String::new(),
+        })?;
+        eprintln!("{reason}");
+        Ok(std::process::ExitCode::from(20))
+    };
+    let Ok(input_bytes) = std::fs::read(&args.r#in) else {
+        return fail(&format!("read input failed: {}", args.r#in.display()));
+    };
+    let value: serde_json::Value = match serde_json::from_slice(&input_bytes) {
+        Ok(v) => v,
+        Err(err) => return fail(&format!("parse JSON failed: {err}")),
+    };
     let text = crate::x07text::to_text(&value);
-    match args.out.as_deref() {
-        Some(path) => crate::reporting::write_bytes(path, text.as_bytes())?,
-        None => print!("{text}"),
-    }
+    crate::reporting::write_bytes(&out_path, text.as_bytes())?;
+    print_json(&AstTextReport {
+        ok: true,
+        r#in: args.r#in.display().to_string(),
+        out: out_path.display().to_string(),
+        sha256: sha256_hex(text.as_bytes()),
+    })?;
     Ok(std::process::ExitCode::SUCCESS)
 }
 
 fn cmd_from_text(args: AstFromTextArgs) -> Result<std::process::ExitCode> {
-    let input = std::fs::read_to_string(&args.r#in)
-        .with_context(|| format!("read input: {}", args.r#in.display()))?;
-    let value = crate::x07text::from_text(&input)
-        .with_context(|| format!("parse x07text: {}", args.r#in.display()))?;
+    // Default output: the input path with the .x07.json extension.
+    let out_path = args.out.clone().unwrap_or_else(|| {
+        let name = args.r#in.file_name().map(|n| n.to_string_lossy());
+        let stem = name
+            .as_deref()
+            .map(|n| n.strip_suffix(".x07t").unwrap_or(n).to_string())
+            .unwrap_or_default();
+        args.r#in.with_file_name(format!("{stem}.x07.json"))
+    });
+    let fail = |reason: &str| -> Result<std::process::ExitCode> {
+        print_json(&AstTextReport {
+            ok: false,
+            r#in: args.r#in.display().to_string(),
+            out: out_path.display().to_string(),
+            sha256: String::new(),
+        })?;
+        eprintln!("{reason}");
+        Ok(std::process::ExitCode::from(20))
+    };
+    let Ok(input) = std::fs::read_to_string(&args.r#in) else {
+        return fail(&format!("read input failed: {}", args.r#in.display()));
+    };
+    let value = match crate::x07text::from_text(&input) {
+        Ok(v) => v,
+        Err(err) => return fail(&format!("parse x07text failed: {err}")),
+    };
     // Canonical (JCS) bytes so output is byte-identical to `x07 fmt` output.
     let json = crate::reporting::canonical_json_bytes(&value)?;
     if args.validate {
         if let Err(err) = x07c::x07ast::parse_x07ast_json(&json) {
-            eprintln!("x07text parsed, but the document is not a valid x07AST file: {err}");
-            return Ok(std::process::ExitCode::from(20));
+            return fail(&format!(
+                "x07text parsed, but the document is not a valid x07AST file: {err}"
+            ));
         }
     }
-    match args.out.as_deref() {
-        Some(path) => crate::reporting::write_bytes(path, &json)?,
-        None => {
-            use std::io::Write as _;
-            std::io::stdout().write_all(&json).context("write stdout")?;
-        }
-    }
+    crate::reporting::write_bytes(&out_path, &json)?;
+    print_json(&AstTextReport {
+        ok: true,
+        r#in: args.r#in.display().to_string(),
+        out: out_path.display().to_string(),
+        sha256: sha256_hex(&json),
+    })?;
     Ok(std::process::ExitCode::SUCCESS)
 }
 
