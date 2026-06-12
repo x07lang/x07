@@ -365,7 +365,7 @@ Notes:
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
 - After upgrading the toolchain, if old locks reference incompatible package versions, use `x07 pkg repair --toolchain current`.
 - If you must force a transitive dependency version, use `project.patch` in `x07.json` on the current `x07.project@0.5.0` manifest line.
-- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
+- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit. Requirements are exact versions (`base@0.1.5`) or SemVer ranges (`base@>=0.1.5 <0.2.0`); ranges resolve to the highest satisfying version at lock time and the lockfile freezes the choice.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
 
 If you hit a dependency version conflict, the canonical repair loop is:

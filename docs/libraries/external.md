@@ -21,7 +21,7 @@ Notes:
 
 - With `--sync`, `x07 pkg add` also runs `x07 pkg lock` to fetch deps and update `x07.lock.json`.
 - `x07 pkg lock` defaults to the official registry index when fetching is required.
-- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but the canonical agent path is to use the capability map and templates so the dependency set is explicit.
+- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but the canonical agent path is to use the capability map and templates so the dependency set is explicit. Requirements may be exact versions or SemVer ranges (`name@>=0.1.5 <0.2.0`); ranges resolve to the highest satisfying version at lock time.
 
 Examples include:
 

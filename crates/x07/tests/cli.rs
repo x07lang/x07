@@ -10559,6 +10559,159 @@ fn x07_pkg_lock_transitive_conflict_includes_required_by_context() {
 }
 
 #[test]
+fn x07_pkg_lock_range_requirement_satisfied_by_existing_dep() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_range_satisfied");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("base/0.1.5"), "base", "0.1.5", &[]);
+    write_minimal_pkg_manifest(
+        &deps_root.join("meta/0.1.0"),
+        "meta",
+        "0.1.0",
+        &["base@>=0.1.0 <0.2.0"],
+    );
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).unwrap()).unwrap();
+    let obj = doc.as_object_mut().unwrap();
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"base","version":"0.1.5","path":".x07/deps/base/0.1.5"}),
+            serde_json::json!({"name":"meta","version":"0.1.0","path":".x07/deps/meta/0.1.0"}),
+        ]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let proj: Value = serde_json::from_slice(&std::fs::read(&proj_path).unwrap()).unwrap();
+    let deps = proj["dependencies"].as_array().unwrap();
+    let base = deps.iter().find(|d| d["name"] == "base").expect("base dep");
+    assert_eq!(base["version"], "0.1.5", "in-range version must be kept");
+}
+
+#[test]
+fn x07_pkg_lock_range_requirement_resolves_highest_vendored() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_range_resolves");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("base/0.1.0"), "base", "0.1.0", &[]);
+    write_minimal_pkg_manifest(&deps_root.join("base/0.1.5"), "base", "0.1.5", &[]);
+    write_minimal_pkg_manifest(&deps_root.join("base/0.2.0"), "base", "0.2.0", &[]);
+    write_minimal_pkg_manifest(
+        &deps_root.join("meta/0.1.0"),
+        "meta",
+        "0.1.0",
+        &["base@>=0.1.0 <0.2.0"],
+    );
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).unwrap()).unwrap();
+    let obj = doc.as_object_mut().unwrap();
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"meta","version":"0.1.0","path":".x07/deps/meta/0.1.0"}),
+        ]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let proj: Value = serde_json::from_slice(&std::fs::read(&proj_path).unwrap()).unwrap();
+    let deps = proj["dependencies"].as_array().unwrap();
+    let base = deps.iter().find(|d| d["name"] == "base").expect("base dep");
+    assert_eq!(
+        base["version"], "0.1.5",
+        "must pick highest satisfying vendored version (0.2.0 is outside the range)"
+    );
+}
+
+#[test]
+fn x07_pkg_lock_range_requirement_conflict_outside_range() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_range_conflict");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("base/0.2.0"), "base", "0.2.0", &[]);
+    write_minimal_pkg_manifest(
+        &deps_root.join("meta/0.1.0"),
+        "meta",
+        "0.1.0",
+        &["base@>=0.1.0 <0.2.0"],
+    );
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).unwrap()).unwrap();
+    let obj = doc.as_object_mut().unwrap();
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"base","version":"0.2.0","path":".x07/deps/base/0.2.0"}),
+            serde_json::json!({"name":"meta","version":"0.1.0","path":".x07/deps/meta/0.1.0"}),
+        ]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "expected conflict; stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains(">=0.1.0 <0.2.0") && stderr.contains("required by meta@0.1.0"),
+        "stderr missing range conflict context:\n{}",
+        stderr
+    );
+}
+
+#[test]
 fn x07_pkg_lock_patch_overrides_transitive_requires_packages() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_patch_override_transitive");

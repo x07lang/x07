@@ -65,7 +65,13 @@ Publishable packages use `x07-package.json` (`x07.package@0.1.0`) plus `meta` fi
 Policy:
 
 - Packages must declare transitive hard requirements through `meta.requires_packages` so dependency
-  resolution is explicit.
+  resolution is explicit. Entries are `name@<requirement>` where the requirement is either an exact
+  version (`name@1.2.3`, meaning `==`) or a SemVer range (`name@>=1.2.3 <1.3.0`).
+  Prefer patch-compatible ranges: exact pins make every patch release of the dependency conflict
+  with your package until you republish. Ranges never select pre-releases; resolution picks the
+  highest satisfying version at lock time, and `x07.lock.json` then freezes the exact choice —
+  reproducibility always comes from the lock, not the manifest. Reserve exact pins for genuinely
+  lockstep couplings (for example FFI sibling packages).
 - Packages must declare the worlds they support in `meta.worlds_allowed` (and stay within those
   capability bounds).
 - Packages may declare toolchain support via `meta.x07c_compat` (a SemVer requirement string, for

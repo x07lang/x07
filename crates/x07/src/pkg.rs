@@ -1038,7 +1038,7 @@ fn cmd_pkg_tree(args: TreeArgs) -> Result<std::process::ExitCode> {
         };
 
         for spec in reqs {
-            let (name, version) = match parse_pkg_spec(&spec) {
+            let (name, req) = match parse_pkg_req_spec(&spec) {
                 Ok(parsed) => parsed,
                 Err(err) => {
                     let report = TreeReport {
@@ -1058,6 +1058,30 @@ fn cmd_pkg_tree(args: TreeArgs) -> Result<std::process::ExitCode> {
                     };
                     println!("{}", serde_json::to_string(&report)?);
                     return Ok(std::process::ExitCode::from(20));
+                }
+            };
+            let version = match &req {
+                PkgReq::Exact(v) => v.clone(),
+                PkgReq::Range { raw, clauses } => {
+                    // Edge targets the highest project version satisfying the
+                    // range; otherwise report the raw requirement as missing.
+                    let mut best: Option<SemverVersion> = None;
+                    for (n, v) in pkg_ids.keys() {
+                        if n != &name {
+                            continue;
+                        }
+                        if let Some(sv) = parse_semver_version(v) {
+                            if semver_satisfies(&sv, clauses)
+                                && best.as_ref().is_none_or(|b| sv > *b)
+                            {
+                                best = Some(sv);
+                            }
+                        }
+                    }
+                    match best {
+                        Some(b) => format!("{}.{}.{}", b.major, b.minor, b.patch),
+                        None => raw.clone(),
+                    }
                 }
             };
             let (version, path) = apply_patch_override(&name, &version, &manifest.patch);
@@ -3223,23 +3247,62 @@ pub(crate) fn ensure_project_deps_hydrated_quiet(
     anyhow::bail!("{msg}");
 }
 
-fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
+/// A `meta.requires_packages` requirement: an exact version (`name@1.2.3`,
+/// the historical form) or a semver range (`name@>=1.2.3 <1.3.0`). Ranges
+/// state compatibility; exact resolution always lives in `x07.lock.json`.
+enum PkgReq {
+    Exact(String),
+    Range {
+        raw: String,
+        clauses: Vec<SemverReqClause>,
+    },
+}
+
+fn parse_pkg_req_spec(spec: &str) -> Result<(String, PkgReq)> {
     let spec = spec.trim();
-    let Some((name, version)) = spec.split_once('@') else {
-        anyhow::bail!("expected NAME@VERSION, got {:?}", spec);
+    let Some((name, req_raw)) = spec.split_once('@') else {
+        anyhow::bail!("expected NAME@VERSION or NAME@RANGE, got {:?}", spec);
     };
     let name = parse_pkg_name(name)?;
-    let version = version.trim();
-    if version.is_empty() {
-        anyhow::bail!("package version must be non-empty");
+    let req_raw = req_raw.trim();
+    if req_raw.is_empty() {
+        anyhow::bail!("package requirement must be non-empty");
     }
-    if !is_valid_semver_version(version) {
+    let is_range = req_raw.starts_with(['>', '<', '='])
+        || req_raw.contains(char::is_whitespace)
+        || req_raw.contains(',');
+    if is_range {
+        let clauses = parse_semver_req(req_raw)
+            .with_context(|| format!("invalid semver range in requirement {spec:?}"))?;
+        return Ok((
+            name,
+            PkgReq::Range {
+                raw: req_raw.to_string(),
+                clauses,
+            },
+        ));
+    }
+    if !is_valid_semver_version(req_raw) {
         anyhow::bail!(
-            "package version must be semver (MAJOR.MINOR.PATCH), got {:?}",
-            version
+            "package requirement must be a semver version or range, got {:?}",
+            req_raw
         );
     }
-    Ok((name, version.to_string()))
+    Ok((name, PkgReq::Exact(req_raw.to_string())))
+}
+
+/// Version of `name` already declared in the project doc, if any.
+fn existing_dep_version(doc: &Value, name: &str) -> Option<String> {
+    let deps = doc.get("dependencies")?.as_array()?;
+    for dep in deps {
+        if dep.get("name").and_then(Value::as_str) == Some(name) {
+            return dep
+                .get("version")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
+    }
+    None
 }
 
 fn parse_pkg_name(raw: &str) -> Result<String> {
@@ -5002,6 +5065,63 @@ struct TransitiveResolveCtx<'a> {
     index_used: &'a mut Option<String>,
 }
 
+/// Resolves a range requirement to the highest satisfying version visible
+/// from (in order considered, max wins): vendored project deps, the official
+/// packages tree, and — unless offline — the package index (non-yanked).
+fn resolve_max_satisfying(
+    name: &str,
+    raw: &str,
+    clauses: &[SemverReqClause],
+    required_by: &str,
+    ctx: &mut TransitiveResolveCtx<'_>,
+) -> Result<String> {
+    let mut best: Option<SemverVersion> = None;
+    let mut consider = |v: SemverVersion| {
+        // Ranges never select pre-releases.
+        if v.pre.is_empty() && semver_satisfies(&v, clauses) && best.as_ref().is_none_or(|b| v > *b)
+        {
+            best = Some(v);
+        }
+    };
+
+    for (v, _raw) in cached_versions_for_package(ctx.base, name)? {
+        consider(v);
+    }
+    if let Some(official_ext) = official_ext_packages_dir() {
+        let root = official_ext.join(format!("x07-{name}"));
+        if let Ok(rd) = std::fs::read_dir(&root) {
+            for entry in rd.flatten() {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    if let Some(v) = parse_semver_version(&entry.file_name().to_string_lossy()) {
+                        consider(v);
+                    }
+                }
+            }
+        }
+    }
+    if !ctx.args.offline && ensure_index_client(ctx.index, ctx.client, ctx.index_used)?.is_none() {
+        if let Some(client) = ctx.client.as_ref() {
+            if let Ok(entries) = client.fetch_entries(name) {
+                for e in entries {
+                    if e.yanked {
+                        continue;
+                    }
+                    if let Some(v) = parse_semver_version(&e.version) {
+                        consider(v);
+                    }
+                }
+            }
+        }
+    }
+
+    let Some(best) = best else {
+        anyhow::bail!(
+            "no available version of {name} satisfies {raw:?} (required by {required_by}; hint: use project.patch to override {name}, or run without --offline so the index can be consulted)"
+        );
+    };
+    Ok(format!("{}.{}.{}", best.major, best.minor, best.patch))
+}
+
 fn resolve_transitive_deps(
     doc: &mut Value,
     project_path: &Path,
@@ -5027,7 +5147,28 @@ fn resolve_transitive_deps(
             let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
             let reqs = requires_packages_from_manifest(&dep_dir)?;
             for spec in reqs {
-                let (name, version) = parse_pkg_spec(&spec)?;
+                let (name, req) = parse_pkg_req_spec(&spec)?;
+                let version = match &req {
+                    PkgReq::Exact(v) => v.clone(),
+                    PkgReq::Range { raw, clauses } => {
+                        if let Some(existing) = existing_dep_version(doc, &name) {
+                            let satisfied = parse_semver_version(&existing)
+                                .is_some_and(|ev| semver_satisfies(&ev, clauses));
+                            if satisfied {
+                                continue;
+                            }
+                            if !ctx.patch.contains_key(&name) {
+                                anyhow::bail!(
+                                    "dependency version conflict: project has {name}@{existing}, but {name}@{raw} is required by {}@{} (hint: use project.patch to override {name})",
+                                    dep.name,
+                                    dep.version
+                                );
+                            }
+                        }
+                        let required_by = format!("{}@{}", dep.name, dep.version);
+                        resolve_max_satisfying(&name, raw, clauses, &required_by, ctx)?
+                    }
+                };
                 let (version, path) = apply_patch_override(&name, &version, ctx.patch);
                 let allow_update = ctx.patch.contains_key(&name);
                 match ensure_dep_entry(doc, &name, &version, &path, allow_update)? {
@@ -5598,6 +5739,32 @@ fn deps_from_project_doc(doc: &Value, project_path: &Path) -> Result<Vec<project
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn parse_pkg_req_spec_exact_and_range() {
+        let (name, req) = parse_pkg_req_spec("ext-json-rs@0.1.8").expect("exact");
+        assert_eq!(name, "ext-json-rs");
+        assert!(matches!(req, PkgReq::Exact(ref v) if v == "0.1.8"));
+
+        let (name, req) = parse_pkg_req_spec("ext-json-rs@>=0.1.8 <0.2.0").expect("range");
+        assert_eq!(name, "ext-json-rs");
+        let PkgReq::Range { raw, clauses } = req else {
+            panic!("expected range");
+        };
+        assert_eq!(raw, ">=0.1.8 <0.2.0");
+        let v = parse_semver_version("0.1.9").unwrap();
+        assert!(semver_satisfies(&v, &clauses));
+        let v = parse_semver_version("0.2.0").unwrap();
+        assert!(!semver_satisfies(&v, &clauses));
+
+        // Comma-separated form is accepted too.
+        let (_, req) = parse_pkg_req_spec("a@>=1.2.3, <2.0.0").expect("comma range");
+        assert!(matches!(req, PkgReq::Range { .. }));
+
+        assert!(parse_pkg_req_spec("a@").is_err());
+        assert!(parse_pkg_req_spec("a@not-a-version").is_err());
+        assert!(parse_pkg_req_spec("no-at-sign").is_err());
+    }
 
     fn temp_dir(prefix: &str) -> PathBuf {
         let stamp = SystemTime::now()
@@ -6648,6 +6815,28 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
         };
         println!("{}", serde_json::to_string(&report)?);
         return Ok(std::process::ExitCode::from(20));
+    }
+
+    // Reverse-dependency conflicts reported by the registry: packages whose
+    // latest version requires this package at a version the just-published
+    // release does not satisfy. Warnings only — rdeps update after the dep
+    // exists, so failing here would deadlock publish ordering.
+    if let Some(conflicts) = resp_json.get("rdep_conflicts").and_then(|v| v.as_array()) {
+        for c in conflicts {
+            let rdep = c.get("package").and_then(|v| v.as_str()).unwrap_or("?");
+            let rdep_version = c.get("version").and_then(|v| v.as_str()).unwrap_or("?");
+            let requirement = c.get("requirement").and_then(|v| v.as_str()).unwrap_or("?");
+            eprintln!(
+                "warning: {rdep}@{rdep_version} requires {requirement}; resolving it together with {name}@{version} will conflict until {rdep} is updated"
+            );
+        }
+        if !conflicts.is_empty() {
+            eprintln!(
+                "warning: {} reverse dependenc{} pin(s) incompatible with {name}@{version}; coordinate follow-up releases or use ranges in meta.requires_packages",
+                conflicts.len(),
+                if conflicts.len() == 1 { "y has" } else { "ies have" }
+            );
+        }
     }
 
     // Best-effort publish verification: check the registry API for the just-published version.
