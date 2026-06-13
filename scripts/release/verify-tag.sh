@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: verify-tag.sh --repo-kind <x07|x07-wasm-backend|x07-web-ui|x07-device-host> --tag <vX.Y.Z>
+usage: verify-tag.sh --repo-kind <x07|x07-wasm-backend> --tag <vX.Y.Z>
 EOF
   exit 2
 }
@@ -96,15 +96,6 @@ case "$repo_kind" in
     ;;
   x07-wasm-backend)
     check_equal "x07-wasm" "$(read_cargo_version "$ROOT_DIR/crates/x07-wasm/Cargo.toml")"
-    ;;
-  x07-web-ui)
-    [[ -f "$ROOT_DIR/VERSION" ]] || { echo "missing VERSION" >&2; exit 1; }
-    check_equal "x07-web-ui" "$(tr -d '\r\n' < "$ROOT_DIR/VERSION")"
-    ;;
-  x07-device-host)
-    check_equal "x07-device-host-assets" "$(read_cargo_version "$ROOT_DIR/crates/x07-device-host-assets/Cargo.toml")"
-    check_equal "x07-device-host-abi" "$(read_cargo_version "$ROOT_DIR/crates/x07-device-host-abi/Cargo.toml")"
-    check_equal "x07-device-host-desktop" "$(read_cargo_version "$ROOT_DIR/crates/x07-device-host-desktop/Cargo.toml")"
     ;;
   *)
     echo "unsupported --repo-kind: $repo_kind" >&2

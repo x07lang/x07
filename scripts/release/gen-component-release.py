@@ -14,8 +14,6 @@ from typing import Any
 COMPONENTS = {
     "x07_core",
     "x07_wasm",
-    "x07_web_ui_host",
-    "x07_device_host",
 }
 
 SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$")
@@ -69,16 +67,6 @@ def infer_asset_kind(component: str, name: str) -> str:
         if name.startswith("x07up-") and (name.endswith(".tar.gz") or name.endswith(".tar.xz") or name.endswith(".zip")):
             return "installer_archive"
 
-    if component == "x07_web_ui_host":
-        if name.startswith("x07-web-ui-host-") and name.endswith(".zip"):
-            return "host_bundle"
-
-    if component == "x07_device_host":
-        if name.startswith("x07-device-host-mobile-templates-") and name.endswith(".zip"):
-            return "templates"
-        if name.startswith("x07-device-host-abi-") and name.endswith(".json"):
-            return "abi_snapshot"
-
     if name.endswith(".tar.gz") or name.endswith(".tar.xz") or name.endswith(".zip"):
         return "archive"
 
@@ -89,7 +77,6 @@ def infer_target(component: str, version: str, name: str) -> str | None:
     prefixes = {
         "x07_core": [f"x07-{version}-", f"x07-v{version}-"],
         "x07_wasm": [f"x07-wasm-{version}-"],
-        "x07_device_host": [f"x07-device-host-desktop-{version}-"],
     }
     if component not in prefixes:
         prefixes = {}

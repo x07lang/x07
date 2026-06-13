@@ -110,8 +110,6 @@ struct ComponentSelectionArgs {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ValueEnum, PartialEq, Eq)]
 enum ComponentName {
     Wasm,
-    #[value(name = "device-host")]
-    DeviceHost,
 }
 
 #[derive(Debug, Args)]
@@ -210,24 +208,23 @@ impl Reporter {
 }
 
 impl ComponentName {
+    const ALL: &'static [ComponentName] = &[ComponentName::Wasm];
+
     fn cli_name(self) -> &'static str {
         match self {
             Self::Wasm => "wasm",
-            Self::DeviceHost => "device-host",
         }
     }
 
     fn binary_name(self) -> &'static str {
         match self {
             Self::Wasm => "x07-wasm",
-            Self::DeviceHost => "x07-device-host-desktop",
         }
     }
 
     fn manifest_component(self) -> &'static str {
         match self {
             Self::Wasm => "x07_wasm",
-            Self::DeviceHost => "x07_device_host",
         }
     }
 }
@@ -416,12 +413,6 @@ struct BundleComponentRef {
 }
 
 #[derive(Debug, Deserialize)]
-struct BundlePackages {
-    #[allow(dead_code)]
-    std_web_ui: String,
-}
-
-#[derive(Debug, Deserialize)]
 struct BundleManifest {
     schema_version: String,
     channel: String,
@@ -430,11 +421,6 @@ struct BundleManifest {
     min_x07up_version: String,
     x07_core: BundleComponentRef,
     x07_wasm: BundleComponentRef,
-    #[allow(dead_code)]
-    x07_web_ui_host: BundleComponentRef,
-    x07_device_host: BundleComponentRef,
-    #[allow(dead_code)]
-    packages: BundlePackages,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1052,7 +1038,6 @@ fn download_release_asset(
 fn component_reference(bundle: &BundleManifest, component: ComponentName) -> &BundleComponentRef {
     match component {
         ComponentName::Wasm => &bundle.x07_wasm,
-        ComponentName::DeviceHost => &bundle.x07_device_host,
     }
 }
 
@@ -1395,7 +1380,7 @@ fn selected_or_default_components(
         return Ok(selected.to_vec());
     }
     let mut out = Vec::new();
-    for component in [ComponentName::Wasm, ComponentName::DeviceHost] {
+    for &component in ComponentName::ALL {
         let binary = toolchain_dir.join("bin").join(component.binary_name());
         if binary.is_file() || load_component_state(toolchain_dir, component)?.is_some() {
             out.push(component);
@@ -1474,7 +1459,7 @@ fn cmd_component_list(root: &Path, reporter: &Reporter) -> Result<std::process::
     let sel = select_active_toolchain(root, &cfg)?;
     let toolchain = sel.resolved.clone();
     let mut components = Vec::new();
-    for component in [ComponentName::Wasm, ComponentName::DeviceHost] {
+    for &component in ComponentName::ALL {
         let (installed, version, tag) = if let Some(toolchain_tag) = &toolchain {
             let toolchain_dir = toolchains_dir(root).join(toolchain_tag);
             let state = load_component_state(&toolchain_dir, component)?;
@@ -1689,7 +1674,6 @@ fn install_x07up_release(
         "x07-os-runner",
         "x07import-cli",
         "x07-wasm",
-        "x07-device-host-desktop",
         "x07up",
     ];
     for tool in tools {
@@ -2521,7 +2505,6 @@ fn ensure_proxies(root: &Path) -> Result<()> {
         "x07-os-runner",
         "x07import-cli",
         "x07-wasm",
-        "x07-device-host-desktop",
         "x07up",
     ];
     for tool in tools {
@@ -2564,10 +2547,6 @@ fn proxy_dispatch(invoked: &str) -> Result<std::process::ExitCode> {
             "x07-wasm" => format!(
                 "install the wasm component: x07up component add {}",
                 ComponentName::Wasm.cli_name()
-            ),
-            "x07-device-host-desktop" => format!(
-                "install the device-host component: x07up component add {}",
-                ComponentName::DeviceHost.cli_name()
             ),
             _ => format!("reinstall toolchain: x07up install {}", sel.spec),
         };

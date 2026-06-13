@@ -123,12 +123,8 @@ def main(argv: list[str]) -> int:
         return 2
 
     min_x07up_version = in_doc.get("min_x07up_version")
-    packages = in_doc.get("packages")
     if not isinstance(min_x07up_version, str) or not SEMVER_RE.fullmatch(min_x07up_version):
         print(f"invalid min_x07up_version: {min_x07up_version!r}", file=sys.stderr)
-        return 2
-    if not isinstance(packages, dict) or "std_web_ui" not in packages:
-        print("input missing packages.std_web_ui", file=sys.stderr)
         return 2
 
     core_repo = str(core_doc["repo"]).rstrip("/")
@@ -141,8 +137,6 @@ def main(argv: list[str]) -> int:
 
     try:
         wasm_ref = validate_component_ref("x07_wasm", in_doc["x07_wasm"], "x07_wasm")
-        web_ui_host_ref = validate_component_ref("x07_web_ui_host", in_doc["x07_web_ui_host"], "x07_web_ui_host")
-        device_host_ref = validate_component_ref("x07_device_host", in_doc["x07_device_host"], "x07_device_host")
     except KeyError as exc:
         print(f"input missing key: {exc.args[0]}", file=sys.stderr)
         return 2
@@ -157,9 +151,6 @@ def main(argv: list[str]) -> int:
         "min_x07up_version": min_x07up_version,
         "x07_core": core_ref,
         "x07_wasm": wasm_ref,
-        "x07_web_ui_host": web_ui_host_ref,
-        "x07_device_host": device_host_ref,
-        "packages": packages,
     }
 
     out_path = args.out.resolve()
