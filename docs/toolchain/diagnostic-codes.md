@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 643
-- quickfix support (`sometimes` or `always`): 582
-- quickfix coverage: 90.51%
+- total codes: 646
+- quickfix support (`sometimes` or `always`): 583
+- quickfix coverage: 90.25%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -341,6 +341,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-BORROW-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-BORROW-0002`. |
 | `X07-CLI-ARGS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0001`. |
 | `X07-CLI-ARGS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0002`. |
+| `X07-CONC-0001` | x07c / lint / error | never | `task.scope_v1` / `task.scope.*` is only allowed in solve or defasync, not a defn. |
 | `X07-CONTRACT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0001`. |
 | `X07-CONTRACT-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0002`. |
 | `X07-CONTRACT-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0003`. |
@@ -354,6 +355,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-FOR-0001` | x07c / lint / error | never | `for` loop variable must be an identifier. |
 | `X07-GENERICS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0001`. |
 | `X07-GENERICS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0002`. |
+| `X07-IMPORT-0002` | x07c / lint / error | always | A builtin namespace must not be imported. |
 | `X07-INTERNAL-0001` | x07 / lint / error | sometimes | Internal toolchain/compiler error. |
 | `X07-IO-READ-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-READ-0001`. |
 | `X07-IO-WRITE-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-WRITE-0001`. |
@@ -378,6 +380,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-TAPP-INFER-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-TAPP-INFER-0001`. |
 | `X07-TOOL-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-ARGS-0001`. |
 | `X07-TOOL-EXEC-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-EXEC-0001`. |
+| `X07-TY-0102` | x07c / lint / error<br/>x07c / type / error | never | Unknown generic `ty.*` intrinsic head. |
 | `X07-TYPE-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-0001`. |
 | `X07-TYPE-CALL-0001` | x07c / type / error | sometimes | Unknown callee (function not found). |
 | `X07-TYPE-CALL-0002` | x07c / type / error | sometimes | Call argument type mismatch. |
@@ -7451,6 +7454,27 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07-CONC-0001`
+
+Summary: `task.scope_v1` / `task.scope.*` is only allowed in solve or defasync, not a defn.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires restructuring into a kernel/shell split.
+
+Details:
+
+Structured concurrency (`task.scope_v1` and the `task.scope.*` operations) is only valid in a `solve` expression or a `defasync` body, not in a plain `defn`. XTAL certifies a `defn`; keep the kernel pure and put concurrency in the shell.
+
+Agent strategy:
+
+- Move the `task.scope_v1` orchestration into the `solve` body or a `defasync`.
+- Keep the pure deterministic kernel as a `defn`; the concurrent shell lives in solve.
+- Re-run lint.
+
+
 ## `X07-CONTRACT-0001`
 
 Summary: Core lint/schema diagnostic `X07-CONTRACT-0001`.
@@ -7713,6 +7737,27 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-IMPORT-0002`
+
+Summary: A builtin namespace must not be imported.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Some `std.*` namespaces (for example `std.brand`) provide builtin operations and have no importable module file. Importing them fails resolution; remove the import. A JSON Patch quickfix removes the offending import.
+
+Agent strategy:
+
+- Remove the builtin namespace from `:imports` (apply the quickfix).
+- The operations resolve as builtins without an import.
+- Re-run lint.
 
 
 ## `X07-INTERNAL-0001`
@@ -8200,6 +8245,28 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-TY-0102`
+
+Summary: Unknown generic `ty.*` intrinsic head.
+
+Origins:
+- x07c (stage: lint, severity: error)
+- x07c (stage: type, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires choosing the intended intrinsic.
+
+Details:
+
+The generic `ty.*` intrinsic head is not one of the supported intrinsics. The complete set is `ty.size_bytes`, `ty.size`, `ty.read_le_at`, `ty.write_le_at`, `ty.push_le`, `ty.lt`, `ty.cmp`, `ty.eq`, `ty.hash32`, `ty.clone`, `ty.drop`, `ty.add`, `ty.sub`, `ty.mul`. The diagnostic notes carry a did-you-mean suggestion. There is no generic division/modulo intrinsic.
+
+Agent strategy:
+
+- Use one of the known `ty.*` intrinsics named in the diagnostic notes.
+- For comparison use `ty.lt` / `ty.cmp` / `ty.eq`; for arithmetic use `ty.add` / `ty.sub` / `ty.mul` (num_like).
+- Re-run lint.
 
 
 ## `X07-TYPE-0001`

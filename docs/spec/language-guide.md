@@ -278,6 +278,7 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.bytes.alloc","n"]` -> bytes (length `n`)
   - `["std.bytes.eq","a","b"]` -> i32 (1 if equal else 0)
   - `["std.bytes.find_u8","b","target"]` -> i32 (index, or -1)
+  - `["std.bytes.find_sub","hay","needle"]` -> i32 (substring index, or -1)
   - `["std.bytes.cmp_range","a","a_off","a_len","b","b_off","b_len"]` -> i32 (-1/0/1)
   - `["std.bytes.max_u8","v"]` -> i32 (`v` is bytes_view; returns 0 if empty)
   - `["std.bytes.sum_u8","v"]` -> i32 (`v` is bytes_view; wraps mod 2^32)
@@ -556,6 +557,7 @@ Additional bytes ops:
 
 - `["std.bytes.eq","a","b"]` -> i32 (1 if equal else 0)
 - `["std.bytes.find_u8","b","target"]` -> i32 (index, or -1)
+- `["std.bytes.find_sub","hay","needle"]` -> i32 (substring index, or -1)
 - `["std.bytes.cmp_range","a","a_off","a_len","b","b_off","b_len"]` -> i32 (-1/0/1)
 
 - `["std.bytes.max_u8","v"]` -> i32 (`v` is bytes_view; returns 0 if empty)

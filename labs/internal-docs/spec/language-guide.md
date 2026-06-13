@@ -140,6 +140,17 @@ Standalone OS builtins:
   - `os.fs.list_dir_sorted_text_v1(path: bytes, caps: bytes) -> result_bytes`
   - `os.fs.walk_glob_sorted_text_v1(root: bytes, glob: bytes, caps: bytes) -> result_bytes`
   - `os.fs.stat_v1(path: bytes, caps: bytes) -> result_bytes`
+  - `os.fs.stream_open_write_v1(path: bytes, caps: bytes) -> result_i32`
+  - `os.fs.stream_write_all_v1(writer_handle: i32, data: bytes_view) -> result_i32`
+  - `os.fs.stream_close_v1(writer_handle: i32) -> result_i32`
+  - `os.fs.stream_drop_v1(writer_handle: i32) -> i32`
+  - `os.fs.stream_open_read_v1(path: bytes, caps: bytes) -> result_i32`
+  - `os.fs.stream_read_some_v1(reader_handle: i32, max_bytes: i32) -> result_bytes`
+  - `os.fs.stream_close_read_v1(reader_handle: i32) -> result_i32`
+  - `os.fs.stream_drop_read_v1(reader_handle: i32) -> i32`
+  - `os.archive.tar_extract_to_fs_v1(out_root: bytes, tar_path: bytes, caps_read: bytes, caps_write: bytes, profile_id: bytes) -> bytes`
+  - `os.archive.tgz_extract_to_fs_v1(out_root: bytes, tgz_path: bytes, caps_read: bytes, caps_write: bytes, profile_id: bytes) -> bytes`
+  - `os.archive.zip_extract_to_fs_v1(out_root: bytes, zip_path: bytes, caps_read: bytes, caps_write: bytes, profile_id: bytes) -> bytes`
   - `os.env.get(key: bytes) -> bytes`
   - `os.time.now_unix_ms() -> i32`
   - `os.time.now_instant_v1() -> bytes`
@@ -267,6 +278,7 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.bytes.alloc","n"]` -> bytes (length `n`)
   - `["std.bytes.eq","a","b"]` -> i32 (1 if equal else 0)
   - `["std.bytes.find_u8","b","target"]` -> i32 (index, or -1)
+  - `["std.bytes.find_sub","hay","needle"]` -> i32 (substring index, or -1)
   - `["std.bytes.cmp_range","a","a_off","a_len","b","b_off","b_len"]` -> i32 (-1/0/1)
   - `["std.bytes.max_u8","v"]` -> i32 (`v` is bytes_view; returns 0 if empty)
   - `["std.bytes.sum_u8","v"]` -> i32 (`v` is bytes_view; wraps mod 2^32)
@@ -345,8 +357,8 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 - `std.json`
   - `["std.json.canonicalize_small","json_bytes"]` -> bytes (or `ERR`)
   - `["std.json.extract_path_canon_or_err","b"]` -> bytes
-  - `["std.json.encode","doc","opts"]` -> bytes (doc envelope)
-  - `["std.json.pretty_encode","doc"]` -> bytes (doc envelope)
+  - `["std.json.encode","json_bytes","opts"]` -> bytes (or `ERR`)
+  - `["std.json.pretty_encode","json_bytes"]` -> bytes (or `ERR`)
 - `std.csv`
   - `["std.csv.sum_second_col_i32_status_le","csv_bytes"]` -> bytes (tag byte 1 + i32_le, or tag byte 0)
   - `["std.csv.sum_second_col_i32le_or_err","csv_bytes"]` -> bytes (i32_le, or `ERR`)
@@ -545,6 +557,7 @@ Additional bytes ops:
 
 - `["std.bytes.eq","a","b"]` -> i32 (1 if equal else 0)
 - `["std.bytes.find_u8","b","target"]` -> i32 (index, or -1)
+- `["std.bytes.find_sub","hay","needle"]` -> i32 (substring index, or -1)
 - `["std.bytes.cmp_range","a","a_off","a_len","b","b_off","b_len"]` -> i32 (-1/0/1)
 
 - `["std.bytes.max_u8","v"]` -> i32 (`v` is bytes_view; returns 0 if empty)

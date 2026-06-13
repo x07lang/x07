@@ -276,6 +276,9 @@ pub fn guide_md() -> String {
     out.push_str("  - `[\"std.bytes.alloc\",\"n\"]` -> bytes (length `n`)\n");
     out.push_str("  - `[\"std.bytes.eq\",\"a\",\"b\"]` -> i32 (1 if equal else 0)\n");
     out.push_str("  - `[\"std.bytes.find_u8\",\"b\",\"target\"]` -> i32 (index, or -1)\n");
+    out.push_str(
+        "  - `[\"std.bytes.find_sub\",\"hay\",\"needle\"]` -> i32 (substring index, or -1)\n",
+    );
     out.push_str("  - `[\"std.bytes.cmp_range\",\"a\",\"a_off\",\"a_len\",\"b\",\"b_off\",\"b_len\"]` -> i32 (-1/0/1)\n");
     out.push_str(
         "  - `[\"std.bytes.max_u8\",\"v\"]` -> i32 (`v` is bytes_view; returns 0 if empty)\n",
@@ -580,6 +583,9 @@ pub fn guide_md() -> String {
     out.push_str("Additional bytes ops:\n\n");
     out.push_str("- `[\"std.bytes.eq\",\"a\",\"b\"]` -> i32 (1 if equal else 0)\n");
     out.push_str("- `[\"std.bytes.find_u8\",\"b\",\"target\"]` -> i32 (index, or -1)\n");
+    out.push_str(
+        "- `[\"std.bytes.find_sub\",\"hay\",\"needle\"]` -> i32 (substring index, or -1)\n",
+    );
     out.push_str("- `[\"std.bytes.cmp_range\",\"a\",\"a_off\",\"a_len\",\"b\",\"b_off\",\"b_len\"]` -> i32 (-1/0/1)\n\n");
     out.push_str(
         "- `[\"std.bytes.max_u8\",\"v\"]` -> i32 (`v` is bytes_view; returns 0 if empty)\n",

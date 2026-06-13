@@ -29,6 +29,7 @@ Parse error codes:
 ### Bytes: common view helpers
 
 - `std.bytes.trim_ascii_view(b)` trims ASCII whitespace (`' '`, `'\t'`, `'\n'`, `'\r'`) and returns a `bytes_view`.
+- `std.bytes.find_sub(hay, needle)` returns the index of the first occurrence of `needle` in `hay`, or `-1` if absent (empty `needle` returns `0`).
 - `std.bytes.strip_prefix_view(a, prefix)` returns `a` without `prefix` when present.
 - `std.bytes.strip_suffix_view(a, suffix)` returns `a` without `suffix` when present.
 

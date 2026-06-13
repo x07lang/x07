@@ -8,6 +8,7 @@
   "std.bytes.ends_with": "Returns 1 if a ends with suffix (empty suffix always matches), else 0.",
   "std.bytes.eq": "Returns 1 if a and b have identical length and bytes, else 0.",
   "std.bytes.find_u8": "Returns the index of the first byte equal to target, or -1 if absent.",
+  "std.bytes.find_sub": "Returns the index of the first occurrence of substring needle in hay, or -1 if absent; an empty needle returns 0.",
   "std.bytes.get_u8": "Returns byte i of b as i32 0-255; traps if i is out of bounds.",
   "std.bytes.len": "Returns the length of b in bytes.",
   "std.bytes.max_u8": "Returns the maximum byte value in v, or 0 if v is empty.",

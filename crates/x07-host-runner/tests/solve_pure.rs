@@ -61,6 +61,31 @@ fn solve_pure_echoes_bytes() {
 }
 
 #[test]
+fn solve_pure_find_sub_returns_substring_index() {
+    let cfg = config();
+
+    // std.bytes.find_sub("hello world", "world") == 6, encoded u32 LE.
+    let program = x07_program::entry(
+        &["std.bytes", "std.codec"],
+        json!([
+            "std.codec.write_u32_le",
+            [
+                "std.bytes.find_sub",
+                ["bytes.view_lit", "hello world"],
+                ["bytes.view_lit", "world"]
+            ]
+        ]),
+    );
+    let compile = compile_program(program.as_slice(), &cfg, None).expect("compile ok");
+    assert!(compile.ok, "compile_error={:?}", compile.compile_error);
+    let exe = compile.compiled_exe.expect("compiled exe");
+
+    let res = run_artifact_file(&cfg, &exe, b"").expect("runner ok");
+    assert!(res.ok, "trap={:?}", res.trap);
+    assert_eq!(res.solve_output, vec![6, 0, 0, 0]);
+}
+
+#[test]
 fn solve_pure_is_deterministic_across_runs() {
     let cfg = config();
 

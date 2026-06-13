@@ -12,7 +12,7 @@
               "name": "AABA"
             }
           ],
-          "compile_fuel_used": 1474
+          "compile_fuel_used": 1541
         },
         "full/mini_app_report_v1": {
           "c_source_size": 465576,
@@ -23,7 +23,7 @@
               "name": "full_app"
             }
           ],
-          "compile_fuel_used": 14368
+          "compile_fuel_used": 14435
         }
       }
     },
