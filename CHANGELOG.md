@@ -4,6 +4,44 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+## v0.2.13
+
+### Added
+
+- Generic arithmetic: `ty.add` / `ty.sub` / `ty.mul` intrinsics for the
+  `num_like` bound (`i32`/`u32`; lower to `+`/`-`/`*`, wrap modulo 2^32). A
+  generic numeric fold/sum/reduce is now expressible; previously only generic
+  comparison/ordering and LE (de)serialization were. No generic division.
+- `std.bytes.find_sub(hay, needle) -> i32`: substring search (first occurrence
+  index, or -1; empty needle returns 0), shipped in std-core 0.1.4. Closes the
+  gap that forced hand-rolled O(n·m) scans for `contains`-style filters.
+- Lint-stage enforcement of three rules that previously only failed at
+  `x07 check` (codegen), so `x07 lint` catches them in the fast loop:
+  `X07-TY-0102` (unknown `ty.*` intrinsic, with a did-you-mean), `X07-CONC-0001`
+  (`task.scope_v1`/`task.scope.*` inside a plain `defn`; structured concurrency
+  is solve/defasync-only), and `X07-IMPORT-0002` (importing a builtin namespace
+  such as `std.brand`, with a remove-the-import quickfix).
+- `x07 doc` did-you-mean on unknown `ty.*` intrinsics; unknown-module errors
+  recognize builtin namespaces and advise removing the import.
+- Docs: a generics reference (`docs/language/generics.md`: define/call, the
+  bound → `ty.*` map, all intrinsic signatures including arithmetic) and a
+  concurrency-and-certification section (kernel/shell: certify the pure kernel,
+  keep `task.scope_v1` in the solve shell; static slots vs dynamic channel
+  fan-out).
+
+### Fixed
+
+- Module-local typecheck (`x07 lint`) no longer pins an unresolved
+  imported-callee result to `bytes_view` at a coercible call-arg position,
+  which falsely retyped locals and rejected later owned uses
+  (X07-TYPE-SET-0002). (Shipped in the dogfood line; recorded here.)
+
+### CI
+
+- The release `guest-runner-image` job builds per-arch on native runners
+  (amd64 + `ubuntu-24.04-arm`) with a registry build cache instead of emulating
+  arm64 under QEMU, cutting the job from ~2h toward ~15–20 min.
+
 ## v0.2.12
 
 ### Added
