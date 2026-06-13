@@ -14909,6 +14909,30 @@ sys.exit(0)
 }
 
 #[test]
+fn x07_doctor_reports_formal_prover_check() {
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .args(["doctor"])
+        .output()
+        .expect("run x07 doctor");
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse doctor JSON");
+    let checks = v["checks"].as_array().expect("checks[]");
+    // The formal-verification prover availability is reported as an advisory
+    // check (always ok; detail names z3/cbmc availability) so agents doing
+    // certification can see whether `x07 verify --prove` will run.
+    let prover = checks
+        .iter()
+        .find(|c| c["name"] == "formal_prover_z3_cbmc")
+        .expect("expected a formal_prover_z3_cbmc check");
+    assert_eq!(prover["ok"], Value::Bool(true), "prover check is advisory");
+    assert!(
+        prover["detail"].as_str().is_some_and(|d| d.contains("z3")),
+        "prover detail should mention z3: {:?}",
+        prover["detail"]
+    );
+}
+
+#[test]
 fn x07_patch_apply_dry_run_and_write_modes() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_patch_apply");

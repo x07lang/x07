@@ -10,7 +10,7 @@ The premise: as code generation gets cheap, the bottleneck moves to trust — de
 - **Record/replay:** turn real OS interactions into deterministic cassettes you can re-run in fixture worlds.
 - **Budgets:** local `budget.scope_v1` caps and arch-driven budget profiles prevent cost blowups from small agent edits.
 - **Capability sandboxing:** side effects are opt-in through explicit OS worlds and policy files; `run-os-sandboxed` defaults to a VM boundary on supported platforms.
-- **Structured diagnostics:** a 643-code diagnostic catalog with quickfix coverage enforced as a CI gate; the toolchain surface is JSON-first (diagnostics + patches + reports), so "lint → fix → re-run" is machine-drivable.
+- **Structured diagnostics:** a 646-code diagnostic catalog with quickfix coverage enforced as a CI gate; the toolchain surface is JSON-first (diagnostics + patches + reports), so "lint → fix → re-run" is machine-drivable.
 - **Spec-first testing:** XTAL drives verify/repair/certify loops from pinned specs ([XTAL](toolchain/xtal.md)).
 - **Proof-backed certification:** `x07 verify` produces proof and coverage artifacts, `x07 prove check` replays them, and `x07 trust certify` binds proof, test, boundary, and runtime evidence into a certificate ([Formal verification & certification](toolchain/formal-verification.md)).
 - **Review artifacts:** semantic diff + trust report make changes auditable (world/capability deltas, budgets, nondeterminism flags).
@@ -48,7 +48,7 @@ For runtime/compile time/binary size comparisons (X07 vs C vs Rust vs Go), use:
 
 ### 4) Diagnostic catalog + quickfix coverage gate
 
-X07 tracks diagnostics as a catalog (643 codes) and enforces quickfix coverage as a CI gate:
+X07 tracks diagnostics as a catalog (646 codes) and enforces quickfix coverage as a CI gate:
 
 - Catalog tooling: `x07 diag catalog`, `x07 diag check`, `x07 diag coverage`
 - Rendered codes doc: [Diagnostic codes](toolchain/diagnostic-codes.md)

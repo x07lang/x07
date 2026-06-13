@@ -82,7 +82,7 @@ Verify:
 - `x07 --help`
 - `x07 run --help`
 - `x07 ast apply-patch --help`
-- `x07 doctor` (host prerequisites for OS worlds)
+- `x07 doctor` (host prerequisites for OS worlds; also reports formal-prover z3/cbmc availability for proof-backed certification)
 - `x07up doctor --json` (installer/toolchain + host prerequisites)
 - optional (advanced): `x07c --help`, `x07-os-runner --help`
 

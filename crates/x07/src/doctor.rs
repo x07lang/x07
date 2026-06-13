@@ -88,6 +88,37 @@ pub fn cmd_doctor(
         }
     }
 
+    // Advisory: the formal-verification provers are external system dependencies
+    // used by `x07 verify --prove` and `x07 trust certify`. They are optional
+    // (general use and `x07 prove check`'s structural validation work without
+    // them), so a missing prover does not make the environment unhealthy — but
+    // an agent doing certification needs to know whether proofs will run.
+    let z3 = find_first_in_path(&["z3"]);
+    let cbmc = find_first_in_path(&["cbmc"]);
+    let prover_detail = match (&z3, &cbmc) {
+        (Some(z), Some(c)) => format!("found z3: {}; cbmc: {}", z.display(), c.display()),
+        (Some(z), None) => format!(
+            "found z3: {}; cbmc not found (unbounded async proofs need cbmc)",
+            z.display()
+        ),
+        (None, Some(c)) => format!("found cbmc: {}; z3 not found", c.display()),
+        (None, None) => {
+            "not found (optional: `x07 verify --prove` / `x07 trust certify` need z3 + cbmc on PATH; `x07 prove check` still validates proof structure without them)".to_string()
+        }
+    };
+    checks.push(Check {
+        name: "formal_prover_z3_cbmc".to_string(),
+        // Advisory: present for visibility, never fails the overall report.
+        ok: true,
+        detail: Some(prover_detail),
+    });
+    if z3.is_none() || cbmc.is_none() {
+        suggestions.push(
+            "For proof-backed certification, install z3 and cbmc on PATH (see scripts/ci/install_formal_verification_tools_linux.sh)."
+                .to_string(),
+        );
+    }
+
     let ok = checks.iter().all(|c| c.ok);
 
     let report = DoctorReport {
