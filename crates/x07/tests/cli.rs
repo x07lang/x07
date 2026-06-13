@@ -620,19 +620,34 @@ fn x07_check_unknown_ty_intrinsic_suggests_known_intrinsic() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
     let diags = v["diagnostics"].as_array().expect("diagnostics[]");
-    let msg = diags
+    // The unknown-ty-intrinsic check fires at lint (X07-TY-0102); the ty.lt
+    // suggestion is carried in the message or notes.
+    let d = diags
         .iter()
-        .filter_map(|d| d["message"].as_str())
-        .find(|m| m.contains("unknown ty intrinsic"))
+        .find(|d| {
+            d["message"]
+                .as_str()
+                .is_some_and(|m| m.contains("unknown ty intrinsic"))
+        })
         .unwrap_or_else(|| {
             panic!(
                 "expected unknown-ty-intrinsic diagnostic; got:\n{}",
                 serde_json::to_string_pretty(diags).unwrap()
             )
         });
+    assert_eq!(d["code"], "X07-TY-0102");
+    let mut hay = d["message"].as_str().unwrap_or("").to_string();
+    if let Some(notes) = d["notes"].as_array() {
+        for n in notes {
+            if let Some(s) = n.as_str() {
+                hay.push(' ');
+                hay.push_str(s);
+            }
+        }
+    }
     assert!(
-        msg.contains("ty.lt"),
-        "expected suggestion of ty.lt; got: {msg}"
+        hay.contains("ty.lt"),
+        "expected suggestion of ty.lt in message/notes; got: {hay}"
     );
 
     std::fs::remove_dir_all(&root).expect("cleanup tmp dir");

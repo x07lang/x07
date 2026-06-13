@@ -80,6 +80,9 @@ struct LintCtx {
     begin_stmt: Option<BeginStmtCtx>,
     hoist_safe: bool,
     value_used: bool,
+    /// True when linting inside a plain `defn` body, where structured
+    /// concurrency (`task.scope_v1`, `await`, `task.join.*`) is not allowed.
+    in_defn_body: bool,
 }
 
 impl Default for LintCtx {
@@ -88,6 +91,7 @@ impl Default for LintCtx {
             begin_stmt: None,
             hoist_safe: true,
             value_used: true,
+            in_defn_body: false,
         }
     }
 }
@@ -643,7 +647,11 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
         );
 
         let ptr = format!("/decls/{decl_idx}/body");
-        lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
+        let defn_ctx = LintCtx {
+            in_defn_body: true,
+            ..ctx.clone()
+        };
+        lint_expr(&f.body, &ptr, options, &defn_ctx, &mut diagnostics);
     }
     for (idx, f) in file.async_functions.iter().enumerate() {
         let decl_idx = defn_base + file.functions.len() + idx;
@@ -1251,6 +1259,44 @@ fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut V
 }
 
 fn lint_world_imports(file: &X07AstFile, options: LintOptions, diagnostics: &mut Vec<Diagnostic>) {
+    // Builtin operation namespaces that read like importable `std.*` modules but
+    // resolve as builtins (no module file). Importing them is the mistake; the
+    // operations work without an `:imports` entry.
+    const BUILTIN_NAMESPACES: &[&str] = &["std.brand"];
+    for ns in BUILTIN_NAMESPACES {
+        if file.imports.iter().any(|m| m == ns) {
+            let kept: Vec<serde_json::Value> = file
+                .imports
+                .iter()
+                .filter(|m| m.as_str() != *ns)
+                .cloned()
+                .map(serde_json::Value::String)
+                .collect();
+            diagnostics.push(Diagnostic {
+                code: "X07-IMPORT-0002".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Lint,
+                message: format!("{ns:?} is a builtin namespace and must not be imported"),
+                loc: Some(Location::X07Ast {
+                    ptr: "/imports".to_string(),
+                }),
+                notes: vec![format!(
+                    "{ns}.* operations resolve as builtins; remove {ns} from :imports."
+                )],
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix: Some(Quickfix {
+                    kind: QuickfixKind::JsonPatch,
+                    patch: vec![PatchOp::Replace {
+                        path: "/imports".to_string(),
+                        value: serde_json::Value::Array(kept),
+                    }],
+                    note: Some(format!("Remove the {ns} import")),
+                }),
+            });
+        }
+    }
+
     if options.world.is_eval_world() {
         let has_os = file.imports.iter().any(|m| m.starts_with("std.os."));
         if has_os {
@@ -1345,6 +1391,88 @@ fn lint_world_imports(file: &X07AstFile, options: LintOptions, diagnostics: &mut
     });
 }
 
+/// The complete set of generic `ty.*` intrinsics (mirrors the lowering in
+/// `generics.rs`). Kept here so `x07 lint` rejects unknown `ty.*` heads at the
+/// fast loop instead of only at codegen.
+const KNOWN_TY_INTRINSICS: &[&str] = &[
+    "ty.size_bytes",
+    "ty.size",
+    "ty.read_le_at",
+    "ty.write_le_at",
+    "ty.push_le",
+    "ty.lt",
+    "ty.cmp",
+    "ty.eq",
+    "ty.hash32",
+    "ty.clone",
+    "ty.drop",
+    "ty.add",
+    "ty.sub",
+    "ty.mul",
+];
+
+fn lint_ty_intrinsic_name(head: &str, ptr: &str, diagnostics: &mut Vec<Diagnostic>) {
+    if !head.starts_with("ty.") || KNOWN_TY_INTRINSICS.contains(&head) {
+        return;
+    }
+    let suggestions = crate::suggest::rank_similar(head, KNOWN_TY_INTRINSICS.iter().copied(), 3);
+    let note = if suggestions.is_empty() {
+        format!("known ty.* intrinsics: {}", KNOWN_TY_INTRINSICS.join(", "))
+    } else {
+        format!("did you mean {}?", suggestions.join(" / "))
+    };
+    diagnostics.push(Diagnostic {
+        code: "X07-TY-0102".to_string(),
+        severity: Severity::Error,
+        stage: Stage::Lint,
+        message: format!("unknown ty intrinsic: {head:?}"),
+        loc: Some(Location::X07Ast {
+            ptr: ptr.to_string(),
+        }),
+        notes: vec![note],
+        related: Vec::new(),
+        data: Default::default(),
+        quickfix: None,
+    });
+}
+
+fn lint_concurrency_placement(
+    head: &str,
+    ptr: &str,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if !ctx.in_defn_body {
+        return;
+    }
+    if head != "task.scope_v1" && !head.starts_with("task.scope.") {
+        return;
+    }
+    // Skip the structural config/selector sub-forms (`task.scope.cfg_v1`,
+    // `task.scope.select.cfg_v1`/`cases_v1`/`case_*`); they only appear inside
+    // the scope form, so flagging them duplicates the operation's diagnostic.
+    if head.ends_with(".cfg_v1") || head.ends_with(".cases_v1") || head.contains(".case_") {
+        return;
+    }
+    diagnostics.push(Diagnostic {
+        code: "X07-CONC-0001".to_string(),
+        severity: Severity::Error,
+        stage: Stage::Lint,
+        message: format!("{head:?} is only allowed in solve or defasync, not a defn"),
+        loc: Some(Location::X07Ast {
+            ptr: ptr.to_string(),
+        }),
+        notes: vec![
+            "Structured concurrency must live in the solve shell or a defasync body.".to_string(),
+            "Pattern: certify the pure kernel as a defn; keep task.scope_v1 in the shell."
+                .to_string(),
+        ],
+        related: Vec::new(),
+        data: Default::default(),
+        quickfix: None,
+    });
+}
+
 fn lint_expr(
     expr: &Expr,
     ptr: &str,
@@ -1378,6 +1506,8 @@ fn lint_expr(
             lint_core_eager_bool_traps(head, items, ptr, diagnostics);
             lint_core_move_rules(head, items, ptr, diagnostics);
             lint_world_heads(head, ptr, options, diagnostics);
+            lint_ty_intrinsic_name(head, ptr, diagnostics);
+            lint_concurrency_placement(head, ptr, ctx, diagnostics);
 
             for (idx, item) in items.iter().enumerate() {
                 let child_ptr = format!("{ptr}/{idx}");
@@ -2621,7 +2751,8 @@ mod tests {
     use crate::ast::Expr;
 
     use super::{
-        expr_ident, expr_list, lint_core_borrow_rules, lint_core_move_rules, LintCtx, QuickfixKind,
+        expr_ident, expr_list, lint_concurrency_placement, lint_core_borrow_rules,
+        lint_core_move_rules, lint_ty_intrinsic_name, LintCtx, QuickfixKind,
     };
 
     fn expr_int(value: i32) -> Expr {
@@ -2629,6 +2760,64 @@ mod tests {
             value,
             ptr: String::new(),
         }
+    }
+
+    #[test]
+    fn lint_ty_intrinsic_name_flags_unknown_with_suggestion() {
+        let mut diagnostics = Vec::new();
+        lint_ty_intrinsic_name("ty.gt", "/decls/0/body", &mut diagnostics);
+        assert_eq!(diagnostics.len(), 1, "unexpected diags: {diagnostics:?}");
+        let d = diagnostics.first().expect("len == 1");
+        assert_eq!(d.code, "X07-TY-0102");
+        assert!(
+            d.notes.iter().any(|n| n.contains("ty.lt")),
+            "expected ty.lt suggestion: {:?}",
+            d.notes
+        );
+    }
+
+    #[test]
+    fn lint_ty_intrinsic_name_accepts_known() {
+        let mut diagnostics = Vec::new();
+        for known in ["ty.lt", "ty.add", "ty.sub", "ty.mul", "ty.read_le_at"] {
+            lint_ty_intrinsic_name(known, "/x", &mut diagnostics);
+        }
+        assert!(diagnostics.is_empty(), "unexpected diags: {diagnostics:?}");
+    }
+
+    #[test]
+    fn lint_concurrency_placement_flags_task_scope_in_defn() {
+        let defn_ctx = LintCtx {
+            in_defn_body: true,
+            ..LintCtx::default()
+        };
+        let mut diagnostics = Vec::new();
+        lint_concurrency_placement(
+            "task.scope_v1",
+            "/decls/0/body",
+            &defn_ctx,
+            &mut diagnostics,
+        );
+        assert_eq!(diagnostics.len(), 1, "unexpected diags: {diagnostics:?}");
+        assert_eq!(diagnostics[0].code, "X07-CONC-0001");
+
+        // The structural cfg sub-form is not flagged separately.
+        let mut diagnostics = Vec::new();
+        lint_concurrency_placement("task.scope.cfg_v1", "/x", &defn_ctx, &mut diagnostics);
+        assert!(diagnostics.is_empty(), "cfg sub-form should not fire");
+
+        // Allowed in solve / defasync (in_defn_body = false).
+        let mut diagnostics = Vec::new();
+        lint_concurrency_placement(
+            "task.scope_v1",
+            "/solve",
+            &LintCtx::default(),
+            &mut diagnostics,
+        );
+        assert!(
+            diagnostics.is_empty(),
+            "task.scope is allowed outside a defn"
+        );
     }
 
     #[test]
