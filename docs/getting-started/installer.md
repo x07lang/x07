@@ -57,7 +57,6 @@ Use `x07up` to install/update runtime components that must track the active core
 
 ```bash
 x07up component add wasm
-x07up component add device-host
 x07up component update
 x07up component list
 ```

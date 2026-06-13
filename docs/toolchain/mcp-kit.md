@@ -54,21 +54,11 @@ The core toolchain delegates MCP kit commands to `x07-mcp`:
 
 If `x07-mcp` is not installed on PATH, delegated commands exit with code `2`.
 
-## Official `x07lang-mcp` lifecycle path
+## Official `x07lang-mcp` server
 
-The official `io.x07/x07lang-mcp` server is the supported MCP entry point for X07 lifecycle actions. Use query surfaces such as `lp.query_v1` for read-only inspection and capability-gated control surfaces such as `lp.control_v1` for safe structured lifecycle mutations when the platform pack is enabled.
+The official `io.x07/x07lang-mcp` server is the supported MCP entry point for X07. On the `x07` side, the responsibility is the local delegation layer (`x07 mcp ...` and `x07 init --template ...`) plus the surrounding project bootstrap.
 
-`x07` does not re-implement those lifecycle actions. Its responsibility is the local delegation layer (`x07 mcp ...` and `x07 init --template ...`) plus the surrounding project bootstrap; the lifecycle mutation surface itself stays in the official MCP server.
-
-For release-control clients such as Forge, the public lifecycle read/write split is:
-
-- mutate through `lp.control_v1`, which returns `lp.control.action.result@0.1.0`
-- read deploy state through `lp.query_v1` into `lp.deploy.query.result@0.1.0`
-- read environment inventory through `lp.query_v1` into `lp.environment.list.result@0.1.0`
-- read incident inbox/detail through `lp.query_v1` into `lp.incident.query.result@0.2.0`
-- read regression generation status through `lp.query_v1` into `lp.regression.run.result@0.2.0`
-
-This is the boundary on the `x07` side: release-candidate composition remains client-owned, while deploy, environment, incident, and regression truth comes from the official structured `lp.*` contracts. Consumers should cache against stable ids and artifact refs from those contracts instead of scraping CLI text or private platform internals. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
+The `lp.*` platform lifecycle tools were archived in the 2026-06 refocus (see [Platform (x07lp)](../agent/platform.md)).
 
 ## HTTP template quickstart
 
@@ -104,7 +94,7 @@ x07 pkg lock
 x07 test --manifest tests/tests.json
 ```
 
-Use this template when the server should expose HTTP+SSE task flows, progress, or resumable task polling to MCP clients such as Forge.
+Use this template when the server should expose HTTP+SSE task flows, progress, or resumable task polling to MCP clients.
 
 The HTTP Tasks template includes:
 
@@ -196,7 +186,7 @@ When `publish.require_signed_prm=true`, dry-run also verifies:
 
 The kit includes these reference servers:
 
-- `x07lang-mcp` (official X07 ecosystem server; core editing tools plus capability-gated pkg/wasm/web-ui/device/app/platform packs)
+- `x07lang-mcp` (official X07 ecosystem server; core editing tools plus capability-gated pkg and wasm packs)
 - `github-mcp`
 - `slack-mcp`
 - `jira-mcp`

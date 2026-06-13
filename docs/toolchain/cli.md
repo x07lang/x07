@@ -59,8 +59,6 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Delegates template generation to `x07-mcp scaffold init ... --machine json`.
   - Creates the agent kit and a worker base policy at `.x07/policies/base/worker.sandbox.base.policy.json`.
   - Prefer `mcp-server-http-tasks` for task-aware HTTP/SSE servers that expose long-running tool calls, progress, or `tasks/*` APIs.
-  - Official lifecycle control still flows through the official `io.x07/x07lang-mcp` server via capability-gated tools such as `lp.query_v1` and `lp.control_v1`; `x07` does not duplicate platform runtime actions here.
-  - Forge-style clients should treat the public `lp.control.action.result@0.1.0`, `lp.deploy.query.result@0.1.0`, `lp.environment.list.result@0.1.0`, `lp.incident.query.result@0.2.0`, and `lp.regression.run.result@0.2.0` outputs as the stable lifecycle read surface.
 
 ### WASM tooling
 
@@ -80,36 +78,9 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - `x07 wasm component targets`
   - `x07 wasm serve`
   - `x07 wasm component run`
-  - `x07 wasm web-ui contracts validate`
-  - `x07 wasm web-ui profile validate`
-  - `x07 wasm web-ui build`
-  - `x07 wasm web-ui serve`
-  - `x07 wasm web-ui test`
-  - `x07 wasm web-ui regress-from-incident`
-  - `x07 wasm device index validate`
-  - `x07 wasm device profile validate`
-  - `x07 wasm device build`
-  - `x07 wasm device verify`
-  - `x07 wasm device run`
-  - `x07 wasm device package`
-  - `x07 wasm app contracts validate`
-  - `x07 wasm app profile validate`
-  - `x07 wasm app build`
-  - `x07 wasm app serve`
-  - `x07 wasm app test`
-  - `x07 wasm app pack`
-  - `x07 wasm app verify`
-  - `x07 wasm app regress from-incident`
-  - `x07 wasm deploy plan`
-  - `x07 wasm slo eval`
+  - `x07 wasm http contracts validate`
 
-For platform-facing remote deploy workflows, the supported wasm contract surface is:
-
-- `x07 wasm app pack`
-- `x07 wasm app verify`
-- `x07 wasm deploy plan`
-- `x07 wasm slo eval`
-- `x07 wasm app regress from-incident`
+The web-ui, device, and app-bundle subcommands were removed in the 2026-06 refocus (archived `x07-web-ui` / `x07-device-host`).
 
 See: [WASM](wasm.md).
 

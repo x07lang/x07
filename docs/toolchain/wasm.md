@@ -4,15 +4,11 @@
 
 - build+run loops for **solve-pure** X07 programs as WASM modules
 - **WASI 0.2 components** (HTTP + CLI runnable targets)
-- a **Web UI** loop (`web-ui build|serve|test`) for `std.web_ui` reducers
-- a **full-stack app bundle** loop (`app build|serve|test`) combining a reducer frontend and `wasi:http/proxy` backend component
-- hardening surfaces (toolchain pin validation, runtime budgets, app packs, and core-wasm HTTP reducers)
-- operational contracts (ops profiles, capabilities, policy), SLO-as-code, deploy plan generation, and signed provenance
-- device bundles, device runners, and iOS/Android project generation via `device package --target ios|android`
+- hardening surfaces (toolchain pin validation, runtime budgets, and core-wasm HTTP reducers)
 
 This surface is implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
-> **Status (2026-06):** core WASM modules and WASI components are active surfaces. The web-ui, app-bundle, and device lanes depend on `x07-web-ui` / `x07-device-host`, which are in maintenance mode under the [2026-06 scope cut](../roadmap.md) — they keep working but receive security and compatibility fixes only.
+> **Status (2026-06):** core WASM modules and WASI components are the active surfaces. The web-ui, app-bundle, and device lanes were removed in the [2026-06 refocus](../roadmap.md) along with the archived `x07-web-ui` / `x07-device-host` repos.
 
 ## Delegation model
 
@@ -27,7 +23,6 @@ Primary path:
 
 ```sh
 x07up component add wasm
-x07up component add device-host
 x07 wasm doctor --json
 ```
 
@@ -35,18 +30,9 @@ Fallbacks:
 
 ```sh
 cargo install --locked x07-wasm --version <VERSION>
-cargo install --locked x07-device-host-desktop --version <VERSION>
 ```
 
 Use `cargo install --locked --git https://github.com/x07lang/x07-wasm-backend.git x07-wasm` only when you need unreleased development state from the repo.
-
-## Official showcase apps
-
-The released docs bundle mirrors the official `x07-wasm` showcase sources under [`docs/examples/wasm_showcases/`](../examples/wasm_showcases/index.md):
-
-- [`x07_atlas/`](../examples/wasm_showcases/x07_atlas/README.md): full-stack app bundle with traces, regression generation, pack verification, provenance, deploy planning, and SLO checks
-- [`x07_studio/`](../examples/wasm_showcases/x07_studio/README.md): desktop device bundle with persistent notes, import/export flows, provenance, packaging, and host smoke
-- [`x07_field_notes/`](../examples/wasm_showcases/x07_field_notes/README.md): shared desktop/mobile reducer with replay traces and iOS/Android packaging
 
 The canonical runnable projects and CI scripts live in `x07-wasm-backend/examples/`.
 
@@ -56,17 +42,6 @@ Component builds also require additional tools on `PATH` (checked by `x07 wasm d
 - `wit-bindgen`
 - `wac`
 - `wasmtime`
-
-Browser component builds (transpiled ESM outputs) also use:
-
-- `node`
-- `jco` (component transpile)
-
-Note: Node is used for browser-targeted tooling (for example `jco transpile`), not as a secure WASI runtime. Node’s WASI APIs are not intended to be a security sandbox for untrusted code; use Wasmtime (the `x07-wasm` baseline) for untrusted execution.
-
-Desktop host runner and packaging also use:
-
-- `x07-device-host-desktop`
 
 ## Profiles (contracts-as-data)
 
@@ -169,156 +144,9 @@ x07 wasm serve --mode canary --component dist/app.http.component.wasm --request-
 x07 wasm component run --component dist/app.cli.component.wasm --stdin examples/solve_pure_echo/tests/fixtures/in_hello.bin --stdout-out dist/stdout.bin --json
 ```
 
-## Web UI (browser host)
+## Archived lanes (web-ui / device / app bundle)
 
-This section covers a browser host loop for X07 reducers that consume `x07.web_ui.dispatch@0.1.0` and emit `x07.web_ui.frame@0.2.0` as UTF-8 JSON bytes.
-
-The canonical `std-web-ui` package, browser host assets, and WIT contracts live in the `x07-web-ui` repo. Install/update the package with the X07 package manager:
-
-```sh
-x07 pkg versions std-web-ui
-x07 pkg add std-web-ui@0.2.6 --sync
-```
-
-If `std-web-ui` is locked under `.x07/deps/...` but missing on disk, `x07 test`, `x07 build`, `x07 run`, `x07 wasm web-ui build`, and `x07 wasm device build` auto-sync the package before they continue. Keep `x07 pkg lock --project x07.json --check` in CI when you want that state drift to fail hard instead.
-
-Validate contracts + profile registry (offline):
-
-```sh
-x07 wasm web-ui contracts validate --json
-x07 wasm web-ui profile validate --json
-```
-
-Build + serve + test (example from `x07-web-ui`):
-
-```sh
-git clone https://github.com/x07lang/x07-web-ui.git
-cd x07-web-ui
-
-x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_ui_debug --out-dir dist --json
-x07 wasm web-ui serve --dir dist --mode listen --strict-mime --json
-x07 wasm web-ui test --dist-dir dist --case examples/web_ui_counter/tests/counter.trace.json --json
-```
-
-Use `x07 wasm web-ui test` or `x07 test` for reducer-semantic coverage. Device bundle commands do not replace those feature-level checks.
-
-Host entrypoint notes:
-
-- `web-ui build` emits `dist/index.html` which loads `dist/bootstrap.js`.
-- `dist/main.mjs` is a compatibility alias that imports `bootstrap.js`.
-- Host HTML uses a strict CSP that allows WebAssembly via `'wasm-unsafe-eval'` (without enabling general `'unsafe-eval'`).
-
-Component build (transpiled for the browser via `jco transpile`):
-
-```sh
-x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_ui_debug --out-dir dist --format component --json
-```
-
-Note: `web-ui build` emits `dist/wasm.profile.json` (the resolved wasm profile used for the build). `web-ui test` and replay tooling use it to apply runtime limits deterministically.
-
-## Device bundles (system WebView host)
-
-This section covers a device contract layer for running `std.web_ui` reducers in a system WebView host (desktop + mobile).
-
-The device bundle format pins a host ABI hash (from the `x07-device-host` repo) so that device apps can reject incompatible hosts deterministically.
-
-The host ABI is sealed as a snapshot contract in `x07-device-host` (`arch/host_abi/host_abi.snapshot.json`) and pinned into `x07-wasm-backend`. `device verify` compares a bundle’s `host.host_abi_hash` against the tool-pinned ABI hash and emits `X07WASM_DEVICE_BUNDLE_HOST_ABI_HASH_MISMATCH` (exit code 3) on mismatch. It does not require a repo-local vendored host ABI snapshot in the consumer project.
-
-Validate contracts (offline):
-
-```sh
-x07 wasm device index validate --json
-x07 wasm device profile validate --json
-```
-
-Build + verify a bundle:
-
-```sh
-x07 wasm device build --profile device_dev --out-dir dist/device --clean --json
-x07 wasm device verify --dir dist/device --json
-```
-
-Bundle layout notes:
-
-- The resolved device profile is embedded into the bundle under `profile/device.profile.json` and is digest-verified by `device verify`.
-- `device verify` streams digests and enforces hard size caps to avoid unbounded reads (bundle manifest 8 MiB; bundle files 256 MiB).
-- `web-ui build` and `device build` emit the canonical browser/WebView host assets from the tool-pinned `x07-web-ui` snapshot. Consumer repos do not need a local `vendor/x07-web-ui/` tree.
-- Use reducer-level tests for semantics. Device commands cover bundle integrity, provenance, packaging, and host smoke execution.
-
-Signed device provenance (DSSE + Ed25519):
-
-```sh
-x07 wasm device provenance attest --dir dist/device --signing-key <signing_key.b64> --out dist/device.provenance.dsse.json --json
-x07 wasm device provenance verify --attestation dist/device.provenance.dsse.json --bundle-dir dist/device --trusted-public-key <public_key.b64> --json
-```
-
-## Device run + package (desktop host)
-
-Run a device bundle via the desktop host:
-
-```sh
-x07 wasm device run --bundle dist/device --target desktop --json
-```
-
-For a full desktop smoke loop, run:
-
-```sh
-x07 wasm device build --profile device_dev --out-dir dist/device --clean --json
-x07 wasm device verify --dir dist/device --json
-x07 wasm device package --bundle dist/device --target desktop --out-dir dist/device_package --json
-x07 wasm device run --bundle dist/device --target desktop --headless-smoke --json
-```
-
-Testing boundary:
-
-- Use `x07 wasm web-ui test` when you need deterministic reducer-level trace replay and feature assertions.
-- Use `x07 wasm device build|verify|provenance|package|run` when you need bundle/package/provenance validation and desktop smoke coverage.
-
-Package a device bundle into a desktop payload (writes `package.manifest.json`):
-
-```sh
-x07 wasm device package --bundle dist/device --target desktop --out-dir dist/device_package --json
-```
-
-## Device package (iOS/Android project generation)
-
-Generate an iOS project directory (no Xcode required for generation):
-
-```sh
-x07 wasm device package --bundle dist/device --target ios --out-dir dist/device_package_ios --json
-```
-
-Generate an Android project directory (no Gradle required for generation):
-
-```sh
-x07 wasm device package --bundle dist/device --target android --out-dir dist/device_package_android --json
-```
-
-## App bundle (full stack)
-
-This section introduces an app-bundle registry (`arch/app/*`) and a single closed loop:
-
-- app profile → app build → app serve → app test → incident → regression
-
-Validate (offline):
-
-```sh
-x07 wasm app contracts validate --json
-x07 wasm app profile validate --json
-```
-
-Build + serve + test (example from `x07-wasm-backend`):
-
-```sh
-git clone https://github.com/x07lang/x07-wasm-backend.git
-cd x07-wasm-backend
-
-x07 wasm app build --profile app_dev --out-dir dist/app --clean --json
-x07 wasm app serve --dir dist/app --mode smoke --strict-mime --json
-x07 wasm app test --dir dist/app --trace examples/app_fullstack_hello/tests/trace_0001.json --json
-```
-
-For backends that need server-held JSON state across one `app serve` or `app test` session, set `backend.adapter` to `wasi_http_proxy_state_doc_v1`. The adapter passes a typed `{request, state}` document into the backend and persists the returned `state` for the next request in that replay session.
+The web-ui (`x07 wasm web-ui ...`), device bundle (`x07 wasm device ...`), and full-stack app-bundle (`x07 wasm app ...`) lanes — together with the `std-web-ui` package and the iOS/Android project generators — were removed in the [2026-06 refocus](../roadmap.md) along with the archived `x07-web-ui` and `x07-device-host` repos.
 
 ## Hardening
 
@@ -343,89 +171,9 @@ Shipped WASM profiles include:
 
 - `wasm_release_cached` (enables Wasmtime compilation cache via `arch/wasm/toolchain/wasmtime_cache.toml`)
 - `wasm_release_pooling` (pooling allocator)
-- `wasm_web_ui_release_cached` (web-ui + compilation cache)
-- `wasm_web_ui_release_pooling` (web-ui + pooling allocator)
-
-App deploy artifacts:
-
-```sh
-x07 wasm app pack --bundle-manifest dist/app/app.bundle.json --out-dir dist/app.pack --profile-id app_dev --json
-x07 wasm app verify --pack-manifest dist/app.pack/app.pack.json --json
-```
-
-The supported wasm integration surface for platform deploy workflows is:
-
-- `x07 wasm app pack`
-- `x07 wasm app verify`
-- `x07 wasm deploy plan`
-- `x07 wasm slo eval`
-- `x07 wasm app regress from-incident`
 
 Core-wasm HTTP reducer contracts + loop:
 
 ```sh
 x07 wasm http contracts validate --strict --json
 ```
-
-## Ops + capabilities + policy + SLO + deploy plans + provenance
-
-This section introduces machine-readable operational governance and deployment artifacts:
-
-```sh
-x07 wasm ops validate --profile arch/app/ops/ops_release.json --json
-x07 wasm caps validate --profile arch/app/ops/caps_release.json --json
-```
-
-Policy cards (assertions + optional RFC-6902 JSON Patch):
-
-```sh
-x07 wasm policy validate --card arch/app/ops/policy_deploy_patch_id.json --json
-```
-
-SLO-as-code + offline evaluation:
-
-```sh
-x07 wasm slo validate --profile arch/slo/slo_min.json --json
-x07 wasm slo eval --profile arch/slo/slo_min.json --metrics examples/app_min/tests/metrics_canary_ok.json --json
-```
-
-Deploy plan generation (writes `deploy.plan.json`; by default also emits Kubernetes YAMLs under `--out-dir`):
-
-```sh
-x07 wasm deploy plan --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --out-dir dist/deploy_plan --json
-```
-
-Plan-only mode (no Kubernetes YAML outputs):
-
-```sh
-x07 wasm deploy plan --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --emit-k8s false --out-dir dist/deploy_plan --json
-```
-
-Signed pack provenance (DSSE + Ed25519):
-
-```sh
-x07 wasm provenance attest --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --signing-key <signing_key.b64> --out dist/provenance.dsse.json --json
-x07 wasm provenance verify --attestation dist/provenance.dsse.json --pack-dir dist/app.pack --trusted-public-key <public_key.b64> --json
-```
-
-Runtime enforcement via ops profiles:
-
-- `x07 wasm serve --ops <ops.json>` applies capability enforcement to WASI 0.2 HTTP components.
-- `x07 wasm http serve --ops <ops.json>` applies capability enforcement to the core-wasm HTTP reducer effects (for example `http.fetch` and `time.now`).
-- `x07 wasm app serve --ops <ops.json>` applies capability enforcement to backend requests served via the in-proc component host.
-- `x07 wasm app serve --mode canary --ops <ops.json>` includes an SLO decision (if the ops profile includes an SLO reference) under `result.stdout_json.canary.slo_decision`.
-
-Record/replay evidence (clocks/random + secret delivery metadata):
-
-- If caps use `clocks.mode=record` or `random.mode=record`, `x07 wasm serve` requires:
-  - `--evidence-out <path>` (record), or
-  - `--evidence-in <path>` (replay).
-- Secrets are allowlisted via `caps.secrets.allow[]` and sourced from `.x07/secrets/<id>` or env `X07_SECRET_<ID>` (values are not recorded; only metadata is).
-
-Provenance notes:
-
-- Attestations include `predicate.x07.compatibility_hash` (matches `x07 wasm ops validate`).
-- `x07 wasm provenance attest` fails closed (no DSSE envelope is written) if it encounters errors while resolving subjects, and writes DSSE output atomically (`*.tmp` then rename).
-- `x07 wasm provenance verify` verifies the DSSE signature and then recomputes subject digests against `--pack-dir`.
-- Verification commands stream digests and enforce hard size caps to avoid unbounded reads (pack manifest 8 MiB; pack files/subjects 256 MiB; DSSE attestation 16 MiB).
-- `x07 wasm provenance attest` fails closed (does not write the DSSE output) when any subject path is unsafe and emits `X07WASM_PROVENANCE_SUBJECT_PATH_UNSAFE` (exit code 1).

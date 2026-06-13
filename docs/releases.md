@@ -40,11 +40,9 @@ An X07 release consists of:
 The `x07` release is the root compatibility anchor for the official companion repos:
 
 - `x07-mcp` tracks the released core toolchain and companion package line.
-- `x07-wasm-backend`, `x07-web-ui`, and `x07-device-host` publish component releases
-  that declare compatibility with supported `x07` core versions. (`x07-web-ui` and
-  `x07-device-host` are in maintenance mode under the 2026-06 scope cut — see the
-  [roadmap](roadmap.md) — so their component releases are limited to security and
-  compatibility fixes.)
+- `x07-wasm-backend` publishes component releases that declare compatibility with
+  supported `x07` core versions. (The former `x07-web-ui` and `x07-device-host`
+  component repos were archived in the 2026-06 scope cut — see the [roadmap](roadmap.md).)
 - `x07-registry` validates the published toolchain and package surfaces that core and
   companion repos depend on.
 - `x07-website` publishes the released docs and installer surfaces generated from `x07`.

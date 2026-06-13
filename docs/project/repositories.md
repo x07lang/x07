@@ -16,9 +16,9 @@ The `x07lang` GitHub org is split into focused repos. The active set was deliber
 - `x07lang/x07-website`: the `x07lang.org` site built from released docs bundles.
 - `x07lang/x07-perf-compare`: performance comparison harnesses and reproducible benchmark snapshots.
 
-## Maintenance mode (2026-06 scope cut)
+## Archived (2026-06 scope cut)
 
-These repos receive security and compatibility fixes only, until the direct-authoring eval gate passes and at least one external adopter exists (rationale in the [roadmap](../roadmap.md)):
+These repos were archived in the 2026-06 refocus and are read-only on GitHub (rationale in the [roadmap](../roadmap.md)):
 
 - `x07lang/x07-studio`: Studio/Forge shells and the Loom lifecycle daemon.
 - `x07lang/x07-forge`: terminal shell over the XTAL loop.
@@ -30,8 +30,8 @@ These repos receive security and compatibility fixes only, until the direct-auth
 - `x07lang/x07-sentinel-reference-stack`: backend reference system for the former managed-platform offering.
 - `x07lang/x07-platform` and `x07lang/x07-platform-contracts`: workload/runtime control plane and its public `lp.*` contracts.
 
-The private `x07lang/x07-platform-cloud` (managed control layer) follows the platform repos into maintenance mode. `x07lang/x07-infra-private` holds operational infrastructure.
+The private `x07lang/x07-platform-cloud` (managed control layer) was archived alongside the platform repos. `x07lang/x07-infra-private` holds operational infrastructure.
 
 ## Governance scope
 
-For governance purposes, the official companion repositories currently cited alongside `x07` are listed in `GOVERNANCE.md`; maintenance-mode repos remain covered for security and compatibility fixes.
+For governance purposes, the official companion repositories currently cited alongside `x07` are listed in `GOVERNANCE.md`; archived repos remain in governance scope as read-only history.

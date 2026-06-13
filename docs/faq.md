@@ -36,7 +36,7 @@ x07text is instead a **lossless projection**: `x07 ast to-text` renders readable
 
 ## What happened to the studio / device / web-ui repos?
 
-They were moved to maintenance mode in the 2026-06 scope cut: `x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, and the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`). They receive security and compatibility fixes only.
+They were archived in the 2026-06 scope cut: `x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, and the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`). They are read-only on GitHub.
 
 The reasoning: those surfaces duplicate mature mainstream ecosystems, multiply single-maintainer load, and none of them move the core bet — the deterministic, certifiable substrate. The active set is `x07`, `x07-mcp`, `x07-registry`, `x07-wasm-backend`, and `hardproof`. Reactivation conditions are in the [roadmap](roadmap.md).
 

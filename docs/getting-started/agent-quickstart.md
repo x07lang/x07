@@ -112,7 +112,7 @@ See also: [Install](install.md).
 
 ## MCP: install the official X07 MCP server (optional)
 
-If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient core tools plus capability-gated ecosystem tools (`x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.doc_v1`, `x07.wasm.core_v1`, safe patching, etc). The web-ui/device/app/platform tool packs target ecosystem surfaces that are in maintenance mode under the [2026-06 scope cut](../roadmap.md); they keep working where enabled, but the active surface is core editing, packages, and WASM.
+If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient core tools plus capability-gated ecosystem tools (`x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.doc_v1`, `x07.wasm.core_v1`, safe patching, etc). The active surface is core editing, packages, and WASM.
 
 Download the published bundle from GitHub releases:
 - Repo: https://github.com/x07lang/x07-mcp
@@ -140,7 +140,7 @@ Configure your MCP client:
   - `cwd`: `.../x07lang-mcp.bundle` (so `config/mcp.server.json` + `out/mcp-worker` resolve)
   - env (recommended): `X07_MCP_X07_EXE=/absolute/path/to/x07` (`command -v x07`)
 
-Before optional wasm actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine. If a workflow still uses the maintenance-mode platform pack, prefer the official MCP server path (`lp.control_v1` when enabled) and the public `lp.*` result contracts over private shell glue — see [Platform (x07lp)](../agent/platform.md).
+Before optional wasm actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine.
 
 If you are creating a new HTTP/SSE MCP server project that needs long-running tool calls or task polling, start from:
 

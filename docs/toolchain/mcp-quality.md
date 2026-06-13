@@ -4,7 +4,7 @@ Official MCP conformance is the baseline. Hardproof (`hardproof`) layers additio
 
 What Hardproof does:
 
-- **Scan**: run deterministic verification across five dimensions (conformance, reliability, performance, security, trust) and emit a stable scan report (`scan.json`) plus an event stream (`scan.events.jsonl`).
+- **Scan**: run deterministic verification across five dimensions (conformance, security, performance, trust, reliability) and emit a stable scan report (`scan.json`) plus an event stream (`scan.events.jsonl`).
 - **CI gating**: run `hardproof ci` to enforce policies (minimum score, zero critical findings, per-dimension minimums, usage limits).
 - **Replay**: record a small session cassette and replay it to detect behavior drift with deterministic diffs.
 - **Trust + bundle**: verify registry metadata (`server.json`) and bundle integrity (`.mcpb`) as part of a scan (when inputs are provided) or via explicit subcommands.

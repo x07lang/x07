@@ -50,7 +50,7 @@ The `x07` repo is the entrypoint. The active ecosystem was deliberately narrowed
 - **Packages and docs**: [`x07-registry`](https://github.com/x07lang/x07-registry) powers package publishing at [x07.io](https://x07.io), and [`x07-website`](https://github.com/x07lang/x07-website) serves [x07lang.org](https://x07lang.org).
 - **MCP server verification**: [`hardproof`](https://github.com/x07lang/hardproof) is the standalone verifier CLI used by the [MCP quality](toolchain/mcp-quality.md) flow.
 
-Former ecosystem surfaces — studio/IDE shells, web UI contracts, device hosts, and the lifecycle platform (`x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, `x07-platform` + contracts/cloud) — are in maintenance mode under the 2026-06 scope cut: security and compatibility fixes only. See the [roadmap](roadmap.md) for the rationale and reactivation conditions.
+Former ecosystem surfaces — studio/IDE shells, web UI contracts, device hosts, and the lifecycle platform (`x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, `x07-platform` + contracts/cloud) — were archived in the 2026-06 scope cut (read-only on GitHub). See the [roadmap](roadmap.md) for the rationale and reactivation conditions.
 
 ## What makes X07 different?
 
