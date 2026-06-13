@@ -4,6 +4,24 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+## v0.2.14
+
+### Added
+
+- `x07 doctor`: advisory `formal_prover_z3_cbmc` check reporting whether `z3`
+  and/or `cbmc` are on `PATH` (the external provers `x07 verify --prove` and
+  `x07 trust certify` invoke). Always advisory — when a prover is absent,
+  `x07 prove check` still validates the certificate's proof binding structurally.
+
+### Changed
+
+- Official ext packages: the `ext-data-model` / `ext-json-rs`
+  reverse-dependency closure is republished with SemVer **range**
+  `requires_packages` pins (`name@>=X.Y.Z <UPPER`) instead of exact pins —
+  ranges in `requires_packages`, exact versions in lockfiles. Downstream
+  projects resolve the latest compatible transitive versions without exact-pin
+  cascades. Range `requires_packages` require the v0.2.13+ resolver.
+
 ## v0.2.13
 
 ### Added
