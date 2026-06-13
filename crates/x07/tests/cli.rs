@@ -576,6 +576,124 @@ fn x07_check_stdlib_call_arg_mismatch_is_type_error_not_internal() {
 }
 
 #[test]
+fn x07_check_unknown_ty_intrinsic_suggests_known_intrinsic() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_unknown_ty_intrinsic");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "operational_entry_symbol": "main.mx",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+    write_lockfile_for_project_bytes(&root, &project);
+
+    // `ty.gt` does not exist; the closest real intrinsic is `ty.lt`.
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [{
+            "kind": "export",
+            "names": ["main.mx"]
+        }, {
+            "kind": "defn",
+            "name": "main.mx",
+            "type_params": [{"name": "A", "bound": "orderable"}],
+            "params": [{"name": "a", "ty": ["t", "A"]}, {"name": "b", "ty": ["t", "A"]}],
+            "result": ["t", "A"],
+            "body": ["if", ["ty.gt", ["t", "A"], "a", "b"], "a", "b"]
+        }],
+        "solve": ["codec.write_u32_le", ["tapp", "main.mx", ["tys", "u32"], 3, 7]]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(out.status.code(), Some(1), "expected failure");
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    let msg = diags
+        .iter()
+        .filter_map(|d| d["message"].as_str())
+        .find(|m| m.contains("unknown ty intrinsic"))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected unknown-ty-intrinsic diagnostic; got:\n{}",
+                serde_json::to_string_pretty(diags).unwrap()
+            )
+        });
+    assert!(
+        msg.contains("ty.lt"),
+        "expected suggestion of ty.lt; got: {msg}"
+    );
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_check_generic_arithmetic_ty_add_compiles() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_generic_arithmetic");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "operational_entry_symbol": "main.sum2",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+    write_lockfile_for_project_bytes(&root, &project);
+
+    // Generic numeric reduction via ty.add over a num_like type variable, then
+    // instantiated at u32 — must pass full check (typecheck + backend lowering).
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": ["std.codec"],
+        "decls": [{
+            "kind": "export",
+            "names": ["main.sum2"]
+        }, {
+            "kind": "defn",
+            "name": "main.sum2",
+            "type_params": [{"name": "A", "bound": "num_like"}],
+            "params": [{"name": "a", "ty": ["t", "A"]}, {"name": "b", "ty": ["t", "A"]}],
+            "result": ["t", "A"],
+            "body": ["ty.add", ["t", "A"], "a", "b"]
+        }],
+        "solve": ["std.codec.write_u32_le", ["tapp", "main.sum2", ["tys", "u32"], 100, 250]]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "generic ty.add must compile; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
 fn x07_check_unknown_callee_in_stdlib_is_type_error_not_codegen() {
     let root = fresh_tmp_dir(&repo_root(), "x07_check_unknown_callee_in_stdlib");
     std::fs::create_dir_all(&root).expect("create root");

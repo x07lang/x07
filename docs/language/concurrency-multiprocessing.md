@@ -40,7 +40,11 @@ Task ops:
 - `["task.yield"] -> i32`
 - `["task.sleep", ticks_i32] -> i32` (virtual time ticks)
 
-Note: `await` / `task.join.*` are only allowed in `solve` and inside `defasync` bodies (not inside `defn`).
+Note: `await` / `task.join.*` — and likewise `task.scope_v1` and all
+`task.scope.*` ops — are only allowed in `solve` and inside `defasync` bodies,
+**not** inside a plain `defn`. This is enforced by the compiler. See
+[Concurrency and certification](#concurrency-and-certification-kernel-and-shell)
+for why this shapes the trust story.
 
 ### Channels (bytes payloads)
 
@@ -90,6 +94,30 @@ Slots are scope-owned handles for child task results. They are not raw task hand
 - `["task.scope.try_await_slot.result_bytes_v1", slot_id] -> result_result_bytes` (`err=1` not ready; `err=2` canceled)
 - `["task.scope.slot_is_finished_v1", slot_id] -> i32` (0/1)
 
+### Static vs dynamic fan-out
+
+There are two ways to fan work out across child tasks, and they differ in
+whether the number of children is known at authoring time:
+
+- **Static arity (named slots).** Use
+  `task.scope.async_let_bytes_v1` (or `…_result_bytes_v1`) to start a fixed,
+  small set of children, then `task.scope.await_slot_bytes_v1` each slot by id.
+  The slot ids are distinct named handles, so the child count is fixed in the
+  source. Reach for this when you know exactly how many subtasks there are
+  (e.g. two halves, three stages).
+  See `docs/examples/14_task_scope_slots.x07.json`.
+
+- **Dynamic arity (channels).** Use `task.scope.start_soon_v1` in a loop to
+  start a runtime-determined number of children, and a bytes channel
+  (`chan.bytes.new` / `chan.bytes.send` / `chan.bytes.recv`) to collect their
+  results. `start_soon_v1` does not return a handle (no per-child slot), so the
+  worker count can be a runtime value. Reach for this for map/reduce-style work
+  where the number of workers (or chunks) is computed.
+  See `docs/examples/12_async_mapreduce.x07.json`.
+
+Both run under the same `task.scope_v1` nursery and the same deterministic
+scheduler, so both are reproducible.
+
 ### Scoped select (`task.scope.select_*_v1`)
 
 Select waits for one of several scope-owned events deterministically:
@@ -129,6 +157,42 @@ Event tags (stable):
 - `3`: chan recv bytes ready (payload = bytes)
 - `4`: chan closed (no payload)
 - `5`: timeout (no payload)
+
+## Concurrency and certification: kernel and shell
+
+`task.scope_v1`, every `task.scope.*` op, and `await` / `task.join.*` are
+allowed **only** in `solve` and inside `defasync` bodies — never in a plain
+`defn`. The compiler enforces this (`x07 doc --builtin task.scope_v1` states it
+directly: *"Only in solve/defasync contexts"*).
+
+This has a direct consequence for the trust story. XTAL certifies a `defn`
+named by the project's `operational_entry_symbol`, and a certifiable pure entry
+runs under a restricted language subset with `allow_defasync: false`. So a
+concurrent program's **orchestration cannot itself be the certified entry** —
+the orchestration lives in `solve` (or in `defasync` helpers), which the pure
+certificate deliberately excludes.
+
+The canonical resolution is the **kernel/shell** split:
+
+- **Kernel** — the deterministic, pure logic, written as a `defn` in a module
+  and named by `operational_entry_symbol`. This is what XTAL certifies (with
+  `requires` / `ensures` contracts and proof objects). It contains no
+  `task.scope_v1` and no `defasync`.
+- **Shell** — the `task.scope_v1` orchestration in the `solve` body (plus any
+  `defasync` workers). The shell calls the kernel and is validated against it
+  by golden end-to-end examples.
+
+The two produce **byte-identical output**: the concurrent shell exists only to
+schedule the work; the kernel decides the result. You certify the kernel and
+test the shell. See the worked
+`docs/examples/verified_core_pure_v1/` project (a pure `defn` entry under
+`world: solve-pure`) and the
+[Kernel/shell in production](../guides/kernel-shell-production.md) guide.
+
+A practical corollary, combined with [generics](generics.md): a generic numeric
+reduction is not expressible (no generic arithmetic), so a parallel map/reduce
+keeps its per-chunk reducer **monomorphic** (concrete `i32` / `u32`) — exactly
+what `docs/examples/12_async_mapreduce.x07.json` does.
 
 ## OS threads (policy-gated)
 

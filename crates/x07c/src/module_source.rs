@@ -96,6 +96,20 @@ pub fn read_module_from_roots(
     let mut json_rel = rel_path_base.clone();
     json_rel.set_extension("x07.json");
     let json_rel_display = json_rel.display().to_string();
+
+    // Builtin operation namespaces that read like importable `std.*` modules but
+    // are resolved as builtins (no module file). Importing them is the mistake;
+    // the operations work without an `:imports` entry.
+    const BUILTIN_NAMESPACES: &[&str] = &["std.brand"];
+    if BUILTIN_NAMESPACES.contains(&module_id) {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            format!(
+                "unknown module: {module_id:?}; {module_id} provides builtins that need no import — remove it from :imports (its operations resolve without a module)"
+            ),
+        ));
+    }
+
     Err(CompilerError::new(
         CompileErrorKind::Parse,
         format!("unknown module: {module_id:?} (searched: {json_rel_display})"),
@@ -146,4 +160,33 @@ fn read_module_from_roots_if_present(
         };
     }
     Ok(None)
+}
+
+#[cfg(test)]
+mod builtin_namespace_hint_tests {
+    use super::*;
+
+    #[test]
+    fn unknown_builtin_namespace_import_hints_removal() {
+        let roots = vec![PathBuf::from("/nonexistent-root")];
+        let err = read_module_from_roots("std.brand", &roots)
+            .expect_err("std.brand is a builtin namespace, not a module");
+        let msg = err.message.to_string();
+        assert!(
+            msg.contains("need no import") && msg.contains("remove it from :imports"),
+            "expected builtin-namespace hint, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn unknown_real_module_keeps_searched_path() {
+        let roots = vec![PathBuf::from("/nonexistent-root")];
+        let err = read_module_from_roots("acme.widget", &roots)
+            .expect_err("acme.widget does not exist under the root");
+        let msg = err.message.to_string();
+        assert!(
+            msg.contains("searched:") && msg.contains("acme/widget.x07.json"),
+            "expected searched-path message, got: {msg}"
+        );
+    }
 }

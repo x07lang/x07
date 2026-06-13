@@ -1147,6 +1147,22 @@ impl<'a> InferState<'a> {
                 }
                 TyTerm::Named("i32".to_string())
             }
+            "ty.add" | "ty.sub" | "ty.mul" => {
+                // Generic arithmetic over a `num_like` type variable: both
+                // operands and the result are the substituted numeric type.
+                for it in items.iter().skip(2) {
+                    self.check_expr(
+                        it,
+                        &tt,
+                        ConstraintOrigin::CallArg {
+                            callee: head.to_string(),
+                            arg_index: 1,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+                tt.clone()
+            }
             _ => {
                 for it in items.iter().skip(2) {
                     let _ = self.infer_expr(it, None);

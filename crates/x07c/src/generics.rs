@@ -2165,6 +2165,68 @@ fn lower_ty_intrinsic(
                 ptr,
             })
         }
+        "ty.add" | "ty.sub" | "ty.mul" => {
+            if items.len() != 4 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Parse,
+                    format!("{head:?} expects 3 arguments"),
+                ));
+            }
+            let a = rewrite_expr(
+                items[2].clone(),
+                ctx,
+                sigs,
+                generic_symbols,
+                module_exports,
+                extern_symbols,
+                subst,
+                instances,
+                pending,
+                tapp_sites_total,
+                max_specializations,
+                max_type_depth,
+            )?;
+            let b = rewrite_expr(
+                items[3].clone(),
+                ctx,
+                sigs,
+                generic_symbols,
+                module_exports,
+                extern_symbols,
+                subst,
+                instances,
+                pending,
+                tapp_sites_total,
+                max_specializations,
+                max_type_depth,
+            )?;
+            // Arithmetic wraps modulo 2^32 for both i32 and u32, so the same
+            // operator serves both; non-numeric types are rejected (num_like).
+            if !matches!(type_name, "i32" | "u32") {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "X07-TY-0101: unsupported type for {head:?}: {type_name:?} (generic arithmetic requires a num_like type)"
+                    ),
+                ));
+            }
+            let op = match head {
+                "ty.add" => "+",
+                "ty.sub" => "-",
+                _ => "*",
+            };
+            Ok(Expr::List {
+                items: vec![
+                    Expr::Ident {
+                        name: op.to_string(),
+                        ptr: head_ptr,
+                    },
+                    a,
+                    b,
+                ],
+                ptr,
+            })
+        }
         "ty.eq" => {
             if items.len() != 4 {
                 return Err(CompilerError::new(
@@ -2685,10 +2747,35 @@ fn lower_ty_intrinsic(
                 ptr,
             })
         }
-        other => Err(CompilerError::new(
-            CompileErrorKind::Typing,
-            format!("X07-TY-0102: unknown ty intrinsic: {other:?}"),
-        )),
+        other => {
+            const KNOWN_TY_INTRINSICS: &[&str] = &[
+                "ty.size_bytes",
+                "ty.size",
+                "ty.read_le_at",
+                "ty.write_le_at",
+                "ty.push_le",
+                "ty.lt",
+                "ty.cmp",
+                "ty.eq",
+                "ty.hash32",
+                "ty.clone",
+                "ty.drop",
+                "ty.add",
+                "ty.sub",
+                "ty.mul",
+            ];
+            let suggestions =
+                crate::suggest::rank_similar(other, KNOWN_TY_INTRINSICS.iter().copied(), 3);
+            let hint = if suggestions.is_empty() {
+                format!("known: {}", KNOWN_TY_INTRINSICS.join(", "))
+            } else {
+                format!("did you mean {}?", suggestions.join(" / "))
+            };
+            Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("X07-TY-0102: unknown ty intrinsic: {other:?}; {hint}"),
+            ))
+        }
     }
 }
 
