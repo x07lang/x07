@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /private
+
+User-agent: x07-crawler
+Disallow: /nope
+Allow: /special

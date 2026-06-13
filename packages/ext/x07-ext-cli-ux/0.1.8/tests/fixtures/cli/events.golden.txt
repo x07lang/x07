@@ -1,0 +1,5 @@
+scan started
+phase started: probe
+dimension started: security
+dimension finished: security
+scan finished: PASS

@@ -1,0 +1,7 @@
+{
+  "schema_version": "x07.arch.cli.profile@0.1.0",
+  "id": "default_v1",
+  "v": 1,
+  "render": { "mode": "plain_v1", "max_line_bytes": 16384 }
+}
+

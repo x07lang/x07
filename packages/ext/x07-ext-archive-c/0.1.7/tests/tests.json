@@ -1,0 +1,49 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.archive/path_policy_posix_strict_v1",
+      "world": "solve-pure",
+      "entry": "std.archive.tests.test_path_policy_posix_strict_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.archive/tar_list_hello_v1",
+      "world": "solve-pure",
+      "entry": "std.archive.tests.test_tar_list_hello_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.archive/tar_list_skips_dir_v1",
+      "world": "solve-pure",
+      "entry": "std.archive.tests.test_tar_list_skips_dir_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.archive/zip_list_hello_v1",
+      "world": "solve-pure",
+      "entry": "std.archive.tests.test_zip_list_hello_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.archive/zip_extract_hello_v1",
+      "world": "solve-pure",
+      "entry": "std.archive.tests.test_zip_extract_hello_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.archive/zip_slip_rejected_v1",
+      "world": "solve-pure",
+      "entry": "std.archive.tests.test_zip_slip_rejected_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.archive/extract_os_big_zip_run_os_sandboxed_v1",
+      "world": "run-os-sandboxed",
+      "entry": "std.archive.extract_os.tests.test_big_zip_extract_to_fs_v1",
+      "policy_json": "policies/archive_extract_os_smoke.policy.json",
+      "timeout_ms": 20000,
+      "expect": "pass"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "topic": "events",
+    "key": "k1",
+    "value": "v1",
+    "headers": { "a": "1", "b": "2" }
+  },
+  {
+    "topic": "events",
+    "key": "",
+    "value": "hello",
+    "headers": {}
+  }
+]

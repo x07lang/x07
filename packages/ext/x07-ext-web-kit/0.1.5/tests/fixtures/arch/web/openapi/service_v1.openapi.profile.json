@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.arch.web.openapi_profile@0.1.0",
+  "id": "service_v1",
+  "v": 1,
+  "oas": "3.1.0",
+  "title": "Service API",
+  "version": "0.1.0",
+  "json_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+  "server_urls": []
+}
+

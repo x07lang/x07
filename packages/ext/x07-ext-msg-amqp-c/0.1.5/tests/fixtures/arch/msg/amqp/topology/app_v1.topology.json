@@ -1,0 +1,8 @@
+{
+  "schema_version": "x07.arch.msg.amqp.topology@0.1.0",
+  "id": "app_v1",
+  "v": 1,
+  "exchanges": [{ "name": "x07", "type": "topic", "durable": true }],
+  "queues": [{ "name": "x07", "durable": true }],
+  "bindings": [{ "exchange": "x07", "queue": "x07", "routing_key": "#" }]
+}

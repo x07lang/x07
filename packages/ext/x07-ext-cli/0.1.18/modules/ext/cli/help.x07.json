@@ -1,0 +1,35 @@
+{
+    "decls": [
+        {
+            "kind": "export",
+            "names": [
+                "ext.cli.help.render"
+            ]
+        },
+        {
+            "body": [
+                "ext.cli.render_help",
+                "spec_json_or_specbin",
+                [
+                    "bytes.alloc",
+                    0
+                ]
+            ],
+            "kind": "defn",
+            "name": "ext.cli.help.render",
+            "params": [
+                {
+                    "name": "spec_json_or_specbin",
+                    "ty": "bytes"
+                }
+            ],
+            "result": "bytes"
+        }
+    ],
+    "imports": [
+        "ext.cli"
+    ],
+    "kind": "module",
+    "module_id": "ext.cli.help",
+    "schema_version": "x07.x07ast@0.3.0"
+}

@@ -1,0 +1,5 @@
+{"type":"scan.started","run_id":"r1"}
+{"type":"scan.phase.started","run_id":"r1","phase":"probe"}
+{"type":"scan.dimension.started","run_id":"r1","dimension":"security"}
+{"type":"scan.dimension.finished","run_id":"r1","dimension":"security","err_code":0}
+{"type":"scan.finished","run_id":"r1","status":"pass"}

@@ -1,0 +1,59 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.msgpack/vector_0",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_0",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/vector_neg1",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_neg1",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/vector_123",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_123",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/vector_hi",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_hi",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/vector_map_len_b_aa",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_map_len_b_aa",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/vector_dec_1_23",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_dec_1_23",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/vector_big_pos",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_big_pos",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/vector_big_neg",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_vector_big_neg",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.msgpack/data_model_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.msgpack.tests.test_data_model_roundtrip",
+      "expect": "pass"
+    }
+  ]
+}

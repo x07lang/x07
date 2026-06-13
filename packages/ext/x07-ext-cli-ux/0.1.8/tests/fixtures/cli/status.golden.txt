@@ -1,0 +1,4 @@
+pass: PASS
+warn: WARN
+fail: FAIL
+unknown: UNKNOWN

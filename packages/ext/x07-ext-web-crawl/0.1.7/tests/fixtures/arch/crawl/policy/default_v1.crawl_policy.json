@@ -1,0 +1,14 @@
+{
+  "schema_version": "x07.arch.crawl.policy@0.1.0",
+  "id": "default_v1",
+  "v": 1,
+  "user_agent": "x07-crawler",
+  "robots": { "respect": true, "cache_ttl_secs": 3600 },
+  "limits": {
+    "max_urls_total": 1000,
+    "max_depth": 3,
+    "max_url_bytes": 2048,
+    "max_body_bytes": 1048576,
+    "per_host_inflight": 8
+  }
+}

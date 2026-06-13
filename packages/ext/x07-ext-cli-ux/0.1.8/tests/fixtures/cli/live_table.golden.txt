@@ -1,0 +1,5 @@
+Conformance  RUNNING -  11/24
+Security     PENDING
+Performance  PASS  20 samples
+Trust        UNKNOWN
+Reliability  FAIL  replay drift

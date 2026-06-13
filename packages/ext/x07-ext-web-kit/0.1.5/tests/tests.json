@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.web/errors_encode_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.web.tests.test_errors_encode_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.web/openapi_render_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.web.tests.test_openapi_render_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.web/router_compile_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.web.tests.test_router_compile_v1",
+      "expect": "pass"
+    }
+  ]
+}
+

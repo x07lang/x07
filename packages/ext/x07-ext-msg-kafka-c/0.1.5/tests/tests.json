@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.msg.kafka/connect_from_arch_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.msg.kafka.tests.test_connect_from_arch_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.msg.kafka/rr_replay_publish_v1",
+      "world": "solve-rr",
+      "fixture_root": "fixtures/rr",
+      "entry": "std.msg.kafka.tests.test_rr_replay_publish_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.msg.kafka/rr_replay_poll_v1",
+      "world": "solve-rr",
+      "fixture_root": "fixtures/rr",
+      "entry": "std.msg.kafka.tests.test_rr_replay_poll_v1",
+      "expect": "pass"
+    }
+  ]
+}
