@@ -2249,13 +2249,17 @@ pub fn cmd_init(
         }
     }
 
+    let mut notes = init_notes();
+    if let Some(note) = init_sandbox_run_note(args.template) {
+        notes.insert(0, note);
+    }
     let report = InitReport {
         ok: true,
         command: "init",
         root: root.display().to_string(),
         created,
-        notes: init_notes(),
-        next_steps: init_next_steps(),
+        notes,
+        next_steps: init_next_steps(args.template),
         error: None,
     };
     println!("{}", serde_json::to_string(&report)?);
@@ -2578,11 +2582,35 @@ fn init_notes() -> Vec<String> {
     ]
 }
 
-fn init_next_steps() -> Vec<String> {
+fn init_next_steps(template: Option<InitTemplate>) -> Vec<String> {
+    // Templates that default to the `sandbox` profile run under `run-os-sandboxed`,
+    // which needs a VZ guest bundle; a bare `x07 run` fails on machines without it.
+    // Point at the unsandboxed `--profile os` so the scaffold runs out of the box.
+    let run = if template.map(template_default_profile) == Some("sandbox") {
+        "x07 run --profile os"
+    } else {
+        "x07 run"
+    };
     vec![
-        "x07 run".to_string(),
+        run.to_string(),
         "x07 test --manifest tests/tests.json".to_string(),
     ]
+}
+
+/// Note shown for `sandbox`-default scaffolds: a bare `x07 run` needs a VZ guest
+/// bundle, so document the unsandboxed quick-run path and the bundle setup.
+fn init_sandbox_run_note(template: Option<InitTemplate>) -> Option<String> {
+    if template.map(template_default_profile) == Some("sandbox") {
+        Some(
+            "Default profile is 'sandbox' (run-os-sandboxed) for least privilege; \
+             a bare `x07 run` needs a VZ guest bundle (set X07_VM_VZ_GUEST_BUNDLE — \
+             see scripts/build_vz_guest_bundle.sh). `x07 run --profile os` runs \
+             unsandboxed for a quick check."
+                .to_string(),
+        )
+    } else {
+        None
+    }
 }
 
 fn init_package_notes() -> Vec<String> {

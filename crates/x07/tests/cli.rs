@@ -8630,6 +8630,60 @@ fn x07_test_finds_stdlib_lock_from_exe_when_missing() {
 }
 
 #[test]
+fn x07_init_fs_tool_guides_unsandboxed_quick_run() {
+    // A `sandbox`-default template (fs-tool) defaults to run-os-sandboxed, which
+    // needs a VZ guest bundle; a bare `x07 run` fails on machines without it.
+    // The scaffold must point at the unsandboxed `--profile os` quick-run path
+    // and explain the default so an agent isn't stranded by a silent failure.
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_fs_tool_guidance");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--template", "fs-tool"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+
+    let next_steps: Vec<&str> = v["next_steps"]
+        .as_array()
+        .expect("next_steps[]")
+        .iter()
+        .map(|v| v.as_str().expect("next_steps[] string"))
+        .collect();
+    assert_eq!(
+        next_steps,
+        vec![
+            "x07 run --profile os",
+            "x07 test --manifest tests/tests.json"
+        ],
+        "sandbox-default scaffold should guide the unsandboxed quick run"
+    );
+
+    let notes: Vec<&str> = v["notes"]
+        .as_array()
+        .expect("notes[]")
+        .iter()
+        .map(|v| v.as_str().expect("notes[] string"))
+        .collect();
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("X07_VM_VZ_GUEST_BUNDLE") && n.contains("--profile os")),
+        "expected a sandbox/VZ guidance note, got: {notes:?}"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
 fn x07_init_creates_project_skeleton() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_init_project");

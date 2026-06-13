@@ -652,7 +652,11 @@ fn synthesize_vm_backend_failure_report(
         "c_source_size": 0,
         "compiled_exe": serde_json::Value::Null,
         "compiled_exe_size": serde_json::Value::Null,
-        "compile_error": serde_json::Value::Null,
+        // A fatal setup/exec error (e.g. missing sandbox guest bundle) is not a
+        // compile error per se, but `ok:false` with a null `compile_error` reads
+        // as a silent failure. Surface the reason here so the JSON report is
+        // self-describing; the raw bytes remain in `stderr_b64`.
+        "compile_error": serde_json::Value::String(err_msg.clone()),
         "stdout_b64": b64.encode(b""),
         "stderr_b64": b64.encode(err_msg.as_bytes()),
         "fuel_used": serde_json::Value::Null,

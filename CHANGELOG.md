@@ -4,6 +4,28 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+### Added
+
+- Drift gate for documented diagnostic-catalog size: prose that states the
+  catalog code count (e.g. `docs/why-x07.md`) is now checked against
+  `catalog/diagnostics.json` in the canary gate, so the hand-written count
+  can no longer rot silently.
+
+### Changed
+
+- `x07 init` for `sandbox`-default templates (`fs-tool`, `http-client`,
+  `web-service`, `sqlite-app`, …) now suggests `x07 run --profile os` (the
+  unsandboxed quick-run path) and notes that the default sandboxed run needs a
+  VZ guest bundle (`X07_VM_VZ_GUEST_BUNDLE`), instead of a bare `x07 run` that
+  fails out of the box without the sandbox guest bundle.
+
+### Fixed
+
+- `x07 run` failures from a fatal sandbox/exec setup error (e.g. a missing VZ
+  guest bundle) now populate `compile.compile_error` in the JSON report with
+  the reason and fix hint, instead of leaving it null (the message was
+  previously only in `stderr_b64`/stderr), so a failed run is self-describing.
+
 ## v0.2.14
 
 ### Added
