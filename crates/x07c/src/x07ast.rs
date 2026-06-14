@@ -4,7 +4,7 @@ use std::fmt::Display;
 use serde_json::Value;
 use x07_contracts::{
     X07AST_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
-    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0, X07AST_SCHEMA_VERSION_V0_9_0,
 };
 
 use crate::ast::Expr;
@@ -90,6 +90,7 @@ impl TypeRef {
 pub fn ty_to_name(ty: Ty) -> &'static str {
     match ty {
         Ty::I32 => "i32",
+        Ty::F64 => "f64",
         Ty::Bytes => "bytes",
         Ty::BytesView => "bytes_view",
         Ty::VecU8 => "vec_u8",
@@ -227,20 +228,24 @@ fn supports_contracts(schema_version: &str) -> bool {
         || schema_version == X07AST_SCHEMA_VERSION_V0_6_0
         || schema_version == X07AST_SCHEMA_VERSION_V0_7_0
         || schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_9_0
 }
 
 fn supports_loop_contracts(schema_version: &str) -> bool {
     schema_version == X07AST_SCHEMA_VERSION_V0_6_0
         || schema_version == X07AST_SCHEMA_VERSION_V0_7_0
         || schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_9_0
 }
 
 fn supports_async_protocol(schema_version: &str) -> bool {
-    schema_version == X07AST_SCHEMA_VERSION_V0_7_0 || schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+    schema_version == X07AST_SCHEMA_VERSION_V0_7_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_9_0
 }
 
 fn supports_defn_decreases(schema_version: &str) -> bool {
-    schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+    schema_version == X07AST_SCHEMA_VERSION_V0_8_0 || schema_version == X07AST_SCHEMA_VERSION_V0_9_0
 }
 
 pub fn parse_x07ast_json(bytes: &[u8]) -> Result<X07AstFile, X07AstError> {

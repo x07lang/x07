@@ -7,7 +7,7 @@ use serde::Serialize;
 use walkdir::WalkDir;
 use x07_contracts::{
     X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
-    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0, X07AST_SCHEMA_VERSION_V0_9_0,
 };
 use x07_runner_common::os_policy;
 use x07_worlds::WorldId;
@@ -351,6 +351,7 @@ pub fn cmd_lint(
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_9_0
         {
             let mut visiting: BTreeSet<String> = BTreeSet::new();
             for module_id in &file.imports {

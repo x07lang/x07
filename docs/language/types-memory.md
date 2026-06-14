@@ -84,6 +84,37 @@ For zero-copy pipelines and parsers, X07 also provides view payload variants:
 
 These are especially useful with brand-aware casts (`std.brand.cast_view_v1`) and stream pipes, where validation can operate on a view without allocating.
 
+## Floating point (`f64`)
+
+`f64` is an IEEE-754 double scalar, available from `x07.x07ast@0.9.0` (RFC 0002). It is
+a by-value scalar like `i32`, lowered to C `double` and compiled with strict, deterministic
+floating point (no fast-math, no FMA contraction), so results match across targets.
+
+There is **no implicit numeric tower** — conversions between `i32` and `f64` are always
+explicit:
+
+- `f64.of_i32` — widen a signed `i32` to `f64`
+- `f64.to_i32_trunc` — truncate an `f64` toward zero into `i32`
+- `f64.add` / `f64.sub` / `f64.mul` / `f64.div` — arithmetic on two `f64` values
+
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.9.0
+  :imports ()
+  :decls ()
+  :solve (codec.write_u32_le
+    (f64.to_i32_trunc (f64.div (f64.of_i32 22) (f64.of_i32 7)))
+  )
+}
+```
+
+`(f64.div (f64.of_i32 22) (f64.of_i32 7))` is real division (≈ 3.142857), so
+`f64.to_i32_trunc` yields `3` — not the `i32` result `22 / 7`. Mixing `f64` and `i32`
+without an explicit conversion is a type error.
+
 ## Branded bytes (typed encodings)
 
 Bytes-like values can carry a nominal **brand** (compile-time only) to represent “validated bytes of encoding X”.

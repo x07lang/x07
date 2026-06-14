@@ -2043,6 +2043,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07ast.v0.9.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07ast.v0.9.0.schema.json",
+      "schema_version": "x07.x07ast@0.9.0",
+      "title": "X07 x07AST v0.9.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07c.report.schema.json",
       "schema_id": "https://x07.io/spec/x07c.report.schema.json",
       "schema_version": "x07c.report@0.1.0",

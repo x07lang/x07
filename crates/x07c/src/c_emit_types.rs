@@ -845,6 +845,53 @@ impl InferCtx {
                         }
                         Ok(Ty::Bytes.into())
                     }
+                    "f64.add" | "f64.sub" | "f64.mul" | "f64.div" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 2 args"),
+                            ));
+                        }
+                        let a = self.infer(&args[0])?;
+                        let b = self.infer(&args[1])?;
+                        if a != Ty::F64 || b != Ty::F64 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (f64, f64)"),
+                            ));
+                        }
+                        Ok(Ty::F64.into())
+                    }
+                    "f64.of_i32" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "f64.of_i32 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "f64.of_i32 expects i32".to_string(),
+                            ));
+                        }
+                        Ok(Ty::F64.into())
+                    }
+                    "f64.to_i32_trunc" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "f64.to_i32_trunc expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::F64 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "f64.to_i32_trunc expects f64".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
                     "math.f64.add_v1" | "math.f64.sub_v1" | "math.f64.mul_v1"
                     | "math.f64.div_v1" | "math.f64.pow_v1" | "math.f64.atan2_v1"
                     | "math.f64.min_v1" | "math.f64.max_v1" => {

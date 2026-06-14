@@ -32,6 +32,7 @@ impl<'a> Emitter<'a> {
                 | Ty::TaskHandleResultBytesV1
                 | Ty::TaskSlotV1
                 | Ty::TaskSelectEvtV1 => (ty.ty, self.alloc_local("t_i32_")?),
+                Ty::F64 => (Ty::F64, self.alloc_local("t_f64_")?),
                 Ty::TaskScopeV1 => (Ty::TaskScopeV1, self.alloc_local("t_scope_")?),
                 Ty::BudgetScopeV1 => (Ty::BudgetScopeV1, self.alloc_local("t_budget_scope_")?),
                 Ty::Bytes => (Ty::Bytes, self.alloc_local("t_bytes_")?),
@@ -642,6 +643,12 @@ impl<'a> Emitter<'a> {
             | "<=" | ">" | ">=" | "<u" | ">=u" | ">u" | "<=u" => {
                 self.emit_binop_to(head, args, dest_ty, dest)
             }
+
+            "f64.add" | "f64.sub" | "f64.mul" | "f64.div" => {
+                self.emit_f64_arith_to(head, args, dest_ty, dest)
+            }
+            "f64.of_i32" => self.emit_f64_of_i32_to(args, dest_ty, dest),
+            "f64.to_i32_trunc" => self.emit_f64_to_i32_trunc_to(args, dest_ty, dest),
 
             "bytes.len" => self.emit_bytes_len_to(args, dest_ty, dest),
             "bytes.get_u8" => self.emit_bytes_get_u8_to(args, dest_ty, dest),
@@ -1698,6 +1705,105 @@ impl<'a> Emitter<'a> {
             }
             _ => unreachable!(),
         }
+        Ok(())
+    }
+
+    pub(super) fn emit_f64_arith_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 2 args"),
+            ));
+        }
+        if dest_ty != Ty::F64 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns f64"),
+            ));
+        }
+        let a = self.emit_expr(&args[0])?;
+        let b = self.emit_expr(&args[1])?;
+        if a.ty != Ty::F64 || b.ty != Ty::F64 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects f64 args"),
+            ));
+        }
+        let op = match head {
+            "f64.add" => "+",
+            "f64.sub" => "-",
+            "f64.mul" => "*",
+            "f64.div" => "/",
+            _ => unreachable!("emit_f64_arith_to dispatched on non-f64-arith head"),
+        };
+        self.line(&format!("{dest} = {} {op} {};", a.c_name, b.c_name));
+        Ok(())
+    }
+
+    pub(super) fn emit_f64_of_i32_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "f64.of_i32 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::F64 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "f64.of_i32 returns f64".to_string(),
+            ));
+        }
+        let a = self.emit_expr(&args[0])?;
+        if a.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "f64.of_i32 expects i32".to_string(),
+            ));
+        }
+        // i32 is stored as uint32_t but is signed; cast through int32_t so the
+        // sign is preserved when widening to double.
+        self.line(&format!("{dest} = (double)(int32_t){};", a.c_name));
+        Ok(())
+    }
+
+    pub(super) fn emit_f64_to_i32_trunc_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "f64.to_i32_trunc expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "f64.to_i32_trunc returns i32".to_string(),
+            ));
+        }
+        let a = self.emit_expr(&args[0])?;
+        if a.ty != Ty::F64 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "f64.to_i32_trunc expects f64".to_string(),
+            ));
+        }
+        // double -> int32_t truncates toward zero; store in the uint32_t carrier.
+        self.line(&format!("{dest} = (uint32_t)(int32_t){};", a.c_name));
         Ok(())
     }
 

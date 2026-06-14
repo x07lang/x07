@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ty {
     I32,
+    F64,
     Bytes,
     BytesView,
     VecU8,
@@ -33,6 +34,7 @@ impl Ty {
         match name {
             "i32" => Some(Ty::I32),
             "u32" => Some(Ty::I32),
+            "f64" => Some(Ty::F64),
             "bytes" => Some(Ty::Bytes),
             "bytes_view" => Some(Ty::BytesView),
             "vec_u8" => Some(Ty::VecU8),

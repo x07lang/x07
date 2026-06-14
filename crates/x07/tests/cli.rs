@@ -1360,13 +1360,13 @@ fn x07_test_smoke_suite() {
     );
     let v = parse_json_stdout(&out);
     assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
-    assert_eq!(v["summary"]["passed"], 43);
+    assert_eq!(v["summary"]["passed"], 44);
     assert_eq!(v["summary"]["failed"], 0);
     assert_eq!(v["summary"]["errors"], 0);
     assert_eq!(v["summary"]["xfail_failed"], 1);
 
     let tests = v["tests"].as_array().expect("tests[]");
-    assert_eq!(tests.len(), 44);
+    assert_eq!(tests.len(), 45);
     let ids: Vec<&str> = tests
         .iter()
         .map(|t| t["id"].as_str().expect("test.id"))
@@ -1375,6 +1375,7 @@ fn x07_test_smoke_suite() {
         ids,
         vec![
             "smoke/budget_scope_result_err_alloc_bytes",
+            "smoke/f64_arith",
             "smoke/fs_read_hello",
             "smoke/fs_read_hello_run_os_sandboxed",
             "smoke/fs_read_task_hello_run_os_sandboxed",
