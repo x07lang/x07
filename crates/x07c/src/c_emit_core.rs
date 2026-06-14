@@ -615,6 +615,7 @@ impl<'a> Emitter<'a> {
             | Ty::TaskSlotV1
             | Ty::TaskSelectEvtV1
             | Ty::Never => self.line(&format!("uint32_t {name} = UINT32_C(0);")),
+            Ty::F64 => self.line(&format!("double {name} = 0.0;")),
             Ty::TaskScopeV1 => self.line(&format!("rt_scope_t {name} = (rt_scope_t){{0}};")),
             Ty::BudgetScopeV1 => self.line(&format!(
                 "rt_budget_scope_t {name} = (rt_budget_scope_t){{0}};"

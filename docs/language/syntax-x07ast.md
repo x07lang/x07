@@ -54,7 +54,15 @@ The root JSON object must include `schema_version`.
 
 Current schema version:
 
-- `x07.x07ast@0.8.0`
+- `x07.x07ast@0.8.0` (the default emitted by tooling)
+
+Opt-in additive schema:
+
+- `x07.x07ast@0.9.0` — the RFC 0002 expressiveness floor. Currently adds the `f64`
+  scalar type and its explicit conversions/arithmetic (`f64.of_i32`,
+  `f64.to_i32_trunc`, `f64.add`/`sub`/`mul`/`div`). Concrete-only 0.8.0 programs stay
+  valid; set `schema_version` to `0.9.0` to use the new types. See
+  [Types & memory model](types-memory.md#floating-point-f64).
 
 The toolchain also accepts legacy schema versions:
 

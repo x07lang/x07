@@ -16,7 +16,7 @@ use crate::types::Ty;
 use crate::x07ast;
 use x07_contracts::{
     NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
-    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0, X07AST_SCHEMA_VERSION_V0_9_0,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1216,6 +1216,7 @@ fn enforce_contract_typecheck(
         && file.schema_version != X07AST_SCHEMA_VERSION_V0_6_0
         && file.schema_version != X07AST_SCHEMA_VERSION_V0_7_0
         && file.schema_version != X07AST_SCHEMA_VERSION_V0_8_0
+        && file.schema_version != X07AST_SCHEMA_VERSION_V0_9_0
     {
         return Ok(());
     }

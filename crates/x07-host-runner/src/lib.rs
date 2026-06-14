@@ -1593,6 +1593,9 @@ pub fn compile_c_to_exe_with_config(
     cmd.arg("-std=c11");
     cmd.arg("-O2");
     cmd.arg("-fno-builtin");
+    // Strict, deterministic floating point for `f64` (RFC 0002): no fast-math,
+    // and no FMA contraction so results match across targets.
+    cmd.arg("-ffp-contract=off");
     #[cfg(target_os = "linux")]
     {
         cmd.arg("-D_GNU_SOURCE");

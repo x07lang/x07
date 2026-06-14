@@ -11,7 +11,7 @@ use crate::mem_provenance::{
 use crate::x07ast::{self, X07AstFile, X07AstKind};
 use x07_contracts::{
     X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
-    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0, X07AST_SCHEMA_VERSION_V0_9_0,
 };
 
 fn expr_ident(name: impl Into<String>) -> Expr {
@@ -700,7 +700,8 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0
-            || file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0)
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_9_0)
     {
         let tc = crate::typecheck::typecheck_file_local(
             file,

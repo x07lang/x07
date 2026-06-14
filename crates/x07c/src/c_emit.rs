@@ -784,6 +784,7 @@ fn c_ret_ty(ty: Ty) -> &'static str {
         | Ty::TaskSlotV1
         | Ty::TaskSelectEvtV1
         | Ty::Never => "uint32_t",
+        Ty::F64 => "double",
         Ty::TaskScopeV1 => "rt_scope_t",
         Ty::BudgetScopeV1 => "rt_budget_scope_t",
         Ty::Bytes => "bytes_t",
@@ -814,6 +815,7 @@ fn c_zero(ty: Ty) -> &'static str {
         | Ty::TaskSlotV1
         | Ty::TaskSelectEvtV1
         | Ty::Never => "UINT32_C(0)",
+        Ty::F64 => "0.0",
         Ty::TaskScopeV1 => "(rt_scope_t){0}",
         Ty::BudgetScopeV1 => "(rt_budget_scope_t){0}",
         Ty::Bytes => "rt_bytes_empty(ctx)",
@@ -854,6 +856,7 @@ fn c_param_list_value(params: &[FunctionParam]) -> String {
             | Ty::TaskSlotV1
             | Ty::TaskSelectEvtV1
             | Ty::Never => "uint32_t",
+            Ty::F64 => "double",
             Ty::TaskScopeV1 => "rt_scope_t",
             Ty::BudgetScopeV1 => "rt_budget_scope_t",
             Ty::Bytes => "bytes_t",
@@ -894,6 +897,7 @@ fn c_param_list_user(params: &[FunctionParam]) -> String {
             | Ty::TaskSlotV1
             | Ty::TaskSelectEvtV1
             | Ty::Never => "uint32_t",
+            Ty::F64 => "double",
             Ty::TaskScopeV1 => "rt_scope_t",
             Ty::BudgetScopeV1 => "rt_budget_scope_t",
             Ty::Bytes => "bytes_t",

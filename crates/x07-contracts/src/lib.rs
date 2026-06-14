@@ -10,8 +10,13 @@ pub const X07AST_SCHEMA_VERSION_V0_5_0: &str = "x07.x07ast@0.5.0";
 pub const X07AST_SCHEMA_VERSION_V0_6_0: &str = "x07.x07ast@0.6.0";
 pub const X07AST_SCHEMA_VERSION_V0_7_0: &str = "x07.x07ast@0.7.0";
 pub const X07AST_SCHEMA_VERSION_V0_8_0: &str = "x07.x07ast@0.8.0";
+pub const X07AST_SCHEMA_VERSION_V0_9_0: &str = "x07.x07ast@0.9.0";
 
 /// The default x07AST schema version emitted by current tooling.
+///
+/// Stays at 0.8.0: 0.9.0 (the RFC 0002 expressiveness floor — `f64`, and later
+/// records, enums + `match`, `string`/`string_view`) is additive and opt-in per
+/// `schema_version`, so concrete-only 0.8.0 programs remain valid unchanged.
 pub const X07AST_SCHEMA_VERSION: &str = X07AST_SCHEMA_VERSION_V0_8_0;
 
 pub const X07AST_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
@@ -21,6 +26,7 @@ pub const X07AST_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
     X07AST_SCHEMA_VERSION_V0_6_0,
     X07AST_SCHEMA_VERSION_V0_7_0,
     X07AST_SCHEMA_VERSION_V0_8_0,
+    X07AST_SCHEMA_VERSION_V0_9_0,
 ];
 pub const X07_MONO_MAP_SCHEMA_VERSION: &str = "x07.mono.map@0.1.0";
 pub const X07_PBT_REPRO_SCHEMA_VERSION: &str = "x07.pbt.repro@0.1.0";

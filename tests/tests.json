@@ -8,6 +8,12 @@
       "expect": "pass"
     },
     {
+      "id": "smoke/f64_arith",
+      "world": "solve-pure",
+      "entry": "smoke_f64.f64_arith",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/pure_i32_eq",
       "world": "solve-pure",
       "entry": "smoke_pure.pure_i32_eq",

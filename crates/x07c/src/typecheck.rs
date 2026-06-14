@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
-use x07_contracts::X07AST_SCHEMA_VERSION_V0_8_0;
+use x07_contracts::{X07AST_SCHEMA_VERSION_V0_8_0, X07AST_SCHEMA_VERSION_V0_9_0};
 
 use crate::ast::Expr;
 use crate::diagnostics::{Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Severity, Stage};
@@ -2955,6 +2955,24 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
         "i32.lit".to_string(),
         mono("i32.lit", &[("x", "i32")], "i32"),
     );
+
+    // f64 scalar (RFC 0002, schema 0.9.0): explicit conversions only, no
+    // implicit numeric tower. Lowers to C `double`.
+    sigs.insert(
+        "f64.of_i32".to_string(),
+        mono("f64.of_i32", &[("x", "i32")], "f64"),
+    );
+    sigs.insert(
+        "f64.to_i32_trunc".to_string(),
+        mono("f64.to_i32_trunc", &[("x", "f64")], "i32"),
+    );
+    for op in ["f64.add", "f64.sub", "f64.mul", "f64.div"] {
+        sigs.insert(
+            op.to_string(),
+            mono(op, &[("a", "f64"), ("b", "f64")], "f64"),
+        );
+    }
+
     sigs.insert(
         "await".to_string(),
         mono("await", &[("handle", "i32")], "bytes"),
@@ -3683,6 +3701,12 @@ const CONTRACT_PURE_CALL_HEAD_ALLOWLIST: &[&str] = &[
     "bytes.lit",
     "bytes.view_lit",
     "i32.lit",
+    "f64.of_i32",
+    "f64.to_i32_trunc",
+    "f64.add",
+    "f64.sub",
+    "f64.mul",
+    "f64.div",
     "bytes.view",
     "bytes.subview",
     "bytes.len",
@@ -3890,7 +3914,8 @@ fn typecheck_file_impl(
         }
         if decreases.is_empty() && has_contracts && !direct_recursive_calls.is_empty() {
             let legacy_allow = opts.compat.version <= crate::compat::CompatVersion::new(0, 3);
-            let quickfix = (file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0)
+            let quickfix = (file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0
+                || file.schema_version == X07AST_SCHEMA_VERSION_V0_9_0)
                 .then(|| {
                     infer_decreases_expr_for_direct_recursion(
                         &direct_recursive_call_exprs,
