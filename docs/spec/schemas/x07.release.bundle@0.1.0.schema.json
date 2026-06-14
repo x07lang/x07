@@ -10,10 +10,7 @@
     "published_at_utc",
     "min_x07up_version",
     "x07_core",
-    "x07_wasm",
-    "x07_web_ui_host",
-    "x07_device_host",
-    "packages"
+    "x07_wasm"
   ],
   "properties": {
     "schema_version": {
@@ -50,9 +47,6 @@
     "packages": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "std_web_ui"
-      ],
       "properties": {
         "std_web_ui": {
           "type": "string",

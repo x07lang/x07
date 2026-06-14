@@ -173,19 +173,6 @@ def website_propagation_fixture(tmp_dir: Path) -> None:
                 "release_manifest_url": f"https://example.invalid/{tag}/x07-wasm-release.json",
                 "release_manifest_sha256": "sha256:" + ("1" * 64),
             },
-            "x07_web_ui_host": {
-                "version": version,
-                "tag": tag,
-                "release_manifest_url": f"https://example.invalid/{tag}/x07-web-ui-host-release.json",
-                "release_manifest_sha256": "sha256:" + ("2" * 64),
-            },
-            "x07_device_host": {
-                "version": version,
-                "tag": tag,
-                "release_manifest_url": f"https://example.invalid/{tag}/x07-device-host-release.json",
-                "release_manifest_sha256": "sha256:" + ("3" * 64),
-            },
-            "packages": {"std_web_ui": "0.1.5"},
         },
     )
     module.validate_install_manifests(
@@ -226,19 +213,6 @@ def website_propagation_fixture(tmp_dir: Path) -> None:
                 "release_manifest_url": f"https://example.invalid/{tag}/x07-wasm-release.json",
                 "release_manifest_sha256": "sha256:" + ("1" * 64),
             },
-            "x07_web_ui_host": {
-                "version": version,
-                "tag": tag,
-                "release_manifest_url": f"https://example.invalid/{tag}/x07-web-ui-host-release.json",
-                "release_manifest_sha256": "sha256:" + ("2" * 64),
-            },
-            "x07_device_host": {
-                "version": version,
-                "tag": tag,
-                "release_manifest_url": f"https://example.invalid/{tag}/x07-device-host-release.json",
-                "release_manifest_sha256": "sha256:" + ("3" * 64),
-            },
-            "packages": {"std_web_ui": "0.1.5"},
         },
     )
     try:
@@ -279,8 +253,6 @@ def core_fixture(tmp_dir: Path) -> None:
 
     compat_path = tmp_dir / "core-compat.json"
     compat_doc = {
-        "device_host": "0.1.0",
-        "std_web_ui": "0.1.5",
         "x07_core": ">=0.1.52,<0.1.53",
         "x07_wasm": "0.1.0",
     }
@@ -348,24 +320,11 @@ def core_fixture(tmp_dir: Path) -> None:
     bundle_input_doc = {
         "published_at_utc": "2026-03-05T00:20:00Z",
         "min_x07up_version": version,
-        "packages": {"std_web_ui": "0.1.5"},
         "x07_wasm": {
             "version": "0.1.0",
             "tag": "v0.1.0",
             "release_manifest_url": "https://github.com/x07lang/x07-wasm-backend/releases/download/v0.1.0/x07-wasm-0.1.0-release.json",
             "release_manifest_sha256": "sha256:" + ("1" * 64),
-        },
-        "x07_web_ui_host": {
-            "version": "0.1.5",
-            "tag": "v0.1.5",
-            "release_manifest_url": "https://github.com/x07lang/x07-web-ui/releases/download/v0.1.5/x07-web-ui-host-0.1.5-release.json",
-            "release_manifest_sha256": "sha256:" + ("2" * 64),
-        },
-        "x07_device_host": {
-            "version": "0.1.0",
-            "tag": "v0.1.0",
-            "release_manifest_url": "https://github.com/x07lang/x07-device-host/releases/download/v0.1.0/x07-device-host-0.1.0-release.json",
-            "release_manifest_sha256": "sha256:" + ("3" * 64),
         },
     }
     write_json(bundle_input_path, bundle_input_doc)
@@ -395,9 +354,6 @@ def core_fixture(tmp_dir: Path) -> None:
             "release_manifest_sha256": f"sha256:{sha256_file(release_path)}",
         },
         "x07_wasm": bundle_input_doc["x07_wasm"],
-        "x07_web_ui_host": bundle_input_doc["x07_web_ui_host"],
-        "x07_device_host": bundle_input_doc["x07_device_host"],
-        "packages": {"std_web_ui": "0.1.5"},
     }
     assert_text(bundle_path, render_json(expected_bundle))
 
@@ -461,7 +417,7 @@ def component_fixture(
     expected_assets: list[dict[str, object]] = []
     for name in asset_names:
         target = None
-        if name.endswith((".tar.gz", ".zip")) and not name.startswith("x07-web-ui-host-") and not name.startswith("x07-device-host-mobile-templates-"):
+        if name.endswith((".tar.gz", ".zip")):
             for candidate, _ext in TARGETS:
                 if candidate in name:
                     target = candidate
@@ -471,27 +427,13 @@ def component_fixture(
                 repo,
                 f"v{version}",
                 dist_dir / name,
-                {
-                    "x07_wasm": "archive",
-                    "x07_web_ui_host": "host_bundle",
-                    "x07_device_host": "archive",
-                }.get(component, "archive"),
+                "archive",
                 target,
             )
         )
     attest_path = dist_dir / attestations_name
     expected_assets.append(release_asset(repo, f"v{version}", attest_path, "attestations"))
     expected_assets.append(release_asset(repo, f"v{version}", checksums_path, "checksums"))
-    if component == "x07_device_host":
-        templates = dist_dir / f"x07-device-host-mobile-templates-{version}.zip"
-        abi = dist_dir / f"x07-device-host-abi-{version}.json"
-        for asset in expected_assets:
-            if asset["name"] == templates.name:
-                asset["kind"] = "templates"
-                asset.pop("target", None)
-            if asset["name"] == abi.name:
-                asset["kind"] = "abi_snapshot"
-                asset.pop("target", None)
     expected_doc: dict[str, object] = {
         "schema_version": "x07.component.release@0.1.0",
         "component": component,
@@ -522,58 +464,12 @@ def main() -> int:
             version="0.1.0",
             repo="https://github.com/x07lang/x07-wasm-backend",
             compat_doc={
-                "device_host": "0.1.0",
-                "std_web_ui": "0.1.5",
                 "x07_core": ">=0.1.52,<0.1.53",
             },
             asset_names=[f"x07-wasm-0.1.0-{target}{ext}" for target, ext in TARGETS],
             published_at_utc="2026-03-05T00:05:00Z",
             metadata_items=[
                 "host_abi_hash=sha256:" + ("4" * 64),
-                "package_name=std-web-ui",
-                "package_version=0.1.5",
-            ],
-        )
-        component_fixture(
-            tmp_dir,
-            component="x07_web_ui_host",
-            base_name="x07-web-ui-host-",
-            version="0.1.5",
-            repo="https://github.com/x07lang/x07-web-ui",
-            compat_doc={
-                "device_host": "0.1.0",
-                "std_web_ui": "0.1.5",
-                "x07_core": ">=0.1.52,<0.1.53",
-                "x07_wasm": "0.1.0",
-            },
-            asset_names=["x07-web-ui-host-0.1.5.zip"],
-            published_at_utc="2026-03-05T00:10:00Z",
-            metadata_items=[
-                "host_abi_hash=sha256:" + ("5" * 64),
-                "package_name=std-web-ui",
-                "package_version=0.1.5",
-            ],
-        )
-        component_fixture(
-            tmp_dir,
-            component="x07_device_host",
-            base_name="x07-device-host-",
-            version="0.1.0",
-            repo="https://github.com/x07lang/x07-device-host",
-            compat_doc={
-                "std_web_ui": "0.1.5",
-                "x07_core": ">=0.1.52,<0.1.53",
-            },
-            asset_names=[
-                f"x07-device-host-desktop-0.1.0-{target}{ext}" for target, ext in TARGETS
-            ]
-            + [
-                "x07-device-host-mobile-templates-0.1.0.zip",
-                "x07-device-host-abi-0.1.0.json",
-            ],
-            published_at_utc="2026-03-05T00:15:00Z",
-            metadata_items=[
-                "host_abi_hash=sha256:" + ("6" * 64),
             ],
         )
         formal_verification_release_fixture()
