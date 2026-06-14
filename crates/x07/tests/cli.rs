@@ -1360,13 +1360,13 @@ fn x07_test_smoke_suite() {
     );
     let v = parse_json_stdout(&out);
     assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
-    assert_eq!(v["summary"]["passed"], 46);
+    assert_eq!(v["summary"]["passed"], 47);
     assert_eq!(v["summary"]["failed"], 0);
     assert_eq!(v["summary"]["errors"], 0);
     assert_eq!(v["summary"]["xfail_failed"], 1);
 
     let tests = v["tests"].as_array().expect("tests[]");
-    assert_eq!(tests.len(), 47);
+    assert_eq!(tests.len(), 48);
     let ids: Vec<&str> = tests
         .iter()
         .map(|t| t["id"].as_str().expect("test.id"))
@@ -1390,6 +1390,7 @@ fn x07_test_smoke_suite() {
             "smoke/stdlib_json_encode",
             "smoke/stdlib_parse_dec",
             "smoke/stdlib_path_helpers",
+            "smoke/str_ops",
             "smoke/stream_pipe_bytes_budget_items",
             "smoke/stream_pipe_bytes_collect_identity",
             "smoke/stream_pipe_bytes_filter_collect",

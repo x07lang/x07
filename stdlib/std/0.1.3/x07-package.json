@@ -8,6 +8,7 @@
     "std.pbt.case_v1",
     "std.pbt.gen_v1",
     "std.pbt.shrink_v1",
+    "std.str",
     "std.text.ascii",
     "std.text.slices",
     "std.text.utf8",

@@ -199,6 +199,55 @@ omits a variant (`non-exhaustive match on enum app.Shape; missing arm(s): ...`),
 or scrutinizes a value that is not branded with an enum. As with records, functions accept an
 enum by declaring a `bytes` parameter (or result) whose `brand` is the enum name.
 
+## Strings (`std.str`, validated UTF-8)
+
+A **string** is `bytes` carrying the brand `std.str.utf8_v1` — bytes that have been validated
+as UTF-8 (RFC 0002). `string_view` is the borrowed form (`bytes_view@std.str.utf8_v1`). There
+is no separate string runtime type: a string is branded bytes, so it reuses the move-only
+`bytes` model and the [branded-bytes](#branded-bytes-typed-encodings) machinery, exactly like
+records and enums. The `std.str` stdlib module provides the operations:
+
+- `std.str.from_bytes_v1(b: bytes) -> result_bytes@std.str.utf8_v1` — validate UTF-8 once and
+  brand on success (the only way to obtain a string from arbitrary bytes).
+- `std.str.as_bytes(s) -> bytes` — drop the brand (free; UTF-8 stays valid).
+- `std.str.len(s) -> i32` — byte length; `std.str.char_count(s) -> i32` — Unicode codepoints.
+- `std.str.slice_v1(s, start, len) -> result_bytes@std.str.utf8_v1` — a byte-range slice,
+  re-validated so a cut across a codepoint boundary is rejected rather than silently corrupting.
+- `std.str.to_lower_ascii(s)` / `std.str.to_upper_ascii(s)` — ASCII-only case folding (bytes
+  ≥ 128 pass through untouched, so multi-byte sequences are preserved).
+
+Validation can fail, so `from_bytes_v1` returns a `result`. The idiomatic way to consume it is
+`try`, which unwraps the `result_bytes` to a branded string and propagates the validation error
+otherwise — so a function returning `result_*` gets a real string with no separate error
+handling:
+
+```clojure
+; x07text
+{
+  :kind module
+  :module_id app
+  :schema_version x07.x07ast@0.9.0
+  :imports (std.str)
+  :decls ({:kind export :names (app.char_len)}
+    {
+      :kind defn
+      :name app.char_len
+      :body (begin
+        (let s (try (std.str.from_bytes_v1 raw)))
+        (result_i32.ok (std.str.char_count s))
+      )
+      :params ({:name raw :ty bytes})
+      :result result_i32
+    }
+  )
+}
+```
+
+Because a string is branded bytes, accessor-style functions declare a `bytes_view` parameter
+branded `std.str.utf8_v1`, and an owned string (`bytes@std.str.utf8_v1`) is accepted there
+directly (bytes coerce to a view, preserving the brand). Passing unvalidated `bytes` where a
+string is expected is a type error — the brand is what makes it a string.
+
 ## Branded bytes (typed encodings)
 
 Bytes-like values can carry a nominal **brand** (compile-time only) to represent “validated bytes of encoding X”.
