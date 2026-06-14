@@ -60,9 +60,11 @@ Opt-in additive schema:
 
 - `x07.x07ast@0.9.0` — the RFC 0002 expressiveness floor. Adds the `f64` scalar type
   with explicit conversions/arithmetic (`f64.of_i32`, `f64.to_i32_trunc`,
-  `f64.add`/`sub`/`mul`/`div`), and the `defrecord` decl kind for nominal product types
-  (generated `<Record>.make` constructor and `<Record>.<field>` accessors). Concrete-only
-  0.8.0 programs stay valid; set `schema_version` to `0.9.0` to use the new features. See
+  `f64.add`/`sub`/`mul`/`div`), the `defrecord` decl kind for nominal product types
+  (generated `<Record>.make` constructor and `<Record>.<field>` accessors), and the
+  `defenum` decl kind for nominal tagged unions (generated `<Enum>.<Variant>` constructors)
+  consumed by the exhaustive `match` form. Concrete-only 0.8.0 programs stay valid; set
+  `schema_version` to `0.9.0` to use the new features. See
   [Types & memory model](types-memory.md#floating-point-f64).
 
 The toolchain also accepts legacy schema versions:

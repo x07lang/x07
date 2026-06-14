@@ -155,6 +155,50 @@ an `app.Order` is expected is a type error — `(app.Order.total x)` requires `x
 the `app.Order` brand. Functions accept records by declaring a `bytes` parameter (or result)
 with the record name as its `brand`.
 
+## Enums (`defenum`) and `match`
+
+`defenum` declares a nominal tagged-union (sum) type, available from `x07.x07ast@0.9.0`
+(RFC 0002). Like a record, an enum value lowers to `bytes` branded with the enum's name, so
+it reuses the move-only `bytes` model. The layout is `[u32 tag][payload?]`: a little-endian
+tag holding the variant's 0-based declaration index, optionally followed by a 4-byte payload.
+Enums v1 support unit variants and variants with a single `i32`/`u32` payload.
+
+Each declared variant becomes a constructor `<Enum>.<Variant>`: a unit variant takes no
+arguments, a payload variant takes one `i32`. You consume an enum with `match`, which is
+**exhaustive** — every variant must appear exactly once, with no fallthrough or wildcard —
+and binds a payload variant's value to a name in that arm:
+
+```clojure
+; x07text
+{
+  :kind module
+  :module_id app
+  :schema_version x07.x07ast@0.9.0
+  :imports ()
+  :decls ({:kind export :names (app.area)}
+    {
+      :kind defn
+      :name app.area
+      :body (match s (app.Shape.Unit 1) (app.Shape.Square side (* side side)))
+      :params ({:name s :brand app.Shape :ty bytes})
+      :result i32
+    }
+    {
+      :kind defenum
+      :name app.Shape
+      :variants ({:name Unit} {:name Square :payload i32})
+    }
+  )
+}
+```
+
+A match arm is `(<Enum>.<Variant> <body>)` for a unit variant or
+`(<Enum>.<Variant> <bind> <body>)` for a payload variant, where `<bind>` names the payload
+inside `<body>`. All arms must agree on a result type, and the compiler rejects a match that
+omits a variant (`non-exhaustive match on enum app.Shape; missing arm(s): ...`), repeats one,
+or scrutinizes a value that is not branded with an enum. As with records, functions accept an
+enum by declaring a `bytes` parameter (or result) whose `brand` is the enum name.
+
 ## Branded bytes (typed encodings)
 
 Bytes-like values can carry a nominal **brand** (compile-time only) to represent “validated bytes of encoding X”.

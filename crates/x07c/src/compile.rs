@@ -376,9 +376,10 @@ fn compile_frontend(
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("main: {e}")))?;
     enforce_contract_typecheck("main", &file, options.compat)?;
     fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
-    // Records (RFC 0002) are not generic; capture the main module's record
-    // layouts before `file` is consumed, then attach to the lowered program.
+    // Records and enums (RFC 0002) are not generic; capture the main module's
+    // type layouts before `file` is consumed, then attach to the lowered program.
     let mut all_records = crate::records::lower_records(&file.records);
+    let mut all_enums = crate::enums::lower_enums(&file.enums);
     let main = parse_main_file_x07ast(file)?;
     if !options.allow_internal_only_heads_in_entry {
         forbid_internal_only_heads_in_entry("main", &main)?;
@@ -403,6 +404,7 @@ fn compile_frontend(
             &mut visiting,
             &mut fuel_used,
             &mut all_records,
+            &mut all_enums,
         )?;
     }
 
@@ -414,6 +416,7 @@ fn compile_frontend(
         &mut visiting,
         &mut fuel_used,
         &mut all_records,
+        &mut all_enums,
     )?;
 
     let ParsedMain {
@@ -454,6 +457,7 @@ fn compile_frontend(
     let (mut parsed_program, mono_map) =
         generics::monomorphize(generic_program, &module_exports, &main_schema_version)?;
     parsed_program.records = all_records;
+    parsed_program.enums = all_enums;
     propagate_mono_exports(&mut module_infos, &mono_map)?;
 
     forbid_reserved_helper_function_names(&parsed_program)?;
@@ -530,6 +534,7 @@ struct ModuleInfo {
     is_builtin: bool,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn inject_implicit_imports_for_ty_intrinsics(
     main: &ParsedMain,
     options: &CompileOptions,
@@ -538,6 +543,7 @@ fn inject_implicit_imports_for_ty_intrinsics(
     visiting: &mut BTreeSet<String>,
     fuel_used: &mut u64,
     records_out: &mut Vec<crate::program::RecordDef>,
+    enums_out: &mut Vec<crate::program::EnumDef>,
 ) -> Result<(), CompilerError> {
     let imports_by_module: BTreeMap<String, BTreeSet<&'static str>> = {
         let mut imports_by_module: BTreeMap<String, BTreeSet<&'static str>> = BTreeMap::new();
@@ -596,6 +602,7 @@ fn inject_implicit_imports_for_ty_intrinsics(
             visiting,
             fuel_used,
             records_out,
+            enums_out,
         )?;
     }
 
@@ -1102,6 +1109,7 @@ fn parse_module_file_x07ast(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_module_recursive(
     module_id: &str,
     options: &CompileOptions,
@@ -1110,6 +1118,7 @@ fn load_module_recursive(
     visiting: &mut BTreeSet<String>,
     fuel_used: &mut u64,
     records_out: &mut Vec<crate::program::RecordDef>,
+    enums_out: &mut Vec<crate::program::EnumDef>,
 ) -> Result<(), CompilerError> {
     if module_infos.contains_key(module_id) {
         return Ok(());
@@ -1144,6 +1153,7 @@ fn load_module_recursive(
     enforce_contract_typecheck(module_id, &file, options.compat)?;
     *fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     records_out.extend(crate::records::lower_records(&file.records));
+    enums_out.extend(crate::enums::lower_enums(&file.enums));
     let (m, mut info) = parse_module_file_x07ast(module_id, file)?;
     info.is_builtin = is_builtin;
 
@@ -1160,6 +1170,7 @@ fn load_module_recursive(
             visiting,
             fuel_used,
             records_out,
+            enums_out,
         )?;
     }
 

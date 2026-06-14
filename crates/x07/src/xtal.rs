@@ -9472,6 +9472,7 @@ fn plan_impl_sync_edits(
                 async_functions: Vec::new(),
                 extern_functions: Vec::new(),
                 records: Vec::new(),
+                enums: Vec::new(),
                 solve: None,
                 meta: BTreeMap::new(),
             }
@@ -9701,6 +9702,7 @@ fn contract_clause_is_contract_core(
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         records: Vec::new(),
+        enums: Vec::new(),
         solve: None,
         meta: BTreeMap::new(),
     };
@@ -12023,6 +12025,7 @@ fn generate_tests_from_specs(
             async_functions: Vec::new(),
             extern_functions: Vec::new(),
             records: Vec::new(),
+            enums: Vec::new(),
             solve: None,
             meta: BTreeMap::new(),
         };
@@ -12994,6 +12997,7 @@ fn typecheck_spec_contracts(
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         records: Vec::new(),
+        enums: Vec::new(),
         solve: None,
         meta: BTreeMap::new(),
     };

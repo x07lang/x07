@@ -390,6 +390,7 @@ mod tests {
             }],
             extern_functions: Vec::new(),
             records: Vec::new(),
+            enums: Vec::new(),
             solve: Expr::Int {
                 value: 0,
                 ptr: "/solve".to_string(),
@@ -626,6 +627,7 @@ pub fn emit_c(expr: &Expr, options: &CompileOptions) -> Result<String, CompilerE
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         records: Vec::new(),
+        enums: Vec::new(),
         solve: expr.clone(),
     };
     emit_c_program(&program, options)

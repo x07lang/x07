@@ -608,6 +608,7 @@ impl<'a> Emitter<'a> {
             "set" => self.emit_set_to(args, dest_ty, dest),
             "set0" => self.emit_set0_to(args, dest_ty, dest),
             "if" => self.emit_if_to(args, dest_ty, dest),
+            "match" => self.emit_match_to(args, dest_ty, dest),
             "for" => self.emit_for_to(args, dest_ty, dest),
             "while" => self.emit_while_to(args, dest_ty, dest),
             "budget.scope_v1" => self.emit_budget_scope_v1_to(args, dest_ty, dest),
@@ -1179,6 +1180,9 @@ impl<'a> Emitter<'a> {
             _ => {
                 if let Some(op) = crate::records::resolve_record_op(&self.program.records, head) {
                     return self.emit_record_op_to(head, op, args, dest_ty, dest);
+                }
+                if let Some(op) = crate::enums::resolve_enum_op(&self.program.enums, head) {
+                    return self.emit_enum_op_to(head, op, args, dest_ty, dest);
                 }
                 if self.fn_c_names.contains_key(head) {
                     self.emit_user_call_to(head, args, dest_ty, dest)
@@ -1788,6 +1792,244 @@ impl<'a> Emitter<'a> {
                 self.emit_expr_to(&read, Ty::I32, dest)
             }
         }
+    }
+
+    pub(super) fn emit_enum_op_to(
+        &mut self,
+        head: &str,
+        op: crate::enums::EnumOp,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let ptr = args
+            .first()
+            .map(|e| e.ptr().to_string())
+            .unwrap_or_default();
+        let ident = |name: &str| Expr::Ident {
+            name: name.to_string(),
+            ptr: ptr.clone(),
+        };
+        let int = |value: i32| Expr::Int {
+            value,
+            ptr: ptr.clone(),
+        };
+        match op {
+            crate::enums::EnumOp::Variant(_en, variant) => {
+                if dest_ty != Ty::Bytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} returns bytes"),
+                    ));
+                }
+                // Tag is the variant's 0-based index, written little-endian.
+                let tag = Expr::List {
+                    items: vec![ident("codec.write_u32_le"), int(variant.tag as i32)],
+                    ptr: ptr.clone(),
+                };
+                match &variant.payload {
+                    None => {
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} is a unit variant and takes no arguments"),
+                            ));
+                        }
+                        self.emit_expr_to(&tag, Ty::Bytes, dest)
+                    }
+                    Some(_) => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 1 payload arg"),
+                            ));
+                        }
+                        // Layout is [u32 tag][u32 payload]:
+                        //   (bytes.concat (codec.write_u32_le tag) (codec.write_u32_le payload))
+                        let payload = Expr::List {
+                            items: vec![ident("codec.write_u32_le"), args[0].clone()],
+                            ptr: ptr.clone(),
+                        };
+                        let packed = Expr::List {
+                            items: vec![ident("bytes.concat"), tag, payload],
+                            ptr: ptr.clone(),
+                        };
+                        self.emit_expr_to(&packed, Ty::Bytes, dest)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Emit a `match` form by desugaring it to a `let`-bound scrutinee, a tag
+    /// read, and a dense `if` chain over the tag — reusing the existing core
+    /// forms. Exhaustiveness/typing was already enforced during inference, so
+    /// the highest-tag variant becomes the chain's bare `else`.
+    pub(super) fn emit_match_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() < 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "match form: (match <scrut> <arm>...)".to_string(),
+            ));
+        }
+        let ptr = args[0].ptr().to_string();
+        let ident = |name: &str| Expr::Ident {
+            name: name.to_string(),
+            ptr: ptr.clone(),
+        };
+        let int = |value: i32| Expr::Int {
+            value,
+            ptr: ptr.clone(),
+        };
+        let list = |items: Vec<Expr>| Expr::List {
+            items,
+            ptr: ptr.clone(),
+        };
+
+        // Recover the matched enum from the first arm's pattern head.
+        let first_pat = args[1]
+            .as_list()
+            .and_then(|items| items.first())
+            .and_then(Expr::as_ident)
+            .ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Parse,
+                    "match arm must be a list (<Enum>.<Variant> ...)".to_string(),
+                )
+            })?;
+        let en = match crate::enums::resolve_enum_op(&self.program.enums, first_pat) {
+            Some(crate::enums::EnumOp::Variant(en, _)) => en,
+            None => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{first_pat:?} is not an enum variant"),
+                ))
+            }
+        };
+
+        // Map each variant name to its arm (payload binding + body).
+        let mut arms: BTreeMap<String, (Option<String>, Expr)> = BTreeMap::new();
+        for arm in &args[1..] {
+            let items = arm.as_list().ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Parse,
+                    "match arm must be a list".to_string(),
+                )
+            })?;
+            let pat = items.first().and_then(Expr::as_ident).ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Parse,
+                    "match arm pattern head must be a variant identifier".to_string(),
+                )
+            })?;
+            let vname = pat
+                .strip_prefix(en.name.as_str())
+                .and_then(|r| r.strip_prefix('.'))
+                .ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{pat:?} is not a variant of enum {}", en.name),
+                    )
+                })?
+                .to_string();
+            let variant = en
+                .variants
+                .iter()
+                .find(|v| v.name == vname)
+                .ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{pat:?} is not a variant of enum {}", en.name),
+                    )
+                })?;
+            let (bind, body) = match &variant.payload {
+                None => (None, items[1].clone()),
+                Some(_) => (
+                    Some(items[1].as_ident().unwrap_or_default().to_string()),
+                    items[2].clone(),
+                ),
+            };
+            arms.insert(vname, (bind, body));
+        }
+
+        self.tmp_counter += 1;
+        let n = self.tmp_counter;
+        let tag_tmp = format!("match_tag_{n}");
+
+        // Read the scrutinee through a borrow (codec.read_u32_le does not
+        // consume). If it is already a binding, read it directly so the
+        // caller's value is not moved; otherwise bind it once to a temp, since
+        // the tag and payload reads must not re-evaluate it.
+        let scrut_is_ident = matches!(&args[0], Expr::Ident { .. });
+        let scrut_tmp = format!("match_scrut_{n}");
+        let scrut_ref = if scrut_is_ident {
+            args[0].clone()
+        } else {
+            ident(&scrut_tmp)
+        };
+
+        // arm_body builds the result expression for one variant, reading the
+        // payload (after the tag) into the binding for payload variants.
+        let payload_offset = crate::enums::TAG_SIZE as i32;
+        let arm_body = |variant: &crate::program::EnumVariant| -> Result<Expr, CompilerError> {
+            let (bind, body) = arms.get(&variant.name).ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "non-exhaustive match on enum {}: missing variant {}",
+                        en.name, variant.name
+                    ),
+                )
+            })?;
+            match (bind, &variant.payload) {
+                (Some(bind), Some(_)) => Ok(list(vec![
+                    ident("begin"),
+                    list(vec![
+                        ident("let"),
+                        ident(bind),
+                        list(vec![
+                            ident("codec.read_u32_le"),
+                            scrut_ref.clone(),
+                            int(payload_offset),
+                        ]),
+                    ]),
+                    body.clone(),
+                ])),
+                _ => Ok(body.clone()),
+            }
+        };
+
+        // Build the dense if-chain in tag order; highest tag is the bare else.
+        let mut variants_in_order = en.variants.clone();
+        variants_in_order.sort_by_key(|v| v.tag);
+        let last = variants_in_order.last().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("enum {} has no variants", en.name),
+            )
+        })?;
+        let mut chain = arm_body(last)?;
+        for variant in variants_in_order.iter().rev().skip(1) {
+            let cond = list(vec![ident("="), ident(&tag_tmp), int(variant.tag as i32)]);
+            chain = list(vec![ident("if"), cond, arm_body(variant)?, chain]);
+        }
+
+        let mut desugared_items = vec![ident("begin")];
+        if !scrut_is_ident {
+            desugared_items.push(list(vec![ident("let"), ident(&scrut_tmp), args[0].clone()]));
+        }
+        desugared_items.push(list(vec![
+            ident("let"),
+            ident(&tag_tmp),
+            list(vec![ident("codec.read_u32_le"), scrut_ref.clone(), int(0)]),
+        ]));
+        desugared_items.push(chain);
+        self.emit_expr_to(&list(desugared_items), dest_ty, dest)
     }
 
     pub(super) fn emit_f64_arith_to(

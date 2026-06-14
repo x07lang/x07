@@ -208,6 +208,21 @@ pub struct AstRecordDef {
     pub fields: Vec<AstRecordField>,
 }
 
+/// A variant of a `defenum` (RFC 0002 enums): a name and an optional payload type.
+#[derive(Debug, Clone)]
+pub struct AstEnumVariant {
+    pub name: String,
+    pub payload: Option<TypeRef>,
+}
+
+/// A `defenum` declaration: a nominal tagged-union (sum) type.
+#[derive(Debug, Clone)]
+pub struct AstEnumDef {
+    pub name: String,
+    pub doc: Option<String>,
+    pub variants: Vec<AstEnumVariant>,
+}
+
 #[derive(Debug, Clone)]
 pub struct X07AstFile {
     pub schema_version: String,
@@ -219,6 +234,7 @@ pub struct X07AstFile {
     pub async_functions: Vec<AstAsyncFunctionDef>,
     pub extern_functions: Vec<AstExternFunctionDecl>,
     pub records: Vec<AstRecordDef>,
+    pub enums: Vec<AstEnumDef>,
     pub solve: Option<Expr>,
     pub meta: BTreeMap<String, Value>,
 }
@@ -266,6 +282,78 @@ fn supports_defn_decreases(schema_version: &str) -> bool {
 
 fn supports_records(schema_version: &str) -> bool {
     schema_version == X07AST_SCHEMA_VERSION_V0_9_0
+}
+
+fn supports_enums(schema_version: &str) -> bool {
+    schema_version == X07AST_SCHEMA_VERSION_V0_9_0
+}
+
+fn parse_enum(
+    dobj: &serde_json::Map<String, Value>,
+    dptr: &str,
+) -> Result<AstEnumDef, X07AstError> {
+    let name = get_required_string(dobj, &format!("{dptr}/name"), "name")?;
+    let doc = dobj
+        .get("doc")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let variants_v = dobj
+        .get("variants")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| X07AstError {
+            message: "defenum requires a `variants` array".to_string(),
+            ptr: format!("{dptr}/variants"),
+        })?;
+    if variants_v.is_empty() {
+        return Err(X07AstError {
+            message: "defenum requires at least one variant".to_string(),
+            ptr: format!("{dptr}/variants"),
+        });
+    }
+    let mut variants = Vec::with_capacity(variants_v.len());
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    for (i, vv) in variants_v.iter().enumerate() {
+        let vptr = format!("{dptr}/variants/{i}");
+        let vo = vv.as_object().ok_or_else(|| X07AstError {
+            message: format!("enum variant {i} must be an object"),
+            ptr: vptr.clone(),
+        })?;
+        let vname = get_required_string(vo, &format!("{vptr}/name"), "name")?;
+        if !seen.insert(vname.clone()) {
+            return Err(X07AstError {
+                message: format!("duplicate enum variant: {vname:?}"),
+                ptr: format!("{vptr}/name"),
+            });
+        }
+        let payload = match vo.get("payload") {
+            None => None,
+            Some(p) => {
+                let pty = p.as_str().ok_or_else(|| X07AstError {
+                    message: "enum variant payload must be a type name string".to_string(),
+                    ptr: format!("{vptr}/payload"),
+                })?;
+                if pty != "i32" && pty != "u32" {
+                    return Err(X07AstError {
+                        message: format!(
+                            "enum variant {vname:?} payload type {pty:?} is unsupported; \
+                             variants currently support no payload or a single `i32`/`u32` payload"
+                        ),
+                        ptr: format!("{vptr}/payload"),
+                    });
+                }
+                Some(TypeRef::Named(pty.to_string()))
+            }
+        };
+        variants.push(AstEnumVariant {
+            name: vname,
+            payload,
+        });
+    }
+    Ok(AstEnumDef {
+        name,
+        doc,
+        variants,
+    })
 }
 
 fn parse_record(
@@ -398,6 +486,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
     let mut async_functions: Vec<AstAsyncFunctionDef> = Vec::new();
     let mut extern_functions: Vec<AstExternFunctionDecl> = Vec::new();
     let mut records: Vec<AstRecordDef> = Vec::new();
+    let mut enums: Vec<AstEnumDef> = Vec::new();
     let mut defn_decreases_meta = serde_json::Map::new();
 
     let mut function_names: BTreeSet<String> = BTreeSet::new();
@@ -542,6 +631,24 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 }
                 records.push(rec);
             }
+            "defenum" => {
+                if !supports_enums(&schema_version) {
+                    return Err(X07AstError {
+                        message: format!(
+                            "defenum is only supported in {X07AST_SCHEMA_VERSION_V0_9_0}"
+                        ),
+                        ptr: format!("{dptr}/kind"),
+                    });
+                }
+                let en = parse_enum(dobj, &dptr)?;
+                if !function_names.insert(en.name.clone()) {
+                    return Err(X07AstError {
+                        message: format!("duplicate decl name: {:?}", en.name),
+                        ptr: format!("{dptr}/name"),
+                    });
+                }
+                enums.push(en);
+            }
             _ => {
                 return Err(X07AstError {
                     message: format!("unsupported decl kind: {kind:?}"),
@@ -582,6 +689,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
         async_functions,
         extern_functions,
         records,
+        enums,
         solve,
         meta,
     })
@@ -1584,6 +1692,9 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
     for r in &file.records {
         out.push(Value::Object(record_decl_value(r)));
     }
+    for e in &file.enums {
+        out.push(Value::Object(enum_decl_value(e)));
+    }
     out
 }
 
@@ -1605,6 +1716,29 @@ fn record_decl_value(rec: &AstRecordDef) -> serde_json::Map<String, Value> {
         })
         .collect();
     m.insert("fields".to_string(), Value::Array(fields));
+    m
+}
+
+fn enum_decl_value(en: &AstEnumDef) -> serde_json::Map<String, Value> {
+    let mut m = serde_json::Map::new();
+    m.insert("kind".to_string(), Value::String("defenum".to_string()));
+    m.insert("name".to_string(), Value::String(en.name.clone()));
+    if let Some(doc) = &en.doc {
+        m.insert("doc".to_string(), Value::String(doc.clone()));
+    }
+    let variants: Vec<Value> = en
+        .variants
+        .iter()
+        .map(|v| {
+            let mut vm = serde_json::Map::new();
+            vm.insert("name".to_string(), Value::String(v.name.clone()));
+            if let Some(payload) = &v.payload {
+                vm.insert("payload".to_string(), type_ref_to_value(payload));
+            }
+            Value::Object(vm)
+        })
+        .collect();
+    m.insert("variants".to_string(), Value::Array(variants));
     m
 }
 

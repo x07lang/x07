@@ -34,6 +34,13 @@ impl Expr {
             _ => None,
         }
     }
+
+    pub fn as_list(&self) -> Option<&[Expr]> {
+        match self {
+            Expr::List { items, .. } => Some(items),
+            _ => None,
+        }
+    }
 }
 
 impl PartialEq for Expr {

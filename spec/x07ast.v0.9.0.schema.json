@@ -329,13 +329,38 @@
         }
       }
     },
+    "decl_defenum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "variants"],
+      "properties": {
+        "kind": { "const": "defenum" },
+        "name": { "$ref": "#/$defs/symbol" },
+        "doc": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "$ref": "#/$defs/local_name" },
+              "payload": { "$ref": "#/$defs/type_name" }
+            }
+          }
+        }
+      }
+    },
     "decl": {
       "oneOf": [
         { "$ref": "#/$defs/decl_defn" },
         { "$ref": "#/$defs/decl_defasync" },
         { "$ref": "#/$defs/decl_export" },
         { "$ref": "#/$defs/decl_extern" },
-        { "$ref": "#/$defs/decl_defrecord" }
+        { "$ref": "#/$defs/decl_defrecord" },
+        { "$ref": "#/$defs/decl_defenum" }
       ]
     }
   }
