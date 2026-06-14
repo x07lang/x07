@@ -5,7 +5,6 @@
 
 ## Getting started
 - [Install](getting-started/install.md)
-- [Installer / x07up](getting-started/installer.md)
 - [First project](getting-started/first-project.md)
 - [Agent initial prompt](getting-started/agent-initial-prompt.md)
 - [Agent quickstart](getting-started/agent-quickstart.md)
@@ -15,7 +14,6 @@
 ## Agent
 - [Agent contracts](agent/contract.md)
 - [Readiness checks](agent/readiness-checks.md)
-- [Platform (x07lp)](agent/platform.md)
 - [Reference apps](agent/apps.md)
 
 ## Recipes
@@ -88,7 +86,6 @@
 - [ABI v1](spec/abi/abi-v1.md)
 - [ABI v2](spec/abi/abi-v2.md)
 - [ABI stability policy](spec/abi/stability-policy.md)
-- [Published spec manifest](spec/spec-index.md)
 
 ## Packages
 - [Packages & workspaces](packages/index.md)

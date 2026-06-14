@@ -2,8 +2,13 @@
 
 X07 uses a structured syntax called **x07AST**.
 
-- Humans can work with a pretty form.
-- Agents should operate directly on the JSON AST (no fragile text edits).
+- The canonical on-disk format is JSON (`*.x07.json`).
+- [x07text](x07text.md) is the lossless, human/agent-readable text projection
+  of that JSON. `x07 ast from-text` re-canonicalizes x07text back to
+  byte-identical JSON, so you can read and author in x07text without giving up
+  the JSON-first source of truth.
+- Structural edits (JSON Patch / quickfix / MCP patch) still operate on the
+  canonical JSON.
 
 ## Why JSON AST?
 
@@ -20,6 +25,11 @@ A JSON AST:
 - is easy to patch with JSON Patch,
 - is easy to autoformat deterministically,
 - makes tooling (lint/repair) reliable.
+
+x07text keeps these guarantees: it is a 1:1 surface over the JSON, so
+whole-file conversion re-canonicalizes everything and text editing cannot
+accumulate the paren/brace drift above. See the
+[x07text projection](#x07text-projection) section below.
 
 ## Core expression model
 
@@ -104,7 +114,15 @@ Each item points at a loop body by JSON Pointer and declares:
 - `invariant[]`: clauses that must hold at loop entry and every iteration
 - `decreases[]`: lexicographic rank terms used to prove termination
 
-Minimal shape:
+Minimal shape (x07text projection of the `loop_contracts` value):
+
+```clojure
+; x07text
+({:decreases ({:expr (- n i)}) :invariant ({:expr (>= i 0) :id i_nonneg}) :ptr /decls/0/body/4}
+)
+```
+
+Canonical JSON:
 
 ```json
 "loop_contracts": [
@@ -128,7 +146,22 @@ x07AST v0.8 adds `decreases` on `defn` declarations so pure self-recursive funct
 
 `decreases` uses the same contract-clause object shape as `requires` / `ensures` / `invariant` and declares the lexicographic rank that must descend on recursive self-calls.
 
-Minimal shape:
+Minimal shape (x07text projection of the `defn`):
+
+```clojure
+; x07text
+{
+  :kind defn
+  :name main.count_down
+  :body (if (= n 0) 0 (main.count_down (- n 1)))
+  :decreases ({:expr n :id d0})
+  :params ({:name n :ty i32})
+  :requires ({:expr (>= n 0) :id r0})
+  :result i32
+}
+```
+
+Canonical JSON:
 
 ```json
 {
@@ -165,7 +198,21 @@ In `defn`/`defasync` declarations:
 - `params[]` entries may include optional `brand` when `ty` is bytes-like.
 - `result_brand` may be provided when `result` is bytes-like.
 
-Example:
+Example (x07text projection of the `defn`):
+
+```clojure
+; x07text
+{
+  :kind defn
+  :name main.parse_x7sl
+  :body (std.text.slices.cast_bytes_v1 b)
+  :params ({:name b :ty bytes})
+  :result result_bytes
+  :result_brand std.text.slices.x7sl_v1
+}
+```
+
+Canonical JSON:
 
 ```jsonc
 {
@@ -178,12 +225,28 @@ Example:
 }
 ```
 
+## x07text projection
+
+The `; x07text` blocks above are the lossless text projection of the canonical
+JSON shown next to them. Conversion is exact in both directions:
+
+- `x07 ast to-text` renders a `*.x07.json` file as x07text.
+- `x07 ast from-text` parses x07text back into canonical JCS JSON —
+  byte-identical to `x07 fmt` output — so the on-disk source stays JSON.
+
+Author in whichever surface you prefer; the JSON remains the source of truth and
+structural tooling (JSON Patch, quickfix, MCP patch) keeps operating on it. See
+[x07text: the text projection](x07text.md) for the full format reference.
+
 ## Tooling
 
 For a full project skeleton (`x07.json`, lockfile, `src/`, `tests/`), use `x07 init`. The `x07 ast` subcommands are for working with individual `*.x07.json` files.
 
 - `x07 ast init` / `x07 ast validate`:
   - generates and validates `*.x07.json` skeletons
+- `x07 ast to-text` / `x07 ast from-text`:
+  - render canonical JSON as x07text and re-canonicalize x07text back to
+    byte-identical JSON
 - `x07 fmt`:
   - canonicalizes JSON (JCS) and ensures stable emission
 - `x07 lint`:

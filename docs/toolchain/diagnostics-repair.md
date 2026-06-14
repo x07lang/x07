@@ -29,16 +29,11 @@ Some ownership/move/borrow diagnostics include `diagnostics[].data.mem_provenanc
 
 ## Repair loop
 
-`x07 run`, `x07 build`, and `x07 bundle` run the canonical repair loop automatically by default (format → lint → quickfix, repeatable).
-
-For explicit control (or when you want the raw reports), use `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch` and see [Repair loop](repair-loop.md).
+`x07 run`, `x07 build`, and `x07 bundle` consume these diagnostics and quickfixes to converge on a correct program. See [Repair loop](repair-loop.md) for the canonical workflow (automatic repair plus the explicit `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch` loop).
 
 ## Whole-project check
 
-- `x07 check --project x07.json`
-  - Resolves the full import graph (including locked dependencies).
-  - Runs schema validation + lint + project-wide typecheck + backend-check.
-  - Non-mutating: does not run the repair loop and does not emit C or invoke any native compiler.
+A whole-project check resolves the full import graph and emits diagnostics non-mutatingly (no repair loop, no C, no native compiler). See [Project check (no emit)](cli.md#project-check-no-emit).
 
 ## Output contracts (agent-friendly)
 

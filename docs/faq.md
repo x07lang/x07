@@ -36,7 +36,7 @@ x07text is instead a **lossless projection**: `x07 ast to-text` renders readable
 
 ## What happened to the studio / device / web-ui repos?
 
-They were archived in the 2026-06 scope cut: `x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, and the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`). They are read-only on GitHub.
+They were archived in the 2026-06 scope cut: `x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-sentinel-reference-stack`, and the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`). They are read-only on GitHub.
 
 The reasoning: those surfaces duplicate mature mainstream ecosystems, multiply single-maintainer load, and none of them move the core bet — the deterministic, certifiable substrate. The active set is `x07`, `x07-mcp`, `x07-registry`, `x07-wasm-backend`, and `hardproof`. Reactivation conditions are in the [roadmap](roadmap.md).
 
@@ -78,7 +78,7 @@ See: [Property-based testing](toolchain/pbt.md).
 
 ## How do I use function contracts and verification?
 
-x07AST v0.6 supports `requires` / `ensures` / `invariant` on `defn`/`defasync` declarations, plus `loop_contracts` on `defn`.
+x07AST supports `requires` / `ensures` / `invariant` on `defn`/`defasync` declarations (v0.5+), plus `loop_contracts` on `defn` (added in v0.6). The current schema is `x07.x07ast@0.8.0`; see [Syntax & x07AST](language/syntax-x07ast.md) for the per-version contract breakdown.
 
 - Runtime contract violations show up in `x07 test` reports as `failure_kind: "contract_violation"` with a repro artifact path.
 - For bounded proof artifacts, run `x07 verify --bmc|--smt --entry <sym>`.
@@ -119,9 +119,10 @@ Start from the readiness-check examples under `docs/examples/` — they combine 
 
 `bytes.view` takes a **named local**, not an arbitrary expression. Bind the bytes-producing expression to a local first:
 
-```json
-["let", "raw", ["bytes.lit", "hello"]],
-["bytes.view", "raw"]
+```clojure
+; x07text
+(let raw (bytes.lit hello))
+(bytes.view raw)
 ```
 
 See [Agent patterns — bytes vs bytes_view](recipes/agent-patterns.md#1-bytes-vs-bytes_view) for the full set of ownership recipes.

@@ -21,15 +21,17 @@ Performance rule:
 
 `bytes.view` requires an identifier owner. You can’t create a view of a temporary expression; bind it first:
 
-```json
-["let","b",["bytes.lit","hello"]],
-["let","v",["bytes.view","b"]]
+```clojure
+; x07text
+(let b (bytes.lit hello))
+(let v (bytes.view b))
 ```
 
 For string literals, you can use `bytes.view_lit` to produce a `bytes_view` directly:
 
-```json
-["let","v",["bytes.view_lit","hello"]]
+```clojure
+; x07text
+(let v (bytes.view_lit hello))
 ```
 
 The literal argument may include whitespace (same as `bytes.lit`).

@@ -1,14 +1,12 @@
 # Versioning
 
-## Toolchain
+The canonical, full description of how X07 versions its toolchain, stdlib
+packages, and machine-readable contracts lives in
+[Versioning policy](versioning-policy.md).
 
-The toolchain (`x07`, `x07c`) uses SemVer.
+Quick map:
 
-## Stdlib packages
-
-Stdlib packages are versioned independently and pinned by `stdlib.lock`.
-
-## Schemas/contracts
-
-Schema files under `spec/` are versioned by their `schema_version` identifiers and updated when contracts change.
-
+- **Toolchain** (`x07`, `x07c`) — SemVer.
+- **Stdlib packages** — versioned independently and pinned by `stdlib.lock`.
+- **Schemas/contracts** — versioned by their `schema_version` identifiers (and
+  `_v1`/`_v2` function suffixes); contracts do not change in-place.

@@ -1,5 +1,7 @@
 # x07 Agent Quickstart — Production Readiness Report
 
+> Historical evaluation (v0.1.10). Kept as a record.
+
 **Date**: 2026-02-09
 **Toolchain**: x07 v0.1.10
 **Agent**: Claude Opus 4.6 (via Claude Code CLI)

@@ -4,6 +4,23 @@ Budget scopes are a compiler/runtime primitive for **local** resource contracts.
 
 ## AST shape
 
+```clojure
+; x07text
+(budget.scope_v1
+  (budget.cfg_v1
+    (mode trap_v1)
+    (label (bytes.lit parse_headers))
+    (alloc_bytes 65536)
+    (alloc_calls 0)
+    (realloc_calls 0)
+    (memcpy_bytes 1048576)
+    (sched_ticks 0)
+    (fuel 0)
+  )
+  <body_expr>
+)
+```
+
 ```jsonc
 ["budget.scope_v1",
   ["budget.cfg_v1",
@@ -39,6 +56,11 @@ Notes:
 ## Arch-driven scopes (`budget.scope_from_arch_v1`)
 
 To keep budgets pinned and reviewable, store them as data under `arch/budgets/` and reference them by id:
+
+```clojure
+; x07text
+(budget.scope_from_arch_v1 (bytes.lit hot_parse_v1) <body_expr>)
+```
 
 ```jsonc
 ["budget.scope_from_arch_v1",

@@ -71,6 +71,32 @@ Inside rr scopes, stream pipes can consume cassette entries as streams:
 
 Example (collect a streamed response payload):
 
+```clojure
+; x07text
+(std.rr.with_policy_v1
+  (bytes.lit smoke_rr_v1)
+  (bytes.lit smoke.rrbin)
+  (i32.lit 2)
+  (begin
+    (let doc
+      (std.stream.pipe_v1
+        (std.stream.cfg_v1
+          (chunk_max_bytes 64)
+          (bufread_cap_bytes 64)
+          (max_in_bytes 1048576)
+          (max_out_bytes 1048576)
+          (max_items 1048576)
+        )
+        (std.stream.src.rr_send_v1 (std.stream.expr_v1 (bytes.lit K)))
+        (std.stream.chain_v1)
+        (std.stream.sink.collect_bytes_v1)
+      )
+    )
+    doc
+  )
+)
+```
+
 ```jsonc
 ["std.rr.with_policy_v1",
   ["bytes.lit","smoke_rr_v1"],

@@ -9,17 +9,7 @@ At a minimum, a CI run usually does:
 3) start your MCP server (HTTP)
 4) run `hardproof ci` and upload the scan report artifacts (`scan.json`, `scan.events.jsonl`)
 
-Hardproof reports **score truth** explicitly:
-
-- `score_mode=full` means `overall_score` is present and eligible as a full score.
-- `score_mode=partial` means the scan is not publishable (`score_truth_status=partial`). `overall_score` is still computed as the effective score (matching `partial_score`), and `gating_reasons` explain what evidence is missing (commonly because Trust inputs were not provided).
-
-Token/context usage truth is explicit under `scan.json.usage_metrics` (`requested_usage_mode`, `usage_status`, plus the effective `usage_mode`):
-
-- `estimate` (deterministic estimates)
-- `tokenizer_exact` (exact counts under a chosen tokenizer profile)
-- `trace_observed` (observed counts from a real trace)
-- `mixed` (per-metric mix of exact + observed)
+Hardproof reports score truth and usage truth explicitly in `scan.json`; `hardproof ci` gates on them. For what `score_mode`, `usage_mode`, and the related fields mean, see [Score truth and usage truth](mcp-quality.md#score-truth-and-usage-truth).
 
 ## Minimal workflow sketch
 

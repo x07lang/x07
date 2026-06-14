@@ -10,30 +10,28 @@ X07 can be used “standalone” by using the compiler + runners directly, pinni
 ## Build/run pipeline
 
 1. Write an X07 program as **x07AST JSON** (`*.x07.json`), the canonical LLM-first source format.
-2. Format + lint + autofix deterministically with `x07c` (machine-first tooling; stable JSON output + JSON Patch quickfixes).
-3. Compile the program to C with `x07c`.
-4. Compile and run the generated C as a native solver artifact:
-   - Deterministic evaluation worlds: `x07-host-runner`
-   - Standalone OS worlds: `x07-os-runner`
+2. Format + lint + autofix deterministically with `x07` (machine-first tooling; stable JSON output + JSON Patch quickfixes).
+3. Build the program to C with `x07 build`.
+4. Compile and run the generated C as a native solver artifact with `x07 run` (it selects the deterministic or OS runner from the project world).
 
 See `docs/spec/internal/x07-c-backend.md` for the solver ABI and execution details.
 
 ## Tooling loop (recommended)
 
-For an autonomous agent workflow, treat `x07c` as the contract-enforcer:
+For an autonomous agent workflow, treat `x07` as the contract-enforcer:
 
-- Canonicalize JSON: `cargo run -p x07c -- fmt --input program.x07.json --write`
-- Lint (world-scoped): `cargo run -p x07c -- lint --input program.x07.json --world solve-pure`
-- Apply safe fixes: `cargo run -p x07c -- fix --input program.x07.json --world solve-pure --write`
-- Apply LLM repair edits (RFC 6902): `cargo run -p x07c -- apply-patch --program program.x07.json --patch repair.patch.json --out program.x07.json`
+- Canonicalize JSON: `x07 fmt --input program.x07.json`
+- Lint: `x07 lint --input program.x07.json`
+- Apply safe fixes: `x07 fix --input program.x07.json`
+- Apply LLM repair edits (RFC 6902): `x07 ast apply-patch --in program.x07.json --patch repair.patch.json --out program.x07.json`
 
 ## Projects (modules/packages)
 
 For multi-module programs and pinned dependencies, use the project workflow:
 
-- `cargo run -p x07c -- lock --project <project/x07.json>`
-- `cargo run -p x07c -- build --project <project/x07.json> --out <out.c>`
-- `cargo run -p x07-host-runner -- --project <project/x07.json> --world solve-pure --input <case.bin>`
+- `x07 pkg lock --project <project/x07.json>`
+- `x07 build --project <project/x07.json> --out <out.c>`
+- `x07 run --project <project/x07.json> --input <case.bin>`
 
 Details: `docs/spec/internal/modules-packages.md`.
 

@@ -61,6 +61,20 @@ for why this shapes the trust story.
 
 Shape:
 
+```clojure
+; x07text
+(task.scope_v1
+  (task.scope.cfg_v1
+    (max_children <u32>)
+    (max_ticks <u64>)
+    (max_blocked_waits <u64>)
+    (max_join_polls <u64>)
+    (max_slot_result_bytes <u32>)
+  )
+  <body_expr>
+)
+```
+
 ```jsonc
 ["task.scope_v1",
   ["task.scope.cfg_v1",
@@ -125,6 +139,17 @@ Select waits for one of several scope-owned events deterministically:
 - `["task.scope.select_v1", <cfg_v1>, <cases_v1>] -> i32` (select evt id)
 - `["task.scope.select_try_v1", <cfg_v1>, <cases_v1>] -> option_i32` (optional select evt id)
 
+```clojure
+; x07text
+(task.scope.select.cfg_v1
+  (max_cases <u32>)
+  (policy priority_v1)
+  (poll_sleep_ticks <u32>)
+  (max_polls <u32>)
+  (timeout_ticks <u32>)
+)
+```
+
 ```jsonc
 ["task.scope.select.cfg_v1",
   ["max_cases", <u32>],
@@ -133,6 +158,14 @@ Select waits for one of several scope-owned events deterministically:
   ["max_polls", <u32>],
   ["timeout_ticks", <u32>]
 ]
+```
+
+```clojure
+; x07text
+(task.scope.select.cases_v1
+  (task.scope.select.case_slot_bytes_v1 slot_id)
+  (task.scope.select.case_chan_recv_bytes_v1 <i32_chan_handle>)
+)
 ```
 
 ```jsonc

@@ -11,6 +11,8 @@ So the workflow is built into the ecosystem:
 - stable error codes,
 - canonical file layouts.
 
+New here? Start with [Agent quickstart](agent-quickstart.md) — it is the canonical on-ramp and defines the core agent loop. This page covers the project-shaping pieces an agent needs on top of that loop: the architecture contract file, the package → example → scenario map, and the boundary rules.
+
 ## The “architecture contract” file
 
 Every serious X07 project should include:
@@ -26,37 +28,16 @@ This is a short, structured contract that tells the agent:
 
 Use the template in: [Agentic design patterns](../libraries/agentic-design.md#the-architecture-contract).
 
-## The minimal agent loop
+## The agent loop
 
-An autonomous agent should follow a loop like:
+The core agent loop (run → test → repair, with patches and migration) is defined once in [Agent quickstart](agent-quickstart.md#3-the-core-loop-run--test-auto-repair). Run it from the project root; this page assumes that loop is already in place.
 
-1. Read task/spec + `AGENT.md`. Use `x07 doc <symbol>` for behavioral summaries of stdlib exports before guessing at APIs.
-2. Modify code through **structured patches** (JSON Patch), or author whole modules as [x07text](../language/x07text.md) and convert with `x07 ast from-text` (lossless; output is canonical `x07 fmt` bytes)
-3. Iterate in deterministic worlds:
-   - `x07 run` (auto-repair by default via `--repair=...`; failure reports embed structured diagnostics)
-   - `x07 check --project x07.json` (non-mutating whole-project validation)
-   - `x07 test`
-   - optional: `x07 lint` for raw diagnostics (`x07diag`)
-4. If it fails:
-   - parse `x07diag` output (unknown-symbol errors include did-you-mean suggestions; `ptr=/...` JSON Pointers locate the failing node)
-   - apply a suggested quickfix (`x07 fix`) or produce a new patch and apply it with `x07 ast apply-patch`
-   - if diagnostics indicate a compatibility or migration issue, run `x07 migrate --check/--write --to 0.5` (or temporarily override with `--compat`)
-   - if the repo uses a legacy `x07.json` schema line, run `x07 project migrate --check/--write --project x07.json`
-5. Repeat until green
+Two project-level habits make the loop reliable for autonomous work:
 
-See also: [Repair loop](../toolchain/repair-loop.md) and [Running programs](../toolchain/running-programs.md).
-
-When dependencies change, update and verify the lockfile in the same loop:
-
-- `x07 pkg lock --project x07.json`
-- `x07 pkg lock --project x07.json --check` (CI gate)
-- When the index can be consulted, `--check` also fails on yanked/advised deps unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
-- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical schema: `x07.project@0.5.0`; `x07.project@0.2.0`, `x07.project@0.3.0`, and `x07.project@0.4.0` are legacy compatibility lines).
-- For offline workflows and local `file://` registry mirrors, see: [Offline workflows](../guides/offline.md).
+- Read the task/spec + `AGENT.md` first, and use `x07 doc <symbol>` for behavioral summaries of stdlib exports before guessing at APIs.
+- When OS access is required, prefer explicit profiles (for example `x07 run --profile os` / `x07 run --profile sandbox`) and run `x07 doctor` early to catch platform prerequisites.
 
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.
-
-When OS access is required, prefer explicit profiles (for example `x07 run --profile os` / `x07 run --profile sandbox`) and run `x07 doctor` early to catch platform prerequisites.
 
 ## Canonical by-example workflow (CI-gated, offline)
 

@@ -13,9 +13,7 @@ The recommended installer is `x07up` (toolchain manager). It installs:
 - offline docs + the agent skills pack (default profile)
 - optional runtime components via `x07up component add ...`
 
-Quickstart and full installer reference:
-
-- quickstart: [Installer / x07up](installer.md)
+The bootstrap script (`install.sh`) installs `x07up`, then `x07up` installs the selected toolchain and sets up `~/.x07/bin/` shims. After bootstrap, `x07up` reads the per-channel bundle manifest (`/install/channels/<channel>.json`) to resolve compatible component versions. On Windows, run the bootstrap inside WSL2.
 
 ## Prerequisites
 
@@ -92,14 +90,26 @@ Use `x07up` for runtime components that must stay compatible with the installed 
 
 ```bash
 x07up component add wasm
+x07up component update
 x07up component list
 x07 wasm doctor --json
 ```
+
+`x07up component update` reads the bundle published for the active installed toolchain tag, so component upgrades stay on the compatibility line blessed by that core release.
 
 Fallbacks:
 
 - preferred fallback for `x07-wasm`: `cargo install --locked x07-wasm --version <VERSION>`
 - use `cargo install --locked --git ...` only for local development against unreleased repo state
+
+### Toolchain selection (deterministic precedence)
+
+`x07up` selects the active toolchain in this order:
+
+1. `X07UP_TOOLCHAIN` environment variable
+2. `x07-toolchain.toml` found by walking up directories
+3. global default from `~/.x07/config.json`
+4. fallback: `stable` (but `x07up` never auto-installs; you must run `x07up install`)
 
 ### Pin a toolchain per project
 
@@ -109,7 +119,34 @@ Write `x07-toolchain.toml` in your repo root:
 x07up override set v0.2.14
 ```
 
-This makes toolchain selection deterministic for agents and CI.
+This makes toolchain selection deterministic for agents and CI. It writes a file like:
+
+```toml
+[toolchain]
+channel = "v0.2.14"
+components = ["docs", "skills"]
+```
+
+Notes:
+
+- `channel` can be `stable` or a specific tag like `v0.2.14`.
+- `components` controls whether `x07up` installs the offline docs and skills pack.
+
+Remove it:
+
+```bash
+x07up override unset
+```
+
+### Agent kit (offline docs + skills + project rails)
+
+- Offline docs path: `x07up docs path --json`
+- Skills install:
+  - user-scoped: `x07up skills install --user`
+  - project-scoped: `x07up skills install --project .`
+- Canonical project start (creates `AGENT.md`, pins the toolchain, and installs project-scoped skills): `x07 init`
+
+See also: [Available skills](available-skills.md).
 
 ## Option B (advanced): manual install
 

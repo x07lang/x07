@@ -171,7 +171,7 @@ The compiler ships versioned stdlib packages under:
 - `std.io.bufread`: `new`, `fill`, `consume` (buffering)
 - `std.fs`: `read`, `read_async`, `read_task` (bind via `std.world.fs`), plus fixture-only ops `open_read`, `list_dir`, `list_dir_sorted`
 - `std.world.fs`: fixture-backed adapter used by `std.fs.read` in deterministic worlds
-- `std.rr`: `send_request`, `fetch`, `send` (solve-rr only)
+- `std.rr`: `open_v1`, `close_v1`, `stats_v1`, `next_v1`, `append_v1`, `entry_resp_v1`, `entry_err_v1`, `current_v1` (solve-rr only)
 - `std.kv`: `get`, `get_async`, `set`, `get_stream` (solve-kv only)
 - `std.path`: `join`, `basename`, `extname`, `normalize_posix`, `is_safe_relative`, `parent`, `join_checked`
 
@@ -184,7 +184,9 @@ The compiler ships versioned stdlib packages under:
 - Pinned by `stdlib.os.lock` (checked by `./scripts/ci/check_stdlib_lock.sh`).
 - `std.os.env`, `std.os.time`, `std.os.process`, `std.os.net` (aliases of `std.world.*`)
 
-`std.os.fs` is provided by the external filesystem package `ext-fs` (`packages/ext/x07-ext-fs/0.1.0/`).
+`std.os.fs` is provided by the external filesystem package `ext-fs` (see the registry catalog).
 
 Note: `std.world.net.http_request` maps to `os.net.http_request`, which currently traps (reserved).
-For OS-world HTTP today, use `ext-net` (`packages/ext/x07-ext-net/0.1.5/`) via `std.net.http.*` (see `docs/guides/networking.md` and `docs/net/net-v1.md`).
+For OS-world HTTP today, use `ext-net` (see the registry catalog) via `std.net.http.*` (see `docs/guides/networking.md` and `docs/net/net-v1.md`).
+
+The full list of standalone-only `os.*` builtins lives in [C Backend (Native Execution)](x07-c-backend.md).

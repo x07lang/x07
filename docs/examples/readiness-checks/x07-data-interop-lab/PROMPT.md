@@ -30,7 +30,7 @@ DEPENDENCIES (add via x07 pkg add … --sync and lock)
 - ext-streams (stream readers)
 - ext-cli (argv parsing)
 
-See also: [Data interoperability guide](../guides/data-interop.md) (codec entrypoints map + canonical roundtrip strategy).
+See also: [Data interoperability guide](../../../guides/data-interop.md) (codec entrypoints map + canonical roundtrip strategy).
 
 REQUIREMENTS
 A) Use ext.data_model as the canonical internal representation.

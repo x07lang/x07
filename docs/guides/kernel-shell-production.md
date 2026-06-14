@@ -28,6 +28,9 @@ Recommended boundaries:
 3. **Execute effects** in shell: DB writes, calls, publishing.
 4. **Commit** in shell before ack: make replay safe.
 
+For the retry-boundary and idempotency-key rules the shell must follow, see
+[Guide: Scaling, retry, and idempotency for services](scaling-retry-idempotency.md).
+
 ## Error classification (production rule)
 
 Keep kernel errors structural and stable:
@@ -78,9 +81,9 @@ Prove the boundary with two test classes:
 
 ## Related docs
 
-- `docs/guides/x07-service-architecture-v1.md`
-- `docs/guides/scaling-retry-idempotency.md`
-- `docs/toolchain/testing-by-example.md`
+- [X07 service architecture v1](x07-service-architecture-v1.md)
+- [Guide: Scaling, retry, and idempotency for services](scaling-retry-idempotency.md)
+- [Testing by example](../toolchain/testing-by-example.md)
 
 ## Expert notes
 

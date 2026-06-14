@@ -71,6 +71,31 @@ acme-hello-demo/
 
 `x07 init --package` generates `modules/ext/acme_hello_demo.x07.json`:
 
+```clojure
+; x07text
+{
+  :kind module
+  :module_id ext.acme_hello_demo
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ({:kind export :names (ext.acme_hello_demo.hello_v1)}
+    {
+      :kind defn
+      :name ext.acme_hello_demo.hello_v1
+      :body (begin
+        (let prefix (bytes.concat (bytes.lit "hello,") (bytes1 32)))
+        (let tmp (bytes.concat prefix (view.to_bytes name)))
+        (bytes.concat tmp (bytes1 10))
+      )
+      :params ({:name name :ty bytes_view})
+      :result bytes
+    }
+  )
+}
+```
+
+Canonical JSON (save as `modules/ext/acme_hello_demo.x07.json`):
+
 ```json
 {
   "schema_version": "x07.x07ast@0.8.0",
@@ -98,6 +123,39 @@ acme-hello-demo/
 ## Step 2: published tests module (recommended)
 
 `x07 init --package` also generates `modules/ext/acme_hello_demo/tests.x07.json`:
+
+```clojure
+; x07text
+{
+  :kind module
+  :module_id ext.acme_hello_demo.tests
+  :schema_version x07.x07ast@0.8.0
+  :imports (ext.acme_hello_demo std.test)
+  :decls ({:kind export :names (ext.acme_hello_demo.tests.test_hello_v1)}
+    {
+      :kind defn
+      :name ext.acme_hello_demo.tests.test_hello_v1
+      :body (begin
+        (let name (bytes.lit x07))
+        (let got (ext.acme_hello_demo.hello_v1 (bytes.view name)))
+        (let expected_prefix (bytes.concat (bytes.lit "hello,") (bytes1 32)))
+        (let expected_tmp (bytes.concat expected_prefix name))
+        (let expected (bytes.concat expected_tmp (bytes1 10)))
+        (try
+          (std.test.assert_bytes_eq got expected
+            (std.test.code_assert_bytes_eq)
+          )
+        )
+        (std.test.pass)
+      )
+      :params ()
+      :result result_i32
+    }
+  )
+}
+```
+
+Canonical JSON (save as `modules/ext/acme_hello_demo/tests.x07.json`):
 
 ```json
 {

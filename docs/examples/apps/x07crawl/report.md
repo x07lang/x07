@@ -1,5 +1,7 @@
 # x07 Agent Quickstart: Production Readiness Report
 
+> Historical evaluation (v0.1.10). Kept as a record.
+
 ## Executive Summary
 
 Successfully implemented the **x07crawl** tool following the agent quickstart guide.
@@ -107,6 +109,11 @@ syntax help (no bracket matching for semantic units, no jump-to-definition).
 **Observation**: This is inherent to the JSON-as-IR design. For an agent, the
 structured format is actually easier to manipulate programmatically than text
 syntax. But debugging malformed JSON is harder than debugging text syntax errors.
+
+**Resolved in 0.2.x**: The lossless x07text projection now ships. Use
+`x07 ast to-text` to render an x07AST JSON file as readable x07text and
+`x07 ast from-text` to parse it back into canonical x07AST JSON; the round-trip
+is lossless and `*.x07.json` stays canonical on disk.
 
 ---
 

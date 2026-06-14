@@ -19,9 +19,9 @@ surface whose deeper investment is gated on measured evidence — see
 
 ## Horizon 1 — now through Q3 2026 (in flight)
 
-Shipped in v0.2.11 (2026-06): agent DX (did-you-mean, fuzzy `x07 doc`,
-behavioral summaries on 79 stdlib exports), the x07text lossless projection
-(RFC 0001), structured diagnostics in failed-run reports, the
+Shipped during the 0.2.x line (2026-06): agent DX (did-you-mean, fuzzy
+`x07 doc`, behavioral summaries on 79 stdlib exports), the x07text lossless
+projection (RFC 0001), structured diagnostics in failed-run reports, the
 `labs/agent-eval` comparative benchmark with pilot results, and the scope
 cut to five active repos (`x07`, `x07-mcp`, `x07-registry`,
 `x07-wasm-backend`, `hardproof`).
@@ -34,7 +34,7 @@ Remaining for this horizon:
   artifact of the adoption arc.
 - One design-partner engagement with a team that executes untrusted
   agent-generated code (agent platforms, sandbox providers, CI vendors).
-- x07-mcp release aligned with v0.2.11, surfacing summaries and x07text.
+- x07-mcp release aligned with the 0.2.x line, surfacing summaries and x07text.
 - Package compat-widening train so the ecosystem can accept a future 0.3.0
   (today's packages pin `x07c_compat < 0.3.0`).
 

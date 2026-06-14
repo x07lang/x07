@@ -24,16 +24,16 @@ major breaking changes require core-maintainer approval.
 
 The governance scope covers these official companion repositories:
 
-- `x07lang/x07-rfcs`
 - `x07lang/x07-mcp`
-- `x07lang/x07-wasm-backend`
-- `x07lang/x07-web-ui` (archived)
-- `x07lang/x07-device-host` (archived)
-- `x07lang/x07-platform` (archived)
 - `x07lang/x07-registry`
+- `x07lang/x07-wasm-backend`
+- `x07lang/hardproof`
+- `x07lang/x07-rfcs`
 - `x07lang/x07-website`
 
-Under the 2026-06 scope cut (see the [roadmap](roadmap.md)), active development concentrates on `x07`, `x07-mcp`, `x07-registry`, `x07-wasm-backend`, and `hardproof`. Repos marked archived were retired in that refocus and are read-only on GitHub.
+Archived (2026-06 scope cut; read-only on GitHub): `x07lang/x07-web-ui`, `x07lang/x07-device-host`, and the platform repos (`x07lang/x07-platform`, `x07lang/x07-platform-contracts`, `x07lang/x07-platform-cloud`).
+
+Under the 2026-06 scope cut (see the [roadmap](roadmap.md)), active development concentrates on `x07`, `x07-mcp`, `x07-registry`, `x07-wasm-backend`, and `hardproof`. The archived repos were retired in that refocus.
 
 ## How decisions are made
 

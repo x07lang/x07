@@ -1,12 +1,8 @@
 # XGrammar Cookbook (x07 genpack)
 
-Use the `x07` CLI as the canonical source of x07AST generation artifacts.
+Export the schema and grammar bundle first — see [Export the generation artifacts](index.md#export-the-generation-artifacts).
 
 ## Recipe A: compile from JSON Schema (preferred)
-
-```bash
-x07 ast schema > /tmp/x07ast.schema.json
-```
 
 ```python
 import pathlib
@@ -19,10 +15,6 @@ compiled = compiler.compile_json_schema(schema_str)
 
 ## Recipe B: compile from the shipped grammar bundle
 
-```bash
-x07 ast grammar --cfg > /tmp/x07ast.grammar_bundle.json
-```
-
 ```python
 import json
 import pathlib
@@ -34,6 +26,4 @@ compiler = xgr.GrammarCompiler(tokenizer_info=...)
 compiled = compiler.compile_grammar(min_cfg)
 ```
 
-## Whitespace note
-
-Use the `min` variant for smaller models and higher throughput. The `pretty` variant is included for readability/debugging and may increase repetition risk on weak decoders.
+For the `min` vs `pretty` variant tradeoff, see the [Whitespace note](index.md#whitespace-note).

@@ -87,21 +87,32 @@ Helpers for common cases (from `std.db.params`):
 
 For **multiple parameters**, build a DataModel sequence and wrap it as a doc:
 
-```json
-[
-  "begin",
-  ["let", "v_name", ["ext.data_model.value_string", ["bytes.view", ["bytes.lit", "alice"]]]],
-  ["let", "v_age", ["ext.data_model.value_number", ["bytes.view", ["bytes.lit", "42"]]]],
-  ["let", "elems", ["vec_u8.with_capacity", 0]],
-  ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", 2]]],
-  ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", ["bytes.len", "v_name"]]]],
-  ["set", "elems", ["vec_u8.extend_bytes", "elems", "v_name"]],
-  ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", ["bytes.len", "v_age"]]]],
-  ["set", "elems", ["vec_u8.extend_bytes", "elems", "v_age"]],
-  ["let", "elems_b", ["vec_u8.into_bytes", "elems"]],
-  ["let", "seq_val", ["ext.data_model.value_seq_from_elems", ["bytes.view", "elems_b"]]],
-  ["ext.data_model.doc_ok", ["bytes.view", "seq_val"]]
-]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin
+    (let v_name (ext.data_model.value_string (bytes.view (bytes.lit alice))))
+    (let v_age (ext.data_model.value_number (bytes.view (bytes.lit "42"))))
+    (let elems (vec_u8.with_capacity 0))
+    (set elems (vec_u8.extend_bytes elems (codec.write_u32_le 2)))
+    (set elems
+      (vec_u8.extend_bytes elems (codec.write_u32_le (bytes.len v_name)))
+    )
+    (set elems (vec_u8.extend_bytes elems v_name))
+    (set elems
+      (vec_u8.extend_bytes elems (codec.write_u32_le (bytes.len v_age)))
+    )
+    (set elems (vec_u8.extend_bytes elems v_age))
+    (let elems_b (vec_u8.into_bytes elems))
+    (let seq_val (ext.data_model.value_seq_from_elems (bytes.view elems_b)))
+    (ext.data_model.doc_ok (bytes.view seq_val))
+  )
+}
 ```
 
 ## Pools and concurrency

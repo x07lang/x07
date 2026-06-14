@@ -40,63 +40,37 @@ variants instead of wall-clock time, which is noisy and machine-dependent.
 
 ## Canonical tuning checklist
 
-Start from the scale class and tune in the smallest number of places:
+Start from the scale class and tune in the smallest number of places. For the scale-class
+definitions and the retry/idempotency rules that go with each one, see
+[Guide: Scaling, retry, and idempotency for services](scaling-retry-idempotency.md) — this
+section lists only the performance knobs.
 
 ### `replicated-http`
-
-Primary knobs:
 
 - concurrency limit per replica
 - request body size caps + streaming
 - batching where the downstream contract supports it
 - connection pool sizing (DB/HTTP clients)
-
-Default guidance:
-
-- keep handlers stateless and bounded
-- use explicit timeouts and cancellation
-- record idempotency before acknowledging success upstream
+- explicit timeouts and cancellation
 
 ### `partitioned-consumer`
-
-Primary knobs:
 
 - partition key choice
 - max in-flight per partition
 - retry/backoff and dead-letter policy
 - lag-based scaling signal (if supported by the runtime)
 
-Default guidance:
-
-- treat delivery as at-least-once unless proven otherwise
-- persist dedupe state before ack
-- bound retries and surface incidents early
-
 ### `singleton-orchestrator`
-
-Primary knobs:
 
 - leader election timeouts
 - reconciliation cadence
 - backpressure for fan-out work
 
-Default guidance:
-
-- keep orchestration decisions deterministic in a kernel
-- make side effects idempotent (retries are unavoidable)
-
 ### `burst-batch`
-
-Primary knobs:
 
 - chunk size
 - checkpoint frequency
 - retry policy per step
-
-Default guidance:
-
-- checkpoint after each irreversible effect
-- design for crash/restart and replay safety
 
 ## What to measure
 
@@ -115,9 +89,9 @@ Always be able to answer:
 
 ## Related docs
 
-- `docs/guides/scaling-retry-idempotency.md`
-- `docs/guides/kernel-shell-production.md`
-- `docs/toolchain/benchmarks.md`
+- [Guide: Scaling, retry, and idempotency for services](scaling-retry-idempotency.md)
+- [Guide: Kernel/shell in production](kernel-shell-production.md)
+- [Benchmarks](../toolchain/benchmarks.md)
 
 ## Expert notes
 

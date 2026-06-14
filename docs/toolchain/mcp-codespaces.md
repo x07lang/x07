@@ -33,3 +33,5 @@ hardproof scan --url "http://127.0.0.1:8314/mcp" --out out/scan --format json
 hardproof replay record --url "http://127.0.0.1:8314/mcp" --out out/replay.session.json --machine json
 hardproof replay verify --session out/replay.session.json --url "http://127.0.0.1:8314/mcp" --out out/replay-verify --machine json
 ```
+
+For what the scan report's `score_mode`, `usage_mode`, and related fields mean, see [Score truth and usage truth](mcp-quality.md#score-truth-and-usage-truth).

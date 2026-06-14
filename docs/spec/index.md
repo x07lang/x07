@@ -11,7 +11,7 @@ This directory is the published spec surface for X07.
 - `docs/spec/internal/`: published internal implementation specs.
 - `docs/spec/abi/`: published ABI specs.
 - `docs/spec/schemas/`: published JSON schema assets mirrored from `spec/`.
-- `docs/spec/spec-index.json`: machine-readable manifest for discovery.
+- `docs/spec/spec-index.json`: machine-readable spec manifest used by tooling for discovery.
 - `docs/spec/changelog.md`: spec surface changelog.
 
 For agent workflows, use:

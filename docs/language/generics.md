@@ -1,6 +1,6 @@
 # Generics (monomorphization)
 
-As of x07AST `schema_version` **`x07.x07ast@0.4.0`** (and later), X07 supports bounded generics via **compile-time monomorphization**.
+X07 supports bounded generics via **compile-time monomorphization**. Use `schema_version` **`x07.x07ast@0.8.0`** for new files; the toolchain still accepts the legacy `x07.x07ast@0.4.0` for generics-only programs (see [Schema + compatibility](#schema--compatibility)).
 
 - Generics are compile-time only: each `tapp` instantiation produces a specialized copy.
 - The program given to the existing optimizer + C backend is fully monomorphic (no `tapp` / `ty.*` remains).
@@ -64,6 +64,11 @@ In `params[].ty` and `result`, a `type_ref` can be either:
 ## `type_params` (generic declarations)
 
 `defn` / `defasync` may include `type_params`:
+
+```clojure
+; x07text
+{:kind defn :name main.id :body x :params ({:name x :ty (t A)}) :result (t A) :type_params ({:name A :bound num_like})}
+```
 
 ```jsonc
 {
@@ -190,7 +195,7 @@ Tooling support:
 
 `ty.*` intrinsics are compile-time intrinsics that are lowered during monomorphization.
 
-Supported (v0.4 toolchain):
+Supported:
 
 - `ty.size_bytes(T)` / `ty.size(T)` → `i32` constant (currently: `i32`/`u32` only)
 - `ty.read_le_at(T, bytes_view, off)` → `std.u32.read_le_at(...)` (currently: `i32`/`u32` only)
@@ -233,6 +238,11 @@ Generic add / subtract / multiply are available via `ty.add` / `ty.sub` /
 `ty.mul`, restricted to the `num_like` bound (`i32` / `u32`). They lower to the
 ordinary `+` / `-` / `*` operators for the substituted width and wrap modulo
 2^32, so a generic numeric **fold / sum / reduce** is expressible:
+
+```clojure
+; x07text
+{:kind defn :name pkg.sum2 :body (ty.add (t A) a b) :params ({:name a :ty (t A)} {:name b :ty (t A)}) :result (t A) :type_params ({:name A :bound num_like})}
+```
 
 ```jsonc
 {

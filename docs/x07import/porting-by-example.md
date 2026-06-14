@@ -183,6 +183,52 @@ Expected output:
 
 Create `modules/ext/hex/tests.x07.json`:
 
+```clojure
+; x07text
+{
+  :kind module
+  :module_id ext.hex.tests
+  :schema_version x07.x07ast@0.8.0
+  :imports (ext.hex std.test)
+  :decls ({:kind export :names (ext.hex.tests.test_encode_decode_roundtrip)}
+    {
+      :kind defn
+      :name ext.hex.tests.test_encode_decode_roundtrip
+      :body (begin
+        (let src_bytes (bytes.lit hello))
+        (let hex_bytes (ext.hex.hex_encode (bytes.view src_bytes)))
+        (let expected_hex (bytes.lit "68656c6c6f"))
+        (try
+          (std.test.assert_bytes_eq hex_bytes expected_hex
+            (std.test.code_assert_bytes_eq)
+          )
+        )
+        (let doc (ext.hex.hex_decode (bytes.view hex_bytes)))
+        (let doc_view (bytes.view doc))
+        (try
+          (std.test.assert_i32_eq
+            (ext.hex.hex_is_err doc_view)
+            0
+            (std.test.code_assert_i32_eq)
+          )
+        )
+        (let decoded (ext.hex.hex_get_bytes doc_view))
+        (try
+          (std.test.assert_bytes_eq decoded src_bytes
+            (std.test.code_assert_bytes_eq)
+          )
+        )
+        (std.test.pass)
+      )
+      :params ()
+      :result result_i32
+    }
+  )
+}
+```
+
+Canonical JSON (save as `modules/ext/hex/tests.x07.json`):
+
 ```json
 {
   "schema_version": "x07.x07ast@0.8.0",

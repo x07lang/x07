@@ -91,12 +91,38 @@ Expected bytes: `hello`.
 
 Replace `src/app.x07.json` with:
 
+```clojure
+; x07text
+{
+  :kind module
+  :module_id app
+  :schema_version x07.x07ast@0.8.0
+  :imports (std.os.fs std.os.fs.spec)
+  :decls ({:kind export :names (app.solve)}
+    {
+      :kind defn
+      :name app.solve
+      :body (begin
+        (let data (view.to_bytes b))
+        (let caps (std.os.fs.spec.caps_default_v1))
+        (let rc (std.os.fs.write_all_v1 (bytes.lit out/input.bin) data caps))
+        (if (result_i32.is_ok rc) (bytes.lit ok) (bytes.lit write_failed))
+      )
+      :params ({:name b :ty bytes_view})
+      :result bytes
+    }
+  )
+}
+```
+
+Canonical JSON (save as `src/app.x07.json`):
+
 ```json
 {
   "schema_version": "x07.x07ast@0.8.0",
   "kind": "module",
   "module_id": "app",
-  "imports": ["std.os.fs"],
+  "imports": ["std.os.fs", "std.os.fs.spec"],
   "decls": [
     { "kind": "export", "names": ["app.solve"] },
     {
@@ -107,13 +133,16 @@ Replace `src/app.x07.json` with:
       "body": [
         "begin",
         ["let", "data", ["view.to_bytes", "b"]],
-        ["let", "rc", ["std.os.fs.write_file", ["bytes.lit", "out/input.bin"], "data"]],
-        ["if", ["=", "rc", 0], ["bytes.lit", "ok"], ["bytes.lit", "write_failed"]]
+        ["let", "caps", ["std.os.fs.spec.caps_default_v1"]],
+        ["let", "rc", ["std.os.fs.write_all_v1", ["bytes.lit", "out/input.bin"], "data", "caps"]],
+        ["if", ["result_i32.is_ok", "rc"], ["bytes.lit", "ok"], ["bytes.lit", "write_failed"]]
       ]
     }
   ]
 }
 ```
+
+`std.os.fs.write_all_v1(path, data, caps) -> result_i32` is the canonical write (see [FS v1](../fs/fs-v1.md)); `caps` is an `FsCapsV1` struct from `std.os.fs.spec.caps_default_v1`.
 
 Create `out/` (the base policy allows writing under `out`, but it does not create directories for you):
 
@@ -167,12 +196,58 @@ Edit `x07.json` and update only the sandbox profile policy path:
 
 Replace `src/app.x07.json` with:
 
+```clojure
+; x07text
+{
+  :kind module
+  :module_id app
+  :schema_version x07.x07ast@0.8.0
+  :imports (std.fmt std.net.http std.net.http.spec std.os.fs std.os.fs.spec)
+  :decls ({:kind export :names (app.solve)}
+    {
+      :kind defn
+      :name app.solve
+      :body (begin
+        (let url (view.to_bytes b))
+        (let caps (std.net.http.spec.caps_default_v1))
+        (let resp (std.net.http.get_v1 url caps))
+        (let v (bytes.view resp))
+        (if
+          (std.net.http.resp_is_err_v1 v)
+          (begin
+            (let code (std.net.http.resp_err_code_v1 v))
+            (let code_b (std.fmt.s32_to_dec code))
+            (bytes.concat (bytes.lit http_error_code=) code_b)
+          )
+          (begin
+            (let body (std.net.http.resp_body_v1 v))
+            (let fs_caps (std.os.fs.spec.caps_default_v1))
+            (let _
+              (std.os.fs.write_all_v1
+                (bytes.lit out/body.bin)
+                (std.bytes.copy body)
+                fs_caps
+              )
+            )
+            body
+          )
+        )
+      )
+      :params ({:name b :ty bytes_view})
+      :result bytes
+    }
+  )
+}
+```
+
+Canonical JSON (save as `src/app.x07.json`):
+
 ```json
 {
   "schema_version": "x07.x07ast@0.8.0",
   "kind": "module",
   "module_id": "app",
-  "imports": ["std.fmt", "std.net.http", "std.net.http.spec", "std.os.fs"],
+  "imports": ["std.fmt", "std.net.http", "std.net.http.spec", "std.os.fs", "std.os.fs.spec"],
   "decls": [
     { "kind": "export", "names": ["app.solve"] },
     {
@@ -198,7 +273,8 @@ Replace `src/app.x07.json` with:
           [
             "begin",
             ["let", "body", ["std.net.http.resp_body_v1", "v"]],
-            ["let", "_", ["std.os.fs.write_file", ["bytes.lit", "out/body.bin"], "body"]],
+            ["let", "fs_caps", ["std.os.fs.spec.caps_default_v1"]],
+            ["let", "_", ["std.os.fs.write_all_v1", ["bytes.lit", "out/body.bin"], ["std.bytes.copy", "body"], "fs_caps"]],
             "body"
           ]
         ]

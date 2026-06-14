@@ -7,7 +7,7 @@ This module provides deterministic time zone offset lookup using a pinned tzdb s
 Design constraints:
 
 - **Deterministic**: results must not depend on the host OS’s zoneinfo.
-- **Pinned snapshot**: tzdb data is versioned and bundled (e.g. `2026a`), and the snapshot id is exposed in the API.
+- **Pinned snapshot**: tzdb data is versioned and bundled (currently IANA release `2025b`, exposed as `tzdb-2025b`), and the snapshot id is exposed in the API.
 - **Fast**: offset lookup is O(log N) in number of transitions for the zone.
 
 ## Canonical API (v1)

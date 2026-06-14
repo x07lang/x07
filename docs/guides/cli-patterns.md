@@ -4,19 +4,19 @@ This guide is the companion to [CLI apps](cli-apps.md). It focuses on `ext-cli` 
 
 See the runnable reference project: `docs/examples/agent-gate/cli-ext-cli/`.
 
-## Canonical (specrows JSON + `x07 cli specrows`)
+## Canonical (specrows JSON + `x07 cli spec`)
 
 1. Author your CLI as `x07cli.specrows@0.1.0` JSON (see [Specrows model](#specrows-model)).
 2. Validate semantics (CI-friendly JSON report on stdout):
 
    ```bash
-   x07 cli specrows check --in path/to/cli.specrows.json
+   x07 cli spec check --in path/to/cli.specrows.json
    ```
 
 3. Canonicalize in-place (stable formatting + implied defaults):
 
    ```bash
-   x07 cli specrows fmt --in path/to/cli.specrows.json --write
+   x07 cli spec fmt --in path/to/cli.specrows.json --write
    ```
 
 4. Parse argv and produce deterministic help/errors with `ext-cli`:
@@ -63,10 +63,10 @@ For deterministic semantic validation (and stable formatting), use the toolchain
 
 ```bash
 # Validate (machine-readable JSON report on stdout):
-x07 cli specrows check --in path/to/cli.specrows.json
+x07 cli spec check --in path/to/cli.specrows.json
 
 # Canonicalize rows + implied defaults (writes canonical JSON in-place):
-x07 cli specrows fmt --in path/to/cli.specrows.json --write
+x07 cli spec fmt --in path/to/cli.specrows.json --write
 ```
 
 The validator is stricter than JSON Schema and enforces rules like per-scope uniqueness (`--help` reserved, no duplicate keys) and typed default validity (`U32`, `I32`, `BOOL`, `BYTES_HEX`, `ENUM`).
@@ -220,7 +220,7 @@ In `run-os` worlds you can fetch variables with `std.os.env.get(key)`, then enco
 - Specrows can be compiled to a compact binary form (specbin) for distribution or embedding:
 
   ```bash
-  x07 cli specrows compile --in path/to/cli.specrows.json --out path/to/cli.specrows.bin
+  x07 cli spec compile --in path/to/cli.specrows.json --out path/to/cli.specrows.bin
   ```
 
 - If you need to debug outside `x07 run`, you can run the low-level runners directly:

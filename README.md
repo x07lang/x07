@@ -8,7 +8,7 @@
 
 The deterministic, certifiable execution substrate for agent-written software.
 
-As code generation gets cheap, trust becomes the bottleneck: someone still has to decide whether generated code is safe to run. X07 is a language and toolchain built around that decision. Programs execute in deterministic solve worlds with record/replay, under explicit resource budgets and capability sandboxing. Diagnostics are structured, with quickfix coverage enforced over a 643-code catalog. Testing is spec-first (XTAL), and `x07 verify` / `x07 trust certify` bind proof, test, and runtime evidence into certificates a reviewer can check instead of re-reading source. The C backend gives native speed, fast compiles, and small binaries; a WASM target covers portable sandboxed execution.
+As code generation gets cheap, trust becomes the bottleneck: someone still has to decide whether generated code is safe to run. X07 is a language and toolchain built around that decision. Programs execute in deterministic solve worlds with record/replay, under explicit resource budgets and capability sandboxing. Diagnostics are structured, with quickfix coverage enforced over a 646-code catalog. Testing is spec-first (XTAL), and `x07 verify` / `x07 trust certify` bind proof, test, and runtime evidence into certificates a reviewer can check instead of re-reading source. The C backend gives native speed, fast compiles, and small binaries; a WASM target covers portable sandboxed execution.
 
 > X07 is under active development. Tooling and APIs still move.
 
@@ -33,7 +33,7 @@ The trust surface comes first:
 - **Deterministic execution.** Correctness loops run in `solve-*` worlds; real OS interactions can be recorded into cassettes and replayed deterministically (`std.rr`).
 - **Resource budgets.** Fuel, memory, and output budgets are explicit (`budget.scope_v1`, arch-driven profiles), so a small generated change cannot silently blow up costs.
 - **Capability sandboxing.** Side effects are opt-in through explicit OS worlds and policy files; `run-os-sandboxed` defaults to a VM boundary on supported platforms.
-- **Structured diagnostics.** A 643-code diagnostic catalog with quickfix coverage enforced as a CI gate, machine-readable failure reports, and did-you-mean suggestions on unknown symbols.
+- **Structured diagnostics.** A 646-code diagnostic catalog with quickfix coverage enforced as a CI gate, machine-readable failure reports, and did-you-mean suggestions on unknown symbols.
 - **Spec-first testing.** XTAL drives verify/repair/certify loops from pinned specs, and `x07 gen verify` gates generated artifacts.
 - **Proof-backed certification.** `x07 verify` produces proof and coverage artifacts; `x07 trust certify` binds proof, test, boundary, and runtime evidence into a reviewable certificate.
 - **Native performance.** X07 compiles via C to optimized native code with fast compiles and small binaries; the WASM target covers portable sandboxed execution. See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) for benchmark snapshots.
@@ -157,7 +157,7 @@ Supporting repos:
 - [`x07lang/x07-website`](https://github.com/x07lang/x07-website): public docs site at [x07lang.org](https://x07lang.org)
 - [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare): reproducible cross-language benchmark snapshots
 
-Maintenance mode (2026-06 scope cut; security and compatibility fixes only): `x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-registry-web`, `x07-sentinel-reference-stack`, and the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`). The rationale and the conditions for reactivating them are in the roadmap.
+Maintenance mode (2026-06 scope cut; security and compatibility fixes only): `x07-studio`, `x07-forge`, `x07-crewops`, `x07-tactics`, `x07-device-host`, `x07-web-ui`, `x07-sentinel-reference-stack`, and the platform repos (`x07-platform`, `x07-platform-contracts`, `x07-platform-cloud`). The rationale and the conditions for reactivating them are in the roadmap.
 
 Project governance is documented in [`GOVERNANCE.md`](GOVERNANCE.md) and
 [`OWNERS.md`](OWNERS.md). The public 12-month plan lives in

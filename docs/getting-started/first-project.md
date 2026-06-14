@@ -1,8 +1,8 @@
 # Your first X07 program
 
-This page shows the minimal “hello world” shape **for agents** and **for humans**.
+This page is the minimal human “hello world”. If you are operating through a coding agent, start from [Agent quickstart](agent-quickstart.md) instead — it is the canonical on-ramp.
 
-X07 programs are stored as **x07AST JSON** (`*.x07.json`). Agents should modify programs via JSON Patch applied to a known-good base.
+X07 programs are stored as **x07AST JSON** (`*.x07.json`); you edit them with JSON Patch applied to a known-good base.
 
 ## Create a project (canonical)
 
@@ -19,21 +19,7 @@ This creates:
 - `src/main.x07.json` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)
 
-If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
-
-## Version + compat (when upgrading older code)
-
-New projects pin a compatibility mode in `x07.json` (`project.compat`). If you are working in an older repo or with older package code, prefer mechanical migration:
-
-```bash
-x07 project migrate --check --project x07.json
-x07 project migrate --write --project x07.json
-```
-
-```bash
-x07 migrate --to 0.5 --check --input src/main.x07.json
-x07 migrate --to 0.5 --write --input src/main.x07.json
-```
+For templates (typed CLI, file I/O, JSON reporting, XTAL starters), publishable packages (`x07 init --package`), and migrating older code (`x07 migrate` / `x07 project migrate`), see [Agent quickstart](agent-quickstart.md#templates-agentic-starting-points) and [Version + compat + migration](agent-quickstart.md#05-version--compat--migration-do-this-early).
 
 ## Make it return bytes
 

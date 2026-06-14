@@ -1,41 +1,21 @@
 # verified_core_pure_v1
 
 This example is the canonical smallest project that satisfies the `verified_core_pure_v1`
-trust posture end-to-end.
+trust posture end-to-end. It is pure: no capsule boundary, no network, no
+dependency-closure attestation.
 
-Run the profile check:
+Profile and entry for the [trust / verify cookbook](../trust-cookbook.md):
 
-```bash
-x07 trust profile check \
-  --profile arch/trust/profiles/verified_core_pure_v1.json \
-  --project x07.json \
-  --entry example.main
-```
+- `<profile>` — `arch/trust/profiles/verified_core_pure_v1.json`
+- `<entry>` — `example.main`
 
-Run the smoke + PBT suite:
+The static posture step is just the profile check (there is no capsule index to
+validate), and the test step runs the smoke + PBT suite.
 
-```bash
-x07 test --all --manifest tests/tests.json
-```
+The accepted certificate should report `entry_body_formally_proved: true` and a
+non-empty operational-entry proof inventory.
 
-Emit a certificate bundle:
+CI:
 
-```bash
-x07 trust certify \
-  --project x07.json \
-  --profile arch/trust/profiles/verified_core_pure_v1.json \
-  --entry example.main \
-  --out-dir target/cert
-```
-
-Re-check the emitted proof object:
-
-```bash
-x07 prove check --proof target/cert/prove/example.main/proof.json
-```
-
-`target/cert/` is generated local output. Review `target/cert/summary.html` and `target/cert/certificate.json`; the accepted certificate should report `entry_body_formally_proved: true` and a non-empty operational-entry proof inventory.
-
-CI example:
-
-- `.github/workflows/certify.yml` installs `x07`, `cbmc`, and `z3`, then uploads `target/cert/` as a review artifact.
+- `.github/workflows/certify.yml` installs `x07`, `cbmc`, and `z3`, then uploads
+  `target/cert/` as a review artifact.

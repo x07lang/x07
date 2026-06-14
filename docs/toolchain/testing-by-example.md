@@ -44,6 +44,30 @@ x07 init
 
 Replace `tests/smoke.x07.json` with:
 
+```clojure
+; x07text
+{
+  :kind module
+  :module_id smoke
+  :schema_version x07.x07ast@0.8.0
+  :imports (std.test)
+  :decls ({:kind export :names (smoke.pure_add)}
+    {
+      :kind defn
+      :name smoke.pure_add
+      :body (begin
+        (try (std.test.assert_i32_eq (+ 2 3) 5 (std.test.code_assert_i32_eq)))
+        (std.test.pass)
+      )
+      :params ()
+      :result result_i32
+    }
+  )
+}
+```
+
+Canonical JSON (save as `tests/smoke.x07.json`):
+
 ```json
 {
   "schema_version": "x07.x07ast@0.8.0",

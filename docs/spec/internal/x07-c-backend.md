@@ -77,7 +77,7 @@ Standalone-only OS builtins (compile-time gated to `run-os*`):
 - `os.time.local_tzid_v1() -> bytes` (LocalTzidResultV1 doc; see `docs/time/os-time-v1.md`)
 - `os.process.exit(code: i32) -> never`
 - `os.net.http_request(req: bytes) -> bytes` (currently traps; reserved for later)
-  - OS-world networking today: use `ext-net` (`packages/ext/x07-ext-net/0.1.5/`) via `std.net.*` (see `docs/guides/networking.md` and `docs/net/net-v1.md`).
+  - OS-world networking today: use `ext-net` (see the registry catalog) via `std.net.*` (see `docs/guides/networking.md` and `docs/net/net-v1.md`).
 
 Pinned tzdb builtins (deterministic; used by `ext.time.tzdb`, see `docs/time/tzdb-v1.md`):
 

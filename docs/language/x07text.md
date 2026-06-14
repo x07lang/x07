@@ -34,14 +34,14 @@ canonicalization (the canonical artifact is JSON).
 
 Example:
 
-```
+```clojure
+; x07text
 {
   :kind module
   :module_id app
   :schema_version x07.x07ast@0.8.0
   :imports (std.fmt std.text.ascii)
-  :decls (
-    {:kind export :names (app.solve)}
+  :decls ({:kind export :names (app.solve)}
     {
       :kind defn
       :name app.solve

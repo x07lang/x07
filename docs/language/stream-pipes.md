@@ -55,6 +55,14 @@ bytes payload[payload_len]
 
 To read `err_code`:
 
+```clojure
+; x07text
+(begin
+  (let dv (bytes.view doc))
+  (if (= (view.get_u8 dv 0) 0) (codec.read_u32_le dv 1) 0)
+)
+```
+
 ```jsonc
 ["begin",
   ["let","dv",["bytes.view","doc"]],

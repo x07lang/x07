@@ -1,5 +1,7 @@
 # X07 Production Readiness Report — Agent Flow Evaluation
 
+> Historical evaluation (v0.1.10). Kept as a record.
+
 ## Task Summary
 
 Attempted to build "x07dbguard" — a database migration + drift guard CLI tool — following the agent quickstart flow. The prompt required: contracts, generics, PBT, RR tests, budgets, arch manifests, CI artifacts, and package dependencies.
@@ -104,6 +106,8 @@ Every change requires a full compile and (for `x07 build` / `x07 run`) C emissio
 ### 4.1 High Priority — Agent Productivity
 
 1. **Text-based syntax alternative or bidirectional tooling**: The JSON AST format is the single biggest barrier to agent productivity. Either provide a human-readable text syntax that compiles to x07AST JSON, or provide robust `x07 ast from-text` / `x07 ast to-text` tools. Writing JSON S-expressions is 5-10x slower than equivalent code in any text language.
+
+   **Resolved in 0.2.x**: The lossless x07text projection now ships. Use `x07 ast to-text` to render an x07AST JSON file as x07text and `x07 ast from-text` to parse it back into canonical x07AST JSON (the round-trip is lossless; `*.x07.json` remains canonical on disk).
 
 2. **Contract-purity documentation**: Add a `x07 doc --contract-pure` command that lists all builtins and module functions allowed in contract expressions. Make the diagnostic `X07-CONTRACT-0002` suggest specific alternatives.
 

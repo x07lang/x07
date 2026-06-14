@@ -44,18 +44,7 @@ Artifacts are written under `out/scan/`:
 - `scan.json`
 - `scan.events.jsonl`
 
-Token/context truth classes are explicit in `scan.json.usage_metrics` and in rich/TUI output:
-
-- `usage_mode=estimate`: deterministic estimates
-- `usage_mode=tokenizer_exact`: exact counts under a chosen tokenizer profile (`--tokenizer openai:o200k_base`)
-- `usage_mode=trace_observed`: observed counts from a real client trace (`--token-trace trace.json`)
-- `usage_mode=mixed`: per-metric mix of exact + observed
-
-By default, Hardproof uses `--usage-mode auto`. Auto prefers exact tokenization when tokenizer tables are available and the tool catalog is within limits; otherwise it falls back to deterministic estimates. Fallbacks and errors are explicit in:
-
-- `requested_usage_mode` (what you asked for)
-- `usage_status` (`ok|fallback|error`)
-- `usage_error_code` + `usage_fallback_reason` (why)
+The report makes both score truth and usage truth explicit; see [Score truth and usage truth](#score-truth-and-usage-truth).
 
 4) Replay:
 
@@ -82,12 +71,29 @@ hardproof scan \
   --format json
 ```
 
-Score semantics are explicit in the report:
+## Score truth and usage truth
+
+These semantics are the same wherever Hardproof runs (local, install, GitHub Actions, Codespaces). This section is the canonical definition; the other MCP-quality pages link here instead of repeating it.
+
+**Score truth** is explicit in `scan.json`:
 
 - `score_mode=full`: `overall_score` is populated and the scan is eligible for a full score.
 - `score_mode=partial`: the scan is not publishable (`score_truth_status=partial`). `overall_score` is still computed as the effective score (matching `partial_score`), and `gating_reasons` explain what evidence is missing (commonly Trust inputs).
 
-`hardproof ci` now fails on `score_mode=partial` by default. Use `--allow-partial-score` only when a partial gate is intentional.
+`hardproof ci` fails on `score_mode=partial` by default. Use `--allow-partial-score` only when a partial gate is intentional.
+
+**Usage truth** (token/context) is explicit in `scan.json.usage_metrics` and in rich/TUI output:
+
+- `usage_mode=estimate`: deterministic estimates
+- `usage_mode=tokenizer_exact`: exact counts under a chosen tokenizer profile (`--tokenizer openai:o200k_base` / `openai:cl100k_base`)
+- `usage_mode=trace_observed`: observed counts from a real client trace (`--token-trace trace.json`)
+- `usage_mode=mixed`: per-metric mix of exact + observed
+
+By default, Hardproof uses `--usage-mode auto`. Auto prefers exact tokenization when tokenizer tables are available and the tool catalog is within limits; otherwise it falls back to deterministic estimates. Fallbacks and errors are explicit in:
+
+- `requested_usage_mode` (what you asked for)
+- `usage_status` (`ok|fallback|error`)
+- `usage_error_code` + `usage_fallback_reason` (why)
 
 ## x07-native path (optional)
 

@@ -1,5 +1,7 @@
 # Agent initial prompt (template)
 
+This is the copy/paste bootstrap prompt. For the full on-ramp (install, the core loop, packages, worlds), see [Agent quickstart](agent-quickstart.md).
+
 Copy/paste the prompt below into your coding agent and replace the placeholders (`{...}`).
 
 ```text

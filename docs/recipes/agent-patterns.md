@@ -10,15 +10,30 @@ X07 has two string-like types: `bytes` (owned) and `bytes_view` (borrowed refere
 
 `bytes.view` requires an **identifier** (a named local), not an arbitrary expression. Always bind the bytes-producing expression to a local first:
 
-```json
-["let", "raw", ["bytes.lit", "hello"]],
-["let", "v", ["bytes.view", "raw"]]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin (let raw (bytes.lit hello)) (let v (bytes.view raw)))
+}
 ```
 
 This fails:
 
-```json
-["bytes.view", ["bytes.lit", "hello"]]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (bytes.view (bytes.lit hello))
+}
 ```
 
 The error message says "requires an identifier" — the fix is always to bind first.
@@ -27,27 +42,43 @@ The error message says "requires an identifier" — the fix is always to bind fi
 
 When a function expects `bytes_view`, the caller must pass an identifier. Bind the result to a local first:
 
-```json
-["let", "payload", ["bytes.concat", ["bytes.lit", "prefix:"], "name"]],
-["let", "pv", ["bytes.view", "payload"]],
-["my_module.process_v1", "pv"]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin
+    (let payload (bytes.concat (bytes.lit "prefix:") name))
+    (let pv (bytes.view payload))
+    (my_module.process_v1 pv)
+  )
+}
 ```
 
 ### if branches and ownership
 
 Create borrows only in the branch that needs them. Don't create a `bytes_view` before the `if` and then move the owner inside a branch:
 
-```json
-["let", "data", ["bytes.lit", "value"]],
-["if", ["=", "flag", 1],
-  ["begin",
-    ["let", "dv", ["bytes.view", "data"]],
-    ["some_fn", "dv"]
-  ],
-  ["begin",
-    ["consume_bytes", "data"]
-  ]
-]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin
+    (let data (bytes.lit value))
+    (if
+      (= flag 1)
+      (begin (let dv (bytes.view data)) (some_fn dv))
+      (begin (consume_bytes data))
+    )
+  )
+}
 ```
 
 The borrow (`dv`) exists only in the branch that needs it. The other branch can move `data` freely.
@@ -56,9 +87,16 @@ The borrow (`dv`) exists only in the branch that needs it. The other branch can 
 
 When you need to return owned `bytes` from a `bytes_view`, use `view.to_bytes` at exactly the point where ownership is required:
 
-```json
-["let", "line", ["std.text.ascii.kth_line_view", "b", 0]],
-["view.to_bytes", "line"]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin (let line (std.text.ascii.kth_line_view b 0)) (view.to_bytes line))
+}
 ```
 
 Don't call `view.to_bytes` early — keep data as `bytes_view` as long as possible to avoid copies.
@@ -78,16 +116,34 @@ If you want test functions in the same module as production code, name them `smo
 
 `std.test.assert_bytes_eq` **moves** (consumes) both arguments. After the assertion, neither value is usable:
 
-```json
-["std.test.assert_bytes_eq", "actual", "expected", ["std.test.code_assert_bytes_eq"]]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (std.test.assert_bytes_eq actual expected (std.test.code_assert_bytes_eq))
+}
 ```
 
 If you need to reuse a value after assertion, use `std.test.assert_view_eq` instead — it takes `bytes_view` arguments and does not consume them:
 
-```json
-["let", "av", ["bytes.view", "actual"]],
-["let", "ev", ["bytes.view", "expected"]],
-["std.test.assert_view_eq", "av", "ev", ["std.test.code_assert_view_eq"]]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin
+    (let av (bytes.view actual))
+    (let ev (bytes.view expected))
+    (std.test.assert_view_eq av ev (std.test.code_assert_view_eq))
+  )
+}
 ```
 
 ### Test harness cwd
@@ -110,13 +166,35 @@ Rename to any other identifier:
 - `payload`
 - `req`
 
+```clojure
+; x07text
+{
+  :kind module
+  :module_id app
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ({:kind defn :name app.handle_v1 :body (begin ...) :params ({:name in_bytes :ty bytes_view}) :result bytes}
+  )
+}
+```
+
+Canonical JSON (save as `app.x07.json`):
+
 ```json
 {
-  "kind": "defn",
-  "name": "app.handle_v1",
-  "params": ["in_bytes"],
-  "result": "result_bytes",
-  "body": ["begin", "..."]
+  "kind": "module",
+  "module_id": "app",
+  "schema_version": "x07.x07ast@0.8.0",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "defn",
+      "name": "app.handle_v1",
+      "params": [{ "name": "in_bytes", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["begin", "..."]
+    }
+  ]
 }
 ```
 
@@ -126,35 +204,51 @@ Rename to any other identifier:
 
 When you know the number of concurrent tasks at compile time, use named locals:
 
-```json
-["task.scope_v1",
-  ["begin",
-    ["let", "h1", ["my.task_a"]],
-    ["let", "h2", ["my.task_b"]],
-    ["task.spawn", "h1"],
-    ["task.spawn", "h2"],
-    ["let", "r1", ["await", "h1"]],
-    ["let", "r2", ["await", "h2"]],
-    ["bytes.concat", "r1", "r2"]
-  ]
-]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (task.scope_v1
+    (begin
+      (let h1 (my.task_a))
+      (let h2 (my.task_b))
+      (task.spawn h1)
+      (task.spawn h2)
+      (let r1 (await h1))
+      (let r2 (await h2))
+      (bytes.concat r1 r2)
+    )
+  )
+}
 ```
 
 ### Channel-based fanout (dynamic or large N)
 
 For dynamic fan-out, use `task.scope.start_soon_v1` with channels:
 
-```json
-["task.scope_v1",
-  ["begin",
-    ["let", "ch", ["chan.bytes.make", 16]],
-    ["task.scope.start_soon_v1", ["my.worker_v1", "item1", "ch"]],
-    ["task.scope.start_soon_v1", ["my.worker_v1", "item2", "ch"]],
-    ["chan.bytes.close_send", "ch"],
-    ["let", "results", ["chan.bytes.collect", "ch"]],
-    "results"
-  ]
-]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (task.scope_v1
+    (begin
+      (let ch (chan.bytes.make 16))
+      (task.scope.start_soon_v1 (my.worker_v1 item1 ch))
+      (task.scope.start_soon_v1 (my.worker_v1 item2 ch))
+      (chan.bytes.close_send ch)
+      (let results (chan.bytes.collect ch))
+      results
+    )
+  )
+}
 ```
 
 Each worker sends its result into the channel; the parent collects all results after closing the send side.
@@ -167,27 +261,49 @@ Don't concatenate `bytes.lit` fragments manually to build JSON — escaping bugs
 
 Build each field value as bytes, then assemble and canonicalize:
 
-```json
-["let", "key", ["bytes.lit", "status"]],
-["let", "val", ["bytes.lit", "ok"]],
-["let", "raw", ["bytes.concat",
-  ["bytes.lit", "{\""],
-  "key",
-  ["bytes.lit", "\":\""],
-  "val",
-  ["bytes.lit", "\"}"]
-]],
-["std.json.canonicalize_small", ["bytes.view", "raw"]]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin
+    (let key (bytes.lit status))
+    (let val (bytes.lit ok))
+    (let raw
+      (bytes.concat
+        (bytes.lit "{\"")
+        key
+        (bytes.lit "\":\"")
+        val
+        (bytes.lit "\"}")
+      )
+    )
+    (std.json.canonicalize_small (bytes.view raw))
+  )
+}
 ```
 
 ### If using ext-data-model
 
 Build a map with the DataModel API, then emit canonical JSON. This avoids all manual escaping:
 
-```json
-["let", "doc", ["ext.dm.map_new"]],
-["ext.dm.map_set", "doc", ["bytes.lit", "status"], ["bytes.lit", "ok"]],
-["ext.dm.to_json_canonical", "doc"]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (begin
+    (let doc (ext.dm.map_new))
+    (ext.dm.map_set doc (bytes.lit status) (bytes.lit ok))
+    (ext.dm.to_json_canonical doc)
+  )
+}
 ```
 
 Prefer the DataModel approach for any JSON with dynamic or user-supplied values.
@@ -196,14 +312,20 @@ Prefer the DataModel approach for any JSON with dynamic or user-supplied values.
 
 Use `std.process.set_exit_code_v1` for nonzero exit on failure. This works in `run-os` and `run-os-sandboxed`:
 
-```json
-["if", ["=", "success", 0],
-  ["begin",
-    ["std.process.set_exit_code_v1", 1],
-    ["bytes.lit", "FAIL"]
-  ],
-  ["bytes.lit", "OK"]
-]
+```clojure
+; x07text
+{
+  :kind entry
+  :module_id main
+  :schema_version x07.x07ast@0.8.0
+  :imports ()
+  :decls ()
+  :solve (if
+    (= success 0)
+    (begin (std.process.set_exit_code_v1 1) (bytes.lit FAIL))
+    (bytes.lit OK)
+  )
+}
 ```
 
 The exit code appears in the runner report's `exit_code` field.

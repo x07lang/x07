@@ -12,10 +12,8 @@ Recommended pinned components:
 
 The toolchain should vendor these sources at pinned commits and build them deterministically.
 
-Current in-repo native backend (`crates/x07-math-native`) uses:
-- `libm` (pure Rust libm)
-- `ryu` (formatting)
-- `lexical-core` (parsing)
+The current in-repo native backend and its build/CI wiring are described in the
+[native backend](native-backend-v1.md) page.
 
 See upstream references:
 - OpenLibm: https://openlibm.org/ and https://github.com/JuliaMath/openlibm
