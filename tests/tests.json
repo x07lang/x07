@@ -26,6 +26,12 @@
       "expect": "pass"
     },
     {
+      "id": "smoke/str_ops",
+      "world": "solve-pure",
+      "entry": "smoke_str.str_ops",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/pure_i32_eq",
       "world": "solve-pure",
       "entry": "smoke_pure.pure_i32_eq",

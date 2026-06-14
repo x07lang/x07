@@ -39,6 +39,9 @@ pub fn builtin_module_source(module_id: &str) -> Option<&'static str> {
         "std.bit" => Some(include_str!(
             "../../../stdlib/std-core/0.1.4/modules/std/bit.x07.json"
         )),
+        "std.str" => Some(include_str!(
+            "../../../stdlib/std/0.1.3/modules/std/str.x07.json"
+        )),
         "std.text.ascii" => Some(include_str!(
             "../../../stdlib/std/0.1.3/modules/std/text/ascii.x07.json"
         )),
@@ -169,6 +172,7 @@ pub fn builtin_module_ids() -> &'static [&'static str] {
         "std.pbt.gen_v1",
         "std.pbt.shrink_v1",
         "std.bit",
+        "std.str",
         "std.text.ascii",
         "std.text.slices",
         "std.text.utf8",

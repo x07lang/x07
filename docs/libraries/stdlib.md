@@ -4,6 +4,7 @@ X07 includes a small stdlib for:
 
 - bytes/views
 - parsing/formatting
+- text & validated UTF-8 strings (`std.text`, `std.str`)
 - deterministic collections
 - deterministic PRNG
 - I/O traits (so fixture and OS adapters share a surface)
