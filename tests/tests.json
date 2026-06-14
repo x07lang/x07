@@ -20,6 +20,12 @@
       "expect": "pass"
     },
     {
+      "id": "smoke/enum_match",
+      "world": "solve-pure",
+      "entry": "smoke_enums.enum_match",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/pure_i32_eq",
       "world": "solve-pure",
       "entry": "smoke_pure.pure_i32_eq",

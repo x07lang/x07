@@ -68,11 +68,31 @@ pub struct RecordDef {
     pub size: u32,
 }
 
+/// A variant of a lowered `defenum` (RFC 0002).
+#[derive(Debug, Clone)]
+pub struct EnumVariant {
+    pub name: String,
+    /// Tag byte: the variant's 0-based index in declaration order.
+    pub tag: u8,
+    /// Payload type for a single-payload variant; `None` for a unit variant.
+    pub payload: Option<Ty>,
+}
+
+/// A lowered `defenum`: a nominal tagged-union (sum) type represented as
+/// brand-tagged `bytes` with layout `[u8 tag][payload?]`. The brand id is the
+/// enum's fully-qualified `name`.
+#[derive(Debug, Clone)]
+pub struct EnumDef {
+    pub name: String,
+    pub variants: Vec<EnumVariant>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Program {
     pub functions: Vec<FunctionDef>,
     pub async_functions: Vec<AsyncFunctionDef>,
     pub extern_functions: Vec<ExternFunctionDecl>,
     pub records: Vec<RecordDef>,
+    pub enums: Vec<EnumDef>,
     pub solve: Expr,
 }

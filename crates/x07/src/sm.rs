@@ -590,6 +590,7 @@ fn gen_machine_module(
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         records: Vec::new(),
+        enums: Vec::new(),
         solve: None,
         meta,
     };
@@ -686,6 +687,7 @@ fn gen_tests_module(
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         records: Vec::new(),
+        enums: Vec::new(),
         solve: None,
         meta,
     };

@@ -726,9 +726,10 @@ impl<'a> Emitter<'a> {
                         .collect(),
                     functions: self.functions.clone(),
                     extern_functions: self.extern_functions.clone(),
-                    // Records are resolved in the sync emit context; async bodies
-                    // do not yet construct/access records (RFC 0002 v1).
+                    // Records and enums are resolved in the sync emit context;
+                    // async bodies do not yet construct/match them (RFC 0002 v1).
                     records: Vec::new(),
+                    enums: Vec::new(),
                 };
                 infer.infer(expr)
             }

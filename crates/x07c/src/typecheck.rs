@@ -507,6 +507,7 @@ impl<'a> InferState<'a> {
                     "set" => self.infer_set(list_ptr, items),
                     "set0" => self.infer_set0(list_ptr, items),
                     "if" => self.infer_if(list_ptr, items, want),
+                    "match" => self.infer_match(list_ptr, items, want),
                     "for" => self.infer_for(list_ptr, items),
                     "while" => self.infer_while(list_ptr, items),
                     "return" => self.infer_return(list_ptr, items),
@@ -756,6 +757,75 @@ impl<'a> InferState<'a> {
                 );
                 then_ty
             }
+        }
+    }
+
+    /// Infer a `match` form (RFC 0002). Variant resolution and exhaustiveness
+    /// are enforced by the compiler's typed inference (`InferCtx`); here we only
+    /// scope each arm's optional payload binding so that bodies type-check and
+    /// real errors inside them still surface. An arm is `(<Variant> <body>)` or
+    /// `(<Variant> <bind> <body>)`; the pattern head is structural, not a call.
+    fn infer_match(&mut self, list_ptr: &str, items: &[Expr], want: Option<&TyTerm>) -> TyInfoTerm {
+        if items.len() < 3 {
+            return TyInfoTerm::unbranded(self.fresh_meta());
+        }
+        let _ = self.infer_expr(&items[1], None);
+
+        let mut first: Option<TyInfoTerm> = None;
+        for arm in &items[2..] {
+            let Some(arm_items) = arm.as_list() else {
+                let _ = self.infer_expr(arm, None);
+                continue;
+            };
+            self.push_scope();
+            let body: Option<&Expr> = match arm_items.len() {
+                3 => {
+                    if let Some(bind) = arm_items[1].as_ident() {
+                        self.bind(
+                            bind.to_string(),
+                            TyInfoTerm::unbranded(TyTerm::Named("i32".to_string())),
+                        );
+                    }
+                    Some(&arm_items[2])
+                }
+                2 => Some(&arm_items[1]),
+                _ => None,
+            };
+            match body {
+                Some(b) => {
+                    if let Some(want) = want {
+                        self.check_expr(b, want, ConstraintOrigin::ExprCheck);
+                    } else {
+                        let arm_ty = self.infer_expr(b, None);
+                        match &first {
+                            None => first = Some(arm_ty),
+                            Some(prev) if !matches!(prev.ty, TyTerm::Never) => {
+                                if !matches!(arm_ty.ty, TyTerm::Never) {
+                                    self.add_constraint(
+                                        prev.ty.clone(),
+                                        arm_ty.ty.clone(),
+                                        list_ptr.to_string(),
+                                        ConstraintOrigin::ExprCheck,
+                                    );
+                                }
+                            }
+                            _ => first = Some(arm_ty),
+                        }
+                    }
+                }
+                None => {
+                    for it in arm_items.iter().skip(1) {
+                        let _ = self.infer_expr(it, None);
+                    }
+                }
+            }
+            self.pop_scope();
+        }
+
+        if let Some(want) = want {
+            TyInfoTerm::unbranded(want.clone())
+        } else {
+            first.unwrap_or_else(|| TyInfoTerm::unbranded(self.fresh_meta()))
         }
     }
 

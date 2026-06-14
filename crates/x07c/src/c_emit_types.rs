@@ -23,6 +23,7 @@ pub(super) struct InferCtx {
     pub(super) functions: BTreeMap<String, FnSig>,
     pub(super) extern_functions: BTreeMap<String, ExternFunctionDecl>,
     pub(super) records: Vec<crate::program::RecordDef>,
+    pub(super) enums: Vec<crate::program::EnumDef>,
 }
 
 impl InferCtx {
@@ -222,6 +223,203 @@ impl InferCtx {
         }
     }
 
+    fn infer_enum_op(
+        &mut self,
+        head: &str,
+        op: crate::enums::EnumOp,
+        args: &[Expr],
+    ) -> Result<TyInfo, CompilerError> {
+        match op {
+            crate::enums::EnumOp::Variant(en, variant) => {
+                match &variant.payload {
+                    None => {
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} is a unit variant and takes no arguments"),
+                            ));
+                        }
+                    }
+                    Some(_) => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects 1 payload arg, got {}", args.len()),
+                            ));
+                        }
+                        if self.infer(&args[0])?.ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head}: variant payload is i32"),
+                            ));
+                        }
+                    }
+                }
+                Ok(TyInfo::branded(Ty::Bytes, en.name.clone()))
+            }
+        }
+    }
+
+    /// Infer a `match` form: `(match <scrut> <arm>...)` where each arm is a list
+    /// `(<Enum>.<Variant> <body>)` for a unit variant or
+    /// `(<Enum>.<Variant> <bind> <body>)` for a payload variant. Every variant
+    /// must be matched exactly once (exhaustive, no fallthrough); all arm bodies
+    /// must agree on a result type.
+    fn infer_match(&mut self, args: &[Expr]) -> Result<TyInfo, CompilerError> {
+        if args.len() < 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "match form: (match <scrut> <arm>...) requires a scrutinee and at least one arm"
+                    .to_string(),
+            ));
+        }
+        let scrut = self.infer(&args[0])?;
+        if scrut.ty != Ty::Bytes && scrut.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "match scrutinee must be an enum value".to_string(),
+            ));
+        }
+        let brand = scrut.brand.as_str().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "match scrutinee must be a branded enum value".to_string(),
+            )
+        })?;
+        let en = crate::enums::find_enum(&self.enums, brand)
+            .ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("match scrutinee brand {brand:?} is not an enum"),
+                )
+            })?
+            .clone();
+
+        let mut seen: BTreeMap<String, ()> = BTreeMap::new();
+        let mut result: Option<TyInfo> = None;
+        for arm in &args[1..] {
+            let Expr::List { items, .. } = arm else {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Parse,
+                    "match arm must be a list (<Enum>.<Variant> ...)".to_string(),
+                ));
+            };
+            let pat = items.first().and_then(Expr::as_ident).ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Parse,
+                    "match arm pattern head must be a variant identifier".to_string(),
+                )
+            })?;
+            let variant = en
+                .variants
+                .iter()
+                .find(|v| {
+                    pat.strip_prefix(en.name.as_str())
+                        .and_then(|r| r.strip_prefix('.'))
+                        == Some(v.name.as_str())
+                })
+                .ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{pat:?} is not a variant of enum {}", en.name),
+                    )
+                })?
+                .clone();
+            if seen.insert(variant.name.clone(), ()).is_some() {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("duplicate match arm for variant {:?}", variant.name),
+                ));
+            }
+            let body_ty = match &variant.payload {
+                None => {
+                    if items.len() != 2 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Parse,
+                            format!("unit variant arm shape is (<Enum>.{} <body>)", variant.name),
+                        ));
+                    }
+                    self.push_scope();
+                    let t = self.infer(&items[1])?;
+                    self.pop_scope();
+                    t
+                }
+                Some(_) => {
+                    if items.len() != 3 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Parse,
+                            format!(
+                                "payload variant arm shape is (<Enum>.{} <bind> <body>)",
+                                variant.name
+                            ),
+                        ));
+                    }
+                    let bind = items[1].as_ident().ok_or_else(|| {
+                        CompilerError::new(
+                            CompileErrorKind::Parse,
+                            "match payload binding must be an identifier".to_string(),
+                        )
+                    })?;
+                    self.push_scope();
+                    self.bind(bind.to_string(), TyInfo::unbranded(Ty::I32));
+                    let t = self.infer(&items[2])?;
+                    self.pop_scope();
+                    t
+                }
+            };
+            result = Some(match result {
+                None => body_ty,
+                Some(prev) => {
+                    if prev.ty == Ty::Never {
+                        body_ty
+                    } else if body_ty.ty == Ty::Never {
+                        prev
+                    } else if prev.ty != body_ty.ty {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!(
+                                "match arms must have the same type (got {:?} and {:?})",
+                                prev.ty, body_ty.ty
+                            ),
+                        ));
+                    } else {
+                        TyInfo {
+                            ty: prev.ty,
+                            brand: tybrand_join(prev.ty, &prev.brand, &body_ty.brand),
+                            view_full: prev.ty == Ty::BytesView
+                                && prev.view_full
+                                && body_ty.view_full,
+                        }
+                    }
+                }
+            });
+        }
+
+        if seen.len() != en.variants.len() {
+            let missing: Vec<String> = en
+                .variants
+                .iter()
+                .filter(|v| !seen.contains_key(&v.name))
+                .map(|v| v.name.clone())
+                .collect();
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!(
+                    "non-exhaustive match on enum {}; missing arm(s): {}",
+                    en.name,
+                    missing.join(", ")
+                ),
+            ));
+        }
+
+        result.ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "match requires at least one arm".to_string(),
+            )
+        })
+    }
+
     pub(super) fn infer(&mut self, expr: &Expr) -> Result<TyInfo, CompilerError> {
         match expr {
             Expr::Int { .. } => Ok(TyInfo::unbranded(Ty::I32)),
@@ -248,8 +446,12 @@ impl InferCtx {
                 if let Some(op) = crate::records::resolve_record_op(&self.records, head) {
                     return self.infer_record_op(head, op, args);
                 }
+                if let Some(op) = crate::enums::resolve_enum_op(&self.enums, head) {
+                    return self.infer_enum_op(head, op, args);
+                }
 
                 match head {
+                    "match" => self.infer_match(args),
                     "begin" => {
                         if args.is_empty() {
                             return Err(CompilerError::new(
@@ -6777,6 +6979,7 @@ impl<'a> Emitter<'a> {
             functions,
             extern_functions: self.extern_functions.clone(),
             records: self.program.records.clone(),
+            enums: self.program.enums.clone(),
         };
         infer.infer(expr)
     }

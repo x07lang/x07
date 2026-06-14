@@ -30,6 +30,7 @@ fn program_with_solve(solve: x07c::ast::Expr) -> Program {
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         records: Vec::new(),
+        enums: Vec::new(),
         solve,
     }
 }

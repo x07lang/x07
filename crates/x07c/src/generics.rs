@@ -619,6 +619,7 @@ pub fn monomorphize(
         async_functions: out_async_functions,
         extern_functions,
         records: Vec::new(),
+        enums: Vec::new(),
         solve,
     };
 

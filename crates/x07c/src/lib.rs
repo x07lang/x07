@@ -6,6 +6,7 @@ pub mod compat;
 pub mod compile;
 pub mod contracts_elab;
 pub mod diagnostics;
+pub mod enums;
 pub mod generics;
 pub mod guide;
 pub mod json_patch;
