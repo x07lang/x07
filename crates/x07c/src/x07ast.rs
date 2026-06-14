@@ -306,6 +306,15 @@ fn parse_record(
             });
         }
         let fty = get_required_string(fo, &format!("{fptr}/ty"), "ty")?;
+        if fty != "i32" && fty != "u32" {
+            return Err(X07AstError {
+                message: format!(
+                    "record field {fname:?} has type {fty:?}; records currently support \
+                     only `i32`/`u32` fields (fixed 32-bit scalars)"
+                ),
+                ptr: format!("{fptr}/ty"),
+            });
+        }
         fields.push(AstRecordField {
             name: fname,
             ty: TypeRef::Named(fty),
@@ -1572,7 +1581,31 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             &f.body,
         )));
     }
+    for r in &file.records {
+        out.push(Value::Object(record_decl_value(r)));
+    }
     out
+}
+
+fn record_decl_value(rec: &AstRecordDef) -> serde_json::Map<String, Value> {
+    let mut m = serde_json::Map::new();
+    m.insert("kind".to_string(), Value::String("defrecord".to_string()));
+    m.insert("name".to_string(), Value::String(rec.name.clone()));
+    if let Some(doc) = &rec.doc {
+        m.insert("doc".to_string(), Value::String(doc.clone()));
+    }
+    let fields: Vec<Value> = rec
+        .fields
+        .iter()
+        .map(|f| {
+            let mut fm = serde_json::Map::new();
+            fm.insert("name".to_string(), Value::String(f.name.clone()));
+            fm.insert("ty".to_string(), type_ref_to_value(&f.ty));
+            Value::Object(fm)
+        })
+        .collect();
+    m.insert("fields".to_string(), Value::Array(fields));
+    m
 }
 
 fn export_decl_value(exports: &BTreeSet<String>) -> serde_json::Map<String, Value> {

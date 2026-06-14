@@ -376,6 +376,9 @@ fn compile_frontend(
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("main: {e}")))?;
     enforce_contract_typecheck("main", &file, options.compat)?;
     fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
+    // Records (RFC 0002) are not generic; capture the main module's record
+    // layouts before `file` is consumed, then attach to the lowered program.
+    let mut all_records = crate::records::lower_records(&file.records);
     let main = parse_main_file_x07ast(file)?;
     if !options.allow_internal_only_heads_in_entry {
         forbid_internal_only_heads_in_entry("main", &main)?;
@@ -399,6 +402,7 @@ fn compile_frontend(
             &mut module_infos,
             &mut visiting,
             &mut fuel_used,
+            &mut all_records,
         )?;
     }
 
@@ -409,6 +413,7 @@ fn compile_frontend(
         &mut modules,
         &mut visiting,
         &mut fuel_used,
+        &mut all_records,
     )?;
 
     let ParsedMain {
@@ -448,6 +453,7 @@ fn compile_frontend(
 
     let (mut parsed_program, mono_map) =
         generics::monomorphize(generic_program, &module_exports, &main_schema_version)?;
+    parsed_program.records = all_records;
     propagate_mono_exports(&mut module_infos, &mono_map)?;
 
     forbid_reserved_helper_function_names(&parsed_program)?;
@@ -531,6 +537,7 @@ fn inject_implicit_imports_for_ty_intrinsics(
     modules: &mut BTreeMap<String, ParsedModule>,
     visiting: &mut BTreeSet<String>,
     fuel_used: &mut u64,
+    records_out: &mut Vec<crate::program::RecordDef>,
 ) -> Result<(), CompilerError> {
     let imports_by_module: BTreeMap<String, BTreeSet<&'static str>> = {
         let mut imports_by_module: BTreeMap<String, BTreeSet<&'static str>> = BTreeMap::new();
@@ -588,6 +595,7 @@ fn inject_implicit_imports_for_ty_intrinsics(
             module_infos,
             visiting,
             fuel_used,
+            records_out,
         )?;
     }
 
@@ -1101,6 +1109,7 @@ fn load_module_recursive(
     module_infos: &mut BTreeMap<String, ModuleInfo>,
     visiting: &mut BTreeSet<String>,
     fuel_used: &mut u64,
+    records_out: &mut Vec<crate::program::RecordDef>,
 ) -> Result<(), CompilerError> {
     if module_infos.contains_key(module_id) {
         return Ok(());
@@ -1134,6 +1143,7 @@ fn load_module_recursive(
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("{module_id:?}: {e}")))?;
     enforce_contract_typecheck(module_id, &file, options.compat)?;
     *fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
+    records_out.extend(crate::records::lower_records(&file.records));
     let (m, mut info) = parse_module_file_x07ast(module_id, file)?;
     info.is_builtin = is_builtin;
 
@@ -1142,7 +1152,15 @@ fn load_module_recursive(
     }
 
     for dep in &info.imports {
-        load_module_recursive(dep, options, modules, module_infos, visiting, fuel_used)?;
+        load_module_recursive(
+            dep,
+            options,
+            modules,
+            module_infos,
+            visiting,
+            fuel_used,
+            records_out,
+        )?;
     }
 
     modules.insert(module_id.to_string(), m);

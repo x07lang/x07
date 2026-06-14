@@ -1462,6 +1462,7 @@ mod tests {
             }],
             async_functions: Vec::new(),
             extern_functions: Vec::new(),
+            records: Vec::new(),
             solve: expr_list(vec![expr_ident("main.inc"), expr_int(7)]),
         };
 
@@ -1508,6 +1509,7 @@ mod tests {
             functions: vec![inc],
             async_functions: Vec::new(),
             extern_functions: Vec::new(),
+            records: Vec::new(),
             solve: solve.clone(),
         };
 
@@ -1543,6 +1545,7 @@ mod tests {
             functions: vec![inc],
             async_functions: Vec::new(),
             extern_functions: Vec::new(),
+            records: Vec::new(),
             solve: solve.clone(),
         };
 

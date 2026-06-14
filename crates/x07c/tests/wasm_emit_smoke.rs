@@ -15,6 +15,7 @@ fn empty_program() -> Program {
         functions: Vec::new(),
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: x07c::ast::Expr::List {
             items: vec![
                 x07c::ast::Expr::Ident {
@@ -57,6 +58,7 @@ fn program_with_contract_pure_cmp() -> Program {
         functions: Vec::new(),
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: expr_list(vec![
             expr_ident("begin"),
             expr_list(vec![
@@ -92,6 +94,7 @@ fn program_with_logic_ops() -> Program {
         functions: Vec::new(),
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: expr_list(vec![
             expr_ident("begin"),
             expr_list(vec![
@@ -114,6 +117,7 @@ fn program_with_logic_in_if_condition() -> Program {
         functions: Vec::new(),
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: expr_list(vec![
             expr_ident("if"),
             expr_list(vec![

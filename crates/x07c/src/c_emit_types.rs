@@ -22,6 +22,7 @@ pub(super) struct InferCtx {
     pub(super) scopes: Vec<BTreeMap<String, TyInfo>>,
     pub(super) functions: BTreeMap<String, FnSig>,
     pub(super) extern_functions: BTreeMap<String, ExternFunctionDecl>,
+    pub(super) records: Vec<crate::program::RecordDef>,
 }
 
 impl InferCtx {
@@ -164,6 +165,63 @@ impl InferCtx {
         Ok(sig.ret)
     }
 
+    fn infer_record_op(
+        &mut self,
+        head: &str,
+        op: crate::records::RecordOp,
+        args: &[Expr],
+    ) -> Result<TyInfo, CompilerError> {
+        match op {
+            crate::records::RecordOp::Make(rec) => {
+                if args.len() != rec.fields.len() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "{head} expects {} field arg(s), got {}",
+                            rec.fields.len(),
+                            args.len()
+                        ),
+                    ));
+                }
+                for a in args {
+                    if self.infer(a)? != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head}: record fields are i32"),
+                        ));
+                    }
+                }
+                Ok(TyInfo::branded(Ty::Bytes, rec.name.clone()))
+            }
+            crate::records::RecordOp::Field(rec, _field) => {
+                if args.len() != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects 1 record arg, got {}", args.len()),
+                    ));
+                }
+                let a = self.infer(&args[0])?;
+                if a.ty != Ty::Bytes && a.ty != Ty::BytesView {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects a {} value", rec.name),
+                    ));
+                }
+                if a.brand.as_str() != Some(rec.name.as_str()) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "{head} expects a {} value, got brand {}",
+                            rec.name,
+                            a.brand.as_str().unwrap_or("(unbranded)")
+                        ),
+                    ));
+                }
+                Ok(TyInfo::unbranded(Ty::I32))
+            }
+        }
+    }
+
     pub(super) fn infer(&mut self, expr: &Expr) -> Result<TyInfo, CompilerError> {
         match expr {
             Expr::Int { .. } => Ok(TyInfo::unbranded(Ty::I32)),
@@ -186,6 +244,10 @@ impl InferCtx {
                     )
                 })?;
                 let args = &items[1..];
+
+                if let Some(op) = crate::records::resolve_record_op(&self.records, head) {
+                    return self.infer_record_op(head, op, args);
+                }
 
                 match head {
                     "begin" => {
@@ -6714,6 +6776,7 @@ impl<'a> Emitter<'a> {
                 .collect(),
             functions,
             extern_functions: self.extern_functions.clone(),
+            records: self.program.records.clone(),
         };
         infer.infer(expr)
     }
