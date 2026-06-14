@@ -49,10 +49,7 @@ jobs:
             --in "${{ steps.bundle.outputs.bundle_path }}" \
             --require channel \
             --require x07_core \
-            --require x07_wasm \
-            --require x07_web_ui_host \
-            --require x07_device_host \
-            --require packages
+            --require x07_wasm
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
