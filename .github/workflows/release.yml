@@ -497,10 +497,7 @@ jobs:
             --in "${{ steps.meta.outputs.bundle_manifest }}" \
             --require channel \
             --require x07_core \
-            --require x07_wasm \
-            --require x07_web_ui_host \
-            --require x07_device_host \
-            --require packages
+            --require x07_wasm
       - name: Attest manifest assets
         continue-on-error: true
         uses: actions/attest-build-provenance@v3
