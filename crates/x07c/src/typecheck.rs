@@ -892,6 +892,38 @@ impl<'a> InferState<'a> {
             return TyInfoTerm::unbranded(self.fresh_meta());
         }
         let arg = self.infer_expr(&items[1], None);
+
+        // `try` propagates the error path by returning from the enclosing function, so
+        // the function's result type must equal the try'd value's result type. When both
+        // are statically known and differ, report it directly: otherwise this surfaces
+        // only as a bare `unification failure` with no hint that `try` is the cause.
+        if let (TyTerm::Named(arg_ty), TyTerm::Named(ret_ty)) = (&arg.ty, &self.fn_ret) {
+            if arg_ty.starts_with("result_") && arg_ty != ret_ty {
+                let arg_ty = arg_ty.clone();
+                let ret_ty = ret_ty.clone();
+                let ptr = items[1].ptr().to_string();
+                self.diagnostics.push(Diagnostic {
+                    code: "X07-TYPE-UNIFY-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Type,
+                    message: format!(
+                        "`try` propagates a `{arg_ty}` error by returning it, so the enclosing function must return `{arg_ty}`, but it returns `{ret_ty}`. Either declare the function `:result {arg_ty}`, or handle the value explicitly (`{arg_ty}.is_ok` / `{arg_ty}.unwrap_or`) and build the `{ret_ty}` result yourself."
+                    ),
+                    loc: Some(Location::X07Ast { ptr }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: BTreeMap::new(),
+                    quickfix: None,
+                });
+                let out = match arg_ty.as_str() {
+                    "result_i32" => TyTerm::Named("i32".to_string()),
+                    "result_bytes" => TyTerm::Named("bytes".to_string()),
+                    _ => self.fresh_meta(),
+                };
+                return TyInfoTerm::unbranded(want.cloned().unwrap_or(out));
+            }
+        }
+
         self.add_constraint(
             arg.ty.clone(),
             self.fn_ret.clone(),

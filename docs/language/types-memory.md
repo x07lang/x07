@@ -228,20 +228,27 @@ handling:
   :module_id app
   :schema_version x07.x07ast@0.9.0
   :imports (std.str)
-  :decls ({:kind export :names (app.char_len)}
+  :decls ({:kind export :names (app.lower)}
     {
       :kind defn
-      :name app.char_len
+      :name app.lower
       :body (begin
         (let s (try (std.str.from_bytes_v1 raw)))
-        (result_i32.ok (std.str.char_count s))
+        (result_bytes.ok (std.str.to_lower_ascii s))
       )
       :params ({:name raw :ty bytes})
-      :result result_i32
+      :result result_bytes
     }
   )
 }
 ```
+
+`try` returns from the enclosing function on the error path, so the function's result
+type must match the value's result type. `from_bytes_v1` yields a `result_bytes`, so a
+function that `try`s it must itself return `result_bytes` (as above) — using it inside a
+`result_i32` function is a type error (`X07-TYPE-UNIFY-0001`). To surface a different
+result, such as an `i32` character count, do **not** `try`: inspect the result with
+`result_bytes.is_ok` / `result_bytes.err_code` and build the `result_i32` yourself.
 
 Because a string is branded bytes, accessor-style functions declare a `bytes_view` parameter
 branded `std.str.utf8_v1`, and an owned string (`bytes@std.str.utf8_v1`) is accepted there

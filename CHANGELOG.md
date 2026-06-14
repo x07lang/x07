@@ -2,6 +2,29 @@
 
 All notable user-facing changes to the X07 toolchain are documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- `try` on a `result_*` value whose result kind differs from the enclosing
+  function's now reports a precise, actionable error (which result type to
+  declare, or to handle the value explicitly with `is_ok`/`unwrap_or`) instead of
+  a bare `X07-TYPE-UNIFY-0001: unification failure` with no pointer to `try`. This
+  is the common failure when obtaining a validated string
+  (`try (std.str.from_bytes_v1 …)`) inside a `result_i32` function.
+- The `std.str` example in `docs/language/types-memory.md` returned `result_i32`
+  while `try`-ing a `result_bytes` value — a pattern that does not compile. It now
+  returns `result_bytes`, with a note documenting the `try` result-kind rule.
+- `tests/smoke_str.x07.json` used the same non-compiling pattern (and was masked
+  by suite fail-fast); rewritten as a `result_bytes` validator probe consumed by a
+  `result_i32` assertion entry, so the canonical `std.str` test compiles and runs.
+
+### Changed
+
+- `x07 guide` now documents the `f64` builtins (`f64.of_i32`, `f64.to_i32_trunc`,
+  `f64.add`/`sub`/`mul`/`div`) and that f64 v1 is a transient compute scalar (no
+  literal, comparison, serialization, or record/enum field).
+
 ## v0.2.15
 
 ### Added
