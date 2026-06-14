@@ -377,7 +377,6 @@ def main(argv: list[str]) -> int:
 
     versioned_literal_files = [
         repo_root / "docs" / "getting-started" / "install.md",
-        repo_root / "docs" / "getting-started" / "installer.md",
         repo_root / "scripts" / "build_channels_json.py",
         repo_root / "scripts" / "build_skills_pack.py",
     ]

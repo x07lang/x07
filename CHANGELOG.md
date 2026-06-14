@@ -2,10 +2,23 @@
 
 All notable user-facing changes to the X07 toolchain are documented in this file.
 
-## Unreleased
+## v0.2.15
 
 ### Added
 
+- RFC 0002 expressiveness floor, opt-in via the additive schema
+  `x07.x07ast@0.9.0` (concrete-only `0.8.0` programs stay valid unchanged):
+  - `f64`: IEEE-754 double scalar with explicit conversions (`f64.of_i32`,
+    `f64.to_i32_trunc`) and arithmetic (`f64.add`/`sub`/`mul`/`div`); strict,
+    deterministic floating point (no fast-math, no FMA contraction).
+  - `defrecord`: nominal product types lowered to fixed-layout branded `bytes`
+    (generated `<Record>.make` constructor and `<Record>.<field>` accessors).
+  - `defenum` + `match`: nominal tagged unions (`[u32 tag][payload?]` branded
+    `bytes`) consumed by an exhaustive `match` form with payload binding.
+  - Validated UTF-8 strings via the new `std.str` stdlib module — a string is
+    `bytes` branded `std.str.utf8_v1` (`from_bytes_v1`, `as_bytes`, `len`,
+    `char_count`, `slice_v1`, `to_lower_ascii`/`to_upper_ascii`).
+- RFC 0001 (x07text surface syntax) promoted to **Accepted**.
 - Drift gate for documented diagnostic-catalog size: prose that states the
   catalog code count (e.g. `docs/why-x07.md`) is now checked against
   `catalog/diagnostics.json` in the canary gate, so the hand-written count

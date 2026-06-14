@@ -116,20 +116,20 @@ Fallbacks:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.2.14
+x07up override set v0.2.15
 ```
 
 This makes toolchain selection deterministic for agents and CI. It writes a file like:
 
 ```toml
 [toolchain]
-channel = "v0.2.14"
+channel = "v0.2.15"
 components = ["docs", "skills"]
 ```
 
 Notes:
 
-- `channel` can be `stable` or a specific tag like `v0.2.14`.
+- `channel` can be `stable` or a specific tag like `v0.2.15`.
 - `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:

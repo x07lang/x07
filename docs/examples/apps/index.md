@@ -18,4 +18,4 @@ After copying an example, hydrate deps from the committed lockfile before runnin
 - [`x07crawl/README.md`](x07crawl/README.md)
 - [`x07dbguard/README.md`](x07dbguard/README.md)
 
-> The `report.md` evaluation in each project is historical (written against v0.1.10) and is kept as a record; it is not current against 0.2.14.
+> The `report.md` evaluation in each project is historical (written against v0.1.10) and is kept as a record; it is not current against 0.2.15.
