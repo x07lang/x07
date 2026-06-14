@@ -1177,6 +1177,9 @@ impl<'a> Emitter<'a> {
             }
 
             _ => {
+                if let Some(op) = crate::records::resolve_record_op(&self.program.records, head) {
+                    return self.emit_record_op_to(head, op, args, dest_ty, dest);
+                }
                 if self.fn_c_names.contains_key(head) {
                     self.emit_user_call_to(head, args, dest_ty, dest)
                 } else if self.async_fn_new_names.contains_key(head) {
@@ -1706,6 +1709,85 @@ impl<'a> Emitter<'a> {
             _ => unreachable!(),
         }
         Ok(())
+    }
+
+    pub(super) fn emit_record_op_to(
+        &mut self,
+        head: &str,
+        op: crate::records::RecordOp,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let ptr = args
+            .first()
+            .map(|e| e.ptr().to_string())
+            .unwrap_or_default();
+        let ident = |name: &str| Expr::Ident {
+            name: name.to_string(),
+            ptr: ptr.clone(),
+        };
+        match op {
+            crate::records::RecordOp::Make(rec) => {
+                if dest_ty != Ty::Bytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} returns bytes"),
+                    ));
+                }
+                if args.len() != rec.fields.len() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("{head} expects {} field arg(s)", rec.fields.len()),
+                    ));
+                }
+                // Pack fields little-endian in declaration order:
+                //   (bytes.concat (... (codec.write_u32_le a0)) (codec.write_u32_le ak))
+                let mut packed = Expr::List {
+                    items: vec![ident("codec.write_u32_le"), args[0].clone()],
+                    ptr: ptr.clone(),
+                };
+                for a in &args[1..] {
+                    let wk = Expr::List {
+                        items: vec![ident("codec.write_u32_le"), a.clone()],
+                        ptr: ptr.clone(),
+                    };
+                    packed = Expr::List {
+                        items: vec![ident("bytes.concat"), packed, wk],
+                        ptr: ptr.clone(),
+                    };
+                }
+                self.emit_expr_to(&packed, Ty::Bytes, dest)
+            }
+            crate::records::RecordOp::Field(_rec, field) => {
+                if dest_ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} returns i32"),
+                    ));
+                }
+                if args.len() != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("{head} expects 1 record arg"),
+                    ));
+                }
+                // Read the field at its byte offset (borrows the record value):
+                //   (codec.read_u32_le <record> <offset>)
+                let read = Expr::List {
+                    items: vec![
+                        ident("codec.read_u32_le"),
+                        args[0].clone(),
+                        Expr::Int {
+                            value: field.offset as i32,
+                            ptr: ptr.clone(),
+                        },
+                    ],
+                    ptr: ptr.clone(),
+                };
+                self.emit_expr_to(&read, Ty::I32, dest)
+            }
+        }
     }
 
     pub(super) fn emit_f64_arith_to(

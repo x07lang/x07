@@ -618,6 +618,7 @@ pub fn monomorphize(
         functions: out_functions,
         async_functions: out_async_functions,
         extern_functions,
+        records: Vec::new(),
         solve,
     };
 

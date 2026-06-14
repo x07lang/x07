@@ -17,6 +17,7 @@ pub mod native;
 pub mod optimize;
 pub mod program;
 pub mod project;
+pub mod records;
 pub mod stream_pipe;
 pub mod suggest;
 pub mod typecheck;

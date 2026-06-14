@@ -193,6 +193,21 @@ pub struct AstExternFunctionDecl {
     pub result: Option<TypeRef>,
 }
 
+/// A field of a `defrecord` (RFC 0002 records): a name and a concrete type.
+#[derive(Debug, Clone)]
+pub struct AstRecordField {
+    pub name: String,
+    pub ty: TypeRef,
+}
+
+/// A `defrecord` declaration: a nominal, fixed-layout product type.
+#[derive(Debug, Clone)]
+pub struct AstRecordDef {
+    pub name: String,
+    pub doc: Option<String>,
+    pub fields: Vec<AstRecordField>,
+}
+
 #[derive(Debug, Clone)]
 pub struct X07AstFile {
     pub schema_version: String,
@@ -203,6 +218,7 @@ pub struct X07AstFile {
     pub functions: Vec<AstFunctionDef>,
     pub async_functions: Vec<AstAsyncFunctionDef>,
     pub extern_functions: Vec<AstExternFunctionDecl>,
+    pub records: Vec<AstRecordDef>,
     pub solve: Option<Expr>,
     pub meta: BTreeMap<String, Value>,
 }
@@ -246,6 +262,65 @@ fn supports_async_protocol(schema_version: &str) -> bool {
 
 fn supports_defn_decreases(schema_version: &str) -> bool {
     schema_version == X07AST_SCHEMA_VERSION_V0_8_0 || schema_version == X07AST_SCHEMA_VERSION_V0_9_0
+}
+
+fn supports_records(schema_version: &str) -> bool {
+    schema_version == X07AST_SCHEMA_VERSION_V0_9_0
+}
+
+fn parse_record(
+    dobj: &serde_json::Map<String, Value>,
+    dptr: &str,
+) -> Result<AstRecordDef, X07AstError> {
+    let name = get_required_string(dobj, &format!("{dptr}/name"), "name")?;
+    let doc = dobj
+        .get("doc")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let fields_v = dobj
+        .get("fields")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| X07AstError {
+            message: "defrecord requires a `fields` array".to_string(),
+            ptr: format!("{dptr}/fields"),
+        })?;
+    if fields_v.is_empty() {
+        return Err(X07AstError {
+            message: "defrecord requires at least one field".to_string(),
+            ptr: format!("{dptr}/fields"),
+        });
+    }
+    let mut fields = Vec::with_capacity(fields_v.len());
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    for (i, fv) in fields_v.iter().enumerate() {
+        let fptr = format!("{dptr}/fields/{i}");
+        let fo = fv.as_object().ok_or_else(|| X07AstError {
+            message: format!("record field {i} must be an object"),
+            ptr: fptr.clone(),
+        })?;
+        let fname = get_required_string(fo, &format!("{fptr}/name"), "name")?;
+        if !seen.insert(fname.clone()) {
+            return Err(X07AstError {
+                message: format!("duplicate record field: {fname:?}"),
+                ptr: format!("{fptr}/name"),
+            });
+        }
+        let fty = get_required_string(fo, &format!("{fptr}/ty"), "ty")?;
+        if fty != "i32" && fty != "u32" {
+            return Err(X07AstError {
+                message: format!(
+                    "record field {fname:?} has type {fty:?}; records currently support \
+                     only `i32`/`u32` fields (fixed 32-bit scalars)"
+                ),
+                ptr: format!("{fptr}/ty"),
+            });
+        }
+        fields.push(AstRecordField {
+            name: fname,
+            ty: TypeRef::Named(fty),
+        });
+    }
+    Ok(AstRecordDef { name, doc, fields })
 }
 
 pub fn parse_x07ast_json(bytes: &[u8]) -> Result<X07AstFile, X07AstError> {
@@ -322,6 +397,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
     let mut functions: Vec<AstFunctionDef> = Vec::new();
     let mut async_functions: Vec<AstAsyncFunctionDef> = Vec::new();
     let mut extern_functions: Vec<AstExternFunctionDecl> = Vec::new();
+    let mut records: Vec<AstRecordDef> = Vec::new();
     let mut defn_decreases_meta = serde_json::Map::new();
 
     let mut function_names: BTreeSet<String> = BTreeSet::new();
@@ -448,6 +524,24 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 }
                 extern_functions.push(ex);
             }
+            "defrecord" => {
+                if !supports_records(&schema_version) {
+                    return Err(X07AstError {
+                        message: format!(
+                            "defrecord is only supported in {X07AST_SCHEMA_VERSION_V0_9_0}"
+                        ),
+                        ptr: format!("{dptr}/kind"),
+                    });
+                }
+                let rec = parse_record(dobj, &dptr)?;
+                if !function_names.insert(rec.name.clone()) {
+                    return Err(X07AstError {
+                        message: format!("duplicate decl name: {:?}", rec.name),
+                        ptr: format!("{dptr}/name"),
+                    });
+                }
+                records.push(rec);
+            }
             _ => {
                 return Err(X07AstError {
                     message: format!("unsupported decl kind: {kind:?}"),
@@ -487,6 +581,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
         functions,
         async_functions,
         extern_functions,
+        records,
         solve,
         meta,
     })
@@ -1486,7 +1581,31 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             &f.body,
         )));
     }
+    for r in &file.records {
+        out.push(Value::Object(record_decl_value(r)));
+    }
     out
+}
+
+fn record_decl_value(rec: &AstRecordDef) -> serde_json::Map<String, Value> {
+    let mut m = serde_json::Map::new();
+    m.insert("kind".to_string(), Value::String("defrecord".to_string()));
+    m.insert("name".to_string(), Value::String(rec.name.clone()));
+    if let Some(doc) = &rec.doc {
+        m.insert("doc".to_string(), Value::String(doc.clone()));
+    }
+    let fields: Vec<Value> = rec
+        .fields
+        .iter()
+        .map(|f| {
+            let mut fm = serde_json::Map::new();
+            fm.insert("name".to_string(), Value::String(f.name.clone()));
+            fm.insert("ty".to_string(), type_ref_to_value(&f.ty));
+            Value::Object(fm)
+        })
+        .collect();
+    m.insert("fields".to_string(), Value::Array(fields));
+    m
 }
 
 fn export_decl_value(exports: &BTreeSet<String>) -> serde_json::Map<String, Value> {

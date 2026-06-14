@@ -159,6 +159,7 @@ fn pipe_elaboration_injects_helper_and_rewrites_call_site() {
         functions: Vec::new(),
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: pipe_expr("in.txt"),
     };
 
@@ -241,6 +242,7 @@ fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
             body: ident("item"),
         }],
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: pipe_expr_par_map(),
     };
 
@@ -322,6 +324,7 @@ fn pipe_elaboration_plugin_stage_emits_native_requires() {
                 functions: Vec::new(),
                 async_functions: Vec::new(),
                 extern_functions: Vec::new(),
+                records: Vec::new(),
                 solve: pipe_expr_plugin_stage_frame_u32le(),
             };
 
@@ -356,6 +359,7 @@ fn pipe_elaboration_plugin_stage_falls_back_to_builtin_registry() {
                 functions: Vec::new(),
                 async_functions: Vec::new(),
                 extern_functions: Vec::new(),
+                records: Vec::new(),
                 solve: pipe_expr_plugin_stage_frame_u32le(),
             };
 
@@ -417,6 +421,7 @@ fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
             body: ident("item"),
         }],
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: pipe_expr("in.txt"),
     };
 
@@ -440,6 +445,7 @@ fn pipe_elaboration_dedups_helper_by_hash_ignoring_expr_bodies() {
         functions: Vec::new(),
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: list(vec![ident("begin"), pipe_expr("a.txt"), pipe_expr("b.txt")]),
     };
 
@@ -462,6 +468,7 @@ fn pipe_elaboration_streaming_fs_sink_emits_stream_builtins() {
         functions: Vec::new(),
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: expr_from_json(&json!([
             "std.stream.pipe_v1",
             [
@@ -522,6 +529,7 @@ fn pipe_elaboration_is_per_module() {
         }],
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: pipe_expr("in.txt"),
     };
 

@@ -115,6 +115,46 @@ explicit:
 `f64.to_i32_trunc` yields `3` — not the `i32` result `22 / 7`. Mixing `f64` and `i32`
 without an explicit conversion is a type error.
 
+## Records (`defrecord`)
+
+`defrecord` declares a nominal product type, available from `x07.x07ast@0.9.0`
+(RFC 0002). A record lowers to a fixed-layout `bytes` value tagged with a brand equal
+to the record's name, so it reuses the move-only `bytes` model — no GC, no new runtime
+representation. Records v1 support `i32`/`u32` fields (each a 4-byte little-endian slot).
+
+A declaration generates two kinds of operations:
+
+- `<Record>.make` — the constructor, taking one `i32` arg per field in declaration order
+  and returning a branded record value.
+- `<Record>.<field>` — a field accessor, taking a value of that record and returning the
+  field. The accessor borrows its argument (reads do not consume), so several fields can
+  be read from the same value.
+
+```clojure
+; x07text
+{
+  :kind module
+  :module_id app
+  :schema_version x07.x07ast@0.9.0
+  :imports ()
+  :decls ({:kind defrecord :name app.Order :fields ({:name id :ty u32} {:name total :ty u32})}
+    {:kind export :names (app.order_total)}
+    {
+      :kind defn
+      :name app.order_total
+      :body (app.Order.total o)
+      :params ({:name o :brand app.Order :ty bytes})
+      :result i32
+    }
+  )
+}
+```
+
+The brand makes records nominal: passing unbranded `bytes`, or a different record, where
+an `app.Order` is expected is a type error — `(app.Order.total x)` requires `x` to carry
+the `app.Order` brand. Functions accept records by declaring a `bytes` parameter (or result)
+with the record name as its `brand`.
+
 ## Branded bytes (typed encodings)
 
 Bytes-like values can carry a nominal **brand** (compile-time only) to represent “validated bytes of encoding X”.

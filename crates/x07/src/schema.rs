@@ -2345,6 +2345,7 @@ fn generate_runtime_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Resul
         functions,
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: None,
         meta,
     };
@@ -2528,6 +2529,7 @@ fn generate_runtime_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<
         functions,
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: None,
         meta,
     };
@@ -2612,6 +2614,7 @@ fn generate_tests_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Result<
         functions,
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: None,
         meta: BTreeMap::new(),
     };
@@ -2689,6 +2692,7 @@ fn generate_tests_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Ve
         functions,
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
+        records: Vec::new(),
         solve: None,
         meta: BTreeMap::new(),
     };
