@@ -1,0 +1,9 @@
+{
+  "min_x07up_version": "0.2.16",
+  "x07_wasm": {
+    "release_manifest_sha256": "sha256:c600354f209dc2966cd2320e4a0071af1b627dc71b0159f6c72b0bf11b9019f8",
+    "release_manifest_url": "https://github.com/x07lang/x07-wasm-backend/releases/download/v0.2.12/x07-wasm-0.2.12-release.json",
+    "tag": "v0.2.12",
+    "version": "0.2.12"
+  }
+}

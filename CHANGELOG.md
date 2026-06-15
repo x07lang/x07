@@ -2,7 +2,7 @@
 
 All notable user-facing changes to the X07 toolchain are documented in this file.
 
-## Unreleased
+## v0.2.16
 
 ### Fixed
 
