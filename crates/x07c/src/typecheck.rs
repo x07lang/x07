@@ -2585,7 +2585,11 @@ fn diag_for_unify_error(c: &Constraint, err: &UnifyError) -> Diagnostic {
                 code: "X07-TYPE-UNIFY-0001".to_string(),
                 severity: Severity::Error,
                 stage: Stage::Type,
-                message: "unification failure".to_string(),
+                message: format!(
+                    "type mismatch: expected `{}`, got `{}`",
+                    contract_ty_brief(&err.rhs),
+                    contract_ty_brief(&err.lhs)
+                ),
                 loc: Some(Location::X07Ast {
                     ptr: c.blame_ptr.clone(),
                 }),

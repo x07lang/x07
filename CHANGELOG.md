@@ -6,6 +6,10 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+- `X07-TYPE-UNIFY-0001` type errors now name the mismatched types — `type
+  mismatch: expected \`<T>\`, got \`<U>\`` — instead of a bare "unification
+  failure". The most common type-error class is now actionable without
+  binary-searching the expression for the conflicting types.
 - The `unsupported schema_version` parse error now detects when a file targets a
   **newer** x07AST schema than the toolchain supports and points at updating the
   toolchain (`x07up`, or raise the channel/version pin in `x07-toolchain.toml`),
