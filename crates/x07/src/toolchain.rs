@@ -899,6 +899,15 @@ fn load_module_recursive(
     Ok(())
 }
 
+/// Extract the head from a codegen `unsupported head: "<head>" (fn=...)` message.
+fn parse_unsupported_head(message: &str) -> Option<String> {
+    let after = message.split("unsupported head:").nth(1)?;
+    let start = after.find('"')? + 1;
+    let rest = &after[start..];
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
+}
+
 fn parse_fn_and_ptr_suffix(message: &str) -> (Option<String>, Option<String>) {
     let Some(start) = message.rfind("(fn=") else {
         return (None, None);
@@ -1345,6 +1354,11 @@ pub fn cmd_check(
                     code = "X07-MOVE-0901";
                 } else if err.message.contains("borrow") {
                     code = "X07-MOVE-0902";
+                } else if err.message.contains("unsupported head") {
+                    // An unresolved call head reaching codegen is a user error (typically a
+                    // stdlib/package function whose module was not imported), not an internal
+                    // compiler fault — report it as an unknown callee with an import hint.
+                    code = "X07-TYPE-CALL-0001";
                 }
                 let mut d = diagnostics::Diagnostic {
                     code: code.to_string(),
@@ -1379,6 +1393,17 @@ pub fn cmd_check(
                             "Suggested fix: copy the view to owned bytes (for example via `view.to_bytes`) or restructure so the owner is not moved/dropped while the borrow is live."
                                 .to_string(),
                         );
+                    }
+                    "X07-TYPE-CALL-0001" => {
+                        if let Some(head) = parse_unsupported_head(&err.message) {
+                            if let Some((module, _)) = head.rsplit_once('.') {
+                                d.notes.push(format!(
+                                    "`{head}` did not resolve. If it is a stdlib or package function, add its module `{module}` to this file's `:imports` (builtins such as `bytes.len` / `view.to_bytes` need no import)."
+                                ));
+                            }
+                            d.data
+                                .insert("callee".to_string(), serde_json::Value::String(head));
+                        }
                     }
                     _ => {}
                 }

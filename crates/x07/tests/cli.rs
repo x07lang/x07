@@ -507,6 +507,70 @@ fn x07_check_project_wide_typecheck_across_modules() {
 }
 
 #[test]
+fn x07_check_unimported_stdlib_head_is_call_error_not_internal() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_unimported_stdlib_head");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+    write_lockfile_for_project_bytes(&root, &project);
+
+    // `std.bytes.copy` is a real stdlib function, but `std.bytes` is not imported.
+    // It used to reach codegen and surface as X07-INTERNAL-0001 with no hint.
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["std.bytes.copy", "input"]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(out.status.code(), Some(1));
+
+    let v = parse_json_stdout(&out);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(
+        !diags.iter().any(|d| d["code"] == "X07-INTERNAL-0001"),
+        "an unimported stdlib head must not be an internal error; got:\n{}",
+        serde_json::to_string_pretty(diags).unwrap()
+    );
+    let d = diags
+        .iter()
+        .find(|d| d["code"] == "X07-TYPE-CALL-0001")
+        .unwrap_or_else(|| {
+            panic!(
+                "expected X07-TYPE-CALL-0001; got:\n{}",
+                serde_json::to_string_pretty(diags).unwrap()
+            )
+        });
+    assert_eq!(d["data"]["callee"], "std.bytes.copy");
+    assert!(
+        d["notes"]
+            .as_array()
+            .map(|ns| ns
+                .iter()
+                .any(|n| n.as_str().map(|s| s.contains("std.bytes")).unwrap_or(false)))
+            .unwrap_or(false),
+        "expected an import hint note naming std.bytes; got:\n{}",
+        serde_json::to_string_pretty(&d["notes"]).unwrap()
+    );
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
 fn x07_check_stdlib_call_arg_mismatch_is_type_error_not_internal() {
     let root = fresh_tmp_dir(&repo_root(), "x07_check_stdlib_call_arg_mismatch");
     std::fs::create_dir_all(&root).expect("create root");

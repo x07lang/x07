@@ -6,6 +6,11 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+- An unresolved call head that reaches codegen — typically a stdlib/package
+  function whose module was not imported (e.g. `std.bytes.copy` without `import
+  std.bytes`) — now reports `X07-TYPE-CALL-0001` (unknown callee) with the callee
+  and an import hint, instead of `X07-INTERNAL-0001` (an internal-error code) with
+  no guidance. `x07 check --project` now flags it cleanly in the loop.
 - `X07-TYPE-UNIFY-0001` type errors now name the mismatched types — `type
   mismatch: expected \`<T>\`, got \`<U>\`` — instead of a bare "unification
   failure". The most common type-error class is now actionable without
