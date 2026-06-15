@@ -411,6 +411,17 @@ fn parse_record(
     Ok(AstRecordDef { name, doc, fields })
 }
 
+/// Parse the `MAJOR.MINOR.PATCH` after `@` in an `x07.x07ast@X.Y.Z` schema id, so an
+/// unknown schema_version can be ordered against the supported set.
+fn x07ast_schema_triple(schema_version: &str) -> Option<(u64, u64, u64)> {
+    let v = schema_version.rsplit('@').next()?;
+    let mut it = v.split('.');
+    let major = it.next()?.parse().ok()?;
+    let minor = it.next()?.parse().ok()?;
+    let patch = it.next()?.parse().ok()?;
+    Some((major, minor, patch))
+}
+
 pub fn parse_x07ast_json(bytes: &[u8]) -> Result<X07AstFile, X07AstError> {
     let doc: Value = serde_json::from_slice(bytes).map_err(|e| X07AstError {
         message: e.to_string(),
@@ -430,9 +441,22 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
         .iter()
         .any(|&v| v == schema_version)
     {
+        // If the file targets a newer x07AST schema than this toolchain knows, the
+        // toolchain is what's behind — point the agent at updating it, not a dependency.
+        let file_v = x07ast_schema_triple(&schema_version);
+        let max_supported = X07AST_SCHEMA_VERSIONS_SUPPORTED
+            .iter()
+            .filter_map(|v| x07ast_schema_triple(v))
+            .max();
+        let toolchain_too_old = matches!((file_v, max_supported), (Some(f), Some(m)) if f > m);
+        let hint = if toolchain_too_old {
+            "this file targets a newer x07AST schema than this toolchain supports; update the toolchain (run `x07up`, or raise the channel/version pin in `x07-toolchain.toml`)"
+        } else {
+            "if this comes from a dependency package, upgrade to a newer package version"
+        };
         return Err(X07AstError {
             message: format!(
-                "unsupported schema_version: got {schema_version:?} (supported: {}) (hint: if this comes from a dependency package, upgrade to a newer package version)",
+                "unsupported schema_version: got {schema_version:?} (supported: {}) (hint: {hint})",
                 X07AST_SCHEMA_VERSIONS_SUPPORTED.join(", ")
             ),
             ptr: "/schema_version".to_string(),

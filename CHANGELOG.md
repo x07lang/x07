@@ -2,6 +2,16 @@
 
 All notable user-facing changes to the X07 toolchain are documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- The `unsupported schema_version` parse error now detects when a file targets a
+  **newer** x07AST schema than the toolchain supports and points at updating the
+  toolchain (`x07up`, or raise the channel/version pin in `x07-toolchain.toml`),
+  instead of the misleading "if this comes from a dependency package, upgrade the
+  package" hint — the toolchain is what's behind, not a dependency.
+
 ## v0.2.16
 
 ### Fixed
