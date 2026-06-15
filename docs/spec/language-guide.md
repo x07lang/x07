@@ -537,7 +537,7 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 
 ## Scalars (f64)
 
-- `f64` is an IEEE-754 double (x07AST 0.9.0 / RFC 0002). There is no implicit i32<->f64 tower; conversions are explicit. v1 is a *transient compute scalar*: no f64 literal, no f64 comparison, no (de)serialization, and `f64` cannot be a record/enum field. Produce/consume it inline, then truncate to i32 or hand-format to a decimal string.
+- `f64` is an IEEE-754 double (x07AST 0.9.0 / RFC 0002). There is no implicit i32/f64 numeric tower; conversions are explicit. v1 is a *transient compute scalar*: no f64 literal, no f64 comparison, no (de)serialization, and `f64` cannot be a record/enum field. Produce/consume it inline, then truncate to i32 or hand-format to a decimal string.
 - `["f64.of_i32","x"]` -> f64 (widen a signed i32)
 - `["f64.to_i32_trunc","x"]` -> i32 (truncate toward zero)
 - `["f64.add","a","b"]` `["f64.sub","a","b"]` `["f64.mul","a","b"]` `["f64.div","a","b"]` -> f64
