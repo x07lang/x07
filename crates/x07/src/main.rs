@@ -975,7 +975,24 @@ fn resolve_test_entry(module_roots: &[PathBuf], entry: &str) -> Result<ResolvedT
             return Ok(ResolvedTestEntry { kind, result });
         }
     }
-    anyhow::bail!("entry {entry:?} was not found under the resolved module roots");
+    anyhow::bail!("{}", test_entry_not_found_message(entry));
+}
+
+/// Message for a test entry whose module could not be resolved. The most common
+/// cause is a module file whose name does not match its `module_id` (the harness
+/// resolves `a.b.fn` from a file `a/b.x07.json` under a module root), so the
+/// "not found under the resolved module roots" wording alone tends to misdirect.
+fn test_entry_not_found_message(entry: &str) -> String {
+    let hint = entry
+        .rsplit_once('.')
+        .map(|(module, _)| {
+            format!(
+                " — expected a module file `{}.x07.json` under a module root; a module's file name must match its `module_id`",
+                module.replace('.', "/")
+            )
+        })
+        .unwrap_or_default();
+    format!("entry {entry:?} was not found under the resolved module roots{hint}")
 }
 
 pub(crate) fn resolve_test_entry_params(
@@ -1022,7 +1039,7 @@ pub(crate) fn resolve_test_entry_params(
             return Ok(out);
         }
     }
-    anyhow::bail!("entry {entry:?} was not found under the resolved module roots");
+    anyhow::bail!("{}", test_entry_not_found_message(entry));
 }
 
 fn hydrate_test_entry_info(module_roots: &[PathBuf], tests: &mut [TestDecl]) -> Vec<ManifestDiag> {

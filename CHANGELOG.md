@@ -6,6 +6,11 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+- `x07 test` now hints the expected module file when a test entry cannot be
+  resolved: the `ETEST_ENTRY_INVALID` "not found under the resolved module roots"
+  error names the expected `<module_id>.x07.json` file and notes that a module's
+  file name must match its `module_id` (the common cause is a misnamed file, not a
+  `module_roots` problem).
 - An unresolved call head that reaches codegen — typically a stdlib/package
   function whose module was not imported (e.g. `std.bytes.copy` without `import
   std.bytes`) — now reports `X07-TYPE-CALL-0001` (unknown callee) with the callee

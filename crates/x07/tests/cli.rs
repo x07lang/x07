@@ -1547,6 +1547,48 @@ fn x07_test_smoke_suite() {
 }
 
 #[test]
+fn x07_test_entry_not_found_hints_module_file_name() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_test_entry_not_found_hint");
+    // module_id is "good" but the file is misnamed, so the harness cannot find
+    // good.x07.json. The error must hint the expected file name, not just say
+    // "not found under the resolved module roots" (which misdirects).
+    write_json(
+        &dir.join("badname.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "good",
+            "imports": ["std.test"],
+            "decls": [
+                {"kind": "export", "names": ["good.t"]},
+                {"kind": "defn", "name": "good.t", "params": [], "result": "result_i32", "body": ["std.test.pass"]}
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("tests.json"),
+        &serde_json::json!({
+            "schema_version": "x07.tests_manifest@0.2.0",
+            "tests": [{"id": "good/t", "world": "solve-pure", "entry": "good.t", "expect": "pass"}]
+        }),
+    );
+
+    let out = run_x07_in_dir(&dir, &["test", "--manifest", "tests.json"]);
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        combined.contains("ETEST_ENTRY_INVALID")
+            && combined.contains("good.x07.json")
+            && combined.contains("module_id"),
+        "expected an entry-not-found error hinting the module file name; got:\n{combined}"
+    );
+}
+
+#[test]
 fn x07_test_manifest_rejects_runtime_attestation_outside_sandbox() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_test_runtime_attest_manifest");

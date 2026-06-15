@@ -81,6 +81,7 @@ X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 
 run_quiet "check_x07_parens" "$python_bin" scripts/check_x07_parens.py
 run_quiet "check_language_guide_sync" ./scripts/ci/check_language_guide_sync.sh
+run_quiet "check_guide_mdx_safe" "$python_bin" scripts/ci/check_guide_mdx_safe.py
 run_quiet "check_llm_contracts" ./scripts/ci/check_llm_contracts.sh
 run_quiet "check_project_manifests" "$python_bin" scripts/ci/check_project_manifests.py
 run_quiet "check_package_manifests" "$python_bin" scripts/ci/check_package_manifests.py
