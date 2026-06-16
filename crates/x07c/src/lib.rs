@@ -27,6 +27,7 @@ pub mod validate;
 pub mod wasm_emit;
 pub mod world_config;
 pub mod x07ast;
+pub mod x07text;
 
 pub const X07C_VERSION: &str = env!("CARGO_PKG_VERSION");
 

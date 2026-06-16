@@ -17157,3 +17157,75 @@ fn x07_run_reads_piped_stdin_without_flag() {
 
     std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }
+
+#[test]
+fn x07t_module_resolves_as_build_input() {
+    use base64::Engine as _;
+
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07t_build_input");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    // Scaffold for a valid lockfile, then build a solve-pure project whose entry
+    // (JSON) imports a helper module authored ONLY in x07text (`.x07t`).
+    let init = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        init.status.code(),
+        Some(0),
+        "init stderr:\n{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    std::fs::write(
+        dir.join("x07.json"),
+        r#"{"schema_version":"x07.project@0.5.0","compat":"0.5","world":"solve-pure","entry":"src/main.x07.json","module_roots":["src"],"dependencies":[],"lockfile":"x07.lock.json"}"#,
+    )
+    .expect("write x07.json");
+    std::fs::write(
+        dir.join("src").join("main.x07.json"),
+        r#"{"schema_version":"x07.x07ast@0.8.0","kind":"entry","module_id":"main","imports":["helper"],"decls":[],"solve":["helper.echo","input"]}"#,
+    )
+    .expect("write main.x07.json");
+    let _ = std::fs::remove_file(dir.join("src").join("app.x07.json"));
+    std::fs::write(
+        dir.join("src").join("helper.x07t"),
+        "{\n  :kind module\n  :module_id helper\n  :schema_version x07.x07ast@0.8.0\n  :imports ()\n  :decls (\n    {:kind export :names (helper.echo)}\n    {:kind defn :name helper.echo :params ({:name b :ty bytes_view}) :result bytes :body (view.to_bytes b)}\n  )\n}\n",
+    )
+    .expect("write helper.x07t");
+
+    // `x07 check` must resolve and type-check the .x07t module.
+    let check = run_x07_in_dir(&dir, &["check", "--project", "x07.json"]);
+    let cv = parse_json_stdout(&check);
+    assert_eq!(
+        cv["ok"],
+        true,
+        "check should pass with a .x07t module; stderr:\n{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+
+    // `x07 run` must compile + run it; helper.echo returns the input unchanged.
+    let b64 = base64::engine::general_purpose::STANDARD.encode(b"x07t-built");
+    let out = run_x07_in_dir(&dir, &["run", "--project", "x07.json", "--input-b64", &b64]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "run stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(
+            v["solve"]["solve_output_b64"]
+                .as_str()
+                .expect("solve_output_b64 present"),
+        )
+        .expect("decode solve output");
+    assert_eq!(
+        decoded, b"x07t-built",
+        "the .x07t helper module should resolve, compile, and run"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}

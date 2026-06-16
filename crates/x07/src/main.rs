@@ -65,7 +65,6 @@ mod trust;
 mod util;
 mod verify;
 mod x07ast_util;
-mod x07text;
 mod xtal;
 mod xtal_events;
 mod xtal_violation;

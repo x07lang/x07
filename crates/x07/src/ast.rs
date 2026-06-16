@@ -231,7 +231,7 @@ fn cmd_to_text(args: AstToTextArgs) -> Result<std::process::ExitCode> {
         Ok(v) => v,
         Err(err) => return fail(&format!("parse JSON failed: {err}")),
     };
-    let text = crate::x07text::to_text(&value);
+    let text = x07c::x07text::to_text(&value);
     crate::reporting::write_bytes(&out_path, text.as_bytes())?;
     print_json(&AstTextReport {
         ok: true,
@@ -265,7 +265,7 @@ fn cmd_from_text(args: AstFromTextArgs) -> Result<std::process::ExitCode> {
     let Ok(input) = std::fs::read_to_string(&args.r#in) else {
         return fail(&format!("read input failed: {}", args.r#in.display()));
     };
-    let value = match crate::x07text::from_text(&input) {
+    let value = match x07c::x07text::from_text(&input) {
         Ok(v) => v,
         Err(err) => return fail(&format!("parse x07text failed: {err}")),
     };

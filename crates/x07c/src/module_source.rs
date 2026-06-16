@@ -96,6 +96,9 @@ pub fn read_module_from_roots(
     let mut json_rel = rel_path_base.clone();
     json_rel.set_extension("x07.json");
     let json_rel_display = json_rel.display().to_string();
+    let mut text_rel = rel_path_base.clone();
+    text_rel.set_extension("x07t");
+    let text_rel_display = text_rel.display().to_string();
 
     // Builtin operation namespaces that read like importable `std.*` modules but
     // are resolved as builtins (no module file). Importing them is the mistake;
@@ -112,7 +115,9 @@ pub fn read_module_from_roots(
 
     Err(CompilerError::new(
         CompileErrorKind::Parse,
-        format!("unknown module: {module_id:?} (searched: {json_rel_display})"),
+        format!(
+            "unknown module: {module_id:?} (searched: {json_rel_display} or {text_rel_display})"
+        ),
     ))
 }
 
@@ -159,6 +164,53 @@ fn read_module_from_roots_if_present(
             )),
         };
     }
+
+    // Fallback: resolve x07text (`.x07t`) modules by parsing them to canonical
+    // x07AST JSON, so a project can be authored in the readable text format with
+    // no manual `x07 ast from-text` step. A `.x07.json` of the same name wins.
+    let mut text_rel = rel_path_base.clone();
+    text_rel.set_extension("x07t");
+    let mut text_hits: Vec<PathBuf> = Vec::new();
+    for root in module_roots {
+        let path = root.join(&text_rel);
+        if path.exists() {
+            text_hits.push(path);
+        }
+    }
+    if !text_hits.is_empty() {
+        return match text_hits.len() {
+            1 => {
+                let path = &text_hits[0];
+                let text = std::fs::read_to_string(path).map_err(|e| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("read module {module_id:?} at {}: {e}", path.display()),
+                    )
+                })?;
+                let value = crate::x07text::from_text(&text).map_err(|e| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!(
+                            "parse x07text module {module_id:?} at {}: {e}",
+                            path.display()
+                        ),
+                    )
+                })?;
+                let src = serde_json::to_string(&value).map_err(|e| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("serialize x07text module {module_id:?}: {e}"),
+                    )
+                })?;
+                Ok(Some((path.clone(), src)))
+            }
+            _ => Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("module {module_id:?} is ambiguous across roots (x07t): {text_hits:?}"),
+            )),
+        };
+    }
+
     Ok(None)
 }
 
