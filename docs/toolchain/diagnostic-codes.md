@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 646
-- quickfix support (`sometimes` or `always`): 583
-- quickfix coverage: 90.25%
+- total codes: 647
+- quickfix support (`sometimes` or `always`): 584
+- quickfix coverage: 90.26%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -427,6 +427,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07INIT_MCP_FAILED` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MCP_FAILED`. |
 | `X07INIT_MCP_MISSING` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MCP_MISSING`. |
 | `X07INIT_MCP_REPORT` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MCP_REPORT`. |
+| `X07INIT_MKDIR` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MKDIR`. |
 | `X07INIT_MODULES` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MODULES`. |
 | `X07INIT_PKG_LOCK` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_PKG_LOCK`. |
 | `X07INIT_SRC` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_SRC`. |
@@ -9182,6 +9183,26 @@ Agent strategy:
 ## `X07INIT_MCP_REPORT`
 
 Summary: Project/package scaffold diagnostic `X07INIT_MCP_REPORT`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_MKDIR`
+
+Summary: Project/package scaffold diagnostic `X07INIT_MKDIR`.
 
 Origins:
 - x07 (stage: lint, severity: error)
