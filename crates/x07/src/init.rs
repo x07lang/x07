@@ -23,6 +23,10 @@ const AGENT_TEMPLATE_MD: &str = include_str!(concat!(
 
 #[derive(Debug, Clone, Args)]
 pub struct InitArgs {
+    /// Optional project directory to create and initialize (default: current directory).
+    #[arg(value_name = "DIR")]
+    pub dir: Option<String>,
+
     /// Optional scaffold template.
     #[arg(long, value_enum)]
     pub template: Option<InitTemplate>,
@@ -1865,7 +1869,7 @@ pub fn cmd_init(
     _machine: &crate::reporting::MachineArgs,
     args: InitArgs,
 ) -> Result<std::process::ExitCode> {
-    let root = match std::env::current_dir() {
+    let cwd = match std::env::current_dir() {
         Ok(p) => p,
         Err(err) => {
             let report = InitReport {
@@ -1884,6 +1888,32 @@ pub fn cmd_init(
             return Ok(std::process::ExitCode::from(20));
         }
     };
+
+    // An optional positional DIR creates (and initializes into) that directory,
+    // so `x07 init my-project` works like `cargo new my-project` instead of
+    // requiring `mkdir my-project && cd my-project && x07 init`.
+    let root = match &args.dir {
+        Some(dir) => cwd.join(dir),
+        None => cwd,
+    };
+    if args.dir.is_some() {
+        if let Err(err) = std::fs::create_dir_all(&root) {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created: Vec::new(),
+                notes: Vec::new(),
+                next_steps: Vec::new(),
+                error: Some(InitError {
+                    code: "X07INIT_MKDIR".to_string(),
+                    message: format!("create project dir {}: {err}", root.display()),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
 
     if args.package {
         if args.template.is_some() {

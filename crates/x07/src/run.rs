@@ -1299,6 +1299,22 @@ fn prepare_input_flag(
             None,
         ));
     }
+    // No explicit input source. If stdin is piped (not a terminal), read it as
+    // the program input so `printf '...' | x07 run` works without `--stdin`.
+    // An interactive terminal is left alone (we don't block on a TTY read).
+    {
+        use std::io::IsTerminal as _;
+        if !std::io::stdin().is_terminal() {
+            let bytes = read_all_stdin().context("read piped stdin")?;
+            if !bytes.is_empty() {
+                let path = write_temp_file(cwd, "x07_run_input", &bytes)?;
+                return Ok((
+                    Some(vec!["--input".to_string(), path.display().to_string()]),
+                    Some(TempPathGuard { path }),
+                ));
+            }
+        }
+    }
     Ok((None, None))
 }
 

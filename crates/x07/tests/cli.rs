@@ -17043,3 +17043,117 @@ fn x07_xtal_repair_emits_patchset_and_summary() {
     assert_eq!(summary["baseline"]["verify_ok"], false);
     assert_eq!(summary["result"]["status"], "patch_suggested");
 }
+
+#[test]
+fn x07_init_positional_dir_creates_subproject() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_positional");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    // `x07 init my-proj` creates and initializes ./my-proj (not the cwd).
+    let out = run_x07_in_dir(&dir, &["init", "my-proj"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+    assert!(
+        v["root"]
+            .as_str()
+            .expect("root string")
+            .ends_with("my-proj"),
+        "report root should be the positional dir, got: {}",
+        v["root"]
+    );
+    let proj = dir.join("my-proj");
+    assert!(
+        proj.join("x07.json").is_file(),
+        "x07.json should exist under the positional dir"
+    );
+    assert!(
+        proj.join("src").join("main.x07.json").is_file(),
+        "src/main.x07.json should exist under the positional dir"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_run_reads_piped_stdin_without_flag() {
+    use base64::Engine as _;
+
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_piped_stdin");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    // Scaffold a valid project (for a real lockfile), then make it a solve-pure
+    // echo whose `solve` returns the input bytes unchanged.
+    let init = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        init.status.code(),
+        Some(0),
+        "init stderr:\n{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    std::fs::write(
+        dir.join("x07.json"),
+        r#"{"schema_version":"x07.project@0.5.0","compat":"0.5","world":"solve-pure","entry":"src/main.x07.json","module_roots":["src"],"dependencies":[],"lockfile":"x07.lock.json"}"#,
+    )
+    .expect("write x07.json");
+    std::fs::write(
+        dir.join("src").join("main.x07.json"),
+        r#"{"schema_version":"x07.x07ast@0.8.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}"#,
+    )
+    .expect("write main.x07.json");
+    let _ = std::fs::remove_file(dir.join("src").join("app.x07.json"));
+
+    // Pipe input on stdin with NO --input/--stdin/--input-b64 flag.
+    ensure_runner_binaries_staged();
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let mut child = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .args(["run", "--project", "x07.json"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn x07 run");
+    child
+        .stdin
+        .take()
+        .expect("child stdin")
+        .write_all(b"PIPED-OK")
+        .expect("write piped stdin");
+    let out = child.wait_with_output().expect("wait x07 run");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "run stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse run report JSON");
+    let b64 = v["solve"]["solve_output_b64"]
+        .as_str()
+        .expect("solve_output_b64 present");
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(b64)
+        .expect("decode solve output");
+    assert_eq!(
+        decoded, b"PIPED-OK",
+        "piped stdin should be delivered to the program as input"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
