@@ -542,6 +542,25 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 - `["f64.to_i32_trunc","x"]` -> i32 (truncate toward zero)
 - `["f64.add","a","b"]` `["f64.sub","a","b"]` `["f64.mul","a","b"]` `["f64.div","a","b"]` -> f64
 
+## Records, Enums, Match (RFC 0002)
+
+Nominal records and enums, opt-in via a module `schema_version` of `x07.x07ast@0.9.0` (concrete `0.8.0` programs stay valid unchanged). Both lower to brand-tagged `bytes`; declare them as `decls` entries next to `defn`.
+
+Records (`defrecord`) are fixed product types; fields are `i32`/`u32` only (one 4-byte slot each).
+- decl: `{"kind":"defrecord","name":"m.Pair","fields":[{"name":"x","ty":"i32"},{"name":"y","ty":"i32"}]}`
+- constructor `["m.Pair.make","x","y"]` -> a value branded `m.Pair`; field accessor `["m.Pair.x","p"]` -> i32
+
+Enums (`defenum`) + `match` are tagged unions, layout `[u32 tag][payload?]`; a variant payload is a single optional `i32`/`u32`.
+- decl: `{"kind":"defenum","name":"m.Val","variants":[{"name":"Num","payload":"i32"},{"name":"Nil"}]}`
+- variant constructors `["m.Val.Num",42]` and `["m.Val.Nil"]` -> a value branded `m.Val`
+- match: `["match","v",["m.Val.Num","n",["std.fmt.s32_to_dec","n"]],["m.Val.Nil",["bytes.lit","nil"]]]`
+  - each arm is `[Variant, body]` or `[Variant, bind, body]` (binds the i32 payload); variant heads are fully qualified, the first arm fixes the enum, and arms must be exhaustive.
+
+Typing a record/enum-valued param or result uses its **brand**, not the dotted name (a type token allows only `[A-Za-z0-9_]`, so `"result":"m.Val"` is rejected):
+- param `{"name":"v","ty":"bytes","brand":"m.Val"}`; result `"result":"bytes","result_brand":"m.Val"`.
+
+v1 limits to design around: record fields and enum payloads are `i32`/`u32` only (no `bytes`, nested ADT, or `f64`); an enum value cannot be rebuilt from a runtime tag (dispatch a stored tag with `if`; `match` only a held enum value); a function returns one value, so bundle extra outputs by hand into a `bytes` buffer.
+
 ## Integer Semantics
 
 - Integers are 32-bit and arithmetic wraps modulo 2^32.
