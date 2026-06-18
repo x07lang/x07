@@ -116,7 +116,7 @@ Fallbacks:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.2.16
+x07up override set v0.2.17
 ```
 
 This makes toolchain selection deterministic for agents and CI. It writes a file like:
