@@ -69,10 +69,14 @@ the usual `\"` `\\` `\n` `\r` `\t` `\u{hex}` escapes.
   defaults a missing `:decls` to the empty list, so `:kind entry` files that
   are only a `:solve` body may omit it. `to-text` always renders `:decls ()`
   explicitly.
-- Authoring: write x07text, then `x07 ast from-text --out <file>.x07.json` and
-  continue with the normal loop (`x07 run`, `x07 lint`, `x07 fix`). Whole-file
-  conversion re-canonicalizes everything, so text editing cannot accumulate
-  the paren/brace drift that motivated JSON-first sources.
+- Authoring: `.x07t` is a first-class build input. Place a module at
+  `<module_root>/<module>.x07t` — or a test-entry module the same way — and the
+  resolver loads it directly (`x07 check`, `build`, `run`, `test`) with no manual
+  `from-text` step; a `.x07.json` of the same name wins. The project `entry` named
+  in `x07.json` must still be `.x07.json` today. The standalone `x07 ast from-text
+  --out <file>.x07.json` remains available when you want to commit canonical JSON.
+  Whole-file conversion re-canonicalizes everything, so text editing cannot
+  accumulate the paren/brace drift that motivated JSON-first sources.
 - Review: render both sides of a change with `to-text` for readable diffs.
 - Patching: JSON Patch / quickfix workflows are unchanged — they operate on
   canonical JSON, and pointers in diagnostics refer to the JSON document.

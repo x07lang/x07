@@ -941,18 +941,46 @@ pub(crate) struct ResolvedTestEntryParam {
     pub(crate) brand: Option<String>,
 }
 
+/// Candidate module files that may declare a test entry, in resolution
+/// priority: every `<root>/<module>.x07.json`, then every `<root>/<module>.x07t`
+/// (the x07text projection). `module_id` carries dotted segments (e.g. `a.b`),
+/// which map to `a/b`. JSON wins over x07text, mirroring the build-input module
+/// resolver, so a test module can be authored in either format.
+fn test_entry_module_candidates(module_roots: &[PathBuf], module_id: &str) -> Vec<PathBuf> {
+    let base = module_id.replace('.', "/");
+    let mut paths = Vec::new();
+    for ext in ["x07.json", "x07t"] {
+        let rel = format!("{base}.{ext}");
+        for root in module_roots {
+            let path = root.join(&rel);
+            if path.is_file() {
+                paths.push(path);
+            }
+        }
+    }
+    paths
+}
+
+/// Load a test-entry module file to canonical x07AST JSON, parsing `.x07t`
+/// sources via x07text so test-entry resolution accepts either source format.
+fn load_test_entry_doc(path: &Path) -> Result<Value> {
+    if path.extension().and_then(|e| e.to_str()) == Some("x07t") {
+        let text = std::fs::read_to_string(path)
+            .with_context(|| format!("read test entry module: {}", path.display()))?;
+        x07c::x07text::from_text(&text)
+            .with_context(|| format!("parse x07text test entry module: {}", path.display()))
+    } else {
+        report_common::read_json_file(path)
+            .with_context(|| format!("read test entry module: {}", path.display()))
+    }
+}
+
 fn resolve_test_entry(module_roots: &[PathBuf], entry: &str) -> Result<ResolvedTestEntry> {
     let (module_id, _) = entry
         .rsplit_once('.')
         .context("test entry must contain '.'")?;
-    let rel = format!("{}.x07.json", module_id.replace('.', "/"));
-    for root in module_roots {
-        let path = root.join(&rel);
-        if !path.is_file() {
-            continue;
-        }
-        let doc = report_common::read_json_file(&path)
-            .with_context(|| format!("read test entry module: {}", path.display()))?;
+    for path in test_entry_module_candidates(module_roots, module_id) {
+        let doc = load_test_entry_doc(&path)?;
         let decls = doc
             .get("decls")
             .and_then(Value::as_array)
@@ -986,7 +1014,8 @@ fn test_entry_not_found_message(entry: &str) -> String {
         .rsplit_once('.')
         .map(|(module, _)| {
             format!(
-                " — expected a module file `{}.x07.json` under a module root; a module's file name must match its `module_id`",
+                " — expected a module file `{}.x07.json` (or `{}.x07t`) under a module root; a module's file name must match its `module_id`",
+                module.replace('.', "/"),
                 module.replace('.', "/")
             )
         })
@@ -1001,14 +1030,8 @@ pub(crate) fn resolve_test_entry_params(
     let (module_id, _) = entry
         .rsplit_once('.')
         .context("test entry must contain '.'")?;
-    let rel = format!("{}.x07.json", module_id.replace('.', "/"));
-    for root in module_roots {
-        let path = root.join(&rel);
-        if !path.is_file() {
-            continue;
-        }
-        let doc = report_common::read_json_file(&path)
-            .with_context(|| format!("read test entry module: {}", path.display()))?;
+    for path in test_entry_module_candidates(module_roots, module_id) {
+        let doc = load_test_entry_doc(&path)?;
         let decls = doc
             .get("decls")
             .and_then(Value::as_array)

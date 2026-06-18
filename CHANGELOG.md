@@ -4,6 +4,19 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ## Unreleased
 
+### Added
+
+- x07text (`.x07t`) is now a first-class build input. The module resolver loads
+  `<root>/<module>.x07t` (parsed to canonical x07AST), and test-entry resolution
+  accepts `.x07t` test modules too, so a whole project — imports and tests — can
+  be authored in the readable text projection with no manual `x07 ast from-text`
+  step. A `.x07.json` of the same name still wins.
+- `x07 init <DIR>` takes an optional positional directory (like `cargo new <dir>`)
+  and scaffolds the project there, creating the directory if needed.
+- `x07 run` reads program input from piped stdin by default when stdin is not a
+  terminal, so `printf … | x07 run` works without an explicit `--input`/
+  `--input-b64`/`--stdin` flag.
+
 ### Fixed
 
 - `x07 test` now hints the expected module file when a test entry cannot be

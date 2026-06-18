@@ -1589,6 +1589,40 @@ fn x07_test_entry_not_found_hints_module_file_name() {
 }
 
 #[test]
+fn x07t_test_entry_module_resolves() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07t_test_entry");
+    // The module that declares the test entry is authored ONLY in x07text
+    // (`good.x07t`), with no `good.x07.json`. Test-entry resolution must accept
+    // the .x07t projection just like the build-input module resolver does, so a
+    // whole project's tests can be authored in the readable text format.
+    write_bytes(
+        &dir.join("good.x07t"),
+        b"{\n  :kind module\n  :module_id good\n  :schema_version x07.x07ast@0.8.0\n  :imports (std.test)\n  :decls (\n    {:kind export :names (good.t)}\n    {:kind defn :name good.t :params () :result result_i32 :body (std.test.pass)}\n  )\n}\n",
+    );
+    write_json(
+        &dir.join("tests.json"),
+        &serde_json::json!({
+            "schema_version": "x07.tests_manifest@0.2.0",
+            "tests": [{"id": "good/t", "world": "solve-pure", "entry": "good.t", "expect": "pass"}]
+        }),
+    );
+
+    let out = run_x07_in_dir(&dir, &["test", "--manifest", "tests.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["summary"]["passed"], 1);
+    assert_eq!(v["summary"]["failed"], 0);
+    assert_eq!(v["summary"]["errors"], 0);
+}
+
+#[test]
 fn x07_test_manifest_rejects_runtime_attestation_outside_sandbox() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_test_runtime_attest_manifest");
