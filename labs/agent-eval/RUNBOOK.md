@@ -51,9 +51,20 @@ worth more credibility than another feature.
 
 ## Mechanics
 
-- Runner: `runner.py` already executes Python and X07 arms; add a `rust`
-  runner (compile with pinned rustc, run binary) and an x07text arm (convert
-  then delegate to the x07 runner).
+The runnable kit for this protocol is built — see **`DRIVER.md`** for the
+operator steps. Status of the pieces RUNBOOK called for:
+
+- Tasks: `tasks/tasks.json` is at 30 tasks, 10 per band (`band: a|b|c`),
+  regenerated + validated by `tasks/build_suite.py` (every vector is backed by
+  a Python reference; `solutions/reference/` is the 30-task baseline).
+- Runner: `runner.py` executes all four arms (python, rust, x07, x07text).
+- Prompts: `render_prompt.py` renders the exact cold-start prompt per
+  `(task, arm)` (X07 arms get `x07 guide` + the doc-tool line and nothing else).
+- Scoring: `score.py` judges a run, computes pass@1 / pass@6 per band per arm,
+  and applies the go/park rule above automatically → verdict + markdown report.
 - Keep all model transcripts; they are the qualitative friction log.
 - Results land in `results/` as JSON + a markdown report; cite
   `results/pilot-2026-06-12.md` as the pilot.
+
+What remains is supplying the 3 cross-vendor models and driving them cold per
+`DRIVER.md`; the kit is model-agnostic.

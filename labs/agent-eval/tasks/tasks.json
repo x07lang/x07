@@ -5,6 +5,7 @@
     {
       "id": "upper_ascii",
       "title": "Uppercase ASCII",
+      "band": "a",
       "prompt": "Read all input bytes. Output the same bytes with ASCII lowercase letters a-z converted to uppercase. All other bytes pass through unchanged.",
       "vectors": [
         {
@@ -24,6 +25,7 @@
     {
       "id": "count_newlines",
       "title": "Count newline bytes",
+      "band": "a",
       "prompt": "Read all input bytes. Output the number of 0x0A (newline) bytes as decimal ASCII digits with no trailing newline.",
       "vectors": [
         {
@@ -47,6 +49,7 @@
     {
       "id": "sum_lines",
       "title": "Sum integer lines",
+      "band": "b",
       "prompt": "Input is zero or more lines, each a non-negative decimal integer (< 1000000), separated by 0x0A newlines; a trailing newline may be absent and empty lines must be ignored. Output the sum as decimal ASCII with no trailing newline.",
       "vectors": [
         {
@@ -70,6 +73,7 @@
     {
       "id": "top_word",
       "title": "Most frequent word",
+      "band": "b",
       "prompt": "Tokenize input into words: maximal runs of ASCII letters a-z/A-Z, lowercased; every other byte separates words. Output 'word count' (single 0x20 between word and decimal count, no trailing newline) for the most frequent word; break count ties by lexicographically smallest word. Input contains at least one word.",
       "vectors": [
         {
@@ -89,6 +93,7 @@
     {
       "id": "rle_encode",
       "title": "Run-length encode",
+      "band": "a",
       "prompt": "Read all input bytes. For each maximal run of identical bytes, output the byte itself followed by the run length as decimal ASCII digits. Output nothing for empty input.",
       "vectors": [
         {
@@ -112,6 +117,7 @@
     {
       "id": "json_name",
       "title": "Extract JSON field",
+      "band": "c",
       "prompt": "Input is a single JSON object whose 'name' member is a JSON string containing no escape sequences. Output the raw string value of 'name' (no quotes, no trailing newline). The object may contain other members in any order; whitespace may vary.",
       "vectors": [
         {
@@ -131,6 +137,7 @@
     {
       "id": "dedupe_lines",
       "title": "Dedupe lines",
+      "band": "b",
       "prompt": "Split input on 0x0A newlines into lines (a missing trailing newline still ends a final line; a trailing newline does not create an extra empty line). Output each line the FIRST time it occurs, in order, each followed by 0x0A. Empty input produces empty output.",
       "vectors": [
         {
@@ -154,6 +161,7 @@
     {
       "id": "fnv1a32",
       "title": "FNV-1a 32-bit checksum",
+      "band": "c",
       "prompt": "Compute the FNV-1a 32-bit hash of all input bytes (offset basis 2166136261; for each byte: hash = (hash XOR byte) * 16777619 with wrapping u32 multiplication). Output the final hash as decimal ASCII, no trailing newline.",
       "vectors": [
         {
@@ -177,6 +185,7 @@
     {
       "id": "frame_u32le",
       "title": "Length-prefix frames",
+      "band": "c",
       "prompt": "Split input on 0x0A newlines into lines (a trailing newline does not create a final empty line; a missing trailing newline still ends a final line). For each line, output a 4-byte little-endian u32 length followed by the line bytes. Empty input produces empty output.",
       "vectors": [
         {
@@ -200,6 +209,7 @@
     {
       "id": "csv_sum_col",
       "title": "Sum CSV second column",
+      "band": "b",
       "prompt": "Input is zero or more 0x0A-separated lines of the form name,value where value is a non-negative decimal integer < 1000000; empty lines must be ignored. Output the sum of the value column as decimal ASCII, no trailing newline.",
       "vectors": [
         {
@@ -219,6 +229,7 @@
     {
       "id": "reverse_lines",
       "title": "Reverse line order",
+      "band": "a",
       "prompt": "Split input on 0x0A newlines into lines (a trailing newline does not create a final empty line). Output the lines in reverse order, each followed by 0x0A. Empty input produces empty output.",
       "vectors": [
         {
@@ -238,6 +249,7 @@
     {
       "id": "second_largest",
       "title": "Second largest distinct integer",
+      "band": "b",
       "prompt": "Input is non-negative decimal integers (< 1000000) separated by ASCII whitespace, containing at least two distinct values. Output the second-largest DISTINCT value as decimal ASCII, no trailing newline.",
       "vectors": [
         {
@@ -251,6 +263,450 @@
         {
           "input": "10\n9 10",
           "expected": "9"
+        }
+      ]
+    },
+    {
+      "id": "rot13",
+      "title": "ROT13 letters",
+      "band": "a",
+      "prompt": "Read all input bytes. Apply ROT13 to ASCII letters (a-z and A-Z rotate by 13 within their case); every other byte passes through unchanged.",
+      "vectors": [
+        {
+          "input": "Hello, World!",
+          "expected": "Uryyb, Jbeyq!"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "abc xyz",
+          "expected": "nop klm"
+        },
+        {
+          "input": "n N z Z",
+          "expected": "a A m M"
+        }
+      ]
+    },
+    {
+      "id": "swap_case",
+      "title": "Swap ASCII case",
+      "band": "a",
+      "prompt": "Read all input bytes. Swap the case of ASCII letters (a-z -> A-Z and A-Z -> a-z); every other byte passes through unchanged.",
+      "vectors": [
+        {
+          "input": "Hello World 123",
+          "expected": "hELLO wORLD 123"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "aA bB",
+          "expected": "Aa Bb"
+        },
+        {
+          "input": "Mixed CaSe!",
+          "expected": "mIXED cAsE!"
+        }
+      ]
+    },
+    {
+      "id": "strip_trailing_spaces",
+      "title": "Strip trailing line whitespace",
+      "band": "a",
+      "prompt": "Split input on 0x0A newlines into lines (a trailing newline does not create a final empty line; a missing trailing newline still ends a final line). Remove trailing spaces (0x20) and tabs (0x09) from each line. Output each stripped line followed by 0x0A. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "a  \nb\t \n",
+          "expected": "a\nb\n"
+        },
+        {
+          "input": "hello   ",
+          "expected": "hello\n"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "x\n   \ny",
+          "expected": "x\n\ny\n"
+        }
+      ]
+    },
+    {
+      "id": "collapse_spaces",
+      "title": "Collapse space runs",
+      "band": "a",
+      "prompt": "Read all input bytes. Replace every maximal run of one or more 0x20 space bytes with a single 0x20 space. All other bytes pass through unchanged.",
+      "vectors": [
+        {
+          "input": "a   b  c",
+          "expected": "a b c"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "  x  ",
+          "expected": " x "
+        },
+        {
+          "input": "no  doubles\nhere   too",
+          "expected": "no doubles\nhere too"
+        }
+      ]
+    },
+    {
+      "id": "byte_count",
+      "title": "Count bytes",
+      "band": "a",
+      "prompt": "Read all input bytes. Output the total number of input bytes as decimal ASCII digits with no trailing newline.",
+      "vectors": [
+        {
+          "input": "hello",
+          "expected": "5"
+        },
+        {
+          "input": "",
+          "expected": "0"
+        },
+        {
+          "input": "a\nb\n",
+          "expected": "4"
+        },
+        {
+          "input": "x",
+          "expected": "1"
+        }
+      ]
+    },
+    {
+      "id": "remove_vowels",
+      "title": "Remove ASCII vowels",
+      "band": "a",
+      "prompt": "Read all input bytes. Output the same bytes with every ASCII vowel removed (a, e, i, o, u in both lower and upper case). All other bytes pass through unchanged.",
+      "vectors": [
+        {
+          "input": "hello world",
+          "expected": "hll wrld"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "AEIOU xyz",
+          "expected": " xyz"
+        },
+        {
+          "input": "bcd",
+          "expected": "bcd"
+        }
+      ]
+    },
+    {
+      "id": "sort_ints",
+      "title": "Sort integers",
+      "band": "b",
+      "prompt": "Input is zero or more non-negative decimal integers (< 1000000) separated by ASCII whitespace. Output the integers sorted ascending, separated by single 0x20 spaces, no trailing newline. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "3 1 2",
+          "expected": "1 2 3"
+        },
+        {
+          "input": "10\n5 20",
+          "expected": "5 10 20"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "7",
+          "expected": "7"
+        },
+        {
+          "input": "5 5 1",
+          "expected": "1 5 5"
+        }
+      ]
+    },
+    {
+      "id": "unique_sorted",
+      "title": "Unique sorted integers",
+      "band": "b",
+      "prompt": "Input is zero or more non-negative decimal integers (< 1000000) separated by ASCII whitespace. Output the DISTINCT integers sorted ascending, separated by single 0x20 spaces, no trailing newline. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "3 1 2 1 3",
+          "expected": "1 2 3"
+        },
+        {
+          "input": "5 5 5",
+          "expected": "5"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "9 1 9 2",
+          "expected": "1 2 9"
+        }
+      ]
+    },
+    {
+      "id": "mode_int",
+      "title": "Most frequent integer",
+      "band": "b",
+      "prompt": "Input is one or more non-negative decimal integers (< 1000000) separated by ASCII whitespace. Output the most frequently occurring integer as decimal ASCII, no trailing newline; break frequency ties by the smallest value.",
+      "vectors": [
+        {
+          "input": "1 2 2 3",
+          "expected": "2"
+        },
+        {
+          "input": "5 5 1 1",
+          "expected": "1"
+        },
+        {
+          "input": "7",
+          "expected": "7"
+        },
+        {
+          "input": "3 3 2 2 2 9",
+          "expected": "2"
+        }
+      ]
+    },
+    {
+      "id": "running_sum",
+      "title": "Running sum",
+      "band": "b",
+      "prompt": "Input is zero or more non-negative decimal integers (< 1000000) separated by ASCII whitespace. Output the cumulative running sum: after reading each integer, output the sum so far as decimal ASCII followed by 0x0A. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "1 2 3",
+          "expected": "1\n3\n6\n"
+        },
+        {
+          "input": "5",
+          "expected": "5\n"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "10 0 5",
+          "expected": "10\n10\n15\n"
+        }
+      ]
+    },
+    {
+      "id": "int_histogram",
+      "title": "Integer histogram",
+      "band": "b",
+      "prompt": "Input is zero or more non-negative decimal integers (< 1000000) separated by ASCII whitespace. For each DISTINCT value in ascending order, output 'value:count' (value decimal, a single 0x3A colon, count decimal) followed by 0x0A. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "1 1 2",
+          "expected": "1:2\n2:1\n"
+        },
+        {
+          "input": "5",
+          "expected": "5:1\n"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "3 3 3 1",
+          "expected": "1:1\n3:3\n"
+        }
+      ]
+    },
+    {
+      "id": "deframe_u32le",
+      "title": "Decode length-prefixed frames",
+      "band": "c",
+      "prompt": "Input is zero or more frames concatenated. Each frame is a 4-byte little-endian u32 length L followed by exactly L payload bytes. The input is well-formed (no truncation). Output each frame's payload followed by 0x0A, in order. Empty input produces empty output.",
+      "vectors": [
+        {
+          "input": "\u0002\u0000\u0000\u0000ab\u0001\u0000\u0000\u0000c",
+          "expected": "ab\nc\n"
+        },
+        {
+          "input": "\u0003\u0000\u0000\u0000hey",
+          "expected": "hey\n"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "\u0000\u0000\u0000\u0000",
+          "expected": "\n"
+        }
+      ]
+    },
+    {
+      "id": "base64_encode",
+      "title": "Base64 encode",
+      "band": "c",
+      "prompt": "Read all input bytes. Output their standard Base64 encoding (RFC 4648, alphabet A-Za-z0-9+/, with '=' padding), no trailing newline.",
+      "vectors": [
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "f",
+          "expected": "Zg=="
+        },
+        {
+          "input": "fo",
+          "expected": "Zm8="
+        },
+        {
+          "input": "foo",
+          "expected": "Zm9v"
+        },
+        {
+          "input": "hello",
+          "expected": "aGVsbG8="
+        }
+      ]
+    },
+    {
+      "id": "base64_decode",
+      "title": "Base64 decode",
+      "band": "c",
+      "prompt": "Input is a valid standard Base64 string (RFC 4648, with '=' padding, no whitespace). Output the decoded raw bytes.",
+      "vectors": [
+        {
+          "input": "Zm9v",
+          "expected": "foo"
+        },
+        {
+          "input": "aGVsbG8=",
+          "expected": "hello"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "Zg==",
+          "expected": "f"
+        }
+      ]
+    },
+    {
+      "id": "hex_encode",
+      "title": "Hex encode",
+      "band": "c",
+      "prompt": "Read all input bytes. Output their lowercase hexadecimal encoding (two hex digits per byte, 0-9a-f), no trailing newline.",
+      "vectors": [
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "A",
+          "expected": "41"
+        },
+        {
+          "input": "hi",
+          "expected": "6869"
+        },
+        {
+          "input": "hello",
+          "expected": "68656c6c6f"
+        },
+        {
+          "input": "0",
+          "expected": "30"
+        }
+      ]
+    },
+    {
+      "id": "hex_decode",
+      "title": "Hex decode",
+      "band": "c",
+      "prompt": "Input is an even-length lowercase hexadecimal string (0-9a-f, no whitespace). Output the decoded raw bytes.",
+      "vectors": [
+        {
+          "input": "41",
+          "expected": "A"
+        },
+        {
+          "input": "6869",
+          "expected": "hi"
+        },
+        {
+          "input": "",
+          "expected": ""
+        },
+        {
+          "input": "68656c6c6f",
+          "expected": "hello"
+        }
+      ]
+    },
+    {
+      "id": "crc32",
+      "title": "CRC-32 checksum",
+      "band": "c",
+      "prompt": "Compute the CRC-32 (IEEE 802.3 / zlib variant: polynomial 0xEDB88320, initial value 0xFFFFFFFF, final XOR 0xFFFFFFFF, reflected) of all input bytes. Output the 32-bit result as decimal ASCII, no trailing newline.",
+      "vectors": [
+        {
+          "input": "",
+          "expected": "0"
+        },
+        {
+          "input": "a",
+          "expected": "3904355907"
+        },
+        {
+          "input": "hello",
+          "expected": "907060870"
+        },
+        {
+          "input": "x07",
+          "expected": "3260576518"
+        }
+      ]
+    },
+    {
+      "id": "json_array_len",
+      "title": "JSON array length",
+      "band": "c",
+      "prompt": "Input is a single well-formed JSON array (the top-level value is an array). Output the number of top-level elements as decimal ASCII, no trailing newline. Elements may be any JSON value; nesting and whitespace vary.",
+      "vectors": [
+        {
+          "input": "[1,2,3]",
+          "expected": "3"
+        },
+        {
+          "input": "[]",
+          "expected": "0"
+        },
+        {
+          "input": "[\"a\", [1,2], {\"x\":1}]",
+          "expected": "3"
+        },
+        {
+          "input": "[ 1 , 2 ]",
+          "expected": "2"
         }
       ]
     }
