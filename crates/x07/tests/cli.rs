@@ -10638,6 +10638,34 @@ fn x07_doc_supports_stdlib_modules_and_symbols() {
 }
 
 #[test]
+fn x07_doc_keyword_surfaces_stdlib_modules() {
+    // A bare keyword like `map` is not an exact module id, but it should not be
+    // a dead end: `x07 doc` must surface matching `std.`-prefixed modules so an
+    // agent can discover the container APIs without already knowing their ids.
+    // Regression guard for two gaps: builtin suggestions matched `starts_with`
+    // only (so `std.*` modules never matched an unqualified keyword), and the
+    // text path discarded the suggestions the JSON path computed.
+    let dir = fresh_os_tmp_dir("x07_doc_keyword");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let out = run_x07_in_dir(&dir, &["doc", "map"]);
+    assert_ne!(
+        out.status.code(),
+        Some(0),
+        "a keyword query is still not an exact match (should fail)"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("did you mean:"),
+        "expected a discovery hint; stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("std.btree_map") && stderr.contains("std.hash_map"),
+        "keyword `map` should surface std.btree_map and std.hash_map; stderr:\n{stderr}"
+    );
+}
+
+#[test]
 fn x07_doc_supports_stdlib_os_modules() {
     let dir = fresh_os_tmp_dir("x07_doc_stdlib_os");
     std::fs::create_dir_all(&dir).expect("create temp dir");

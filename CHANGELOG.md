@@ -19,6 +19,14 @@ All notable user-facing changes to the X07 toolchain are documented in this file
 
 ### Fixed
 
+- `x07 doc <keyword>` is now a discovery surface instead of a dead end. An
+  unqualified query like `map`, `hash`, or `btree` surfaces matching modules
+  (`std.btree_map`, `std.hash_map`, `std.hash_set`, …) on stderr as "did you
+  mean" candidates. Two gaps are fixed: builtin-module suggestions matched only
+  a `starts_with` prefix (so `std.`-prefixed modules never matched an
+  unqualified keyword), and the text path discarded the suggestions the `--json`
+  path already computed. The MCP `x07.doc_v1` tool, which wraps `x07 doc`,
+  inherits the improvement.
 - `x07 test` now hints the expected module file when a test entry cannot be
   resolved: the `ETEST_ENTRY_INVALID` "not found under the resolved module roots"
   error names the expected `<module_id>.x07.json` file and notes that a module's

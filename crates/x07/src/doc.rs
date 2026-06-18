@@ -653,6 +653,27 @@ fn cmd_doc_text(args: DocArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
+    // Discovery aid: a bare query is often a keyword (`map`, `hash`, `parse`),
+    // not an exact module id. Surface matching modules/symbols on stderr so the
+    // text path is a discovery surface, not a dead end — the JSON path already
+    // returns these as structured suggestions.
+    let ctx = DocContext {
+        cwd: cwd.clone(),
+        project_path: project_path.clone(),
+        module_roots: module_roots.clone(),
+        module_roots_with_source: Vec::new(),
+    };
+    let mut suggestions = default_not_found_suggestions(query, &ctx);
+    suggestions.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.query.cmp(&b.query)));
+    suggestions.dedup_by(|a, b| a.kind == b.kind && a.query == b.query);
+    suggestions.truncate(20);
+    if !suggestions.is_empty() {
+        eprintln!("note: no exact match for {query:?}; did you mean:");
+        for s in &suggestions {
+            eprintln!("  {}", s.query);
+        }
+    }
+
     anyhow::bail!("module/symbol not found: {query}");
 }
 
@@ -1263,7 +1284,12 @@ fn default_not_found_suggestions(query: &str, ctx: &DocContext) -> Vec<DocSugges
         }
     }
     for module_id in x07c::builtin_modules::builtin_module_ids() {
-        if module_id.starts_with(query) {
+        // `contains` (not just `starts_with`) so a bare keyword like `map` or
+        // `hash` surfaces `std.btree_map`, `std.hash_map`, `std.hash_set`, etc.
+        // — builtin module ids are `std.`-prefixed, so prefix-only matching
+        // never finds them from an unqualified query. Mirrors the project-module
+        // branch above.
+        if module_id.contains(query) {
             out.push(DocSuggestion {
                 query: (*module_id).to_string(),
                 kind: DocSuggestionKind::Module,
